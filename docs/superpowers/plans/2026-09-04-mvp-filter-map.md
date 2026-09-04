@@ -1306,8 +1306,9 @@ export function generateStaticParams() {
   return SPOTS.map((spot) => ({ slug: spot.id }));
 }
 
-export default function SpotDetailPage({ params }: { params: { slug: string } }) {
-  const spot = SPOTS.find((s) => s.id === params.slug);
+export default async function SpotDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const spot = SPOTS.find((s) => s.id === slug);
   if (!spot) notFound();
 
   const related = getRelatedSpots(SPOTS, spot, 3);
