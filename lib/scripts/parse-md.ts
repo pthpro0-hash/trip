@@ -14,13 +14,13 @@ const BULLET = /^\s*-\s+(.+)$/;
 
 const THEME_RULES: [RegExp, Theme][] = [
   [/궁|종묘|서원|향교|읍성|유적|왕릉|고분|사찰|법주사|통도사|쌍계사|불국사|석굴암|현충사|향교/, "역사유적"],
-  [/해수욕장|해변|바다|갯벌|해안/, "해변"],
-  [/산|봉|계곡|폭포|국립공원|휴양림|숲|자작나무|습지|늪|계곡/, "자연경관"],
-  [/워터파크|놀이공원|테마파크|랜드|에버랜드/, "테마파크"],
+  [/해수욕장|해변|갯벌|해안|바닷가/, "해변"],
+  [/(?<!유)산(?!책)|봉|계곡|폭포|국립공원|휴양림|숲|자작나무|습지|늪|계곡/, "자연경관"],
+  [/워터파크|놀이공원|테마파크|(?<!그)랜드(?!마크)|에버랜드/, "테마파크"],
   [/야경|전망대|타워|스카이|일몰|일출/, "야경"],
   [/민속촌|한옥마을|장터|시장|전통마을/, "체험마을"],
   [/수목원|정원|식물원|화원/, "정원"],
-  [/섬(?!사람)/, "섬"],
+  [/(?<!뚝)섬(?!사람|진강)/, "섬"],
 ];
 
 export function slugify(name: string): string {
@@ -53,8 +53,8 @@ function splitCommaList(raw: string): string[] {
   return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-function deriveThemes(name: string, summary: string, highlights: string[]): Theme[] {
-  const text = [name, summary, highlights.join(" ")].join(" ");
+function deriveThemes(name: string, highlights: string[]): Theme[] {
+  const text = [name, highlights.join(" ")].join(" ");
   const themes = THEME_RULES.filter(([pattern]) => pattern.test(text)).map(([, theme]) => theme);
   return Array.from(new Set(themes));
 }
@@ -96,7 +96,7 @@ export function parseMarkdown(source: string): Spot[] {
       seasonNote: current.seasonNote,
       specialty: current.specialty ?? [],
       foods: current.foods ?? [],
-      themes: deriveThemes(current.name, current.summary ?? "", current.highlights),
+      themes: deriveThemes(current.name, current.highlights),
     });
     current = null;
   };
