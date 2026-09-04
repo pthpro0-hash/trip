@@ -1,0 +1,42 @@
+import type { Spot, Region, Season, Theme } from "./types";
+
+export interface FilterCriteria {
+  regions?: Region[];
+  seasons?: Season[];
+  themes?: Theme[];
+}
+
+export function filterSpots(spots: Spot[], criteria: FilterCriteria): Spot[] {
+  return spots.filter((spot) => {
+    if (criteria.regions?.length && !criteria.regions.includes(spot.region)) return false;
+    if (criteria.seasons?.length && !spot.seasons.some((s) => criteria.seasons!.includes(s))) {
+      return false;
+    }
+    if (criteria.themes?.length && !spot.themes.some((t) => criteria.themes!.includes(t))) {
+      return false;
+    }
+    return true;
+  });
+}
+
+export interface RelaxationSuggestion {
+  relaxed: "regions" | "seasons" | "themes";
+  count: number;
+}
+
+export function suggestRelaxedFilters(
+  spots: Spot[],
+  criteria: FilterCriteria,
+): RelaxationSuggestion[] {
+  const keys: RelaxationSuggestion["relaxed"][] = ["regions", "seasons", "themes"];
+  const suggestions: RelaxationSuggestion[] = [];
+
+  for (const key of keys) {
+    if (!criteria[key]?.length) continue;
+    const relaxed: FilterCriteria = { ...criteria, [key]: undefined };
+    const count = filterSpots(spots, relaxed).length;
+    if (count > 0) suggestions.push({ relaxed: key, count });
+  }
+
+  return suggestions.sort((a, b) => a.count - b.count);
+}
