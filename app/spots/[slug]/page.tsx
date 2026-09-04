@@ -15,8 +15,15 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
   const { slug } = await params;
   // Next.js passes the raw (percent-encoded) path segment here rather than a
   // decoded string, so non-ASCII ids (e.g. Korean spot names) never match
-  // `spot.id` without an explicit decode first.
-  const decodedSlug = decodeURIComponent(slug);
+  // `spot.id` without an explicit decode first. A malformed percent-sequence
+  // (e.g. a bare "%") makes decodeURIComponent throw, so guard it and treat
+  // that the same as an unknown slug instead of letting it crash the render.
+  let decodedSlug: string;
+  try {
+    decodedSlug = decodeURIComponent(slug);
+  } catch {
+    notFound();
+  }
   const spot = SPOTS.find((s) => s.id === decodedSlug);
   if (!spot) notFound();
 
