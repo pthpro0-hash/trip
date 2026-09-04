@@ -205,3 +205,76 @@ describe("deriveThemes 오탐(false positive) 회귀 테스트", () => {
     expect(spot.themes).toContain("섬");
   });
 });
+
+const MOUNTAIN_COMPOUND_FALSE_POSITIVE_FIXTURE = `## 경상권 (4곳)
+
+### 부산엑스더스카이 & 그린레일웨이
+- **위도, 경도**: 35.1600, 129.1600
+- **요약**: 해운대 전망대와 해안 철길.
+- **꼭 볼 것**:
+  - 엑스더스카이 전망대
+  - 그린레일웨이
+  - 해운대 야경
+- **추천 계절**: 사계절
+- **특산물**: 부산 어묵
+- **대표 음식**: 회, 돼지국밥
+
+### 속초 관광수산시장
+- **위도, 경도**: 38.2070, 128.5940
+- **요약**: 동해안 대표 수산시장.
+- **꼭 볼 것**:
+  - 활어 회센터
+  - 중앙시장
+- **추천 계절**: 사계절
+- **특산물**: 속초 오징어
+- **대표 음식**: 오징어순대, 활어회
+
+### 공주 백제 유적 (공산성·무령왕릉)
+- **위도, 경도**: 36.4500, 127.1200
+- **요약**: 백제의 왕도였던 공주의 유적.
+- **꼭 볼 것**:
+  - 공산성
+  - 무령왕릉
+- **추천 계절**: 봄·가을
+- **특산물**: 공주 밤
+- **대표 음식**: 밤요리, 올갱이국
+
+### 부여 백제 유적 (부소산성·궁남지)
+- **위도, 경도**: 36.2800, 126.9100
+- **요약**: 백제의 마지막 수도 부여의 유적.
+- **꼭 볼 것**:
+  - 부소산성
+  - 궁남지
+- **추천 계절**: 봄·가을
+- **특산물**: 부여 연꽃
+- **대표 음식**: 연잎밥, 올갱이국
+`;
+
+describe("deriveThemes 복합어 속 '산' 오탐 회귀 테스트 (부산/수산시장/산성)", () => {
+  const spots = parseMarkdown(MOUNTAIN_COMPOUND_FALSE_POSITIVE_FIXTURE);
+  const byName = (name: string) => {
+    const spot = spots.find((s) => s.name === name);
+    if (!spot) throw new Error(`fixture에 없는 이름: ${name}`);
+    return spot;
+  };
+
+  it("'부산'은 자연경관으로 오탐하지 않는다", () => {
+    const spot = byName("부산엑스더스카이 & 그린레일웨이");
+    expect(spot.themes).not.toContain("자연경관");
+  });
+
+  it("'관광수산시장'은 자연경관으로 오탐하지 않는다", () => {
+    const spot = byName("속초 관광수산시장");
+    expect(spot.themes).not.toContain("자연경관");
+  });
+
+  it("'공산성'은 자연경관으로 오탐하지 않는다", () => {
+    const spot = byName("공주 백제 유적 (공산성·무령왕릉)");
+    expect(spot.themes).not.toContain("자연경관");
+  });
+
+  it("'부소산성'은 자연경관으로 오탐하지 않는다", () => {
+    const spot = byName("부여 백제 유적 (부소산성·궁남지)");
+    expect(spot.themes).not.toContain("자연경관");
+  });
+});
