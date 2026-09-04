@@ -11,3 +11,10 @@
 ## 테스트
 
 `npm test`
+
+## 배포 (Vercel)
+
+1. https://vercel.com 에서 이 저장소를 New Project로 가져온다.
+2. 프로젝트 환경변수에 `NEXT_PUBLIC_KAKAO_MAP_KEY`를 추가한다.
+3. 카카오 개발자 콘솔의 Web 플랫폼 목록에 Vercel 배포 도메인(예: `https://<project>.vercel.app`)을 추가로 등록한다.
+4. Deploy.
