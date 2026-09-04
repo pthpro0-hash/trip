@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { filterSpots, suggestRelaxedFilters } from "./filter";
-import type { Spot } from "./types";
+import type { Spot, Region, Season, Theme } from "./types";
 
 const SPOTS: Spot[] = [
   {
@@ -44,13 +44,13 @@ describe("filterSpots", () => {
 
 describe("suggestRelaxedFilters", () => {
   it("결과가 0건일 때 완화 가능한 조건과 예상 건수를 제안한다", () => {
-    const criteria = { regions: ["경상권"] as const, seasons: ["가을"] as const, themes: ["역사유적"] as const };
+    const criteria = { regions: ["경상권"] as Region[], seasons: ["가을"] as Season[], themes: ["역사유적"] as Theme[] };
     const suggestions = suggestRelaxedFilters(SPOTS, criteria);
     expect(suggestions.find((s) => s.relaxed === "themes")?.count).toBe(1);
   });
 
   it("완화해도 0건이면 제안 목록에서 제외한다", () => {
-    const criteria = { regions: ["제주권"] as const, themes: ["역사유적"] as const };
+    const criteria = { regions: ["제주권"] as Region[], themes: ["역사유적"] as Theme[] };
     const suggestions = suggestRelaxedFilters(SPOTS, criteria);
     expect(suggestions.every((s) => s.count > 0)).toBe(true);
   });
