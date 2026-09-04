@@ -3,7 +3,12 @@
 import { useMemo, useState } from "react";
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
-import { filterSpots, suggestRelaxedFilters, type FilterCriteria } from "@/lib/filter";
+import {
+  filterSpots,
+  suggestRelaxedFilters,
+  type FilterCriteria,
+  type RelaxationSuggestion,
+} from "@/lib/filter";
 import { FilterBar } from "@/components/filter/FilterBar";
 import { SpotCard } from "@/components/spot/SpotCard";
 import { KakaoMap } from "@/components/map/KakaoMap";
@@ -11,7 +16,7 @@ import { ViewToggle } from "@/components/layout/ViewToggle";
 
 const SPOTS = spotsData as Spot[];
 
-const RELAX_LABEL: Record<"regions" | "seasons" | "themes", string> = {
+const RELAX_LABEL: Record<RelaxationSuggestion["relaxed"], string> = {
   regions: "권역",
   seasons: "계절",
   themes: "테마",
@@ -35,7 +40,7 @@ export default function HomePage() {
       <ViewToggle value={mobileView} onChange={setMobileView} />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className={`flex flex-col gap-2 ${mobileView === "map" ? "hidden md:flex" : ""}`}>
+        <div className={`${mobileView === "map" ? "hidden md:flex" : "flex"} flex-col gap-2`}>
           {results.length === 0 ? (
             <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
               조건에 맞는 곳이 없어요.
