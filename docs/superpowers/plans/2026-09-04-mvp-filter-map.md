@@ -9,7 +9,9 @@
 JSON(`lib/data/spots.json`)을 소스로 SSG하고, 필터링은 전부 클라이언트에서 순수 함수로
 처리한다. 지도는 카카오맵 JS SDK를 스크립트 태그로 로드한다.
 
-**Tech Stack:** Next.js 15(App Router), React, TypeScript, Tailwind CSS, Vitest +
+**Tech Stack:** Next.js 15+(App Router — implemented against `create-next-app@latest`, which
+resolved to 16.3.4; the async-`params` API this plan relies on was introduced in 15 and carries
+forward unchanged in 16), React, TypeScript, Tailwind CSS, Vitest +
 Testing Library(단위/컴포넌트 테스트), tsx(마크다운 파싱 스크립트 실행), Kakao Maps JS SDK,
 Vercel(배포).
 
