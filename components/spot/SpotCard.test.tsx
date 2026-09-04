@@ -22,4 +22,10 @@ describe("SpotCard", () => {
     fireEvent.click(screen.getByRole("button"));
     expect(onSelect).toHaveBeenCalledWith("gyeongbokgung");
   });
+
+  it("상세 페이지로 이동하는 링크를 포함한다", () => {
+    render(<SpotCard spot={SPOT} selected={false} onSelect={() => {}} />);
+    const link = screen.getByRole("link", { name: /자세히 보기/ });
+    expect(link).toHaveAttribute("href", "/spots/gyeongbokgung");
+  });
 });
