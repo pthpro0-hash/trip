@@ -193,7 +193,9 @@ git commit -m "chore: Next.js 프로젝트 스캐폴딩 및 테스트 환경 구
 - Create: `lib/data/spots.json` (생성 결과물, Step 6에서 생성)
 
 **Interfaces:**
-- Produces: `Spot`, `Region`, `Season`, `Theme` 타입 (`lib/types.ts`). `parseMarkdown(source: string): Spot[]` 함수 (`lib/scripts/parse-md.ts`). `lib/data/spots.json`은 `Spot[]` 100건.
+- Produces: `Spot`, `Region`, `Season`, `Theme` 타입 (`lib/types.ts`). `parseMarkdown(source: string): Spot[]` 함수 (`lib/scripts/parse-md.ts`). `lib/data/spots.json`은 `Spot[]` 98건 (원본 소스 파일 자체에 수도권 1곳, 경상권 1곳이 누락되어 있음 — 아래 참고).
+
+**데이터 건수에 대한 노트**: 원본 마크다운의 지역 헤더는 "수도권 (22곳)", "경상권 (28곳)"이라 적혀 있지만, 실제 본문 `###` 항목은 각각 21개, 27개뿐이다(다른 4개 지역은 라벨과 일치). 즉 소스 파일 자체가 100건이 아니라 98건을 담고 있다. 데이터를 조작하거나 항목을 지어내지 않고, 있는 그대로 98건으로 진행한다(사용자 확인 완료). 아래 모든 "100건/100곳" 관련 테스트와 로그 기대값은 98로 조정되어 있다. 누락된 2곳은 이후 소스가 보완되면 `data/source/tour-100-2025-2026.md`만 교체하고 파서를 재실행하면 되는 구조다.
 
 - [ ] **Step 1: 타입 정의**
 
@@ -550,7 +552,7 @@ Expected: 8 passed
 npx tsx lib/scripts/parse-md.ts
 ```
 
-Expected 출력: `Parsed 100 spots -> .../lib/data/spots.json`
+Expected 출력: `Parsed 98 spots -> .../lib/data/spots.json` (원본 소스 자체가 98건이므로 100이 아닌 98이 정상 — 위 "데이터 건수에 대한 노트" 참고)
 
 - [ ] **Step 8: 생성 결과 데이터 무결성 테스트**
 
@@ -563,8 +565,8 @@ import type { Spot } from "../types";
 describe("spots.json", () => {
   const typed = spots as Spot[];
 
-  it("정확히 100건이다", () => {
-    expect(typed).toHaveLength(100);
+  it("정확히 98건이다 (원본 소스 파일이 실제로 담고 있는 건수)", () => {
+    expect(typed).toHaveLength(98);
   });
 
   it("모든 항목이 필수 필드를 가진다", () => {
@@ -1372,8 +1374,8 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
 - [ ] **Step 6: 빌드로 정적 라우트 생성 확인**
 
 Run: `npm run build`
-Expected: 빌드 성공, `/spots/[slug]`가 100개 정적 페이지로 생성되었다는 로그 출력 (예:
-`● /spots/[slug]` 아래 100개 경로 목록 또는 "100 paths" 요약)
+Expected: 빌드 성공, `/spots/[slug]`가 98개 정적 페이지로 생성되었다는 로그 출력 (예:
+`● /spots/[slug]` 아래 98개 경로 목록 또는 "98 paths" 요약)
 
 - [ ] **Step 7: Commit**
 
@@ -1528,7 +1530,7 @@ Expected: 에러 없이 빌드 성공
 - [ ] **Step 3: 로컬 개발 서버로 전체 시나리오 수동 확인**
 
 Run: `npm run dev`, 브라우저에서 아래를 순서대로 확인한다.
-1. 메인 페이지 로드 시 100곳이 모두 리스트/지도에 표시되는지
+1. 메인 페이지 로드 시 98곳이 모두 리스트/지도에 표시되는지
 2. "경상권" + "가을" 필터를 선택했을 때 리스트와 지도 마커가 함께 줄어드는지
 3. 결과가 0건이 되는 조합(예: "제주권" + "겨울" + "테마파크")을 선택했을 때 완화 제안 문구가
    보이는지
