@@ -8,7 +8,7 @@ import SpotDetailPage from "./page";
 // async function and the resulting JSX rendered with Testing Library.
 describe("SpotDetailPage", () => {
   it("유효한 한글 slug는 해당 관광지 정보를 렌더링한다", async () => {
-    const jsx = await SpotDetailPage({ params: Promise.resolve({ slug: "경복궁" }) });
+    const jsx = await SpotDetailPage({ params: Promise.resolve({ slug: encodeURIComponent("경복궁") }) });
     render(jsx);
     expect(screen.getByRole("heading", { level: 1, name: "경복궁" })).toBeTruthy();
   });
