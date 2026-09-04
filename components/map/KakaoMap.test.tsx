@@ -7,4 +7,9 @@ describe("KakaoMap", () => {
     const { container } = render(<KakaoMap spots={[]} />);
     expect(container.querySelector("div")).toBeTruthy();
   });
+
+  it("API 키가 없으면 안내 메시지를 표시한다", () => {
+    const { getByText } = render(<KakaoMap spots={[]} />);
+    expect(getByText("지도를 보려면 카카오맵 키 설정이 필요합니다")).toBeTruthy();
+  });
 });
