@@ -13,7 +13,11 @@ export function generateStaticParams() {
 
 export default async function SpotDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const spot = SPOTS.find((s) => s.id === slug);
+  // Next.js passes the raw (percent-encoded) path segment here rather than a
+  // decoded string, so non-ASCII ids (e.g. Korean spot names) never match
+  // `spot.id` without an explicit decode first.
+  const decodedSlug = decodeURIComponent(slug);
+  const spot = SPOTS.find((s) => s.id === decodedSlug);
   if (!spot) notFound();
 
   const related = getRelatedSpots(SPOTS, spot, 3);
