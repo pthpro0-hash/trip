@@ -23,6 +23,16 @@ const SPOT: Spot = {
 // constructed with is enough to assert on center/level without a real SDK.
 function stubKakao() {
   const mapCalls: { center: { lat: number; lng: number }; level: number }[] = [];
+  const markerCalls: { position: { lat: number; lng: number }; image?: unknown }[] = [];
+  const overlayCalls: {
+    position: { lat: number; lng: number };
+    content: HTMLElement;
+    setMapCalls: unknown[];
+  }[] = [];
+  // Marker click listeners registered via event.addListener, keyed by the
+  // marker object they were registered on, so tests can invoke them directly.
+  const markerListeners = new Map<unknown, () => void>();
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test stub mirrors the untyped Kakao SDK
   (window as any).kakao = {
     maps: {
@@ -40,13 +50,40 @@ function stubKakao() {
         mapCalls.push(options);
         return {};
       },
-      Marker: function () {
-        return { setMap: () => {} };
+      Marker: function (options: { position: { lat: number; lng: number }; image?: unknown }) {
+        markerCalls.push(options);
+        const marker = { setMap: () => {} };
+        return marker;
       },
-      event: { addListener: () => {} },
+      MarkerImage: function (src: string, size: unknown, opts: unknown) {
+        return { src, size, opts };
+      },
+      Size: function (width: number, height: number) {
+        return { width, height };
+      },
+      Point: function (x: number, y: number) {
+        return { x, y };
+      },
+      CustomOverlay: function (options: {
+        position: { lat: number; lng: number };
+        content: HTMLElement;
+      }) {
+        const setMapCalls: unknown[] = [];
+        const overlay = {
+          ...options,
+          setMap: (map: unknown) => setMapCalls.push(map),
+        };
+        overlayCalls.push({ ...options, setMapCalls });
+        return overlay;
+      },
+      event: {
+        addListener: (marker: unknown, _event: string, cb: () => void) => {
+          markerListeners.set(marker, cb);
+        },
+      },
     },
   };
-  return mapCalls;
+  return { mapCalls, markerCalls, overlayCalls, markerListeners };
 }
 
 // next/script renders a real <script> tag and relies on browser load/error
@@ -106,7 +143,7 @@ describe("KakaoMap", () => {
 
   it("관광지가 1곳이면 그 위치로 클로즈업해서 초기화한다", () => {
     vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "single-spot-key");
-    const mapCalls = stubKakao();
+    const { mapCalls } = stubKakao();
 
     render(<KakaoMap spots={[SPOT]} />);
     act(() => {
@@ -119,7 +156,7 @@ describe("KakaoMap", () => {
 
   it("관광지가 여러 곳이면 전국이 보이는 기본 뷰로 초기화한다", () => {
     vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "multi-spot-key");
-    const mapCalls = stubKakao();
+    const { mapCalls } = stubKakao();
 
     render(<KakaoMap spots={[SPOT, { ...SPOT, id: "changdeokgung" }]} />);
     act(() => {
@@ -128,5 +165,72 @@ describe("KakaoMap", () => {
 
     expect(mapCalls).toHaveLength(1);
     expect(mapCalls[0]).toEqual({ center: { lat: 36.5, lng: 127.8 }, level: 13 });
+  });
+
+  it("관광지가 1곳이면 작은 마커 이미지를 사용한다", () => {
+    vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "single-marker-key");
+    const { markerCalls } = stubKakao();
+
+    render(<KakaoMap spots={[SPOT]} />);
+    act(() => {
+      scriptProps.at(-1)?.onReady?.();
+    });
+
+    expect(markerCalls).toHaveLength(1);
+    expect(markerCalls[0].image).toBeTruthy();
+  });
+
+  it("관광지가 여러 곳이면 기본 마커 이미지를 사용한다(커스텀 이미지 없음)", () => {
+    vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "multi-marker-key");
+    const { markerCalls } = stubKakao();
+
+    render(<KakaoMap spots={[SPOT, { ...SPOT, id: "changdeokgung" }]} />);
+    act(() => {
+      scriptProps.at(-1)?.onReady?.();
+    });
+
+    expect(markerCalls).toHaveLength(2);
+    expect(markerCalls[0].image).toBeUndefined();
+    expect(markerCalls[1].image).toBeUndefined();
+  });
+
+  it("마커를 클릭하면 해당 위치에 CustomOverlay 팝업이 열린다", () => {
+    vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "overlay-open-key");
+    const { overlayCalls, markerListeners } = stubKakao();
+
+    render(<KakaoMap spots={[SPOT]} />);
+    act(() => {
+      scriptProps.at(-1)?.onReady?.();
+    });
+
+    const [marker] = markerListeners.keys();
+    act(() => {
+      markerListeners.get(marker)?.();
+    });
+
+    expect(overlayCalls).toHaveLength(1);
+    expect(overlayCalls[0].position).toEqual({ lat: SPOT.lat, lng: SPOT.lng });
+    expect(overlayCalls[0].content.textContent).toContain(SPOT.name);
+  });
+
+  it("같은 마커를 다시 클릭하면 팝업이 닫힌다", () => {
+    vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "overlay-toggle-key");
+    const { overlayCalls, markerListeners } = stubKakao();
+
+    render(<KakaoMap spots={[SPOT]} />);
+    act(() => {
+      scriptProps.at(-1)?.onReady?.();
+    });
+
+    const [marker] = markerListeners.keys();
+    act(() => {
+      markerListeners.get(marker)?.();
+    });
+    act(() => {
+      markerListeners.get(marker)?.();
+    });
+
+    expect(overlayCalls).toHaveLength(1);
+    expect(overlayCalls[0].setMapCalls).toContain(null);
   });
 });
