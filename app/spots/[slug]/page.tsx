@@ -31,48 +31,51 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
-      <Link href="/" className="text-sm text-neutral-500">
+      <Link href="/" className="text-sm text-brown-light hover:text-brown">
         ← 목록으로
       </Link>
-      <h1 className="text-2xl font-bold">{spot.name}</h1>
+      <h1 className="font-[family-name:var(--font-jua)] text-3xl text-brown">{spot.name}</h1>
       <p className="text-neutral-700">{spot.summary}</p>
 
-      <section>
-        <h2 className="font-semibold">꼭 볼 것</h2>
-        <ul className="list-inside list-disc text-sm text-neutral-700">
+      <section className="rounded-2xl border border-[var(--color-border-warm)] bg-parchment-light p-4">
+        <h2 className="font-[family-name:var(--font-jua)] text-lg text-brown">꼭 볼 것</h2>
+        <ul className="mt-1 list-inside list-disc text-sm text-neutral-700">
           {spot.highlights.map((h) => (
             <li key={h}>{h}</li>
           ))}
         </ul>
       </section>
 
-      <section className="flex flex-wrap gap-4 text-sm">
+      <section className="flex flex-wrap gap-4 rounded-2xl border border-[var(--color-border-warm)] bg-parchment-light p-4 text-sm">
         <div>
-          <span className="font-semibold">추천 계절: </span>
+          <span className="font-semibold text-brown">추천 계절: </span>
           {spot.seasons.join(", ")}
           {spot.seasonNote ? ` (${spot.seasonNote})` : ""}
         </div>
         <div>
-          <span className="font-semibold">특산물: </span>
+          <span className="font-semibold text-brown">특산물: </span>
           {spot.specialty.join(", ")}
         </div>
         <div>
-          <span className="font-semibold">대표 음식: </span>
+          <span className="font-semibold text-brown">대표 음식: </span>
           {spot.foods.join(", ")}
         </div>
       </section>
 
-      <div className="h-[300px]">
+      <div className="h-[300px] overflow-hidden rounded-2xl border border-[var(--color-border-warm)]">
         <KakaoMap spots={[spot]} />
       </div>
 
       {related.length > 0 && (
-        <section>
-          <h2 className="font-semibold">같은 권역 다른 추천</h2>
+        <section className="rounded-2xl border border-[var(--color-border-warm)] bg-parchment-light p-4">
+          <h2 className="font-[family-name:var(--font-jua)] text-lg text-brown">같은 권역 다른 추천</h2>
           <ul className="mt-2 flex flex-col gap-1">
             {related.map((r) => (
               <li key={r.id}>
-                <Link href={`/spots/${r.id}`} className="text-blue-600 hover:underline">
+                <Link
+                  href={`/spots/${r.id}`}
+                  className="text-brown underline decoration-gold-dark/50 underline-offset-2 hover:decoration-brown"
+                >
                   {r.name}
                 </Link>
               </li>
