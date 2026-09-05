@@ -14,7 +14,7 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
           type="button"
           aria-pressed={value === tab}
           onClick={() => onChange(tab)}
-          className={`rounded-full px-3 py-1 text-sm ${
+          className={`rounded-full px-3 py-2 text-sm ${
             value === tab ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-700"
           }`}
         >

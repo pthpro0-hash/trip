@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { FilterCriteria } from "@/lib/filter";
 import type { Region, Season, Theme } from "@/lib/types";
 
@@ -20,26 +21,42 @@ function toggle<T>(list: T[] | undefined, value: T): T[] {
 }
 
 export function FilterBar({ criteria, onChange }: FilterBarProps) {
+  const [expanded, setExpanded] = useState(false);
+  const activeCount =
+    (criteria.regions?.length ?? 0) +
+    (criteria.seasons?.length ?? 0) +
+    (criteria.themes?.length ?? 0);
+
   return (
     <div className="flex flex-col gap-3 border-b border-neutral-200 pb-4">
-      <FilterGroup
-        label="권역"
-        options={REGIONS}
-        selected={criteria.regions ?? []}
-        onToggle={(v) => onChange({ ...criteria, regions: toggle(criteria.regions, v) })}
-      />
-      <FilterGroup
-        label="계절"
-        options={SEASONS}
-        selected={criteria.seasons ?? []}
-        onToggle={(v) => onChange({ ...criteria, seasons: toggle(criteria.seasons, v) })}
-      />
-      <FilterGroup
-        label="테마"
-        options={THEMES}
-        selected={criteria.themes ?? []}
-        onToggle={(v) => onChange({ ...criteria, themes: toggle(criteria.themes, v) })}
-      />
+      <button
+        type="button"
+        className="flex items-center gap-1 self-start rounded-full border border-neutral-300 px-3 py-2 text-sm text-neutral-700 md:hidden"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {activeCount > 0 ? `필터 (${activeCount})` : "필터"} {expanded ? "▲" : "▾"}
+      </button>
+      <div className={`${expanded ? "flex" : "hidden"} flex-col gap-3 md:flex`}>
+        <FilterGroup
+          label="권역"
+          options={REGIONS}
+          selected={criteria.regions ?? []}
+          onToggle={(v) => onChange({ ...criteria, regions: toggle(criteria.regions, v) })}
+        />
+        <FilterGroup
+          label="계절"
+          options={SEASONS}
+          selected={criteria.seasons ?? []}
+          onToggle={(v) => onChange({ ...criteria, seasons: toggle(criteria.seasons, v) })}
+        />
+        <FilterGroup
+          label="테마"
+          options={THEMES}
+          selected={criteria.themes ?? []}
+          onToggle={(v) => onChange({ ...criteria, themes: toggle(criteria.themes, v) })}
+        />
+      </div>
     </div>
   );
 }
@@ -61,7 +78,7 @@ function FilterGroup<T extends string>({
       {options.map((option) => (
         <label
           key={option}
-          className={`cursor-pointer rounded-full border px-3 py-1 text-sm ${
+          className={`cursor-pointer rounded-full border px-3 py-2 text-sm ${
             selected.includes(option)
               ? "border-neutral-900 bg-neutral-900 text-white"
               : "border-neutral-300 text-neutral-700"

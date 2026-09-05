@@ -22,4 +22,12 @@ describe("FilterBar", () => {
     fireEvent.click(screen.getByLabelText("경상권"));
     expect(onChange).toHaveBeenCalledWith({ regions: [] });
   });
+
+  it("필터 토글 버튼은 접힌 상태로 시작하며 클릭하면 펼침 상태로 전환된다", () => {
+    render(<FilterBar criteria={{}} onChange={() => {}} />);
+    const toggleButton = screen.getByRole("button", { name: /필터/ });
+    expect(toggleButton.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(toggleButton);
+    expect(toggleButton.getAttribute("aria-expanded")).toBe("true");
+  });
 });
