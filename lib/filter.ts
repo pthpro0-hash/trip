@@ -4,6 +4,13 @@ export interface FilterCriteria {
   regions?: Region[];
   seasons?: Season[];
   themes?: Theme[];
+  query?: string;
+}
+
+function buildSearchableText(spot: Spot): string {
+  return [spot.name, spot.summary, spot.highlights.join(" "), spot.foods.join(" ")]
+    .join(" ")
+    .toLowerCase();
 }
 
 export function filterSpots(spots: Spot[], criteria: FilterCriteria): Spot[] {
@@ -15,12 +22,16 @@ export function filterSpots(spots: Spot[], criteria: FilterCriteria): Spot[] {
     if (criteria.themes?.length && !spot.themes.some((t) => criteria.themes!.includes(t))) {
       return false;
     }
+    const query = criteria.query?.trim();
+    if (query && !buildSearchableText(spot).includes(query.toLowerCase())) {
+      return false;
+    }
     return true;
   });
 }
 
 export interface RelaxationSuggestion {
-  relaxed: "regions" | "seasons" | "themes";
+  relaxed: "regions" | "seasons" | "themes" | "query";
   count: number;
 }
 
@@ -28,7 +39,7 @@ export function suggestRelaxedFilters(
   spots: Spot[],
   criteria: FilterCriteria,
 ): RelaxationSuggestion[] {
-  const keys: RelaxationSuggestion["relaxed"][] = ["regions", "seasons", "themes"];
+  const keys: RelaxationSuggestion["relaxed"][] = ["regions", "seasons", "themes", "query"];
   const suggestions: RelaxationSuggestion[] = [];
 
   for (const key of keys) {

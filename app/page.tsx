@@ -10,6 +10,7 @@ import {
   type RelaxationSuggestion,
 } from "@/lib/filter";
 import { FilterBar } from "@/components/filter/FilterBar";
+import { SearchBox } from "@/components/filter/SearchBox";
 import { SpotCard } from "@/components/spot/SpotCard";
 import { KakaoMap } from "@/components/map/KakaoMap";
 import { ViewToggle } from "@/components/layout/ViewToggle";
@@ -20,6 +21,7 @@ const RELAX_LABEL: Record<RelaxationSuggestion["relaxed"], string> = {
   regions: "권역",
   seasons: "계절",
   themes: "테마",
+  query: "검색어",
 };
 
 export default function HomePage() {
@@ -36,6 +38,10 @@ export default function HomePage() {
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-4 p-4">
       <h1 className="text-2xl font-bold">여행세상</h1>
+      <SearchBox
+        value={criteria.query ?? ""}
+        onChange={(query) => setCriteria({ ...criteria, query: query || undefined })}
+      />
       <FilterBar criteria={criteria} onChange={setCriteria} />
       <ViewToggle value={mobileView} onChange={setMobileView} />
 

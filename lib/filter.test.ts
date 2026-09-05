@@ -4,8 +4,8 @@ import type { Spot, Region, Season, Theme } from "./types";
 
 const SPOTS: Spot[] = [
   {
-    id: "a", name: "A", region: "경상권", lat: 0, lng: 0, summary: "", highlights: ["x"],
-    seasons: ["가을"], specialty: [], foods: ["f1", "f2"], themes: ["자연경관"],
+    id: "a", name: "경복궁", region: "경상권", lat: 0, lng: 0, summary: "조선의 정궁", highlights: ["근정전"],
+    seasons: ["가을"], specialty: [], foods: ["설렁탕", "f2"], themes: ["자연경관"],
   },
   {
     id: "b", name: "B", region: "경상권", lat: 0, lng: 0, summary: "", highlights: ["x"],
@@ -40,6 +40,21 @@ describe("filterSpots", () => {
     });
     expect(result).toHaveLength(0);
   });
+
+  it("이름으로 검색한다", () => {
+    const result = filterSpots(SPOTS, { query: "궁" });
+    expect(result.map((s) => s.id)).toEqual(["a"]);
+  });
+
+  it("음식으로 검색한다", () => {
+    const result = filterSpots(SPOTS, { query: "설렁탕" });
+    expect(result.map((s) => s.id)).toEqual(["a"]);
+  });
+
+  it("검색어와 region 조건은 AND로 결합된다", () => {
+    const result = filterSpots(SPOTS, { query: "f1", regions: ["제주권"] });
+    expect(result.map((s) => s.id)).toEqual(["c"]);
+  });
 });
 
 describe("suggestRelaxedFilters", () => {
@@ -53,5 +68,11 @@ describe("suggestRelaxedFilters", () => {
     const criteria = { regions: ["제주권"] as Region[], themes: ["역사유적"] as Theme[] };
     const suggestions = suggestRelaxedFilters(SPOTS, criteria);
     expect(suggestions.every((s) => s.count > 0)).toBe(true);
+  });
+
+  it("검색어 때문에 0건이면 검색어 완화를 제안한다", () => {
+    const criteria = { regions: ["경상권"] as Region[], query: "존재하지않는검색어" };
+    const suggestions = suggestRelaxedFilters(SPOTS, criteria);
+    expect(suggestions.find((s) => s.relaxed === "query")?.count).toBe(2);
   });
 });
