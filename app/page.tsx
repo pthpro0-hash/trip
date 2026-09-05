@@ -45,27 +45,32 @@ export default function HomePage() {
       <FilterBar criteria={criteria} onChange={setCriteria} />
       <ViewToggle value={mobileView} onChange={setMobileView} />
 
+      {results.length === 0 && (
+        // Rendered outside the list/map grid (not inside the list panel) so it's
+        // visible on mobile regardless of which tab (리스트/지도) is active — the
+        // list panel itself is hidden while mobileView is "map", so a message
+        // placed inside it would silently disappear along with the panel,
+        // leaving an empty map with no explanation.
+        <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
+          조건에 맞는 곳이 없어요.
+          {suggestions.map((s) => (
+            <div key={s.relaxed}>
+              {RELAX_LABEL[s.relaxed]} 조건을 빼면 {s.count}곳 있어요.
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className={`${mobileView === "map" ? "hidden md:flex" : "flex"} flex-col gap-2`}>
-          {results.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
-              조건에 맞는 곳이 없어요.
-              {suggestions.map((s) => (
-                <div key={s.relaxed}>
-                  {RELAX_LABEL[s.relaxed]} 조건을 빼면 {s.count}곳 있어요.
-                </div>
-              ))}
-            </div>
-          ) : (
-            results.map((spot) => (
-              <SpotCard
-                key={spot.id}
-                spot={spot}
-                selected={spot.id === selectedId}
-                onSelect={setSelectedId}
-              />
-            ))
-          )}
+          {results.map((spot) => (
+            <SpotCard
+              key={spot.id}
+              spot={spot}
+              selected={spot.id === selectedId}
+              onSelect={setSelectedId}
+            />
+          ))}
         </div>
         <div className={`h-[500px] ${mobileView === "list" ? "hidden md:block" : ""}`}>
           <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
