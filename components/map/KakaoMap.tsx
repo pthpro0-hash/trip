@@ -26,11 +26,14 @@ interface KakaoMapProps {
 // error fallback instead of waiting for an onError that will never come.
 const failedScriptSrcs = new Set<string>();
 
-// A small solid-blue circle with a white ring, matching the app's existing
-// blue accent color (see SpotCard.tsx's season tag). Used instead of the
+// A small solid-gold circle with a white ring, matching the app's warm
+// accent color (see globals.css's --color-gold). Used instead of the
 // default Kakao pin when only a single spot is shown (the detail page).
+// Note: this SVG is rendered as a standalone data URI, a separate document
+// context that cannot see the page's CSS custom properties, so the hex
+// value is duplicated here rather than referenced via var(--color-gold).
 function buildSmallMarkerImage() {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#2563eb" stroke="white" stroke-width="2"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#E8A33D" stroke="white" stroke-width="2"/></svg>`;
   const src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
   return new window.kakao.maps.MarkerImage(
     src,
@@ -45,19 +48,19 @@ function buildSmallMarkerImage() {
 function buildOverlayContent(spot: Spot, onClose: () => void): HTMLElement {
   const container = document.createElement("div");
   container.className =
-    "max-w-[240px] rounded-lg border border-neutral-200 bg-white p-3 text-sm shadow-lg";
+    "max-w-[240px] rounded-lg border border-[var(--color-border-warm)] bg-parchment-light p-3 text-sm shadow-lg";
 
   const closeButton = document.createElement("button");
   closeButton.type = "button";
   closeButton.textContent = "×";
   closeButton.className =
-    "float-right -mt-1 -mr-1 rounded px-1 text-neutral-400 hover:text-neutral-700";
+    "float-right -mt-1 -mr-1 rounded px-1 text-brown-light hover:text-brown";
   closeButton.addEventListener("click", onClose);
   container.appendChild(closeButton);
 
   const name = document.createElement("h4");
   name.textContent = spot.name;
-  name.className = "font-semibold text-base text-neutral-900";
+  name.className = "font-[family-name:var(--font-jua)] text-base text-brown";
   container.appendChild(name);
 
   const summary = document.createElement("p");
@@ -71,13 +74,13 @@ function buildOverlayContent(spot: Spot, onClose: () => void): HTMLElement {
   spot.seasons.forEach((season) => {
     const tag = document.createElement("span");
     tag.textContent = season;
-    tag.className = "rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-700";
+    tag.className = "rounded bg-gold/20 px-2 py-0.5 text-xs text-brown";
     tags.appendChild(tag);
   });
   spot.foods.forEach((food) => {
     const tag = document.createElement("span");
     tag.textContent = food;
-    tag.className = "rounded bg-orange-50 px-2 py-0.5 text-xs text-orange-700";
+    tag.className = "rounded bg-brown/10 px-2 py-0.5 text-xs text-brown";
     tags.appendChild(tag);
   });
   container.appendChild(tags);
@@ -85,7 +88,8 @@ function buildOverlayContent(spot: Spot, onClose: () => void): HTMLElement {
   const link = document.createElement("a");
   link.href = `/spots/${spot.id}`;
   link.textContent = "자세히 보기 →";
-  link.className = "mt-2 inline-block font-medium text-blue-600 hover:underline";
+  link.className =
+    "mt-2 inline-block font-medium text-brown underline decoration-gold-dark/50 underline-offset-2 hover:decoration-brown";
   container.appendChild(link);
 
   return container;
