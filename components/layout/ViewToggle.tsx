@@ -14,8 +14,10 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
           type="button"
           aria-pressed={value === tab}
           onClick={() => onChange(tab)}
-          className={`rounded-full px-3 py-2 text-sm ${
-            value === tab ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-700"
+          className={`rounded-full border px-3 py-2 text-sm ${
+            value === tab
+              ? "border-gold bg-gold text-brown"
+              : "border-[var(--color-border-warm)] bg-parchment-light text-brown"
           }`}
         >
           {tab === "list" ? "리스트" : "지도"}
