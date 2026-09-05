@@ -26,12 +26,29 @@ interface KakaoMapProps {
 // error fallback instead of waiting for an onError that will never come.
 const failedScriptSrcs = new Set<string>();
 
-// A small solid-gold circle with a white ring, matching the app's warm
-// accent color (see globals.css's --color-gold). Used instead of the
-// default Kakao pin when only a single spot is shown (the detail page).
-// Note: this SVG is rendered as a standalone data URI, a separate document
-// context that cannot see the page's CSS custom properties, so the hex
-// value is duplicated here rather than referenced via var(--color-gold).
+// Kakao's stock blue pin doesn't match the app's warm palette at all, so
+// both marker styles below are custom-colored to match --color-gold /
+// --color-brown. These SVGs render as standalone data URIs — a separate
+// document context that can't see the page's CSS custom properties — so
+// the hex values are duplicated here rather than referenced via var().
+
+// A teardrop map-pin (gold fill, brown outline, cream center dot) for the
+// default many-spot view — reads like a classic "X marks the spot" pin at
+// country-wide zoom. Anchored at its bottom tip, where the point actually
+// sits, not at the shape's center.
+function buildPinMarkerImage() {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 24 14 24s14-13.5 14-24C28 6.3 21.7 0 14 0z" fill="#E8A33D" stroke="#6B4423" stroke-width="1.5"/><circle cx="14" cy="14" r="5" fill="#FFFBF2"/></svg>`;
+  const src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  return new window.kakao.maps.MarkerImage(
+    src,
+    new window.kakao.maps.Size(28, 38),
+    { offset: new window.kakao.maps.Point(14, 38) },
+  );
+}
+
+// A small solid-gold circle with a white ring, for the single-spot
+// close-up view (the detail page) — a pin's tail would visually overshoot
+// the tight zoom, so a centered dot reads better here.
 function buildSmallMarkerImage() {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#E8A33D" stroke="white" stroke-width="2"/></svg>`;
   const src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
@@ -144,12 +161,16 @@ export function KakaoMap({ spots, selectedId, onMarkerClick }: KakaoMapProps) {
     markersRef.current.clear();
 
     const isSingleSpot = spots.length === 1;
+    // Built once and reused across every marker below — all markers in a
+    // given render share the same icon, so there's no reason to construct
+    // a fresh MarkerImage (and re-encode the same SVG data URI) per spot.
+    const markerImage = isSingleSpot ? buildSmallMarkerImage() : buildPinMarkerImage();
 
     spots.forEach((spot) => {
       const marker = new window.kakao.maps.Marker({
         position: new window.kakao.maps.LatLng(spot.lat, spot.lng),
         map: mapRef.current,
-        image: isSingleSpot ? buildSmallMarkerImage() : undefined,
+        image: markerImage,
       });
       window.kakao.maps.event.addListener(marker, "click", () => {
         onMarkerClick?.(spot.id);

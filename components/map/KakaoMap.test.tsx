@@ -180,7 +180,7 @@ describe("KakaoMap", () => {
     expect(markerCalls[0].image).toBeTruthy();
   });
 
-  it("관광지가 여러 곳이면 기본 마커 이미지를 사용한다(커스텀 이미지 없음)", () => {
+  it("관광지가 여러 곳이면 골드 핀 마커 이미지를 사용한다(단일 지점의 작은 원과는 다른 모양)", () => {
     vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "multi-marker-key");
     const { markerCalls } = stubKakao();
 
@@ -190,8 +190,11 @@ describe("KakaoMap", () => {
     });
 
     expect(markerCalls).toHaveLength(2);
-    expect(markerCalls[0].image).toBeUndefined();
-    expect(markerCalls[1].image).toBeUndefined();
+    // Both markers share one built-once image (not undefined, and not the
+    // 18x18 single-spot circle) — a distinct, larger teardrop pin shape.
+    expect(markerCalls[0].image).toBeTruthy();
+    expect(markerCalls[0].image).toBe(markerCalls[1].image);
+    expect(markerCalls[0].image.size).not.toEqual({ width: 18, height: 18 });
   });
 
   it("마커를 클릭하면 해당 위치에 CustomOverlay 팝업이 열린다", () => {

@@ -87,8 +87,12 @@ export default function HomePage() {
             />
           ))}
         </div>
-        <div className={`h-[500px] ${mobileView === "list" ? "hidden md:block" : ""}`}>
-          <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
+        <div
+          className={`h-[500px] rounded-2xl border-4 border-gold bg-parchment-light p-1.5 shadow-sm ${mobileView === "list" ? "hidden md:block" : ""}`}
+        >
+          <div className="h-full overflow-hidden rounded-xl">
+            <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
+          </div>
         </div>
       </div>
     </main>

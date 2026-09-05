@@ -62,8 +62,10 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
         </div>
       </section>
 
-      <div className="h-[300px] overflow-hidden rounded-2xl border border-[var(--color-border-warm)]">
-        <KakaoMap spots={[spot]} />
+      <div className="h-[300px] rounded-2xl border-4 border-gold bg-parchment-light p-1.5 shadow-sm">
+        <div className="h-full overflow-hidden rounded-xl">
+          <KakaoMap spots={[spot]} />
+        </div>
       </div>
 
       {related.length > 0 && (
