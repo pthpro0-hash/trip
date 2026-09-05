@@ -27,7 +27,7 @@ const RELAX_LABEL: Record<RelaxationSuggestion["relaxed"], string> = {
 export default function HomePage() {
   const [criteria, setCriteria] = useState<FilterCriteria>({});
   const [selectedId, setSelectedId] = useState<string>();
-  const [mobileView, setMobileView] = useState<"list" | "map">("list");
+  const [mobileView, setMobileView] = useState<"list" | "map">("map");
 
   const results = useMemo(() => filterSpots(SPOTS, criteria), [criteria]);
   const suggestions = useMemo(

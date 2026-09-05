@@ -25,6 +25,13 @@ describe("HomePage", () => {
     expect(afterCount).toBeLessThan(beforeCount);
   });
 
+  it("모바일 기본 뷰는 지도이다(검색/지도가 주요 기능이므로)", () => {
+    render(<HomePage />);
+    expect(screen.getByRole("button", { name: "지도" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+
   it("렌더링되는 모든 카드는 /spots/로 시작하는 링크를 가진다", () => {
     render(<HomePage />);
     const links = screen.getAllByRole("link", { name: /자세히 보기/ });
