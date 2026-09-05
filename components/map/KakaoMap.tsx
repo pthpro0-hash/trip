@@ -60,10 +60,15 @@ export function KakaoMap({ spots, selectedId, onMarkerClick }: KakaoMapProps) {
     // already exists for it.
     if (mapRef.current || !containerRef.current || !window.kakao) return;
     window.kakao.maps.load(() => {
-      const map = new window.kakao.maps.Map(containerRef.current, {
-        center: new window.kakao.maps.LatLng(36.5, 127.8),
-        level: 13,
-      });
+      // A single spot (the detail page) gets a close-up view centered on it;
+      // the full list (the home page) keeps the whole-country overview.
+      const isSingleSpot = spots.length === 1;
+      const center = isSingleSpot
+        ? new window.kakao.maps.LatLng(spots[0].lat, spots[0].lng)
+        : new window.kakao.maps.LatLng(36.5, 127.8);
+      const level = isSingleSpot ? 4 : 13;
+
+      const map = new window.kakao.maps.Map(containerRef.current, { center, level });
       mapRef.current = map;
       renderMarkers();
     });

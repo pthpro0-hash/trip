@@ -2,6 +2,52 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import type { ScriptProps } from "next/script";
 import { KakaoMap } from "./KakaoMap";
+import type { Spot } from "@/lib/types";
+
+const SPOT: Spot = {
+  id: "gyeongbokgung",
+  name: "경복궁",
+  region: "수도권",
+  lat: 37.5796,
+  lng: 126.977,
+  summary: "",
+  highlights: ["근정전"],
+  seasons: ["봄"],
+  specialty: [],
+  foods: ["설렁탕", "왕갈비"],
+  themes: ["역사유적"],
+};
+
+// initMap only touches window.kakao inside window.kakao.maps.load's callback,
+// so a fake that runs the callback synchronously and records what Map() was
+// constructed with is enough to assert on center/level without a real SDK.
+function stubKakao() {
+  const mapCalls: { center: { lat: number; lng: number }; level: number }[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test stub mirrors the untyped Kakao SDK
+  (window as any).kakao = {
+    maps: {
+      load: (cb: () => void) => cb(),
+      // `new window.kakao.maps.LatLng(...)` requires a real constructor —
+      // an arrow function can't be called with `new`, so these must be
+      // ordinary functions.
+      LatLng: function (lat: number, lng: number) {
+        return { lat, lng };
+      },
+      Map: function (
+        _el: unknown,
+        options: { center: { lat: number; lng: number }; level: number },
+      ) {
+        mapCalls.push(options);
+        return {};
+      },
+      Marker: function () {
+        return { setMap: () => {} };
+      },
+      event: { addListener: () => {} },
+    },
+  };
+  return mapCalls;
+}
 
 // next/script renders a real <script> tag and relies on browser load/error
 // events that jsdom never fires, so we stub it to capture the props this
@@ -18,6 +64,8 @@ vi.mock("next/script", () => ({
 afterEach(() => {
   vi.unstubAllEnvs();
   scriptProps = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test stub mirrors the untyped Kakao SDK
+  delete (window as any).kakao;
 });
 
 describe("KakaoMap", () => {
@@ -54,5 +102,31 @@ describe("KakaoMap", () => {
 
     render(<KakaoMap spots={[]} />);
     expect(screen.getByText("지도를 불러오지 못했습니다")).toBeTruthy();
+  });
+
+  it("관광지가 1곳이면 그 위치로 클로즈업해서 초기화한다", () => {
+    vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "single-spot-key");
+    const mapCalls = stubKakao();
+
+    render(<KakaoMap spots={[SPOT]} />);
+    act(() => {
+      scriptProps.at(-1)?.onReady?.();
+    });
+
+    expect(mapCalls).toHaveLength(1);
+    expect(mapCalls[0]).toEqual({ center: { lat: SPOT.lat, lng: SPOT.lng }, level: 4 });
+  });
+
+  it("관광지가 여러 곳이면 전국이 보이는 기본 뷰로 초기화한다", () => {
+    vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "multi-spot-key");
+    const mapCalls = stubKakao();
+
+    render(<KakaoMap spots={[SPOT, { ...SPOT, id: "changdeokgung" }]} />);
+    act(() => {
+      scriptProps.at(-1)?.onReady?.();
+    });
+
+    expect(mapCalls).toHaveLength(1);
+    expect(mapCalls[0]).toEqual({ center: { lat: 36.5, lng: 127.8 }, level: 13 });
   });
 });
