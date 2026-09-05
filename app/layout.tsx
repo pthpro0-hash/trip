@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
+import { Jua } from "next/font/google";
 import "./globals.css";
+
+const jua = Jua({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-jua",
+});
 
 export const metadata: Metadata = {
   title: "여행세상 | 한국관광 100선 추천",
@@ -8,8 +15,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
-      <body className="min-h-screen bg-white text-neutral-900">{children}</body>
+    <html lang="ko" className={jua.variable}>
+      <body className="min-h-screen bg-parchment text-neutral-900">{children}</body>
     </html>
   );
 }
