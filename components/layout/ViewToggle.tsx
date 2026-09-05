@@ -16,7 +16,7 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
           onClick={() => onChange(tab)}
           className={`rounded-full border px-3 py-2 text-sm ${
             value === tab
-              ? "border-gold bg-gold text-brown"
+              ? "border-brown bg-brown text-white"
               : "border-[var(--color-border-warm)] bg-parchment-light text-brown"
           }`}
         >

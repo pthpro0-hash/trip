@@ -80,7 +80,7 @@ function FilterGroup<T extends string>({
           key={option}
           className={`cursor-pointer rounded-full border px-3 py-2 text-sm ${
             selected.includes(option)
-              ? "border-gold bg-gold text-brown"
+              ? "border-brown bg-brown text-white"
               : "border-[var(--color-border-warm)] bg-parchment-light text-brown"
           }`}
         >
