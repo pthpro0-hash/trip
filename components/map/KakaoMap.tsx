@@ -18,13 +18,24 @@ interface KakaoMapProps {
   onMarkerClick?: (id: string) => void;
 }
 
+// next/script caches a script src's load promise even after a load failure
+// (its internal .catch() swallows the rejection into a resolved promise), so
+// a remount after a first-mount failure gets onLoad instead of onError and
+// never learns the script actually failed. Tracking failures here at module
+// scope lets a remount within the same page session immediately show the
+// error fallback instead of waiting for an onError that will never come.
+const failedScriptSrcs = new Set<string>();
+
 export function KakaoMap({ spots, selectedId, onMarkerClick }: KakaoMapProps) {
+  const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ?? "";
+  const scriptSrc = buildKakaoScriptSrc(apiKey);
+
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Kakao Maps SDK has no official types
   const mapRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Kakao Maps SDK has no official types
   const markersRef = useRef<Map<string, any>>(new Map());
-  const [hasError, setHasError] = useState(false);
+  const [hasError, setHasError] = useState(() => failedScriptSrcs.has(scriptSrc));
 
   const renderMarkers = () => {
     if (!mapRef.current || !window.kakao) return;
@@ -85,8 +96,6 @@ export function KakaoMap({ spots, selectedId, onMarkerClick }: KakaoMapProps) {
     };
   }, []);
 
-  const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ?? "";
-
   if (!apiKey) {
     return (
       <div className="flex h-full min-h-[400px] w-full items-center justify-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center text-sm text-neutral-500">
@@ -113,10 +122,13 @@ export function KakaoMap({ spots, selectedId, onMarkerClick }: KakaoMapProps) {
         mount, so it is the only callback that reliably fires on remount.
       */}
       <Script
-        src={buildKakaoScriptSrc(apiKey)}
+        src={scriptSrc}
         strategy="afterInteractive"
         onReady={initMap}
-        onError={() => setHasError(true)}
+        onError={() => {
+          failedScriptSrcs.add(scriptSrc);
+          setHasError(true);
+        }}
       />
       <div ref={containerRef} className="h-full min-h-[400px] w-full" />
     </>
