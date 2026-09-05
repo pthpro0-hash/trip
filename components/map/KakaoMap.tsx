@@ -193,10 +193,21 @@ export function KakaoMap({ spots, selectedId, onMarkerClick }: KakaoMapProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
-  // next/script's LoadCache is keyed by script src, so the script's `load`
-  // event (and therefore onLoad) only ever fires once per src for the whole
-  // page. Every remount of this component starts from a clean slate here so
-  // a later onReady-driven re-init always builds a fresh map instance.
+  // Clears markers/overlay on cleanup, but deliberately does NOT reset
+  // `mapRef.current` here. In dev, React Strict Mode mounts every component
+  // twice (mount → cleanup → mount) to surface exactly this kind of bug.
+  // Once this script src is cached, `<Script onReady>` fires synchronously
+  // on both mount passes (see the comment below), so if cleanup nulled
+  // `mapRef.current`, the second pass's `initMap` guard would see it as
+  // unset and construct a SECOND `kakao.maps.Map` on the same container —
+  // two independent map instances racing to own one DOM node, and whichever
+  // one loses ends up with markers added to a map that's no longer the one
+  // actually attached/visible, so nothing appears. Leaving `mapRef.current`
+  // alone across cleanup makes the second pass's `initMap` a no-op (guard
+  // sees a map already exists) while the `[spots]` effect below still
+  // re-populates markers on that one surviving map instance. A genuine new
+  // mount (a different component instance entirely) is unaffected — it
+  // gets its own fresh `useRef(null)` regardless of what this cleanup does.
   useEffect(() => {
     const markers = markersRef.current;
     return () => {
@@ -204,7 +215,6 @@ export function KakaoMap({ spots, selectedId, onMarkerClick }: KakaoMapProps) {
       markers.clear();
       overlayRef.current?.setMap(null);
       overlayRef.current = null;
-      mapRef.current = null;
     };
   }, []);
 
