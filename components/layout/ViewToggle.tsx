@@ -16,8 +16,8 @@ export function ViewToggle({ value, onChange }: ViewToggleProps) {
           onClick={() => onChange(tab)}
           className={`rounded-full border px-3 py-2 text-sm ${
             value === tab
-              ? "border-brown bg-brown text-white"
-              : "border-[var(--color-border-warm)] bg-parchment-light text-brown"
+              ? "border-gold bg-gold text-bg"
+              : "border-border bg-surface text-text"
           }`}
         >
           {tab === "list" ? "리스트" : "지도"}

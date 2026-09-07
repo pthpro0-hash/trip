@@ -37,20 +37,20 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-4 p-4">
-      <header className="relative overflow-hidden rounded-2xl border border-[var(--color-border-warm)] bg-gold px-6 py-8 text-center shadow-sm">
+      <header className="relative overflow-hidden rounded-2xl border border-border bg-surface-raised px-6 py-8 text-center shadow-sm">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/15"
+          className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-gold/10"
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-white/15"
+          className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-gold/10"
         />
-        <h1 className="relative font-[family-name:var(--font-jua)] text-4xl text-brown md:text-5xl">
+        <h1 className="relative font-[family-name:var(--font-heading)] text-4xl text-gold md:text-5xl">
           여행세상
         </h1>
       </header>
-      <p className="text-center text-sm font-medium text-brown">
+      <p className="text-center text-sm font-medium text-text-muted">
         2025~2026 한국관광 100선, 조건으로 찾고 지도로 만나보세요
       </p>
       <SearchBox
@@ -66,7 +66,7 @@ export default function HomePage() {
         // list panel itself is hidden while mobileView is "map", so a message
         // placed inside it would silently disappear along with the panel,
         // leaving an empty map with no explanation.
-        <div className="rounded-lg border border-dashed border-neutral-300 p-4 text-sm text-neutral-500">
+        <div className="rounded-lg border border-dashed border-border p-4 text-sm text-text-muted">
           조건에 맞는 곳이 없어요.
           {suggestions.map((s) => (
             <div key={s.relaxed}>
@@ -88,7 +88,7 @@ export default function HomePage() {
           ))}
         </div>
         <div
-          className={`h-[500px] rounded-2xl border-4 border-gold bg-parchment-light p-1.5 shadow-sm ${mobileView === "list" ? "hidden md:block" : ""}`}
+          className={`h-[500px] rounded-2xl border-2 border-gold bg-surface p-1.5 shadow-sm ${mobileView === "list" ? "hidden md:block" : ""}`}
         >
           <div className="h-full overflow-hidden rounded-xl">
             <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />

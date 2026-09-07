@@ -65,25 +65,25 @@ function buildSmallMarkerImage() {
 function buildOverlayContent(spot: Spot, onClose: () => void): HTMLElement {
   const container = document.createElement("div");
   container.className =
-    "max-w-[240px] rounded-lg border border-[var(--color-border-warm)] bg-parchment-light p-3 text-sm shadow-lg";
+    "max-w-[240px] rounded-lg border border-border bg-surface p-3 text-sm shadow-lg";
 
   const closeButton = document.createElement("button");
   closeButton.type = "button";
   closeButton.textContent = "×";
   closeButton.className =
-    "float-right -mt-1 -mr-1 rounded px-1 text-brown-light hover:text-brown";
+    "float-right -mt-1 -mr-1 rounded px-1 text-text-muted hover:text-text";
   closeButton.addEventListener("click", onClose);
   container.appendChild(closeButton);
 
   const name = document.createElement("h4");
   name.textContent = spot.name;
-  name.className = "font-[family-name:var(--font-jua)] text-base text-brown";
+  name.className = "font-[family-name:var(--font-heading)] text-base text-text";
   container.appendChild(name);
 
   const summary = document.createElement("p");
   summary.textContent =
     spot.summary.length > 50 ? `${spot.summary.slice(0, 50)}…` : spot.summary;
-  summary.className = "mt-1 text-neutral-600";
+  summary.className = "mt-1 text-text-muted";
   container.appendChild(summary);
 
   const tags = document.createElement("div");
@@ -91,13 +91,13 @@ function buildOverlayContent(spot: Spot, onClose: () => void): HTMLElement {
   spot.seasons.forEach((season) => {
     const tag = document.createElement("span");
     tag.textContent = season;
-    tag.className = "rounded bg-gold/20 px-2 py-0.5 text-xs text-brown";
+    tag.className = "rounded bg-[#41372b] px-2 py-0.5 text-xs text-gold";
     tags.appendChild(tag);
   });
   spot.foods.forEach((food) => {
     const tag = document.createElement("span");
     tag.textContent = food;
-    tag.className = "rounded bg-brown/10 px-2 py-0.5 text-xs text-brown";
+    tag.className = "rounded bg-border-strong px-2 py-0.5 text-xs text-text";
     tags.appendChild(tag);
   });
   container.appendChild(tags);
@@ -106,7 +106,7 @@ function buildOverlayContent(spot: Spot, onClose: () => void): HTMLElement {
   link.href = `/spots/${spot.id}`;
   link.textContent = "자세히 보기 →";
   link.className =
-    "mt-2 inline-block font-medium text-brown underline decoration-gold-dark/50 underline-offset-2 hover:decoration-brown";
+    "mt-2 inline-block font-medium text-gold underline decoration-gold-dark/50 underline-offset-2 hover:decoration-gold";
   container.appendChild(link);
 
   return container;

@@ -28,10 +28,10 @@ export function FilterBar({ criteria, onChange }: FilterBarProps) {
     (criteria.themes?.length ?? 0);
 
   return (
-    <div className="flex flex-col gap-3 border-b border-[var(--color-border-warm)] pb-4">
+    <div className="flex flex-col gap-3 border-b border-border pb-4">
       <button
         type="button"
-        className="flex items-center gap-1 self-start rounded-full border border-[var(--color-border-warm)] bg-parchment-light px-3 py-2 text-sm text-brown md:hidden"
+        className="flex items-center gap-1 self-start rounded-full border border-border bg-surface px-3 py-2 text-sm text-text md:hidden"
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
       >
@@ -74,14 +74,14 @@ function FilterGroup<T extends string>({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="w-12 shrink-0 text-sm font-medium text-brown-light">{label}</span>
+      <span className="w-12 shrink-0 text-sm font-medium text-text-muted">{label}</span>
       {options.map((option) => (
         <label
           key={option}
           className={`cursor-pointer rounded-full border px-3 py-2 text-sm ${
             selected.includes(option)
-              ? "border-brown bg-brown text-white"
-              : "border-[var(--color-border-warm)] bg-parchment-light text-brown"
+              ? "border-gold bg-gold text-bg"
+              : "border-border bg-surface text-text"
           }`}
         >
           <input
