@@ -23,7 +23,10 @@ const SPOT: Spot = {
 // constructed with is enough to assert on center/level without a real SDK.
 function stubKakao() {
   const mapCalls: { center: { lat: number; lng: number }; level: number }[] = [];
-  const markerCalls: { position: { lat: number; lng: number }; image?: unknown }[] = [];
+  const markerCalls: {
+    position: { lat: number; lng: number };
+    image?: { size: { width: number; height: number } };
+  }[] = [];
   const overlayCalls: {
     position: { lat: number; lng: number };
     content: HTMLElement;
@@ -50,7 +53,10 @@ function stubKakao() {
         mapCalls.push(options);
         return {};
       },
-      Marker: function (options: { position: { lat: number; lng: number }; image?: unknown }) {
+      Marker: function (options: {
+        position: { lat: number; lng: number };
+        image?: { size: { width: number; height: number } };
+      }) {
         markerCalls.push(options);
         const marker = { setMap: () => {} };
         return marker;
@@ -180,7 +186,7 @@ describe("KakaoMap", () => {
     expect(markerCalls[0].image).toBeTruthy();
   });
 
-  it("관광지가 여러 곳이면 골드 핀 마커 이미지를 사용한다(단일 지점의 작은 원과는 다른 모양)", () => {
+  it("관광지가 여러 곳이면 단일 지점과 동일한 작은 원 마커 이미지를 하나만 만들어 공유한다", () => {
     vi.stubEnv("NEXT_PUBLIC_KAKAO_MAP_KEY", "multi-marker-key");
     const { markerCalls } = stubKakao();
 
@@ -190,11 +196,11 @@ describe("KakaoMap", () => {
     });
 
     expect(markerCalls).toHaveLength(2);
-    // Both markers share one built-once image (not undefined, and not the
-    // 18x18 single-spot circle) — a distinct, larger teardrop pin shape.
+    // Both markers share one built-once image object — same small circle
+    // used for the single-spot case, not a separate, larger pin shape.
     expect(markerCalls[0].image).toBeTruthy();
     expect(markerCalls[0].image).toBe(markerCalls[1].image);
-    expect(markerCalls[0].image.size).not.toEqual({ width: 18, height: 18 });
+    expect(markerCalls[0].image!.size).toEqual({ width: 18, height: 18 });
   });
 
   it("마커를 클릭하면 해당 위치에 CustomOverlay 팝업이 열린다", () => {
