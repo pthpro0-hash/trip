@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Jua } from "next/font/google";
+import { IBM_Plex_Sans_KR } from "next/font/google";
 import "./globals.css";
 
-const jua = Jua({
+const ibmPlexSansKr = IBM_Plex_Sans_KR({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-jua",
+  weight: "700",
+  variable: "--font-heading",
 });
 
 export const metadata: Metadata = {
@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={jua.variable}>
-      <body className="min-h-screen bg-parchment text-neutral-900">{children}</body>
+    <html lang="ko" className={ibmPlexSansKr.variable}>
+      <body className="min-h-screen bg-bg text-text">{children}</body>
     </html>
   );
 }
