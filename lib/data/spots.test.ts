@@ -5,8 +5,8 @@ import type { Spot } from "../types";
 describe("spots.json", () => {
   const typed = spots as Spot[];
 
-  it("정확히 100건이다 (원본 소스 파일이 실제로 담고 있는 건수)", () => {
-    expect(typed).toHaveLength(100);
+  it("정확히 115건이다 (원본 소스 파일이 실제로 담고 있는 건수)", () => {
+    expect(typed).toHaveLength(115);
   });
 
   it("모든 항목이 필수 필드를 가진다", () => {
