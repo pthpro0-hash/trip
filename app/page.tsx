@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
 import {
@@ -53,6 +54,12 @@ export default function HomePage() {
       <p className="text-center text-sm font-medium text-text-muted">
         2025~2026 한국관광 100선, 조건으로 찾고 지도로 만나보세요
       </p>
+      <Link
+        href="/regions"
+        className="mx-auto flex items-center gap-1 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text hover:border-gold hover:text-gold"
+      >
+        🗺️ 권역별로 둘러보기
+      </Link>
       <SearchBox
         value={criteria.query ?? ""}
         onChange={(query) => setCriteria({ ...criteria, query: query || undefined })}
