@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import type { Spot } from "@/lib/types";
+import { getSpotThumbnail } from "@/lib/media";
 
 interface SpotCardProps {
   spot: Spot;
@@ -10,6 +12,8 @@ interface SpotCardProps {
 }
 
 export function SpotCard({ spot, selected, onSelect }: SpotCardProps) {
+  const thumbnail = getSpotThumbnail(spot.id);
+
   return (
     <div
       className={`w-full rounded-2xl border bg-surface p-3 transition ${
@@ -17,12 +21,22 @@ export function SpotCard({ spot, selected, onSelect }: SpotCardProps) {
       }`}
     >
       <button type="button" onClick={() => onSelect(spot.id)} className="flex w-full gap-3 text-left">
-        <span
-          aria-hidden="true"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold font-[family-name:var(--font-heading)] text-base text-bg"
-        >
-          {spot.region.charAt(0)}
-        </span>
+        {thumbnail ? (
+          <Image
+            src={thumbnail}
+            alt=""
+            width={76}
+            height={76}
+            className="h-[76px] w-[76px] shrink-0 rounded-xl object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-xl bg-gold font-[family-name:var(--font-heading)] text-xl text-bg"
+          >
+            {spot.region.charAt(0)}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <h3 className="font-[family-name:var(--font-heading)] text-lg text-text">{spot.name}</h3>
           <p className="mt-1 line-clamp-2 text-sm text-text-muted">{spot.summary}</p>

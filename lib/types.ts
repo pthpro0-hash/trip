@@ -10,6 +10,21 @@ export type Theme =
   | "정원"
   | "섬";
 
+export interface SpotImage {
+  url: string;
+  /** TourAPI 저작권 유형 (Type1 출처표시, Type3 출처표시+변경금지). */
+  copyright: string;
+}
+
+/** 한국관광공사 TourAPI에서 가져온 사진·공식 소개글. lib/data/spot-media.json */
+export interface SpotMedia {
+  contentId: string;
+  sourceTitle: string;
+  overview: string;
+  homepage: string | null;
+  images: SpotImage[];
+}
+
 export interface Spot {
   id: string;
   name: string;

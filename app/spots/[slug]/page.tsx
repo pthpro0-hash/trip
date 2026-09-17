@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
 import { getRelatedSpots } from "@/lib/related";
+import { getSpotMedia, PHOTO_CREDIT } from "@/lib/media";
 import { KakaoMap } from "@/components/map/KakaoMap";
+import { SpotGallery } from "@/components/spot/SpotGallery";
 import Link from "next/link";
 
 const SPOTS = spotsData as Spot[];
@@ -28,6 +30,7 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
   if (!spot) notFound();
 
   const related = getRelatedSpots(SPOTS, spot, 3);
+  const media = getSpotMedia(spot.id);
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-4 p-4">
@@ -36,6 +39,8 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
       </Link>
       <h1 className="font-[family-name:var(--font-heading)] text-3xl text-text">{spot.name}</h1>
       <p className="text-text">{spot.summary}</p>
+
+      {media && media.images.length > 0 && <SpotGallery name={spot.name} images={media.images} />}
 
       <section className="rounded-2xl border border-border bg-surface p-4">
         <h2 className="font-[family-name:var(--font-heading)] text-lg text-text">꼭 볼 것</h2>
@@ -67,6 +72,28 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
           <KakaoMap spots={[spot]} />
         </div>
       </div>
+
+      {media && media.overview && (
+        <section className="rounded-2xl border border-border bg-surface p-4">
+          <h2 className="font-[family-name:var(--font-heading)] text-lg text-text">자세한 소개</h2>
+          <div className="mt-2 flex flex-col gap-2 text-sm leading-relaxed text-text-muted">
+            {media.overview.split("\n").map((paragraph, index) => (
+              <p key={index}>{paragraph}</p>
+            ))}
+          </div>
+          {media.homepage && (
+            <a
+              href={media.homepage}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="mt-3 inline-block text-sm font-medium text-gold underline decoration-gold-dark/50 underline-offset-2 hover:decoration-gold"
+            >
+              공식 홈페이지 →
+            </a>
+          )}
+          <p className="mt-3 text-xs text-text-muted">{PHOTO_CREDIT}</p>
+        </section>
+      )}
 
       {related.length > 0 && (
         <section className="rounded-2xl border border-border bg-surface p-4">
