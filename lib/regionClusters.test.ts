@@ -35,6 +35,12 @@ describe("splitRegionIntoClusters", () => {
     expect(total).toBe(10);
   });
 
+  it("4개로 갈려도 방향 라벨을 붙인다", () => {
+    const spots = Array.from({ length: 8 }, (_, i) => makeSpot(`s${i}`, 35, 126 + i * 0.5));
+    const clusters = splitRegionIntoClusters(spots, 2);
+    expect(clusters.map((c) => c.label)).toEqual(["서부", "중서부", "중동부", "동부"]);
+  });
+
   it("위도로 갈릴 때 남쪽 클러스터가 북쪽 클러스터보다 위도가 낮다", () => {
     const spots = [
       makeSpot("south1", 35.0, 127),

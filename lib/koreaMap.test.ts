@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  KOREA_LAND_PATHS,
-  computeViewBox,
-  project,
-  spreadPoints,
-  toViewBoxPercent,
-} from "./koreaMap";
+import { KOREA_LAND_PATHS, project, spreadPoints } from "./koreaMap";
 
 describe("project", () => {
   it("북쪽일수록 y가 작고, 동쪽일수록 x가 크다", () => {
@@ -33,43 +27,6 @@ describe("KOREA_LAND_PATHS", () => {
       expect(path.endsWith(" Z")).toBe(true);
       expect(path).toContain("C ");
     }
-  });
-});
-
-describe("computeViewBox", () => {
-  it("항상 정사각형을 반환한다", () => {
-    const box = computeViewBox([
-      { x: 0, y: 0 },
-      { x: 300, y: 40 },
-    ]);
-    expect(box.width).toBe(box.height);
-  });
-
-  it("점들이 viewBox 안에 들어온다", () => {
-    const points = [
-      { x: 100, y: 200 },
-      { x: 160, y: 260 },
-      { x: 130, y: 210 },
-    ];
-    const box = computeViewBox(points);
-    for (const point of points) {
-      expect(point.x).toBeGreaterThanOrEqual(box.x);
-      expect(point.x).toBeLessThanOrEqual(box.x + box.width);
-      expect(point.y).toBeGreaterThanOrEqual(box.y);
-      expect(point.y).toBeLessThanOrEqual(box.y + box.height);
-    }
-  });
-
-  it("점이 몰려 있어도 minSpan 이하로는 확대하지 않는다", () => {
-    const box = computeViewBox([
-      { x: 100, y: 100 },
-      { x: 101, y: 101 },
-    ]);
-    expect(box.width).toBeGreaterThanOrEqual(90);
-  });
-
-  it("점이 없으면 전국 뷰로 폴백한다", () => {
-    expect(computeViewBox([]).width).toBe(340);
   });
 });
 
@@ -119,13 +76,5 @@ describe("spreadPoints", () => {
       { x: 10, y: 10 },
       { x: 10, y: 10 },
     ]);
-  });
-});
-
-describe("toViewBoxPercent", () => {
-  it("viewBox 좌상단은 0%, 우하단은 100%", () => {
-    const viewBox = { x: 100, y: 200, width: 50, height: 50 };
-    expect(toViewBoxPercent({ x: 100, y: 200 }, viewBox)).toEqual({ left: 0, top: 0 });
-    expect(toViewBoxPercent({ x: 150, y: 250 }, viewBox)).toEqual({ left: 100, top: 100 });
   });
 });

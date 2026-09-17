@@ -11,10 +11,12 @@ export interface RegionCluster {
 const LAT_LABELS_BY_COUNT: Record<number, string[]> = {
   2: ["남부", "북부"],
   3: ["남부", "중부", "북부"],
+  4: ["남부", "중남부", "중북부", "북부"],
 };
 const LNG_LABELS_BY_COUNT: Record<number, string[]> = {
   2: ["서부", "동부"],
   3: ["서부", "중부", "동부"],
+  4: ["서부", "중서부", "중동부", "동부"],
 };
 
 function labelChunks(axis: "lat" | "lng", count: number): string[] {
@@ -22,12 +24,13 @@ function labelChunks(axis: "lat" | "lng", count: number): string[] {
   return table[count] ?? Array.from({ length: count }, (_, i) => `${i + 1}구역`);
 }
 
-// A region's spots read as one crowded blob past a certain count (the
-// reference infographic this was modeled on shows ~8 markers per map), so
-// once a region exceeds maxClusterSize it's split into geographically
-// contiguous groups along whichever axis (lat or lng) it spans more —
-// not real administrative boundaries, just an even geographic slice.
-export function splitRegionIntoClusters(spots: Spot[], maxClusterSize = 15): RegionCluster[] {
+// A region's spots read as one crowded blob past a certain count, and every
+// marker on the map carries a name label that needs room around it — about ten
+// per map is what fits before labels start getting dropped. Past that the
+// region is split into geographically contiguous groups along whichever axis
+// (lat or lng) it spans more: not administrative boundaries, just an even
+// geographic slice.
+export function splitRegionIntoClusters(spots: Spot[], maxClusterSize = 10): RegionCluster[] {
   if (spots.length <= maxClusterSize) return [{ label: "", spots }];
 
   const lats = spots.map((s) => s.lat);

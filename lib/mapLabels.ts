@@ -16,6 +16,8 @@ export interface PlacedLabel {
   width: number;
   height: number;
   visible: boolean;
+  /** False when the label only fit after dropping its second line. */
+  showSubText: boolean;
 }
 
 interface Rect {
@@ -81,38 +83,59 @@ export function layoutLabels(
   const results = new Map<string, PlacedLabel>();
 
   for (const input of ordered) {
-    const lines = input.subText ? [input.text, input.subText] : [input.text];
-    const width = Math.max(...lines.map((line) => estimateTextWidth(line, fontSize)));
-    const height = fontSize * (lines.length === 2 ? 2.35 : 1.25);
     const { anchor } = input;
+    // Two shots at fitting: the full two-line label, then name-only. A name
+    // with no description still tells the reader what the pin is, so shedding
+    // the second line beats dropping the label entirely.
+    const variants = input.subText
+      ? [
+          { lines: [input.text, input.subText], showSubText: true },
+          { lines: [input.text], showSubText: false },
+        ]
+      : [{ lines: [input.text], showSubText: false }];
 
-    const below = anchor.y + gap;
-    const above = anchor.y - pinHeight - gap - height;
-    const side = anchor.y - pinHeight / 2 - height / 2;
-    const right = anchor.x + gap + pinHeight * 0.4;
-    const left = anchor.x - gap - pinHeight * 0.4 - width;
-    // Ordered by preference: straight below reads most clearly (and matches
-    // the reference infographic), then above, then the sides, then diagonals
-    // and further-out rows for pins in crowded neighbourhoods.
-    const candidates: Rect[] = [
-      { x: anchor.x - width / 2, y: below, width, height },
-      { x: anchor.x - width / 2, y: above, width, height },
-      { x: right, y: side, width, height },
-      { x: left, y: side, width, height },
-      { x: right, y: below, width, height },
-      { x: left, y: below, width, height },
-      { x: right, y: above, width, height },
-      { x: left, y: above, width, height },
-      { x: anchor.x - width / 2, y: below + height * 1.25, width, height },
-      { x: anchor.x - width / 2, y: above - height * 1.25, width, height },
-    ];
+    let slot: Rect | undefined;
+    let showSubText = false;
+    let width = 0;
+    let height = 0;
 
-    const slot = candidates.find(
-      (candidate) =>
-        contains(viewBox, candidate) &&
-        !placed.some((rect) => overlaps(candidate, rect)) &&
-        !pinBoxes.some((rect) => overlaps(candidate, rect)),
-    );
+    for (const variant of variants) {
+      width = Math.max(...variant.lines.map((line) => estimateTextWidth(line, fontSize)));
+      height = fontSize * (variant.lines.length === 2 ? 2.35 : 1.25);
+
+      const below = anchor.y + gap;
+      const above = anchor.y - pinHeight - gap - height;
+      const side = anchor.y - pinHeight / 2 - height / 2;
+      const right = anchor.x + gap + pinHeight * 0.4;
+      const left = anchor.x - gap - pinHeight * 0.4 - width;
+      // Ordered by preference: straight below reads most clearly (and matches
+      // the reference infographic), then above, then the sides, then diagonals
+      // and further-out rows for pins in crowded neighbourhoods.
+      const candidates: Rect[] = [
+        { x: anchor.x - width / 2, y: below, width, height },
+        { x: anchor.x - width / 2, y: above, width, height },
+        { x: right, y: side, width, height },
+        { x: left, y: side, width, height },
+        { x: right, y: below, width, height },
+        { x: left, y: below, width, height },
+        { x: right, y: above, width, height },
+        { x: left, y: above, width, height },
+        { x: anchor.x - width / 2, y: below + height * 1.25, width, height },
+        { x: anchor.x - width / 2, y: above - height * 1.25, width, height },
+      ];
+
+      slot = candidates.find(
+        (candidate) =>
+          contains(viewBox, candidate) &&
+          !placed.some((rect) => overlaps(candidate, rect)) &&
+          !pinBoxes.some((rect) => overlaps(candidate, rect)),
+      );
+
+      if (slot) {
+        showSubText = variant.showSubText;
+        break;
+      }
+    }
 
     if (slot) {
       placed.push(slot);
@@ -123,6 +146,7 @@ export function layoutLabels(
         width,
         height,
         visible: true,
+        showSubText,
       });
     } else {
       results.set(input.id, {
@@ -132,6 +156,7 @@ export function layoutLabels(
         width,
         height,
         visible: false,
+        showSubText: false,
       });
     }
   }

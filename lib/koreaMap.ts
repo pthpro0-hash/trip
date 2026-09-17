@@ -153,36 +153,6 @@ export const KOREA_LAND_PATHS: string[] = [MAINLAND, JEJU, ULLEUNG].map(toPath);
 
 export const KOREA_FULL_VIEWBOX: ViewBox = { x: 20, y: 20, width: 340, height: 600 };
 
-interface ViewBoxOptions {
-  /** Extra room around the points, as a fraction of the square's side. */
-  padding?: number;
-  /** Floor on the square's side so a tight cluster doesn't zoom absurdly far in. */
-  minSpan?: number;
-}
-
-// Square viewBox centered on the given points. Square because the card is
-// square: matching the aspect ratio here means the projection isn't letterboxed
-// or distorted, and label/pin sizes can be derived from a single span number.
-export function computeViewBox(
-  points: MapPoint[],
-  { padding = 0.22, minSpan = 90 }: ViewBoxOptions = {},
-): ViewBox {
-  if (points.length === 0) return KOREA_FULL_VIEWBOX;
-
-  const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-
-  const side = Math.max(maxX - minX, maxY - minY, minSpan) * (1 + padding * 2);
-  const centerX = (minX + maxX) / 2;
-  const centerY = (minY + maxY) / 2;
-
-  return { x: centerX - side / 2, y: centerY - side / 2, width: side, height: side };
-}
-
 // Spots in the same city land almost on top of each other at region zoom, and
 // stacked pins hide each other entirely. This nudges colliding markers apart
 // by at most `maxOffset` — a legibility adjustment to the drawing only; the
@@ -238,12 +208,4 @@ export function spreadPoints(
   }
 
   return adjusted;
-}
-
-/** Position of a point inside a viewBox, as a 0-100 percentage of its width/height. */
-export function toViewBoxPercent(point: MapPoint, viewBox: ViewBox) {
-  return {
-    left: ((point.x - viewBox.x) / viewBox.width) * 100,
-    top: ((point.y - viewBox.y) / viewBox.height) * 100,
-  };
 }
