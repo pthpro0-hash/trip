@@ -46,13 +46,13 @@ describe("filterSpots", () => {
     expect(result.map((s) => s.id)).toEqual(["a"]);
   });
 
-  it("음식으로 검색한다", () => {
-    const result = filterSpots(SPOTS, { query: "설렁탕" });
-    expect(result.map((s) => s.id)).toEqual(["a"]);
+  it("음식으로는 검색하지 않는다 (궁궐이 갈비로 검색되던 문제)", () => {
+    expect(filterSpots(SPOTS, { query: "설렁탕" })).toHaveLength(0);
   });
 
   it("검색어와 region 조건은 AND로 결합된다", () => {
-    const result = filterSpots(SPOTS, { query: "f1", regions: ["제주권"] });
+    // '가을'은 a와 c 모두에 해당하지만 제주권은 c뿐이다.
+    const result = filterSpots(SPOTS, { query: "가을", regions: ["제주권"] });
     expect(result.map((s) => s.id)).toEqual(["c"]);
   });
 });

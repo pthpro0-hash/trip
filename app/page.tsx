@@ -10,6 +10,7 @@ import {
   type FilterCriteria,
   type RelaxationSuggestion,
 } from "@/lib/filter";
+import { sortByRelevance } from "@/lib/search";
 import { FilterBar } from "@/components/filter/FilterBar";
 import { SearchBox } from "@/components/filter/SearchBox";
 import { SpotCard } from "@/components/spot/SpotCard";
@@ -29,8 +30,15 @@ export default function HomePage() {
   const [criteria, setCriteria] = useState<FilterCriteria>({});
   const [selectedId, setSelectedId] = useState<string>();
   const [mobileView, setMobileView] = useState<"list" | "map">("map");
+  // Searching is a "find this place" action, so results belong in the list —
+  // but only until the reader says otherwise, after which their choice sticks.
+  const [viewChosenByUser, setViewChosenByUser] = useState(false);
 
-  const results = useMemo(() => filterSpots(SPOTS, criteria), [criteria]);
+  const query = criteria.query?.trim() ?? "";
+  const results = useMemo(() => {
+    const filtered = filterSpots(SPOTS, criteria);
+    return query ? sortByRelevance(filtered, query) : filtered;
+  }, [criteria, query]);
   const suggestions = useMemo(
     () => (results.length === 0 ? suggestRelaxedFilters(SPOTS, criteria) : []),
     [results, criteria],
@@ -65,12 +73,24 @@ export default function HomePage() {
 
       <SearchBox
         value={criteria.query ?? ""}
-        onChange={(query) => setCriteria({ ...criteria, query: query || undefined })}
+        spots={SPOTS}
+        onChange={(next) => {
+          setCriteria({ ...criteria, query: next || undefined });
+          if (next.trim() && !viewChosenByUser) setMobileView("list");
+        }}
       />
       <FilterBar criteria={criteria} onChange={setCriteria} />
-      <ViewToggle value={mobileView} onChange={setMobileView} />
+      <ViewToggle
+        value={mobileView}
+        onChange={(next) => {
+          setViewChosenByUser(true);
+          setMobileView(next);
+        }}
+      />
 
-      <p className="text-[13px] text-text-faint">{results.length}곳</p>
+      <p className="text-[13px] text-text-faint">
+        {query ? `'${query}' 검색 결과 ${results.length}곳` : `${results.length}곳`}
+      </p>
 
       {results.length === 0 && (
         // Rendered outside the list/map grid (not inside the list panel) so it's
@@ -96,6 +116,7 @@ export default function HomePage() {
               spot={spot}
               selected={spot.id === selectedId}
               onSelect={setSelectedId}
+              query={query}
             />
           ))}
         </div>

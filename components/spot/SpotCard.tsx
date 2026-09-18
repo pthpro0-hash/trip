@@ -4,17 +4,20 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Spot } from "@/lib/types";
 import { getSpotThumbnail } from "@/lib/media";
+import { HighlightedText } from "./HighlightedText";
 
 interface SpotCardProps {
   spot: Spot;
   selected: boolean;
   onSelect: (id: string) => void;
+  /** Current search term, highlighted wherever it appears in the card. */
+  query?: string;
 }
 
 // Photo first, then the name — the photo is what tells someone whether they
 // want to go. The whole image is the map-select target; the title links
 // through to the detail page.
-export function SpotCard({ spot, selected, onSelect }: SpotCardProps) {
+export function SpotCard({ spot, selected, onSelect, query }: SpotCardProps) {
   const thumbnail = getSpotThumbnail(spot.id);
 
   return (
@@ -50,12 +53,14 @@ export function SpotCard({ spot, selected, onSelect }: SpotCardProps) {
             href={`/spots/${spot.id}`}
             className="truncate text-[17px] font-semibold tracking-tight text-text hover:text-accent"
           >
-            {spot.name}
+            <HighlightedText text={spot.name} query={query} />
           </Link>
           <span className="shrink-0 text-xs text-text-faint">{spot.region}</span>
         </div>
 
-        <p className="line-clamp-2 text-[13px] leading-relaxed text-text-muted">{spot.summary}</p>
+        <p className="line-clamp-2 text-[13px] leading-relaxed text-text-muted">
+          <HighlightedText text={spot.summary} query={query} />
+        </p>
 
         <div className="flex flex-wrap gap-1 pt-0.5">
           {spot.seasons.map((season) => (

@@ -1,16 +1,11 @@
 import type { Spot, Region, Season, Theme } from "./types";
+import { matchesQuery } from "./search";
 
 export interface FilterCriteria {
   regions?: Region[];
   seasons?: Season[];
   themes?: Theme[];
   query?: string;
-}
-
-function buildSearchableText(spot: Spot): string {
-  return [spot.name, spot.summary, spot.highlights.join(" "), spot.foods.join(" ")]
-    .join(" ")
-    .toLowerCase();
 }
 
 export function filterSpots(spots: Spot[], criteria: FilterCriteria): Spot[] {
@@ -23,9 +18,8 @@ export function filterSpots(spots: Spot[], criteria: FilterCriteria): Spot[] {
       return false;
     }
     const query = criteria.query?.trim();
-    if (query && !buildSearchableText(spot).includes(query.toLowerCase())) {
-      return false;
-    }
+    // Which fields count as a match, and how they rank, lives in search.ts.
+    if (query && !matchesQuery(spot, query)) return false;
     return true;
   });
 }
