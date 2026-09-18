@@ -38,6 +38,25 @@ describe("검색 대상", () => {
   });
 });
 
+describe("주소 검색", () => {
+  it("시·군 이름으로 그 지역 여행지를 찾는다", () => {
+    // '강릉'은 이름·요약 어디에도 없고 주소에만 있다.
+    expect(names(search("강릉"))).toContain("정동심곡 바다부채길");
+    expect(names(search("경주"))).toContain("불국사 & 석굴암");
+  });
+
+  it("구·읍·면·동 단위까지 찾는다", () => {
+    expect(names(search("종로"))).toContain("경복궁");
+    expect(names(search("애월읍"))).toContain("한담해변");
+    expect(names(search("진관동"))).toContain("은평한옥마을");
+  });
+
+  it("낱말 중간에 우연히 겹치는 주소는 걸리지 않는다", () => {
+    // 장태산 자연휴양림의 주소에 '장안동'이 있지만 '안동' 검색에 나오면 안 된다.
+    expect(names(search("안동"))).not.toContain("장태산 자연휴양림");
+  });
+});
+
 describe("한 글자 검색", () => {
   it("요약·볼거리의 부분 일치를 무시한다", () => {
     // '회'는 경복궁의 볼거리 '경회루' 안에 들어 있다.

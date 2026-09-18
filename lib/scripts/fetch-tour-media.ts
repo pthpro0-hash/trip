@@ -32,6 +32,8 @@ const USABLE_COPYRIGHT = new Set(["Type1", "Type3"]);
 interface SpotMedia {
   contentId: string;
   sourceTitle: string;
+  /** 시·군·구와 읍·면·동까지 담긴 도로명 주소. 검색에서 지명을 찾는 데 쓴다. */
+  address: string;
   overview: string;
   homepage: string | null;
   images: { url: string; copyright: string }[];
@@ -85,7 +87,7 @@ function resolveContentId(spot: Spot): string | null {
 async function fetchMedia(contentId: string): Promise<SpotMedia | null> {
   const common = await json(`${BASE}/detailCommon2?${COMMON}&contentId=${contentId}`);
   const detail = toList(common?.response?.body?.items)[0] as
-    | { title?: string; overview?: string; homepage?: string }
+    | { title?: string; overview?: string; homepage?: string; addr1?: string; addr2?: string }
     | undefined;
   if (!detail) return null;
 
@@ -109,6 +111,7 @@ async function fetchMedia(contentId: string): Promise<SpotMedia | null> {
   return {
     contentId,
     sourceTitle: String(detail.title ?? ""),
+    address: [detail.addr1, detail.addr2].filter(Boolean).join(" ").trim(),
     overview: cleanOverview(String(detail.overview ?? "")),
     homepage: homepageMatch ? homepageMatch[0] : null,
     images,
@@ -138,7 +141,7 @@ async function main() {
     media[spot.id] = result;
     if (result.images.length === 0) noPhoto.push(spot.name);
     console.log(
-      `${index + 1}/${SPOTS.length} ${spot.name} → ${result.sourceTitle} · 사진 ${result.images.length}장 · 소개 ${result.overview.length}자`,
+      `${index + 1}/${SPOTS.length} ${spot.name} → ${result.sourceTitle} · 사진 ${result.images.length}장 · ${result.address || "주소없음"}`,
     );
     await new Promise((resolve) => setTimeout(resolve, 60));
   }

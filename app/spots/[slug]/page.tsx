@@ -54,6 +54,12 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
       </section>
 
       <section className="flex flex-wrap gap-x-8 gap-y-3 rounded-2xl bg-bg-subtle p-5 text-[15px]">
+        {media?.address && (
+          <div className="w-full">
+            <span className="text-text-faint">주소: </span>
+            {media.address}
+          </div>
+        )}
         <div>
           <span className="text-text-faint">추천 계절: </span>
           {spot.seasons.join(", ")}

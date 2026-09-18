@@ -1,3 +1,4 @@
+import { getSpotAddress } from "./media";
 import type { Spot } from "./types";
 
 /*
@@ -29,11 +30,26 @@ const SCORE = {
   namePrefix: 80,
   nameIncludes: 60,
   region: 50,
+  // 시·군·구, 읍·면·동 단위 지명. 권역보다 좁으므로 같은 급으로 둔다:
+  // "강릉"으로 강릉의 여행지가, "경주"로 경주의 여행지가 나와야 한다.
+  address: 48,
   theme: 45,
   season: 40,
   highlight: 25,
   summary: 15,
 } as const;
+
+// Addresses are matched a token at a time, and only from the start of a token:
+// plain substring matching puts "장안동" (대전 서구 장안동) in the results for
+// "안동". A place name is the head of its token — 강릉시, 애월읍, 진관동 — so
+// a prefix test keeps the real hits and drops the accidental ones.
+function addressMatches(address: string, q: string): boolean {
+  if (!address) return false;
+  return address
+    .split(/\s+/)
+    .map(normalize)
+    .some((token) => token.startsWith(q));
+}
 
 // A single character matches far too much prose to be useful — "회" is inside
 // 경회루, "산" inside 산책 — so one-character queries only look at names and
@@ -58,6 +74,8 @@ export function scoreSpot(spot: Spot, query: string): number {
   if (spot.seasons.some((season) => normalize(season).includes(q))) scores.push(SCORE.season);
 
   if (query.trim().length >= PROSE_MIN_QUERY_LENGTH) {
+    // 한 글자 검색에서는 '로'·'구'처럼 의미 없는 글자가 전부 걸리므로 제외.
+    if (addressMatches(getSpotAddress(spot.id), q)) scores.push(SCORE.address);
     if (spot.highlights.some((h) => normalize(h).includes(q))) scores.push(SCORE.highlight);
     if (normalize(spot.summary).includes(q)) scores.push(SCORE.summary);
   }

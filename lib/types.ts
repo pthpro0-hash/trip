@@ -20,6 +20,8 @@ export interface SpotImage {
 export interface SpotMedia {
   contentId: string;
   sourceTitle: string;
+  /** 시·군·구와 읍·면·동까지 담긴 도로명 주소. */
+  address: string;
   overview: string;
   homepage: string | null;
   images: SpotImage[];
