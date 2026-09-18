@@ -12,12 +12,12 @@ const COAST = "#A9BFCB";
 
 export default function RegionsIndexPage() {
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-4 p-4">
-      <Link href="/" className="text-sm text-text-muted hover:text-text">
+    <main className="mx-auto flex max-w-4xl flex-col gap-5 px-5 pb-16 pt-8">
+      <Link href="/" className="text-[15px] font-medium text-accent hover:text-accent-hover">
         ← 목록으로
       </Link>
-      <h1 className="font-[family-name:var(--font-heading)] text-3xl text-text">권역별로 둘러보기</h1>
-      <p className="text-sm text-text-muted">
+      <h1 className="text-[32px] font-bold tracking-tight text-text md:text-[40px]">권역별로 둘러보기</h1>
+      <p className="-mt-2 text-[15px] text-text-muted">
         권역을 선택하면 그 지역 여행지를 지도 위에 이름과 함께 표시해 드려요.
       </p>
 
@@ -30,8 +30,7 @@ export default function RegionsIndexPage() {
             <Link
               key={region}
               href={`/regions/${region}`}
-              className="flex flex-col gap-2 rounded-2xl border-2 p-2 shadow-sm transition hover:brightness-110"
-              style={{ borderColor: theme.accent }}
+              className="flex flex-col gap-2 rounded-2xl bg-bg-subtle p-2 ring-1 ring-line transition hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.10)]"
             >
               <svg
                 viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
@@ -57,8 +56,8 @@ export default function RegionsIndexPage() {
                 })}
               </svg>
               <div className="px-1 pb-1 text-center">
-                <div className="font-[family-name:var(--font-heading)] text-base text-text">{region}</div>
-                <div className="text-xs text-text-muted">{spots.length}곳</div>
+                <div className="text-[15px] font-semibold tracking-tight text-text">{region}</div>
+                <div className="text-[12px] text-text-faint">{spots.length}곳</div>
               </div>
             </Link>
           );

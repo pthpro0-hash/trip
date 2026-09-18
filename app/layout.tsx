@@ -1,12 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans_KR } from "next/font/google";
 import "./globals.css";
-
-const ibmPlexSansKr = IBM_Plex_Sans_KR({
-  subsets: ["latin"],
-  weight: "700",
-  variable: "--font-heading",
-});
 
 export const metadata: Metadata = {
   title: "여행세상 | 한국관광 100선 추천",
@@ -15,8 +8,20 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={ibmPlexSansKr.variable}>
-      <body className="min-h-screen bg-bg text-text">{children}</body>
+    <html lang="ko">
+      <head>
+        {/*
+          Apple devices get their own system face from the --font-sans stack;
+          this covers everyone else with a Korean typeface of the same
+          character, and the stack falls back cleanly if the CDN is blocked.
+        */}
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="" />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
+        />
+      </head>
+      <body className="min-h-screen bg-bg text-text antialiased">{children}</body>
     </html>
   );
 }

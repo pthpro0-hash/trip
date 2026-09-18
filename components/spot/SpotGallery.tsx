@@ -15,7 +15,7 @@ export function SpotGallery({ name, images }: SpotGalleryProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="relative aspect-[16/10] overflow-hidden rounded-2xl border-2 border-gold bg-surface">
+      <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-bg-subtle">
         <Image
           src={active.url}
           alt={`${name} 사진 ${activeIndex + 1}`}
@@ -36,10 +36,10 @@ export function SpotGallery({ name, images }: SpotGalleryProps) {
               onClick={() => setActiveIndex(index)}
               aria-label={`${name} 사진 ${index + 1} 보기`}
               aria-pressed={index === activeIndex}
-              className={`relative aspect-[4/3] overflow-hidden rounded-lg border transition ${
+              className={`relative aspect-[4/3] overflow-hidden rounded-xl transition ${
                 index === activeIndex
-                  ? "border-gold"
-                  : "border-border opacity-70 hover:opacity-100"
+                  ? "ring-2 ring-accent"
+                  : "ring-1 ring-line opacity-60 hover:opacity-100"
               }`}
             >
               <Image

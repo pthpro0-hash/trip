@@ -28,16 +28,16 @@ export function FilterBar({ criteria, onChange }: FilterBarProps) {
     (criteria.themes?.length ?? 0);
 
   return (
-    <div className="flex flex-col gap-3 border-b border-border pb-4">
+    <div className="flex flex-col gap-3">
       <button
         type="button"
-        className="flex items-center gap-1 self-start rounded-full border border-border bg-surface px-3 py-2 text-sm text-text md:hidden"
+        className="flex items-center gap-1 self-start rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text md:hidden"
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
       >
-        {activeCount > 0 ? `필터 (${activeCount})` : "필터"} {expanded ? "▲" : "▾"}
+        {activeCount > 0 ? `필터 ${activeCount}` : "필터"} {expanded ? "▲" : "▾"}
       </button>
-      <div className={`${expanded ? "flex" : "hidden"} flex-col gap-3 md:flex`}>
+      <div className={`${expanded ? "flex" : "hidden"} flex-col gap-2.5 md:flex`}>
         <FilterGroup
           label="권역"
           options={REGIONS}
@@ -73,15 +73,15 @@ function FilterGroup<T extends string>({
   onToggle: (value: T) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="w-12 shrink-0 text-sm font-medium text-text-muted">{label}</span>
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="w-10 shrink-0 text-[13px] font-medium text-text-faint">{label}</span>
       {options.map((option) => (
         <label
           key={option}
-          className={`cursor-pointer rounded-full border px-3 py-2 text-sm ${
+          className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
             selected.includes(option)
-              ? "border-gold bg-gold text-bg"
-              : "border-border bg-surface text-text"
+              ? "bg-accent text-on-accent"
+              : "bg-bg-subtle text-text hover:bg-line"
           }`}
         >
           <input

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Region, Spot } from "@/lib/types";
 import { loadKakaoMaps } from "@/lib/kakaoLoader";
-import { REGION_THEME } from "@/lib/regionTheme";
 import { spreadPoints, type MapPoint } from "@/lib/koreaMap";
 import { layoutLabels } from "@/lib/mapLabels";
 import { CATEGORY_COLOR, SPOT_CATEGORIES, categorize } from "@/lib/spotCategory";
@@ -55,7 +54,6 @@ function subTextFor(spot: Spot) {
 // the label layout computed for it) holds still.
 export function RegionMap({ region, spots, label }: RegionMapProps) {
   const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ?? "";
-  const theme = REGION_THEME[region];
 
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Kakao Maps SDK has no official types
@@ -174,12 +172,12 @@ export function RegionMap({ region, spots, label }: RegionMapProps) {
   return (
     <div className="flex flex-col gap-3">
       {label && (
-        <h2 className="font-[family-name:var(--font-heading)] text-lg text-text">
+        <h2 className="text-[20px] font-semibold tracking-tight text-text">
           {region} · {label}
         </h2>
       )}
 
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-text-muted">
         {usedCategories.map((category) => (
           <span key={category} className="flex items-center gap-1.5">
             <span
@@ -192,10 +190,7 @@ export function RegionMap({ region, spots, label }: RegionMapProps) {
         ))}
       </div>
 
-      <div
-        className="relative aspect-[4/5] overflow-hidden rounded-2xl border-2 shadow-sm"
-        style={{ borderColor: theme.accent }}
-      >
+      <div className="relative aspect-[4/5] overflow-hidden rounded-2xl ring-1 ring-line">
         <div ref={containerRef} className="absolute inset-0" style={{ filter: TILE_FILTER }} />
         <div className="pointer-events-none absolute inset-0" style={{ background: TILE_SCRIM }} />
 
@@ -314,7 +309,7 @@ export function RegionMap({ region, spots, label }: RegionMapProps) {
 
         {selectedSpot && selectedPoint && (
           <div
-            className="absolute z-10 w-52 -translate-x-1/2 rounded-lg border border-border bg-surface p-3 text-sm shadow-lg"
+            className="absolute z-10 w-52 -translate-x-1/2 rounded-xl bg-surface p-3 text-sm shadow-[0_4px_16px_rgba(0,0,0,0.16)] ring-1 ring-line"
             style={{
               left: `${Math.min(Math.max(selectedPoint.x, 110), Math.max(size.width - 110, 110))}px`,
               top: `${selectedPoint.y + 10}px`,
@@ -324,24 +319,24 @@ export function RegionMap({ region, spots, label }: RegionMapProps) {
               type="button"
               onClick={() => setSelectedId(null)}
               aria-label="닫기"
-              className="float-right -mt-1 -mr-1 rounded px-1 text-text-muted hover:text-text"
+              className="float-right -mt-1 -mr-1 rounded px-1 text-text-faint hover:text-text"
             >
               ×
             </button>
-            <h3 className="font-[family-name:var(--font-heading)] text-base text-text">
+            <h3 className="text-[15px] font-semibold tracking-tight text-text">
               {selectedSpot.name}
             </h3>
-            <p className="mt-1 text-text-muted">{truncate(selectedSpot.summary, 60)}</p>
+            <p className="mt-1 text-[13px] leading-relaxed text-text-muted">{truncate(selectedSpot.summary, 60)}</p>
             <div className="mt-2 flex flex-wrap gap-1">
               {selectedSpot.seasons.map((season) => (
-                <span key={season} className="rounded bg-[#41372b] px-2 py-0.5 text-xs text-gold">
+                <span key={season} className="rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">
                   {season}
                 </span>
               ))}
             </div>
             <Link
               href={`/spots/${selectedSpot.id}`}
-              className="mt-2 inline-block font-medium text-gold underline decoration-gold-dark/50 underline-offset-2 hover:decoration-gold"
+              className="mt-2 inline-block text-[13px] font-medium text-accent hover:text-accent-hover"
             >
               자세히 보기 →
             </Link>
@@ -354,7 +349,7 @@ export function RegionMap({ region, spots, label }: RegionMapProps) {
           <li key={spot.id}>
             <Link
               href={`/spots/${spot.id}`}
-              className="flex items-baseline gap-1.5 text-text hover:text-gold"
+              className="flex items-baseline gap-1.5 text-[14px] text-text hover:text-accent"
             >
               <span
                 className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"

@@ -11,61 +11,78 @@ interface SpotCardProps {
   onSelect: (id: string) => void;
 }
 
+// Photo first, then the name — the photo is what tells someone whether they
+// want to go. The whole image is the map-select target; the title links
+// through to the detail page.
 export function SpotCard({ spot, selected, onSelect }: SpotCardProps) {
   const thumbnail = getSpotThumbnail(spot.id);
 
   return (
     <div
-      className={`w-full rounded-2xl border bg-surface p-3 transition ${
-        selected ? "border-border-strong" : "border-border"
+      className={`overflow-hidden rounded-2xl bg-surface transition ${
+        selected ? "ring-2 ring-accent" : "ring-1 ring-line"
       }`}
     >
-      <button type="button" onClick={() => onSelect(spot.id)} className="flex w-full gap-3 text-left">
+      <button
+        type="button"
+        onClick={() => onSelect(spot.id)}
+        aria-label={`${spot.name} 지도에서 보기`}
+        className="relative block aspect-[16/10] w-full overflow-hidden bg-bg-subtle"
+      >
         {thumbnail ? (
           <Image
             src={thumbnail}
             alt=""
-            width={76}
-            height={76}
-            className="h-[76px] w-[76px] shrink-0 rounded-xl object-cover"
+            fill
+            sizes="(max-width: 768px) 100vw, 380px"
+            className="object-cover transition duration-300 hover:scale-[1.03]"
           />
         ) : (
-          <span
-            aria-hidden="true"
-            className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-xl bg-gold font-[family-name:var(--font-heading)] text-xl text-bg"
-          >
-            {spot.region.charAt(0)}
+          <span className="flex h-full w-full items-center justify-center text-sm text-text-faint">
+            {spot.region}
           </span>
         )}
-        <div className="min-w-0 flex-1">
-          <h3 className="font-[family-name:var(--font-heading)] text-lg text-text">{spot.name}</h3>
-          <p className="mt-1 line-clamp-2 text-sm text-text-muted">{spot.summary}</p>
-          <div className="mt-2 flex flex-wrap gap-1">
-            {spot.seasons.map((season) => (
-              <span
-                key={season}
-                className="rounded bg-[#41372b] px-2 py-0.5 text-xs text-gold"
-              >
-                {season}
-              </span>
-            ))}
-            {spot.foods.map((food) => (
-              <span
-                key={food}
-                className="rounded bg-border-strong px-2 py-0.5 text-xs text-text"
-              >
-                {food}
-              </span>
-            ))}
-          </div>
-        </div>
       </button>
-      <Link
-        href={`/spots/${spot.id}`}
-        className="mt-2 inline-block text-sm font-medium text-gold underline decoration-gold-dark/50 underline-offset-2 hover:decoration-gold"
-      >
-        자세히 보기 →
-      </Link>
+
+      <div className="flex flex-col gap-2 p-4">
+        <div className="flex items-baseline justify-between gap-2">
+          <Link
+            href={`/spots/${spot.id}`}
+            className="truncate text-[17px] font-semibold tracking-tight text-text hover:text-accent"
+          >
+            {spot.name}
+          </Link>
+          <span className="shrink-0 text-xs text-text-faint">{spot.region}</span>
+        </div>
+
+        <p className="line-clamp-2 text-[13px] leading-relaxed text-text-muted">{spot.summary}</p>
+
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          {spot.seasons.map((season) => (
+            <span
+              key={season}
+              className="rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent"
+            >
+              {season}
+            </span>
+          ))}
+          {spot.foods.slice(0, 2).map((food) => (
+            <span
+              key={food}
+              className="rounded-md bg-bg-subtle px-2 py-0.5 text-[11px] text-text-muted"
+            >
+              {food}
+            </span>
+          ))}
+        </div>
+
+        <Link
+          href={`/spots/${spot.id}`}
+          className="mt-1 text-[13px] font-medium text-accent hover:text-accent-hover"
+        >
+          자세히 보기 →
+        </Link>
+      </div>
     </div>
   );
 }

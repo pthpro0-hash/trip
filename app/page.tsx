@@ -37,29 +37,32 @@ export default function HomePage() {
   );
 
   return (
-    <main className="mx-auto flex max-w-6xl flex-col gap-4 p-4">
-      <header className="relative overflow-hidden rounded-2xl border border-border bg-surface-raised px-6 py-8 text-center shadow-sm">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-6 -top-6 h-28 w-28 rounded-full bg-gold/10"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-gold/10"
-        />
-        <h1 className="relative font-[family-name:var(--font-heading)] text-4xl text-gold md:text-5xl">
-          여행세상
-        </h1>
+    <main className="mx-auto flex max-w-6xl flex-col gap-5 px-5 pb-16 pt-10">
+      <header className="flex flex-col gap-3">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h1 className="text-[34px] font-bold tracking-tight text-text md:text-[44px]">
+              여행세상
+            </h1>
+            <p className="mt-1 text-[15px] text-text-muted">
+              2025~2026 한국관광 100선, 조건으로 찾고 지도로 만나보세요
+            </p>
+          </div>
+          <Link
+            href="/regions"
+            className="hidden shrink-0 rounded-full bg-bg-subtle px-4 py-2 text-[13px] font-medium text-text transition hover:bg-line md:block"
+          >
+            권역별로 둘러보기
+          </Link>
+        </div>
+        <Link
+          href="/regions"
+          className="self-start rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text md:hidden"
+        >
+          권역별로 둘러보기
+        </Link>
       </header>
-      <p className="text-center text-sm font-medium text-text-muted">
-        2025~2026 한국관광 100선, 조건으로 찾고 지도로 만나보세요
-      </p>
-      <Link
-        href="/regions"
-        className="mx-auto flex items-center gap-1 rounded-full border border-border bg-surface px-4 py-2 text-sm text-text hover:border-gold hover:text-gold"
-      >
-        🗺️ 권역별로 둘러보기
-      </Link>
+
       <SearchBox
         value={criteria.query ?? ""}
         onChange={(query) => setCriteria({ ...criteria, query: query || undefined })}
@@ -67,24 +70,26 @@ export default function HomePage() {
       <FilterBar criteria={criteria} onChange={setCriteria} />
       <ViewToggle value={mobileView} onChange={setMobileView} />
 
+      <p className="text-[13px] text-text-faint">{results.length}곳</p>
+
       {results.length === 0 && (
         // Rendered outside the list/map grid (not inside the list panel) so it's
         // visible on mobile regardless of which tab (리스트/지도) is active — the
         // list panel itself is hidden while mobileView is "map", so a message
         // placed inside it would silently disappear along with the panel,
         // leaving an empty map with no explanation.
-        <div className="rounded-lg border border-dashed border-border p-4 text-sm text-text-muted">
+        <div className="rounded-2xl bg-bg-subtle p-5 text-[15px] text-text-muted">
           조건에 맞는 곳이 없어요.
           {suggestions.map((s) => (
-            <div key={s.relaxed}>
+            <div key={s.relaxed} className="mt-1 text-[13px]">
               {RELAX_LABEL[s.relaxed]} 조건을 빼면 {s.count}곳 있어요.
             </div>
           ))}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className={`${mobileView === "map" ? "hidden md:flex" : "flex"} flex-col gap-2`}>
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_1fr] md:items-start">
+        <div className={`${mobileView === "map" ? "hidden md:flex" : "flex"} flex-col gap-4`}>
           {results.map((spot) => (
             <SpotCard
               key={spot.id}
@@ -94,12 +99,11 @@ export default function HomePage() {
             />
           ))}
         </div>
+        {/* Sticky on desktop so the map stays put while the list scrolls past it. */}
         <div
-          className={`h-[500px] rounded-2xl border-2 border-gold bg-surface p-1.5 shadow-sm ${mobileView === "list" ? "hidden md:block" : ""}`}
+          className={`h-[70vh] overflow-hidden rounded-2xl ring-1 ring-line md:sticky md:top-6 ${mobileView === "list" ? "hidden md:block" : ""}`}
         >
-          <div className="h-full overflow-hidden rounded-xl">
-            <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
-          </div>
+          <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
         </div>
       </div>
     </main>

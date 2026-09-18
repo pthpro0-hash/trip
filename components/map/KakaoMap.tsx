@@ -27,19 +27,19 @@ interface KakaoMapProps {
 const failedScriptSrcs = new Set<string>();
 
 // Kakao's stock blue pin doesn't match the app's dark-premium palette at
-// all, so the marker below is custom-colored to match --color-gold. This
+// all, so the marker below is custom-colored to match --color-accent. This
 // SVG renders as a standalone data URI — a separate document context that
 // can't see the page's CSS custom properties — so the hex value is
 // duplicated here rather than referenced via var().
 
-// A small solid-gold circle with a white ring, used for both the
+// A small solid-blue circle with a white ring, used for both the
 // single-spot close-up view (the detail page) and the many-spot overview
 // (the home page) — a small, unobtrusive dot reads better at any zoom than
 // a larger pin shape. The white ring stays white regardless of the app's
 // theme: it exists purely for contrast against the map's own light-colored
 // tiles, which Kakao renders independently of the surrounding UI.
 function buildMarkerImage() {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#E8A33D" stroke="white" stroke-width="2"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#0071E3" stroke="white" stroke-width="2"/></svg>`;
   const src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
   return new window.kakao.maps.MarkerImage(
     src,
@@ -54,25 +54,25 @@ function buildMarkerImage() {
 function buildOverlayContent(spot: Spot, onClose: () => void): HTMLElement {
   const container = document.createElement("div");
   container.className =
-    "max-w-[240px] rounded-lg border border-border bg-surface p-3 text-sm shadow-lg";
+    "max-w-[240px] rounded-xl bg-surface p-3 text-sm shadow-[0_4px_16px_rgba(0,0,0,0.16)] ring-1 ring-line";
 
   const closeButton = document.createElement("button");
   closeButton.type = "button";
   closeButton.textContent = "×";
   closeButton.className =
-    "float-right -mt-1 -mr-1 rounded px-1 text-text-muted hover:text-text";
+    "float-right -mt-1 -mr-1 rounded px-1 text-text-faint hover:text-text";
   closeButton.addEventListener("click", onClose);
   container.appendChild(closeButton);
 
   const name = document.createElement("h4");
   name.textContent = spot.name;
-  name.className = "font-[family-name:var(--font-heading)] text-base text-text";
+  name.className = "text-[15px] font-semibold tracking-tight text-text";
   container.appendChild(name);
 
   const summary = document.createElement("p");
   summary.textContent =
     spot.summary.length > 50 ? `${spot.summary.slice(0, 50)}…` : spot.summary;
-  summary.className = "mt-1 text-text-muted";
+  summary.className = "mt-1 text-[13px] leading-relaxed text-text-muted";
   container.appendChild(summary);
 
   const tags = document.createElement("div");
@@ -80,13 +80,13 @@ function buildOverlayContent(spot: Spot, onClose: () => void): HTMLElement {
   spot.seasons.forEach((season) => {
     const tag = document.createElement("span");
     tag.textContent = season;
-    tag.className = "rounded bg-[#41372b] px-2 py-0.5 text-xs text-gold";
+    tag.className = "rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent";
     tags.appendChild(tag);
   });
   spot.foods.forEach((food) => {
     const tag = document.createElement("span");
     tag.textContent = food;
-    tag.className = "rounded bg-border-strong px-2 py-0.5 text-xs text-text";
+    tag.className = "rounded-md bg-bg-subtle px-2 py-0.5 text-[11px] text-text-muted";
     tags.appendChild(tag);
   });
   container.appendChild(tags);
@@ -95,7 +95,7 @@ function buildOverlayContent(spot: Spot, onClose: () => void): HTMLElement {
   link.href = `/spots/${spot.id}`;
   link.textContent = "자세히 보기 →";
   link.className =
-    "mt-2 inline-block font-medium text-gold underline decoration-gold-dark/50 underline-offset-2 hover:decoration-gold";
+    "mt-2 inline-block text-[13px] font-medium text-accent hover:text-accent-hover";
   container.appendChild(link);
 
   return container;
@@ -233,7 +233,7 @@ export function KakaoMap({ spots, selectedId, onMarkerClick }: KakaoMapProps) {
 
   if (!apiKey) {
     return (
-      <div className="flex h-full min-h-[400px] w-full items-center justify-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center text-sm text-neutral-500">
+      <div className="flex h-full min-h-[400px] w-full items-center justify-center bg-bg-subtle p-4 text-center text-sm text-text-faint">
         지도를 보려면 카카오맵 키 설정이 필요합니다
       </div>
     );
@@ -241,7 +241,7 @@ export function KakaoMap({ spots, selectedId, onMarkerClick }: KakaoMapProps) {
 
   if (hasError) {
     return (
-      <div className="flex h-full min-h-[400px] w-full items-center justify-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-4 text-center text-sm text-neutral-500">
+      <div className="flex h-full min-h-[400px] w-full items-center justify-center bg-bg-subtle p-4 text-center text-sm text-text-faint">
         지도를 불러오지 못했습니다
       </div>
     );

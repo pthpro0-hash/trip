@@ -9,7 +9,7 @@ export function SearchBox({ value, onChange }: SearchBoxProps) {
   return (
     <div className="relative">
       <svg
-        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-text-muted"
+        className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-text-faint"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -25,7 +25,7 @@ export function SearchBox({ value, onChange }: SearchBoxProps) {
         onChange={(e) => onChange(e.target.value)}
         placeholder="관광지 이름, 음식으로 검색"
         aria-label="검색"
-        className="w-full rounded-full border border-border bg-surface py-3 pl-11 pr-4 text-sm text-text placeholder:text-text-muted focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/40"
+        className="w-full rounded-xl bg-bg-subtle py-3 pl-10 pr-4 text-[15px] text-text placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-accent/50"
       />
     </div>
   );
