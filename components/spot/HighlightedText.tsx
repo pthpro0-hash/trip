@@ -3,26 +3,40 @@ interface HighlightedTextProps {
   query?: string;
 }
 
-// Marks where the search term actually appears, so a result doesn't look
-// arbitrary. Matching here is plain case-insensitive substring — it only has to
-// agree with what the reader can see, not with the ranking rules in search.ts.
+// Marks where the search terms actually appear, so a result doesn't look
+// arbitrary. Each space-separated term is highlighted on its own — the search
+// itself treats them separately, so "제주 해변" must light up both words rather
+// than looking for that exact phrase. Matching is plain case-insensitive
+// substring: it only has to agree with what the reader can see, not with the
+// ranking rules in search.ts.
 export function HighlightedText({ text, query }: HighlightedTextProps) {
-  const term = query?.trim();
-  if (!term) return <>{text}</>;
+  const terms = (query ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((term) => term.toLowerCase());
+  if (terms.length === 0) return <>{text}</>;
 
   const lowerText = text.toLowerCase();
-  const lowerTerm = term.toLowerCase();
-  const parts: { value: string; hit: boolean }[] = [];
-
-  let cursor = 0;
-  let found = lowerText.indexOf(lowerTerm);
-  while (found !== -1) {
-    if (found > cursor) parts.push({ value: text.slice(cursor, found), hit: false });
-    parts.push({ value: text.slice(found, found + term.length), hit: true });
-    cursor = found + term.length;
-    found = lowerText.indexOf(lowerTerm, cursor);
+  // Mark every character covered by any term, then read the runs back off.
+  const covered = new Array<boolean>(text.length).fill(false);
+  for (const term of terms) {
+    let found = lowerText.indexOf(term);
+    while (found !== -1) {
+      for (let i = found; i < found + term.length; i += 1) covered[i] = true;
+      found = lowerText.indexOf(term, found + term.length);
+    }
   }
-  if (cursor < text.length) parts.push({ value: text.slice(cursor), hit: false });
+
+  const parts: { value: string; hit: boolean }[] = [];
+  let cursor = 0;
+  while (cursor < text.length) {
+    const hit = covered[cursor];
+    let end = cursor;
+    while (end < text.length && covered[end] === hit) end += 1;
+    parts.push({ value: text.slice(cursor, end), hit });
+    cursor = end;
+  }
 
   return (
     <>

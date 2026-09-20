@@ -78,7 +78,7 @@ export function SearchBox({ value, onChange, spots }: SearchBoxProps) {
             setFocused(false);
           }
         }}
-        placeholder="관광지 이름, 지역, 테마로 검색"
+        placeholder="이름, 지역, 테마로 검색 (예: 제주 해변)"
         aria-label="검색"
         className="w-full rounded-xl bg-bg-subtle py-3 pl-10 pr-10 text-[15px] text-text placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-accent/50"
       />

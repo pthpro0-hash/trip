@@ -10,7 +10,7 @@ import {
   type FilterCriteria,
   type RelaxationSuggestion,
 } from "@/lib/filter";
-import { sortByRelevance } from "@/lib/search";
+import { sortByRelevance, suggestCorrection } from "@/lib/search";
 import { FilterBar } from "@/components/filter/FilterBar";
 import { SearchBox } from "@/components/filter/SearchBox";
 import { SpotCard } from "@/components/spot/SpotCard";
@@ -42,6 +42,11 @@ export default function HomePage() {
   const suggestions = useMemo(
     () => (results.length === 0 ? suggestRelaxedFilters(SPOTS, criteria) : []),
     [results, criteria],
+  );
+  // 오타로 0건이 되는 경우가 잦아, 가장 가까운 이름을 되물어 본다.
+  const correction = useMemo(
+    () => (results.length === 0 && query ? suggestCorrection(SPOTS, query) : null),
+    [results, query],
   );
 
   return (
@@ -100,6 +105,19 @@ export default function HomePage() {
         // leaving an empty map with no explanation.
         <div className="rounded-2xl bg-bg-subtle p-5 text-[15px] text-text-muted">
           조건에 맞는 곳이 없어요.
+          {correction && (
+            <div className="mt-2">
+              혹시{" "}
+              <button
+                type="button"
+                onClick={() => setCriteria({ ...criteria, query: correction.name })}
+                className="font-medium text-accent underline underline-offset-2 hover:text-accent-hover"
+              >
+                {correction.name}
+              </button>
+              을 찾으셨나요?
+            </div>
+          )}
           {suggestions.map((s) => (
             <div key={s.relaxed} className="mt-1 text-[13px]">
               {RELAX_LABEL[s.relaxed]} 조건을 빼면 {s.count}곳 있어요.

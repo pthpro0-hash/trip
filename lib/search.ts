@@ -29,6 +29,8 @@ const SCORE = {
   nameSuffix: 85,
   namePrefix: 80,
   nameIncludes: 60,
+  // 초성만 입력한 경우 (ㄱㅂㄱ → 경복궁). 이름 일부 일치와 비슷한 급.
+  chosung: 55,
   region: 50,
   // 시·군·구, 읍·면·동 단위 지명. 권역보다 좁으므로 같은 급으로 둔다:
   // "강릉"으로 강릉의 여행지가, "경주"로 경주의 여행지가 나와야 한다.
@@ -51,14 +53,67 @@ function addressMatches(address: string, q: string): boolean {
     .some((token) => token.startsWith(q));
 }
 
+const CHOSUNG = [
+  "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ",
+  "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+];
+const HANGUL_START = 0xac00;
+const HANGUL_END = 0xd7a3;
+const SYLLABLES_PER_LEAD = 588;
+
+/** "경복궁" → "ㄱㅂㄱ". 한글이 아닌 글자는 그대로 둔다. */
+function toChosung(text: string): string {
+  let out = "";
+  for (const char of text) {
+    const code = char.charCodeAt(0);
+    out +=
+      code >= HANGUL_START && code <= HANGUL_END
+        ? CHOSUNG[Math.floor((code - HANGUL_START) / SYLLABLES_PER_LEAD)]
+        : char;
+  }
+  return out;
+}
+
+// 초성만으로 이뤄진 검색어일 때만 초성 매칭을 켠다. 한 글자(ㄱ)는 거의 모든
+// 이름에 걸리므로 두 글자부터.
+function isChosungQuery(text: string): boolean {
+  return text.length >= 2 && [...text].every((char) => CHOSUNG.includes(char));
+}
+
+/** 편집거리가 max를 넘으면 max + 1을 돌려준다 (전체를 계산하지 않기 위해). */
+function editDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let previous = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const value = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost);
+      current.push(value);
+      if (value < rowMin) rowMin = value;
+    }
+    if (rowMin > max) return max + 1;
+    previous = current;
+  }
+  return previous[b.length];
+}
+
 // A single character matches far too much prose to be useful — "회" is inside
 // 경회루, "산" inside 산책 — so one-character queries only look at names and
 // tags, where a hit is deliberate.
 const PROSE_MIN_QUERY_LENGTH = 2;
 
-/** 0 means no match. Higher is a better match. */
-export function scoreSpot(spot: Spot, query: string): number {
-  const q = normalize(query);
+// 태그(권역·테마·계절)도 주소처럼 앞에서부터 맞춘다. 부분 문자열로 하면
+// '절' 한 글자가 '사계절'에 걸려 57곳이 쏟아진다. 반대로 '자연'으로
+// '자연경관'을 찾는 건 되어야 하므로 완전 일치까지 좁히지는 않는다.
+function tagMatches(tag: string, q: string): boolean {
+  return normalize(tag).startsWith(q);
+}
+
+/** 검색어 한 낱말에 대한 점수. 0이면 그 낱말은 이 여행지와 무관하다. */
+function scoreTerm(spot: Spot, term: string): number {
+  const q = normalize(term);
   if (!q) return 0;
 
   const name = normalize(spot.name);
@@ -68,12 +123,13 @@ export function scoreSpot(spot: Spot, query: string): number {
   else if (name.endsWith(q)) scores.push(SCORE.nameSuffix);
   else if (name.startsWith(q)) scores.push(SCORE.namePrefix);
   else if (name.includes(q)) scores.push(SCORE.nameIncludes);
+  else if (isChosungQuery(q) && toChosung(name).includes(q)) scores.push(SCORE.chosung);
 
-  if (normalize(spot.region).includes(q)) scores.push(SCORE.region);
-  if (spot.themes.some((theme) => normalize(theme).includes(q))) scores.push(SCORE.theme);
-  if (spot.seasons.some((season) => normalize(season).includes(q))) scores.push(SCORE.season);
+  if (tagMatches(spot.region, q)) scores.push(SCORE.region);
+  if (spot.themes.some((theme) => tagMatches(theme, q))) scores.push(SCORE.theme);
+  if (spot.seasons.some((season) => tagMatches(season, q))) scores.push(SCORE.season);
 
-  if (query.trim().length >= PROSE_MIN_QUERY_LENGTH) {
+  if (term.length >= PROSE_MIN_QUERY_LENGTH) {
     // 한 글자 검색에서는 '로'·'구'처럼 의미 없는 글자가 전부 걸리므로 제외.
     if (addressMatches(getSpotAddress(spot.id), q)) scores.push(SCORE.address);
     if (spot.highlights.some((h) => normalize(h).includes(q))) scores.push(SCORE.highlight);
@@ -83,6 +139,60 @@ export function scoreSpot(spot: Spot, query: string): number {
   if (scores.length === 0) return 0;
   // Best field decides the tier; matching several fields breaks ties within it.
   return Math.max(...scores) + (scores.length - 1);
+}
+
+/**
+ * 0 means no match. Higher is a better match.
+ *
+ * 띄어쓴 낱말은 모두 맞아야 한다("제주 해변" = 제주에 있는 해변). 예전에는
+ * 검색어 전체를 한 덩어리로 맞춰서, 사람들이 가장 자연스럽게 쓰는
+ * '지역 + 테마' 조합이 통째로 0건이었다.
+ */
+export function scoreSpot(spot: Spot, query: string): number {
+  const terms = query.trim().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return 0;
+
+  let total = 0;
+  for (const term of terms) {
+    const score = scoreTerm(spot, term);
+    if (score === 0) return 0;
+    total += score;
+  }
+  return total;
+}
+
+/** "해운대 & 송정해수욕장" → 전체 이름과 각 조각. */
+function nameVariants(name: string): string[] {
+  const variants = new Set<string>([name]);
+  const head = name.split(/[([]/)[0];
+  for (const part of head.split(/[&·,]/)) {
+    const trimmed = part.trim();
+    if (trimmed.length >= 2) variants.add(trimmed);
+  }
+  return [...variants];
+}
+
+/**
+ * 결과가 없을 때 쓰는 오타 보정. 이름과의 편집거리가 1(긴 검색어는 2)
+ * 이내인 곳을 돌려준다. 결과가 0건일 때만 부르는 것을 전제로 한다.
+ */
+export function suggestCorrection(spots: Spot[], query: string): Spot | null {
+  const q = normalize(query);
+  if (q.length < 2) return null;
+  const max = q.length >= 5 ? 2 : 1;
+
+  let best: { spot: Spot; distance: number } | null = null;
+  for (const spot of spots) {
+    // 묶음 이름은 조각별로도 비교한다. "해운데"를 "해운대 & 송정해수욕장"
+    // 전체와 재면 거리가 한참 멀어 보정이 안 된다.
+    for (const variant of nameVariants(spot.name)) {
+      const distance = editDistance(q, normalize(variant), max);
+      if (distance <= max && (!best || distance < best.distance)) {
+        best = { spot, distance };
+      }
+    }
+  }
+  return best ? best.spot : null;
 }
 
 export function matchesQuery(spot: Spot, query: string): boolean {
