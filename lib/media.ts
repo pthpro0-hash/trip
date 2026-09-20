@@ -12,6 +12,11 @@ export function getSpotAddress(spotId: string): string {
   return MEDIA[spotId]?.address ?? "";
 }
 
+/** 검색 색인용 공식 소개글. 매칭이 없는 곳은 빈 문자열. */
+export function getSpotOverview(spotId: string): string {
+  return MEDIA[spotId]?.overview ?? "";
+}
+
 /** 목록 카드에 쓰는 대표 사진 한 장. 사진이 없는 곳도 있어 undefined를 반환할 수 있다. */
 export function getSpotThumbnail(spotId: string): string | undefined {
   return MEDIA[spotId]?.images[0]?.url;

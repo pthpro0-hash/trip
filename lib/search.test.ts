@@ -132,6 +132,50 @@ describe("한 글자 검색", () => {
   });
 });
 
+describe("영문·로마자 검색", () => {
+  it("로마자로 지역과 이름을 찾는다", () => {
+    expect(names(search("jeju"))).toContain("성산일출봉");
+    expect(names(search("gyeongbokgung"))).toContain("경복궁");
+    expect(names(search("haeundae"))).toContain("해운대 & 송정해수욕장");
+  });
+
+  it("영문 한 글자로는 찾지 않는다", () => {
+    expect(search("j")).toHaveLength(0);
+  });
+});
+
+describe("동의어", () => {
+  it("일상어로 데이터의 용어를 찾는다", () => {
+    expect(names(search("바닷가"))).toContain("대천해수욕장");
+    expect(names(search("놀이공원"))).toContain("에버랜드");
+    expect(names(search("고궁"))).toContain("덕수궁");
+  });
+
+  it("계절처럼 수십 곳이 공유하는 말로는 넓히지 않는다", () => {
+    // 단풍 → 가을로 넓히면 가을 태그를 단 57곳이 전부 딸려 온다.
+    expect(search("단풍").length).toBeLessThan(15);
+    expect(search("벚꽃").length).toBeLessThan(15);
+  });
+
+  it("직접 맞은 곳이 동의어로 맞은 곳보다 앞에 온다", () => {
+    const results = names(search("바닷가"));
+    // 이름에 '해변'이 든 곳이, 테마만 해변인 곳보다 먼저.
+    expect(results.findIndex((n) => n.includes("해수욕장") || n.includes("해변"))).toBeLessThan(5);
+  });
+});
+
+describe("공식 소개글 색인", () => {
+  it("다른 데 없는 말을 소개글에서 찾는다", () => {
+    expect(names(search("템플스테이"))).toContain("통도사");
+    expect(names(search("벚꽃")).length).toBeGreaterThan(3);
+  });
+
+  it("소개글은 가장 낮은 가중치라 이름 일치를 밀어내지 않는다", () => {
+    // '경복궁'은 창덕궁 소개글에도 언급되지만 1등은 경복궁이어야 한다.
+    expect(names(search("경복궁"))[0]).toBe("경복궁");
+  });
+});
+
 describe("정렬", () => {
   it("이름이 정확히 일치하는 곳이 가장 앞에 온다", () => {
     expect(names(search("우도"))[0]).toBe("우도");

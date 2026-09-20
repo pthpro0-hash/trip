@@ -1,4 +1,6 @@
-import { getSpotAddress } from "./media";
+import { getSpotAddress, getSpotOverview } from "./media";
+import { isRomanQuery, romanize } from "./romanize";
+import { synonymsFor } from "./synonyms";
 import type { Spot } from "./types";
 
 /*
@@ -31,6 +33,8 @@ const SCORE = {
   nameIncludes: 60,
   // 초성만 입력한 경우 (ㄱㅂㄱ → 경복궁). 이름 일부 일치와 비슷한 급.
   chosung: 55,
+  // 로마자로 옮긴 이름 (gyeongbokgung → 경복궁).
+  roman: 55,
   region: 50,
   // 시·군·구, 읍·면·동 단위 지명. 권역보다 좁으므로 같은 급으로 둔다:
   // "강릉"으로 강릉의 여행지가, "경주"로 경주의 여행지가 나와야 한다.
@@ -39,7 +43,23 @@ const SCORE = {
   season: 40,
   highlight: 25,
   summary: 15,
+  // 공식 소개글은 길어서 아무 낱말이나 걸리기 쉽다. 가장 낮은 자리에 둬서
+  // '벚꽃'처럼 다른 데 없는 말은 찾아주되 순위는 넘보지 못하게 한다.
+  overview: 10,
 } as const;
+
+// 동의어로 걸린 결과는 직접 쓴 낱말보다 아래에 오게 한다.
+const SYNONYM_PENALTY = 5;
+
+// 긴 글도 낱말 단위로, 낱말 앞에서부터 맞춘다. 한국어는 조사가 뒤에 붙으므로
+// ("벚꽃이", "단풍으로") 앞자리 일치면 충분히 잡히고, 반대로 낱말 한가운데
+// 우연히 겹치는 것은 걸러진다 — 대전 '장안동'이 '안동' 검색에 딸려오던 문제.
+function prosePrefixMatches(text: string, q: string): boolean {
+  if (!text) return false;
+  return text
+    .split(/\s+/)
+    .some((token) => normalize(token).startsWith(q));
+}
 
 // Addresses are matched a token at a time, and only from the start of a token:
 // plain substring matching puts "장안동" (대전 서구 장안동) in the results for
@@ -129,16 +149,39 @@ function scoreTerm(spot: Spot, term: string): number {
   if (spot.themes.some((theme) => tagMatches(theme, q))) scores.push(SCORE.theme);
   if (spot.seasons.some((season) => tagMatches(season, q))) scores.push(SCORE.season);
 
+  if (isRomanQuery(q)) {
+    const roman = romanize(spot.name);
+    if (roman.includes(q) || romanize(spot.region).includes(q)) scores.push(SCORE.roman);
+  }
+
   if (term.length >= PROSE_MIN_QUERY_LENGTH) {
     // 한 글자 검색에서는 '로'·'구'처럼 의미 없는 글자가 전부 걸리므로 제외.
     if (addressMatches(getSpotAddress(spot.id), q)) scores.push(SCORE.address);
     if (spot.highlights.some((h) => normalize(h).includes(q))) scores.push(SCORE.highlight);
     if (normalize(spot.summary).includes(q)) scores.push(SCORE.summary);
+    if (prosePrefixMatches(getSpotOverview(spot.id), q)) scores.push(SCORE.overview);
   }
 
   if (scores.length === 0) return 0;
   // Best field decides the tier; matching several fields breaks ties within it.
   return Math.max(...scores) + (scores.length - 1);
+}
+
+/**
+ * 한 낱말의 최종 점수. 그 말 그대로 못 찾으면 뜻이 비슷한 말로 한 번 더
+ * 찾아본다 ('바닷가' → 해변). 동의어로 찾은 건 점수를 깎아, 직접 쓴 낱말이
+ * 맞은 곳보다 뒤에 오게 한다.
+ */
+function scoreTermWithSynonyms(spot: Spot, term: string): number {
+  const direct = scoreTerm(spot, term);
+  if (direct > 0) return direct;
+
+  let best = 0;
+  for (const synonym of synonymsFor(term)) {
+    const score = scoreTerm(spot, synonym);
+    if (score > best) best = score;
+  }
+  return best > 0 ? Math.max(1, best - SYNONYM_PENALTY) : 0;
 }
 
 /**
@@ -154,7 +197,7 @@ export function scoreSpot(spot: Spot, query: string): number {
 
   let total = 0;
   for (const term of terms) {
-    const score = scoreTerm(spot, term);
+    const score = scoreTermWithSynonyms(spot, term);
     if (score === 0) return 0;
     total += score;
   }
