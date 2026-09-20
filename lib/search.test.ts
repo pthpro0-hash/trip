@@ -176,6 +176,41 @@ describe("공식 소개글 색인", () => {
   });
 });
 
+describe("문장 검색", () => {
+  it("상황을 말하면 그 상황에 맞는 곳을 찾는다", () => {
+    expect(names(search("아이랑 가기 좋은 곳"))).toContain("에버랜드");
+    expect(names(search("힐링되는 곳"))).toContain("아침고요수목원");
+  });
+
+  it("'비 오는 날'은 실내로 읽는다", () => {
+    const results = names(search("비 오는 날"));
+    expect(results.length).toBeGreaterThan(0);
+    // 한 글자 '비'를 글자로 두면 비자림·도째비골이 나온다.
+    expect(results).not.toContain("비자림");
+  });
+
+  it("지역과 상황을 함께 쓸 수 있다", () => {
+    const results = names(search("사진 찍기 좋은 제주"));
+    expect(results.length).toBeGreaterThan(0);
+    for (const name of results) {
+      expect(SPOTS.find((s) => s.name === name)!.region).toBe("제주권");
+    }
+  });
+
+  it("데이터에 있는 말은 상황어보다 글자 뜻을 먼저 쓴다", () => {
+    // '체험'은 상황어(액티비티)이기도 하지만 '체험마을'은 실제 테마다.
+    const results = names(search("체험마을"));
+    expect(results).toContain("한국민속촌");
+    expect(results.length).toBeLessThan(15);
+  });
+
+  it("뜻을 나르지 않는 말만 있으면 결과가 없다", () => {
+    // 불용어를 다 걸러내고 전체를 보여주면 안 된다.
+    expect(search("좋은 곳")).toHaveLength(0);
+    expect(search("어디 가볼만한 데")).toHaveLength(0);
+  });
+});
+
 describe("정렬", () => {
   it("이름이 정확히 일치하는 곳이 가장 앞에 온다", () => {
     expect(names(search("우도"))[0]).toBe("우도");

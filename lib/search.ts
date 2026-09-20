@@ -1,5 +1,6 @@
 import { getSpotAddress, getSpotOverview } from "./media";
 import { isRomanQuery, romanize } from "./romanize";
+import { isStopword, situationFor, situationsOf } from "./situations";
 import { synonymsFor } from "./synonyms";
 import type { Spot } from "./types";
 
@@ -46,6 +47,9 @@ const SCORE = {
   // 공식 소개글은 길어서 아무 낱말이나 걸리기 쉽다. 가장 낮은 자리에 둬서
   // '벚꽃'처럼 다른 데 없는 말은 찾아주되 순위는 넘보지 못하게 한다.
   overview: 10,
+  // "아이랑", "비 오는 날" 같은 상황어. 지명이나 이름만큼 특정하지는
+  // 않으므로 태그 급으로 둔다.
+  situation: 42,
 } as const;
 
 // 동의어로 걸린 결과는 직접 쓴 낱말보다 아래에 오게 한다.
@@ -192,14 +196,42 @@ function scoreTermWithSynonyms(spot: Spot, term: string): number {
  * '지역 + 테마' 조합이 통째로 0건이었다.
  */
 export function scoreSpot(spot: Spot, query: string): number {
-  const terms = query.trim().split(/\s+/).filter(Boolean);
+  const raw = query.trim().split(/\s+/).filter(Boolean);
+  if (raw.length === 0) return 0;
+
+  // 문장으로 물어오는 경우("아이랑 가기 좋은 곳")를 받기 위해 뜻을 나르지
+  // 않는 말은 버린다. 다만 검색어가 전부 불용어면 버릴 게 아니라 0건이어야
+  // 한다 — 121곳을 통째로 보여주는 결과가 되면 안 된다.
+  const terms = raw.length > 1 ? raw.filter((term) => !isStopword(term)) : raw;
   if (terms.length === 0) return 0;
 
   let total = 0;
   for (const term of terms) {
-    const score = scoreTermWithSynonyms(spot, term);
-    if (score === 0) return 0;
-    total += score;
+    // 한 글자짜리 상황어는 상황 쪽을 먼저 본다. "비 오는 날"의 '비'는 글자로
+    // 두면 비자림·도째비골·마비정에 걸려 실내와 아무 상관 없는 결과가 된다.
+    if (term.length === 1) {
+      const situation = situationFor(term);
+      if (situation) {
+        if (!situationsOf(spot).has(situation)) return 0;
+        total += SCORE.situation;
+        continue;
+      }
+    }
+
+    const direct = scoreTermWithSynonyms(spot, term);
+    if (direct > 0) {
+      total += direct;
+      continue;
+    }
+    // 글자로는 못 찾은 낱말만 상황어로 해석한다. '체험마을'처럼 데이터에
+    // 실제로 있는 말은 그 뜻 그대로 찾고, '아이랑'처럼 데이터에 없는 말만
+    // 상황 태그로 넘긴다.
+    const situation = situationFor(term);
+    if (situation && situationsOf(spot).has(situation)) {
+      total += SCORE.situation;
+      continue;
+    }
+    return 0;
   }
   return total;
 }
@@ -264,4 +296,11 @@ export function suggestCompletions(spots: Spot[], query: string, limit = 5): Spo
 }
 
 /** Starting points for someone who opens the search box with nothing in mind. */
-export const SEARCH_SUGGESTIONS = ["야경", "해변", "한옥마을", "섬", "국립공원", "카페거리"];
+export const SEARCH_SUGGESTIONS = [
+  "아이랑 가기 좋은 곳",
+  "비 오는 날",
+  "힐링되는 곳",
+  "야경",
+  "해변",
+  "한옥마을",
+];
