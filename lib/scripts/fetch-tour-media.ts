@@ -29,6 +29,14 @@ const MAX_IMAGES = 6;
 // restrictions) is left out rather than guessed at.
 const USABLE_COPYRIGHT = new Set(["Type1", "Type3"]);
 
+interface SpotPractical {
+  useTime?: string;
+  restDate?: string;
+  fee?: string;
+  parking?: string;
+  phone?: string;
+}
+
 interface SpotMedia {
   contentId: string;
   sourceTitle: string;
@@ -36,7 +44,33 @@ interface SpotMedia {
   address: string;
   overview: string;
   homepage: string | null;
+  /** 이용시간·휴무일·요금·주차·문의. 가기 전에 확인해야 하는 것들. */
+  practical: SpotPractical;
   images: { url: string; copyright: string }[];
+}
+
+/*
+  detailIntro2의 필드 이름은 콘텐츠 유형마다 다르다 — 관광지는 usetime,
+  문화시설은 usetimeculture, 레포츠는 usetimeleports. 유형별로 나열하는
+  대신 접두사로 고른다. 새 유형이 섞여도 그대로 동작한다.
+*/
+function pickPractical(intro: Record<string, unknown>): SpotPractical {
+  const find = (matches: (key: string) => boolean) => {
+    for (const [key, value] of Object.entries(intro)) {
+      if (!matches(key.toLowerCase())) continue;
+      const text = cleanText(String(value ?? ""));
+      if (text) return text;
+    }
+    return undefined;
+  };
+
+  return {
+    useTime: find((k) => k.startsWith("usetime") || k === "playtime"),
+    restDate: find((k) => k.startsWith("restdate")),
+    fee: find((k) => k.startsWith("usefee")),
+    parking: find((k) => k.startsWith("parking") && !k.includes("fee")),
+    phone: find((k) => k.startsWith("infocenter")),
+  };
 }
 
 async function json(url: string) {
@@ -55,9 +89,9 @@ function https(url: string) {
   return url.replace(/^http:\/\//, "https://");
 }
 
-// overview arrives as a fragment of HTML: <br> line breaks, the odd <b>, and
-// entities. Flatten it to plain paragraphs so the app never renders raw markup.
-function cleanOverview(raw: string) {
+// TourAPI text fields arrive as HTML fragments: <br> line breaks, the odd <b>,
+// and entities. Flatten them so the app never renders raw markup.
+function cleanText(raw: string) {
   return raw
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
@@ -87,9 +121,21 @@ function resolveContentId(spot: Spot): string | null {
 async function fetchMedia(contentId: string): Promise<SpotMedia | null> {
   const common = await json(`${BASE}/detailCommon2?${COMMON}&contentId=${contentId}`);
   const detail = toList(common?.response?.body?.items)[0] as
-    | { title?: string; overview?: string; homepage?: string; addr1?: string; addr2?: string }
+    | {
+        title?: string;
+        overview?: string;
+        homepage?: string;
+        addr1?: string;
+        addr2?: string;
+        contenttypeid?: string;
+      }
     | undefined;
   if (!detail) return null;
+
+  const intro = await json(
+    `${BASE}/detailIntro2?${COMMON}&contentId=${contentId}&contentTypeId=${detail.contenttypeid ?? "12"}`,
+  );
+  const introItem = (toList(intro?.response?.body?.items)[0] ?? {}) as Record<string, unknown>;
 
   const imageResponse = await json(
     `${BASE}/detailImage2?${COMMON}&contentId=${contentId}&imageYN=Y&numOfRows=30&pageNo=1`,
@@ -112,7 +158,8 @@ async function fetchMedia(contentId: string): Promise<SpotMedia | null> {
     contentId,
     sourceTitle: String(detail.title ?? ""),
     address: [detail.addr1, detail.addr2].filter(Boolean).join(" ").trim(),
-    overview: cleanOverview(String(detail.overview ?? "")),
+    overview: cleanText(String(detail.overview ?? "")),
+    practical: pickPractical(introItem),
     homepage: homepageMatch ? homepageMatch[0] : null,
     images,
   };
@@ -141,7 +188,7 @@ async function main() {
     media[spot.id] = result;
     if (result.images.length === 0) noPhoto.push(spot.name);
     console.log(
-      `${index + 1}/${SPOTS.length} ${spot.name} → ${result.sourceTitle} · 사진 ${result.images.length}장 · ${result.address || "주소없음"}`,
+      `${index + 1}/${SPOTS.length} ${spot.name} → ${result.sourceTitle} · 사진 ${result.images.length}장 · 이용정보 ${Object.values(result.practical).filter(Boolean).length}개`,
     );
     await new Promise((resolve) => setTimeout(resolve, 60));
   }

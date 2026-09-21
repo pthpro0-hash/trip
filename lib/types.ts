@@ -16,6 +16,15 @@ export interface SpotImage {
   copyright: string;
 }
 
+/** 가기 전에 확인해야 하는 것들. 여행지마다 있는 항목이 다르다. */
+export interface SpotPractical {
+  useTime?: string;
+  restDate?: string;
+  fee?: string;
+  parking?: string;
+  phone?: string;
+}
+
 /** 한국관광공사 TourAPI에서 가져온 사진·공식 소개글. lib/data/spot-media.json */
 export interface SpotMedia {
   contentId: string;
@@ -24,6 +33,7 @@ export interface SpotMedia {
   address: string;
   overview: string;
   homepage: string | null;
+  practical: SpotPractical;
   images: SpotImage[];
 }
 

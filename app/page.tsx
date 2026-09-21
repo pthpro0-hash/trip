@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
@@ -11,6 +11,7 @@ import {
   type RelaxationSuggestion,
 } from "@/lib/filter";
 import { sortByRelevance, suggestCorrection } from "@/lib/search";
+import { reportEmptySearch } from "@/lib/searchTelemetry";
 import { FilterBar } from "@/components/filter/FilterBar";
 import { SearchBox } from "@/components/filter/SearchBox";
 import { SpotCard } from "@/components/spot/SpotCard";
@@ -48,6 +49,11 @@ export default function HomePage() {
     () => (results.length === 0 && query ? suggestCorrection(SPOTS, query) : null),
     [results, query],
   );
+
+  // 0건이 난 검색어를 모아 무엇을 보강할지 알아낸다.
+  useEffect(() => {
+    if (query && results.length === 0) reportEmptySearch(query);
+  }, [query, results.length]);
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-5 px-5 pb-16 pt-10">

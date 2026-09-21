@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
@@ -6,6 +7,11 @@ import { REGION_THEME } from "@/lib/regionTheme";
 import { KOREA_FULL_VIEWBOX, KOREA_LAND_PATHS, project } from "@/lib/koreaMap";
 
 const SPOTS = spotsData as Spot[];
+
+export const metadata: Metadata = {
+  title: "권역별로 둘러보기",
+  description: "수도권부터 제주권까지, 권역별 지도 위에서 한국관광 100선을 살펴보세요.",
+};
 const SEA = "#CFE4EE";
 const LAND = "#F6F3E9";
 const COAST = "#A9BFCB";

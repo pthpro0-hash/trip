@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
@@ -5,12 +6,47 @@ import { getRelatedSpots } from "@/lib/related";
 import { getSpotMedia, PHOTO_CREDIT } from "@/lib/media";
 import { KakaoMap } from "@/components/map/KakaoMap";
 import { SpotGallery } from "@/components/spot/SpotGallery";
+import { VisitInfo } from "@/components/spot/VisitInfo";
+import { DirectionsLinks } from "@/components/spot/DirectionsLinks";
 import Link from "next/link";
 
 const SPOTS = spotsData as Spot[];
 
 export function generateStaticParams() {
   return SPOTS.map((spot) => ({ slug: spot.id }));
+}
+
+function findSpot(slug: string): Spot | undefined {
+  try {
+    return SPOTS.find((s) => s.id === decodeURIComponent(slug));
+  } catch {
+    return undefined;
+  }
+}
+
+// 페이지마다 제목·설명·대표 이미지를 따로 준다. 이게 없으면 121개 상세
+// 페이지가 검색엔진과 메신저 미리보기에서 전부 같은 글로 보인다.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const spot = findSpot(slug);
+  if (!spot) return { title: "찾을 수 없는 여행지" };
+
+  const media = getSpotMedia(spot.id);
+  const title = `${spot.name} — ${spot.region} 여행`;
+  const description = spot.summary;
+  const images = media?.images[0]?.url ? [{ url: media.images[0].url }] : undefined;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/spots/${spot.id}` },
+    openGraph: { title, description, images, type: "article", locale: "ko_KR" },
+    twitter: { card: "summary_large_image", title, description, images: images?.map((i) => i.url) },
+  };
 }
 
 export default async function SpotDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -32,8 +68,30 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
   const related = getRelatedSpots(SPOTS, spot, 3);
   const media = getSpotMedia(spot.id);
 
+  // 검색엔진이 이 페이지를 '관광지'로 이해하게 해서, 주소·사진·설명이
+  // 검색 결과에 함께 노출될 수 있도록 한다.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "TouristAttraction",
+    name: spot.name,
+    description: spot.summary,
+    image: media?.images.map((image) => image.url),
+    address: media?.address
+      ? { "@type": "PostalAddress", streetAddress: media.address, addressCountry: "KR" }
+      : undefined,
+    geo: { "@type": "GeoCoordinates", latitude: spot.lat, longitude: spot.lng },
+    telephone: media?.practical.phone,
+    openingHours: media?.practical.useTime,
+    url: `https://yeohaeng-sesang.vercel.app/spots/${spot.id}`,
+  };
+
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-5 px-5 pb-16 pt-8">
+      <script
+        type="application/ld+json"
+        // 구조화 데이터는 우리가 만든 값만 담는다 (사용자 입력 없음).
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Link href="/" className="text-[15px] font-medium text-accent hover:text-accent-hover">
         ← 목록으로
       </Link>
@@ -75,8 +133,13 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
         </div>
       </section>
 
-      <div className="h-[320px] overflow-hidden rounded-2xl ring-1 ring-line">
-        <KakaoMap spots={[spot]} />
+      {media && <VisitInfo practical={media.practical} />}
+
+      <div className="flex flex-col gap-3">
+        <div className="h-[320px] overflow-hidden rounded-2xl ring-1 ring-line">
+          <KakaoMap spots={[spot]} />
+        </div>
+        <DirectionsLinks spot={spot} />
       </div>
 
       {media && media.overview && (
