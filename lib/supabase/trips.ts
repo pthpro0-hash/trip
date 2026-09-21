@@ -22,6 +22,8 @@ export interface SavedTrip {
     spotId: string | null;
     /** 행정동. 장소 이름을 몰라도 "강릉시"로 찾을 수 있게 한다. */
     dong: string | null;
+    lat: number;
+    lng: number;
     startedAt: string;
     photoCount: number;
   }[];
@@ -166,7 +168,7 @@ export async function fetchTrips(
   const { data, error } = await supabase
     .from("trips")
     .select(
-      "id,started_on,ended_on,companions,note,visits(place_name,spot_id,dong,started_at,photo_count,position)",
+      "id,started_on,ended_on,companions,note,visits(place_name,spot_id,dong,lat,lng,started_at,photo_count,position)",
     )
     .eq("user_id", userId)
     .order("started_on", { ascending: false });
@@ -204,6 +206,8 @@ export async function fetchTrips(
         placeName: visit.place_name as string,
         spotId: visit.spot_id as string | null,
         dong: visit.dong as string | null,
+        lat: visit.lat as number,
+        lng: visit.lng as number,
         startedAt: visit.started_at as string,
         photoCount: visit.photo_count as number,
       })),

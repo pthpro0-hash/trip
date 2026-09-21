@@ -19,12 +19,20 @@ export default function TripsPage() {
           <h1 className="text-[28px] font-bold tracking-tight text-text md:text-[32px]">내 여행</h1>
           <p className="mt-1 text-[15px] text-text-muted">다녀온 곳을 모아 봅니다</p>
         </div>
-        <Link
-          href="/trips/new"
-          className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
-        >
-          사진에서 찾기
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/sketch"
+            className="rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
+          >
+            스케치
+          </Link>
+          <Link
+            href="/trips/new"
+            className="rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
+          >
+            사진에서 찾기
+          </Link>
+        </div>
       </div>
       <TripList />
     </main>
