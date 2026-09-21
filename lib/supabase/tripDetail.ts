@@ -4,6 +4,8 @@ export interface VisitPhoto {
   id: string;
   storagePath: string;
   takenAt: Date;
+  /** 목록에서 이 여행을 대표하는 한 장인가. */
+  isCover: boolean;
 }
 
 export interface VisitDetail {
@@ -46,7 +48,7 @@ export async function fetchTripDetail(
     .select(
       "id,started_on,ended_on,companions,note," +
         "visits(id,place_name,spot_id,dong,lat,lng,started_at,ended_at,position," +
-        "trip_photos(id,storage_path,taken_at))",
+        "trip_photos(id,storage_path,taken_at,is_cover))",
     )
     .eq("id", tripId)
     .eq("user_id", userId)
@@ -78,6 +80,7 @@ export async function fetchTripDetail(
           id: photo.id as string,
           storagePath: photo.storage_path as string,
           takenAt: wallClockToDate(photo.taken_at as string),
+          isCover: Boolean(photo.is_cover),
         }))
         .sort((a, b) => a.takenAt.getTime() - b.takenAt.getTime()),
     }));

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTripDetail, saveTripNote, type TripDetail as Detail } from "@/lib/supabase/tripDetail";
-import { signedUrls } from "@/lib/supabase/photos";
+import { deletePhoto, setCoverPhoto, signedUrls } from "@/lib/supabase/photos";
 import { companionLabel } from "@/lib/korean";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
@@ -34,6 +34,10 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [note, setNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
+  // 사진을 지우는 것도 되돌릴 수 없다. 한 번 물어보고 나서 지운다.
+  const [confirmingPhoto, setConfirmingPhoto] = useState<string | null>(null);
+  const [removingPhoto, setRemovingPhoto] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState(false);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -78,6 +82,63 @@ export function TripDetail({ tripId }: { tripId: string }) {
     const ok = await saveTripNote(supabase, userId, tripId, note);
     setSavingNote(false);
     setNoteSaved(ok);
+  };
+
+  const removePhoto = async (visitId: string, photoId: string, storagePath: string) => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId || !trip) return;
+
+    setRemovingPhoto(photoId);
+    setPhotoError(false);
+
+    const wasCover = trip.visits
+      .flatMap((visit) => visit.photos)
+      .find((photo) => photo.id === photoId)?.isCover;
+
+    const ok = await deletePhoto(supabase, userId, { id: photoId, storagePath, visitId });
+    if (!ok) {
+      setPhotoError(true);
+      setRemovingPhoto(null);
+      setConfirmingPhoto(null);
+      return;
+    }
+
+    const kept = trip.visits.map((visit) =>
+      visit.id === visitId
+        ? { ...visit, photos: visit.photos.filter((photo) => photo.id !== photoId) }
+        : visit,
+    );
+
+    /*
+      대표였던 사진을 지우면 목록의 썸네일이 비어 버린다.
+      남은 사진 중 첫 장을 대신 세운다.
+    */
+    let nextCoverId: string | null = null;
+    if (wasCover) {
+      nextCoverId = kept.flatMap((visit) => visit.photos)[0]?.id ?? null;
+      if (nextCoverId) {
+        await setCoverPhoto(
+          supabase,
+          userId,
+          kept.map((visit) => visit.id),
+          nextCoverId,
+        );
+      }
+    }
+
+    setTrip({
+      ...trip,
+      visits: kept.map((visit) => ({
+        ...visit,
+        // 지금 상태를 고쳐 쓰지 않고 새로 만든다. 남은 방문은 원래 객체를
+        // 그대로 재사용하기 때문에, 직접 고치면 이전 상태까지 함께 바뀐다.
+        photos: visit.photos.map((photo) =>
+          nextCoverId && photo.id === nextCoverId ? { ...photo, isCover: true } : photo,
+        ),
+      })),
+    });
+    setRemovingPhoto(null);
+    setConfirmingPhoto(null);
   };
 
   if (status === "loading") return <p className="text-[15px] text-text-faint">불러오는 중…</p>;
@@ -132,6 +193,12 @@ export function TripDetail({ tripId }: { tripId: string }) {
         </div>
       )}
 
+      {photoError && (
+        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
+          사진을 지우지 못했어요. 잠시 후 다시 시도해 주세요.
+        </p>
+      )}
+
       <ol className="flex flex-col gap-5">
         {trip.visits.map((visit, index) => {
           const stay = stayLabel(visit.startedAt, visit.endedAt);
@@ -167,10 +234,11 @@ export function TripDetail({ tripId }: { tripId: string }) {
                 <div className="grid grid-cols-2 gap-2 pl-8 sm:grid-cols-3">
                   {visit.photos.map((photo) => {
                     const url = photoUrls.get(photo.storagePath);
+                    const confirming = confirmingPhoto === photo.id;
                     return (
                       <div
                         key={photo.id}
-                        className="aspect-square overflow-hidden rounded-xl bg-bg-subtle"
+                        className="relative aspect-square overflow-hidden rounded-xl bg-bg-subtle"
                       >
                         {url && (
                           // 우리 보관함의 서명 주소라 그때그때 달라진다.
@@ -178,6 +246,28 @@ export function TripDetail({ tripId }: { tripId: string }) {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={url} alt="" className="h-full w-full object-cover" />
                         )}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            confirming
+                              ? removePhoto(visit.id, photo.id, photo.storagePath)
+                              : setConfirmingPhoto(photo.id)
+                          }
+                          onBlur={() =>
+                            setConfirmingPhoto((current) =>
+                              current === photo.id ? null : current,
+                            )
+                          }
+                          disabled={removingPhoto === photo.id}
+                          aria-label={confirming ? "이 사진 정말 지우기" : "이 사진 지우기"}
+                          className={`absolute right-1.5 top-1.5 rounded-full px-2 py-1 text-[12px] font-medium backdrop-blur-sm transition disabled:opacity-60 ${
+                            confirming
+                              ? "bg-[#d70015] text-white"
+                              : "bg-black/45 text-white hover:bg-black/65"
+                          }`}
+                        >
+                          {removingPhoto === photo.id ? "…" : confirming ? "정말?" : "✕"}
+                        </button>
                       </div>
                     );
                   })}

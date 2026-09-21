@@ -139,3 +139,82 @@ export async function signedUrls(
   }
   return urls;
 }
+
+/**
+ * 사진 한 장을 지운다.
+ *
+ * 표에서 먼저 지우고 보관함 파일을 지운다. 순서가 중요하다 —
+ * 파일을 먼저 지웠다가 표 지우기가 실패하면, 가리키는 파일이 없는 줄이
+ * 남아 사용자에게 영영 빈 칸으로 보인다. 반대로 표를 먼저 지우면 최악의
+ * 경우 아무도 가리키지 않는 파일이 남는데, 이건 눈에 보이지 않고
+ * 나중에 쓸어 담을 수 있다.
+ */
+export async function deletePhoto(
+  supabase: SupabaseClient,
+  userId: string,
+  photo: { id: string; storagePath: string; visitId: string },
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("trip_photos")
+    .delete()
+    .eq("id", photo.id)
+    .eq("user_id", userId);
+
+  if (error) return false;
+
+  await supabase.storage.from(BUCKET).remove([photo.storagePath]);
+  await syncPhotoCount(supabase, userId, photo.visitId);
+  return true;
+}
+
+/**
+ * 방문에 남은 사진 수를 다시 센다.
+ *
+ * 하나씩 빼는 대신 세어서 맞춘다. 중간에 무엇이 어긋나도 다음 삭제에서
+ * 바로잡히고, 실제와 다른 숫자가 쌓이지 않는다.
+ */
+async function syncPhotoCount(supabase: SupabaseClient, userId: string, visitId: string) {
+  const { count, error } = await supabase
+    .from("trip_photos")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("visit_id", visitId);
+
+  if (error) return;
+  await supabase
+    .from("visits")
+    .update({ photo_count: count ?? 0 })
+    .eq("id", visitId)
+    .eq("user_id", userId);
+}
+
+/**
+ * 목록에 보일 대표 사진을 정한다.
+ *
+ * 대표였던 사진을 지우면 목록의 썸네일이 비어 버린다. 남은 사진 중
+ * 하나를 대신 세운다. 한 여행에 대표는 하나여야 하므로 먼저 모두 내린다.
+ */
+export async function setCoverPhoto(
+  supabase: SupabaseClient,
+  userId: string,
+  visitIds: string[],
+  photoId: string,
+): Promise<boolean> {
+  if (visitIds.length === 0) return false;
+
+  const cleared = await supabase
+    .from("trip_photos")
+    .update({ is_cover: false })
+    .eq("user_id", userId)
+    .in("visit_id", visitIds);
+
+  if (cleared.error) return false;
+
+  const { error } = await supabase
+    .from("trip_photos")
+    .update({ is_cover: true })
+    .eq("id", photoId)
+    .eq("user_id", userId);
+
+  return !error;
+}
