@@ -98,6 +98,12 @@ export default function HomePage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <NearbyButton state={location} onRequest={requestLocation} onClear={clearLocation} />
+        <Link
+          href="/trips"
+          className="rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
+        >
+          내 여행
+        </Link>
         {wishlist.ids.length > 0 && (
           <>
             <button

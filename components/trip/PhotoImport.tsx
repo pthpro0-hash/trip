@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { getBrowserClient } from "@/lib/supabase/client";
+import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
 import { readShots, type ReadResult } from "@/lib/photo/readShots";
 import { dayKey, findLivingArea, groupIntoTrips, tripDays } from "@/lib/photo/grouping";
 import type { Shot, Trip } from "@/lib/photo/types";
@@ -8,7 +11,14 @@ import type { Shot, Trip } from "@/lib/photo/types";
 interface PlaceAnswer {
   title: string;
   isCuratedSpot: boolean;
+  spotId: string | null;
   dong: string | null;
+}
+
+interface SaveOutcome {
+  saved: number;
+  skipped: number;
+  failed: number;
 }
 
 interface Stage {
@@ -47,15 +57,46 @@ export function PhotoImport() {
   const [places, setPlaces] = useState<PlaceAnswer[]>([]);
   const [dailyShots, setDailyShots] = useState<Shot[]>([]);
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
+  const [userId, setUserId] = useState<string | null>(null);
+  const [companions, setCompanions] = useState<Record<number, string>>({});
+  const [savedRanges, setSavedRanges] = useState<DateRange[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [outcome, setOutcome] = useState<SaveOutcome | null>(null);
+
+  useEffect(() => {
+    const supabase = getBrowserClient();
+    if (!supabase) return;
+    let active = true;
+
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!active || !data.user) return;
+      setUserId(data.user.id);
+      // 같은 사진을 두 번 넣는 일이 잦다. 이미 저장한 날짜를 미리 알아 둔다.
+      setSavedRanges(await fetchSavedRanges(supabase, data.user.id));
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const visible = useMemo(
     () => trips.map((trip, index) => ({ trip, index })).filter(({ index }) => !dismissed.has(index)),
     [trips, dismissed],
   );
 
+  // 이미 저장한 날짜는 건너뛴다. 버튼에도 실제로 기록될 건수를 적어야
+  // "3건 기록하기"를 눌렀는데 아무것도 안 늘어나는 일이 없다.
+  const unsavedCount = useMemo(
+    () => visible.filter(({ trip }) => !overlapsSaved(tripRange(trip), savedRanges)).length,
+    [visible, savedRanges],
+  );
+
   const handleFiles = async (files: File[]) => {
     if (files.length === 0) return;
     setDismissed(new Set());
+    setOutcome(null);
+    setCompanions({});
     setStage({ name: "reading", done: 0, total: files.length });
 
     const result = await readShots(files, (done, total) =>
@@ -89,6 +130,42 @@ export function PhotoImport() {
       setPlaces([]);
       setStage({ name: "ready", message: "장소 이름을 가져오지 못했어요. 날짜와 사진은 그대로예요." });
     }
+  };
+
+  const save = async () => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId) return;
+
+    setSaving(true);
+    const result: SaveOutcome = { saved: 0, skipped: 0, failed: 0 };
+
+    for (const { trip, index } of visible) {
+      // 같은 날짜의 여행이 이미 있으면 건너뛴다. 사진을 두 번 넣어도
+      // 같은 여행이 두 건으로 남지 않는다.
+      if (overlapsSaved(tripRange(trip), savedRanges)) {
+        result.skipped += 1;
+        continue;
+      }
+      const visitPlaces = trip.visits.map((_, visitIndex) => {
+        const place = placeFor(index, visitIndex);
+        return {
+          title: place?.title ?? "알 수 없는 곳",
+          spotId: place?.spotId ?? null,
+          dong: place?.dong ?? null,
+        };
+      });
+      const saved = await saveTrip(supabase, userId, trip, visitPlaces, companions[index] ?? "");
+      if (saved.ok) {
+        result.saved += 1;
+        savedRanges.push(tripRange(trip));
+      } else {
+        result.failed += 1;
+      }
+    }
+
+    setSavedRanges([...savedRanges]);
+    setOutcome(result);
+    setSaving(false);
   };
 
   /** 여러 여행에 걸쳐 방문이 이어져 있어, 몇 번째 방문인지 세어 이름을 찾는다. */
@@ -190,6 +267,10 @@ export function PhotoImport() {
                 </button>
               </div>
 
+              {overlapsSaved(tripRange(trip), savedRanges) && (
+                <p className="text-[13px] text-text-faint">이미 기록한 날짜와 겹쳐요.</p>
+              )}
+
               <ul className="flex flex-col gap-2">
                 {trip.visits.map((visit, visitIndex) => {
                   const place = placeFor(index, visitIndex);
@@ -215,15 +296,69 @@ export function PhotoImport() {
                   );
                 })}
               </ul>
+
+              {userId && !overlapsSaved(tripRange(trip), savedRanges) && (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[13px] font-medium text-text-faint">누구와 가셨나요?</span>
+                  <input
+                    type="text"
+                    value={companions[index] ?? ""}
+                    onChange={(event) =>
+                      setCompanions({ ...companions, [index]: event.target.value })
+                    }
+                    placeholder="예: 가족, 민수, 혼자"
+                    className="rounded-xl bg-bg-subtle px-3.5 py-2.5 text-[15px] text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
+                  />
+                </label>
+              )}
             </li>
           );
         })}
       </ol>
 
+      {outcome && (
+        <div className="flex flex-col gap-2 rounded-xl bg-accent-soft px-4 py-3 text-[14px] text-accent">
+          <p className="font-medium">
+            {outcome.saved > 0 ? `여행 ${outcome.saved}건을 기록했어요.` : "새로 기록한 여행이 없어요."}
+            {outcome.skipped > 0 && ` 이미 있던 ${outcome.skipped}건은 건너뛰었어요.`}
+            {outcome.failed > 0 && ` ${outcome.failed}건은 저장하지 못했어요.`}
+          </p>
+          <Link href="/trips" className="self-start font-medium underline underline-offset-2">
+            내 여행 보기 →
+          </Link>
+        </div>
+      )}
+
+      {visible.length > 0 && !userId && (
+        <div className="flex flex-col gap-2 rounded-xl bg-bg-subtle px-4 py-3.5 text-[14px] text-text-muted">
+          <p>기록으로 남기려면 로그인이 필요해요. 찾은 결과는 로그인한 뒤 다시 골라 주세요.</p>
+          <Link
+            href="/login?next=%2Ftrips%2Fnew"
+            className="self-start font-medium text-accent hover:text-accent-hover"
+          >
+            로그인하기 →
+          </Link>
+        </div>
+      )}
+
+      {visible.length > 0 && userId && (
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving || unsavedCount === 0}
+          className="self-start rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
+        >
+          {saving
+            ? "기록하는 중…"
+            : unsavedCount === 0
+              ? "모두 이미 기록했어요"
+              : `여행 ${unsavedCount}건 기록하기`}
+        </button>
+      )}
+
       {visible.length > 0 && (
-        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[13px] leading-relaxed text-text-muted">
-          지금은 찾은 결과를 보여드리는 데까지예요. 누구와 갔는지 적고 기록으로 남기는 건 다음에
-          붙입니다.
+        <p className="text-[13px] leading-relaxed text-text-faint">
+          지금은 언제 어디를 다녀왔는지만 기록해요. 사진 자체를 올리는 건 다음에 붙입니다.
         </p>
       )}
     </>

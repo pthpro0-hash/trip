@@ -1,0 +1,149 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { getBrowserClient } from "@/lib/supabase/client";
+import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { companionLabel } from "@/lib/korean";
+
+type Status = "loading" | "guest" | "ready" | "failed";
+
+function formatSpan(startedOn: string, endedOn: string) {
+  // "09월 13일"보다 "9월 13일"이 사람이 쓰는 말에 가깝다.
+  const short = (value: string) => {
+    const [, month, day] = value.split("-");
+    return `${Number(month)}월 ${Number(day)}일`;
+  };
+  const year = startedOn.slice(0, 4);
+  if (startedOn === endedOn) return `${year}년 ${short(startedOn)}`;
+  return `${year}년 ${short(startedOn)} ~ ${short(endedOn)}`;
+}
+
+export function TripList() {
+  // 로그인 설정이 아예 없으면 기다릴 것도 없다. 효과 안에서 setState 하지
+  // 않도록 처음 값으로 정한다.
+  const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
+  const [trips, setTrips] = useState<SavedTrip[]>([]);
+
+  useEffect(() => {
+    const supabase = getBrowserClient();
+    if (!supabase) return;
+    let active = true;
+
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!active) return;
+      if (!data.user) {
+        setStatus("guest");
+        return;
+      }
+      const rows = await fetchTrips(supabase, data.user.id);
+      if (!active) return;
+      if (!rows) {
+        setStatus("failed");
+        return;
+      }
+      setTrips(rows);
+      setStatus("ready");
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (status === "loading") {
+    return <p className="text-[15px] text-text-faint">불러오는 중…</p>;
+  }
+
+  if (status === "guest") {
+    return (
+      <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6">
+        <p className="text-[15px] text-text-muted">
+          여행 기록은 계정에 저장돼요. 로그인하시면 어느 기기에서나 이어 보실 수 있어요.
+        </p>
+        <Link
+          href="/login?next=%2Ftrips"
+          className="self-start rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+        >
+          로그인하기
+        </Link>
+      </div>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[15px] text-text-muted">
+        기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
+      </p>
+    );
+  }
+
+  if (trips.length === 0) {
+    return (
+      <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6 text-center">
+        <p className="text-[17px] font-medium text-text">아직 기록한 여행이 없어요</p>
+        <p className="text-[15px] leading-relaxed text-text-muted">
+          사진을 고르면 언제 어디를 다녀왔는지 찾아 드려요.
+        </p>
+        <Link
+          href="/trips/new"
+          className="self-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+        >
+          사진에서 찾기
+        </Link>
+      </div>
+    );
+  }
+
+  const totalVisits = trips.reduce((sum, trip) => sum + trip.visits.length, 0);
+  const totalPhotos = trips.reduce(
+    (sum, trip) => sum + trip.visits.reduce((count, visit) => count + visit.photoCount, 0),
+    0,
+  );
+
+  return (
+    <>
+      <p className="text-[13px] text-text-faint">
+        여행 {trips.length}건 · 다녀온 곳 {totalVisits}곳 · 사진 {totalPhotos}장
+      </p>
+
+      <ol className="flex flex-col gap-4">
+        {trips.map((trip) => (
+          <li key={trip.id} className="flex flex-col gap-2.5 rounded-2xl bg-surface p-5 ring-1 ring-line">
+            <div>
+              <p className="text-[17px] font-semibold tracking-tight text-text">
+                {formatSpan(trip.startedOn, trip.endedOn)}
+              </p>
+              {trip.companions && (
+                <p className="mt-0.5 text-[13px] text-text-muted">
+                  {companionLabel(trip.companions)}
+                </p>
+              )}
+            </div>
+
+            <ul className="flex flex-col gap-1">
+              {trip.visits.map((visit, index) => (
+                <li key={index} className="flex items-baseline gap-2 text-[15px]">
+                  <span className="text-text-faint">▸</span>
+                  {visit.spotId ? (
+                    <Link
+                      href={`/spots/${visit.spotId}`}
+                      className="font-medium text-accent hover:text-accent-hover"
+                    >
+                      {visit.placeName}
+                    </Link>
+                  ) : (
+                    <span className="font-medium text-text">{visit.placeName}</span>
+                  )}
+                  <span className="text-[13px] text-text-faint">사진 {visit.photoCount}장</span>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ol>
+    </>
+  );
+}

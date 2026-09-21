@@ -1,17 +1,8 @@
 import type { Spot } from "@/lib/types";
+import { attachParticle } from "@/lib/korean";
 
 interface DirectionsLinksProps {
   spot: Spot;
-}
-
-// 받침이 있으면 "-으로", 없으면 "-로". 받침이 ㄹ이면 "-로".
-// 이게 없으면 "네이버지도으로"처럼 어색한 말이 그대로 버튼에 찍힌다.
-function withParticle(word: string) {
-  const last = word.charCodeAt(word.length - 1);
-  const isHangul = last >= 0xac00 && last <= 0xd7a3;
-  if (!isHangul) return `${word}로`;
-  const tail = (last - 0xac00) % 28;
-  return tail === 0 || tail === 8 ? `${word}로` : `${word}으로`;
 }
 
 /*
@@ -46,7 +37,7 @@ export function DirectionsLinks({ spot }: DirectionsLinksProps) {
           rel="noreferrer noopener"
           className="rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
         >
-          {withParticle(link.label)} 길찾기
+          {attachParticle(link.label, "으로", "로", true)} 길찾기
         </a>
       ))}
     </div>

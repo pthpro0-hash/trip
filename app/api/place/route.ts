@@ -16,11 +16,16 @@ const UPSTREAM_TIMEOUT_MS = 8000;
 // 100m 남짓. 이보다 가까운 좌표는 같은 곳으로 보고 한 번만 물어본다.
 const CACHE_PRECISION = 3;
 
-const SPOT_NAMES = (spotsData as Spot[]).map((spot) => spot.name);
+const SPOTS = spotsData as Spot[];
+const SPOT_NAMES = SPOTS.map((spot) => spot.name);
+// 이름은 사람에게 보여줄 것이고, id 는 기록에 저장해 상세 페이지로 잇는 데 쓴다.
+const ID_BY_NAME = new Map(SPOTS.map((spot) => [spot.name, spot.id]));
 
 interface PlaceAnswer {
   title: string;
   isCuratedSpot: boolean;
+  /** 100선 중 하나면 그 id. 기록에서 여행지 페이지로 잇는다. */
+  spotId: string | null;
   dong: string | null;
 }
 
@@ -82,6 +87,7 @@ async function describe(key: string, lat: number, lng: number): Promise<PlaceAns
   const answer: PlaceAnswer = {
     title: picked?.title ?? dong ?? "알 수 없는 곳",
     isCuratedSpot: picked?.isCuratedSpot ?? false,
+    spotId: picked?.isCuratedSpot ? (ID_BY_NAME.get(picked.title) ?? null) : null,
     dong,
   };
 
