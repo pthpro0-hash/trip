@@ -20,5 +20,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly" as const,
       priority: 0.7,
     })),
+    // 약관과 방침은 찾을 수 있어야 하는 문서다. 자주 바뀌지 않으니 낮게 둔다.
+    { url: `${BASE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${BASE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
   ];
 }

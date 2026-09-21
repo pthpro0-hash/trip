@@ -57,13 +57,16 @@ export default async function LoginPage({
 
       <LoginButtons providers={providers} next={next ?? "/"} />
 
-      {/*
-        이용약관과 개인정보처리방침은 아직 준비 중이다. 없는 페이지로 링크를
-        걸어 두면 깨진 링크가 되므로, 문서가 올라간 뒤에 링크로 바꾼다.
-        실제 서비스를 열기 전에는 반드시 있어야 하는 문서다.
-      */}
       <p className="text-[12px] leading-relaxed text-text-faint">
-        이용약관과 개인정보처리방침은 준비 중입니다.
+        로그인하시면{" "}
+        <Link href="/terms" className="underline underline-offset-2">
+          이용약관
+        </Link>
+        과{" "}
+        <Link href="/privacy" className="underline underline-offset-2">
+          개인정보처리방침
+        </Link>
+        에 동의하신 것으로 봅니다.
       </p>
     </main>
   );
