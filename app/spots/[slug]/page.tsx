@@ -9,6 +9,7 @@ import { SpotGallery } from "@/components/spot/SpotGallery";
 import { VisitInfo } from "@/components/spot/VisitInfo";
 import { DirectionsLinks } from "@/components/spot/DirectionsLinks";
 import { SaveButton } from "@/components/spot/SaveButton";
+import { WeatherStrip } from "@/components/spot/WeatherStrip";
 import Link from "next/link";
 
 const SPOTS = spotsData as Spot[];
@@ -144,6 +145,8 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
       </section>
 
       {media && <VisitInfo practical={media.practical} />}
+
+      <WeatherStrip lat={spot.lat} lng={spot.lng} />
 
       <div className="flex flex-col gap-3">
         <div className="h-[320px] overflow-hidden rounded-2xl ring-1 ring-line">
