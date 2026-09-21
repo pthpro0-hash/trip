@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { companionLabel } from "@/lib/korean";
 import { signedUrls } from "@/lib/supabase/photos";
+import {
+  companionOptions,
+  searchTrips,
+  yearOptions,
+  type SearchableTrip,
+} from "@/lib/tripSearch";
 
 type Status = "loading" | "guest" | "ready" | "failed";
 
@@ -33,6 +39,9 @@ export function TripList() {
   const [failed, setFailed] = useState(false);
   // 보관함이 비공개라 고정 주소가 없다. 볼 때마다 짧게 사는 주소를 받는다.
   const [covers, setCovers] = useState<Map<string, string>>(new Map());
+  const [query, setQuery] = useState("");
+  const [person, setPerson] = useState<string | null>(null);
+  const [year, setYear] = useState<number | null>(null);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -66,6 +75,38 @@ export function TripList() {
       active = false;
     };
   }, []);
+
+  /*
+    검색이 보는 모양으로 한 번 눕힌다. 장소와 행정동은 방문마다 흩어져
+    있어, 여행 한 건을 찾으려면 모아 두어야 한다.
+  */
+  const searchable: SearchableTrip[] = useMemo(
+    () =>
+      trips.map((trip) => ({
+        id: trip.id,
+        startedOn: trip.startedOn,
+        endedOn: trip.endedOn,
+        companions: trip.companions,
+        note: trip.note,
+        placeNames: trip.visits.map((visit) => visit.placeName),
+        dongs: trip.visits.map((visit) => visit.dong).filter((dong): dong is string => !!dong),
+      })),
+    [trips],
+  );
+
+  const visible = useMemo(() => {
+    const matchedIds = new Set(searchTrips(searchable, query).map((trip) => trip.id));
+    return trips.filter((trip) => {
+      if (query.trim() && !matchedIds.has(trip.id)) return false;
+      if (person && trip.companions?.trim() !== person) return false;
+      if (year !== null) {
+        const from = Number(trip.startedOn.slice(0, 4));
+        const to = Number(trip.endedOn.slice(0, 4));
+        if (year < from || year > to) return false;
+      }
+      return true;
+    });
+  }, [trips, searchable, query, person, year]);
 
   const remove = async (tripId: string) => {
     const supabase = getBrowserClient();
@@ -131,11 +172,95 @@ export function TripList() {
     0,
   );
 
+  const people = companionOptions(searchable);
+  const years = yearOptions(searchable);
+  const narrowed = query.trim() || person || year;
+
   return (
     <>
-      <p className="text-[13px] text-text-faint">
-        여행 {trips.length}건 · 다녀온 곳 {totalVisits}곳 · 사진 {totalPhotos}장
-      </p>
+      <div className="flex flex-col gap-2.5">
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          aria-label="내 기록 검색"
+          placeholder="작년 가족, 해변, 강릉시…"
+          className="w-full rounded-xl bg-bg-subtle px-4 py-3 text-[15px] text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
+        />
+
+        {/*
+          사람은 하나여도 칩을 낸다 — 이름을 적어 둔 기록과 적지 않은 기록을
+          가르는 데 쓰인다. 연도는 하나뿐이면 눌러도 전부 그대로라 숨긴다.
+        */}
+        {people.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="w-8 shrink-0 text-[13px] font-medium text-text-faint">사람</span>
+            {people.map((name) => (
+              <button
+                key={name}
+                type="button"
+                aria-pressed={person === name}
+                onClick={() => setPerson(person === name ? null : name)}
+                className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
+                  person === name
+                    ? "bg-accent text-on-accent"
+                    : "bg-bg-subtle text-text hover:bg-line"
+                }`}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {years.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="w-8 shrink-0 text-[13px] font-medium text-text-faint">시기</span>
+            {years.map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={year === value}
+                onClick={() => setYear(year === value ? null : value)}
+                className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
+                  year === value
+                    ? "bg-accent text-on-accent"
+                    : "bg-bg-subtle text-text hover:bg-line"
+                }`}
+              >
+                {value}년
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <p className="text-[13px] text-text-faint">
+          {narrowed
+            ? `찾은 여행 ${visible.length}건`
+            : `여행 ${trips.length}건 · 다녀온 곳 ${totalVisits}곳 · 사진 ${totalPhotos}장`}
+        </p>
+        {narrowed && (
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setPerson(null);
+              setYear(null);
+            }}
+            className="text-[13px] font-medium text-accent hover:text-accent-hover"
+          >
+            조건 지우기
+          </button>
+        )}
+      </div>
+
+      {narrowed && visible.length === 0 && (
+        <p className="rounded-2xl bg-bg-subtle p-5 text-[15px] text-text-muted">
+          그 조건에 맞는 기록이 없어요. 조건을 하나씩 빼 보세요.
+        </p>
+      )}
 
       {failed && (
         <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
@@ -144,7 +269,7 @@ export function TripList() {
       )}
 
       <ol className="flex flex-col gap-4">
-        {trips.map((trip) => (
+        {visible.map((trip) => (
           <li key={trip.id} className="flex flex-col gap-2.5 rounded-2xl bg-surface p-5 ring-1 ring-line">
             <div className="flex items-start justify-between gap-3">
               <div>
