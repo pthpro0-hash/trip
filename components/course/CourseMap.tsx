@@ -1,0 +1,121 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import type { Spot } from "@/lib/types";
+import { loadKakaoMaps } from "@/lib/kakaoLoader";
+
+interface CourseMapProps {
+  spots: Spot[];
+}
+
+const LINE_COLOR = "#0071E3";
+const BOUNDS_PADDING = 40;
+
+// 지도 위에 순번을 그대로 얹어야 목록의 1·2·3과 눈으로 이어진다.
+// 데이터 URI 안의 SVG는 페이지 CSS 변수를 볼 수 없어 색을 직접 적는다.
+function numberedMarkerImage(order: number) {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26">` +
+    `<circle cx="13" cy="13" r="11" fill="${LINE_COLOR}" stroke="white" stroke-width="2"/>` +
+    `<text x="13" y="17.5" text-anchor="middle" font-size="12" font-weight="700"` +
+    ` font-family="-apple-system, BlinkMacSystemFont, sans-serif" fill="white">${order}</text>` +
+    `</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+export function CourseMap({ spots }: CourseMapProps) {
+  const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ?? "";
+  const containerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Kakao Maps SDK has no official types
+  const mapRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Kakao Maps SDK has no official types
+  const drawnRef = useRef<any[]>([]);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!apiKey || spots.length === 0) return;
+    let cancelled = false;
+
+    loadKakaoMaps(apiKey)
+      .then(() => {
+        if (cancelled || !containerRef.current) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Kakao Maps SDK has no official types
+        const kakao = (window as any).kakao;
+
+        if (!mapRef.current) {
+          mapRef.current = new kakao.maps.Map(containerRef.current, {
+            center: new kakao.maps.LatLng(spots[0].lat, spots[0].lng),
+            level: 10,
+          });
+        }
+        const map = mapRef.current;
+
+        drawnRef.current.forEach((drawn) => drawn.setMap(null));
+        drawnRef.current = [];
+
+        const path = spots.map((spot) => new kakao.maps.LatLng(spot.lat, spot.lng));
+
+        if (path.length > 1) {
+          const line = new kakao.maps.Polyline({
+            path,
+            strokeWeight: 3,
+            strokeColor: LINE_COLOR,
+            strokeOpacity: 0.75,
+            strokeStyle: "solid",
+          });
+          line.setMap(map);
+          drawnRef.current.push(line);
+        }
+
+        spots.forEach((spot, index) => {
+          const marker = new kakao.maps.Marker({
+            position: path[index],
+            map,
+            title: spot.name,
+            image: new kakao.maps.MarkerImage(
+              numberedMarkerImage(index + 1),
+              new kakao.maps.Size(26, 26),
+              { offset: new kakao.maps.Point(13, 13) },
+            ),
+          });
+          drawnRef.current.push(marker);
+        });
+
+        if (path.length > 1) {
+          const bounds = new kakao.maps.LatLngBounds();
+          path.forEach((point: unknown) => bounds.extend(point));
+          map.setBounds(bounds, BOUNDS_PADDING, BOUNDS_PADDING, BOUNDS_PADDING, BOUNDS_PADDING);
+        } else {
+          map.setCenter(path[0]);
+          map.setLevel(5);
+        }
+        // 목록이 길어졌다 짧아지면 컨테이너 높이가 바뀌어 타일이 어긋난다.
+        map.relayout();
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiKey, spots]);
+
+  useEffect(() => {
+    const drawn = drawnRef;
+    return () => {
+      drawn.current.forEach((item) => item.setMap(null));
+      drawn.current = [];
+    };
+  }, []);
+
+  if (!apiKey || failed) {
+    return (
+      <div className="flex h-full min-h-[320px] w-full items-center justify-center bg-bg-subtle text-sm text-text-faint">
+        지도를 불러오지 못했습니다
+      </div>
+    );
+  }
+
+  return <div ref={containerRef} className="h-full min-h-[320px] w-full" />;
+}

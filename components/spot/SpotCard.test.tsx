@@ -19,8 +19,28 @@ describe("SpotCard", () => {
   it("클릭하면 onSelect가 spot id와 함께 호출된다", () => {
     const onSelect = vi.fn();
     render(<SpotCard spot={SPOT} selected={false} onSelect={onSelect} />);
-    fireEvent.click(screen.getByRole("button"));
+    fireEvent.click(screen.getByRole("button", { name: /지도에서 보기/ }));
     expect(onSelect).toHaveBeenCalledWith("gyeongbokgung");
+  });
+
+  it("찜 버튼을 누르면 눌린 상태로 바뀐다", () => {
+    window.localStorage.clear();
+    render(<SpotCard spot={SPOT} selected={false} onSelect={() => {}} />);
+    const save = screen.getByRole("button", { name: "경복궁 찜하기" });
+    expect(save).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(save);
+    expect(screen.getByRole("button", { name: "경복궁 찜 해제" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("내 주변이 켜져 있으면 거리를 함께 보여준다", () => {
+    render(
+      <SpotCard spot={SPOT} selected={false} onSelect={() => {}} distanceKm={3.42} />,
+    );
+    expect(screen.getByText("수도권 · 3.4km")).toBeTruthy();
   });
 
   it("상세 페이지로 이동하는 링크를 포함한다", () => {

@@ -12,8 +12,12 @@ import {
 } from "@/lib/filter";
 import { sortByRelevance, suggestCorrection } from "@/lib/search";
 import { reportEmptySearch } from "@/lib/searchTelemetry";
+import { distanceKm } from "@/lib/geo";
+import { useSavedSpots } from "@/lib/favorites";
+import { useMyLocation } from "@/lib/useMyLocation";
 import { FilterBar } from "@/components/filter/FilterBar";
 import { SearchBox } from "@/components/filter/SearchBox";
+import { NearbyButton } from "@/components/filter/NearbyButton";
 import { SpotCard } from "@/components/spot/SpotCard";
 import { KakaoMap } from "@/components/map/KakaoMap";
 import { ViewToggle } from "@/components/layout/ViewToggle";
@@ -31,18 +35,29 @@ export default function HomePage() {
   const [criteria, setCriteria] = useState<FilterCriteria>({});
   const [selectedId, setSelectedId] = useState<string>();
   const [mobileView, setMobileView] = useState<"list" | "map">("map");
+  const [savedOnly, setSavedOnly] = useState(false);
   // Searching is a "find this place" action, so results belong in the list —
   // but only until the reader says otherwise, after which their choice sticks.
   const [viewChosenByUser, setViewChosenByUser] = useState(false);
 
+  const saved = useSavedSpots();
+  const { state: location, request: requestLocation, clear: clearLocation } = useMyLocation();
+  const origin = location.status === "ready" ? location.point : undefined;
+
   const query = criteria.query?.trim() ?? "";
   const results = useMemo(() => {
     const filtered = filterSpots(SPOTS, criteria);
-    return query ? sortByRelevance(filtered, query) : filtered;
-  }, [criteria, query]);
+    const scoped = savedOnly ? filtered.filter((spot) => saved.ids.includes(spot.id)) : filtered;
+    const ranked = query ? sortByRelevance(scoped, query) : scoped;
+    // 위치를 알고 있으면 가까운 순이 검색어 점수보다 우선한다. "내 주변"을
+    // 누른 사람은 이미 무엇을 볼지 정했고, 남은 질문은 어디가 가깝냐다.
+    if (!origin) return ranked;
+    return [...ranked].sort((a, b) => distanceKm(origin, a) - distanceKm(origin, b));
+  }, [criteria, query, savedOnly, saved.ids, origin]);
+
   const suggestions = useMemo(
-    () => (results.length === 0 ? suggestRelaxedFilters(SPOTS, criteria) : []),
-    [results, criteria],
+    () => (results.length === 0 && !savedOnly ? suggestRelaxedFilters(SPOTS, criteria) : []),
+    [results, criteria, savedOnly],
   );
   // 오타로 0건이 되는 경우가 잦아, 가장 가까운 이름을 되물어 본다.
   const correction = useMemo(
@@ -91,6 +106,31 @@ export default function HomePage() {
         }}
       />
       <FilterBar criteria={criteria} onChange={setCriteria} />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <NearbyButton state={location} onRequest={requestLocation} onClear={clearLocation} />
+        {saved.ids.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setSavedOnly(!savedOnly)}
+              aria-pressed={savedOnly}
+              className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
+                savedOnly ? "bg-accent text-on-accent" : "bg-bg-subtle text-text hover:bg-line"
+              }`}
+            >
+              찜한 곳 {saved.ids.length}
+            </button>
+            <Link
+              href="/course"
+              className="text-[13px] font-medium text-accent hover:text-accent-hover"
+            >
+              내 코스 →
+            </Link>
+          </>
+        )}
+      </div>
+
       <ViewToggle
         value={mobileView}
         onChange={(next) => {
@@ -101,6 +141,7 @@ export default function HomePage() {
 
       <p className="text-[13px] text-text-faint">
         {query ? `'${query}' 검색 결과 ${results.length}곳` : `${results.length}곳`}
+        {origin ? " · 가까운 순" : ""}
       </p>
 
       {results.length === 0 && (
@@ -110,7 +151,7 @@ export default function HomePage() {
         // placed inside it would silently disappear along with the panel,
         // leaving an empty map with no explanation.
         <div className="rounded-2xl bg-bg-subtle p-5 text-[15px] text-text-muted">
-          조건에 맞는 곳이 없어요.
+          {savedOnly ? "찜한 곳 중에는 조건에 맞는 곳이 없어요." : "조건에 맞는 곳이 없어요."}
           {correction && (
             <div className="mt-2">
               혹시{" "}
@@ -141,6 +182,7 @@ export default function HomePage() {
               selected={spot.id === selectedId}
               onSelect={setSelectedId}
               query={query}
+              distanceKm={origin ? distanceKm(origin, spot) : undefined}
             />
           ))}
         </div>

@@ -8,6 +8,7 @@ import { KakaoMap } from "@/components/map/KakaoMap";
 import { SpotGallery } from "@/components/spot/SpotGallery";
 import { VisitInfo } from "@/components/spot/VisitInfo";
 import { DirectionsLinks } from "@/components/spot/DirectionsLinks";
+import { SaveButton } from "@/components/spot/SaveButton";
 import Link from "next/link";
 
 const SPOTS = spotsData as Spot[];
@@ -98,6 +99,15 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
       <div className="flex flex-col gap-2">
         <h1 className="text-[32px] font-bold tracking-tight text-text md:text-[40px]">{spot.name}</h1>
         <p className="text-[17px] leading-relaxed text-text-muted">{spot.summary}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <SaveButton spotId={spot.id} spotName={spot.name} variant="inline" />
+          <Link
+            href="/course"
+            className="text-[13px] font-medium text-accent hover:text-accent-hover"
+          >
+            내 코스 →
+          </Link>
+        </div>
       </div>
 
       {media && media.images.length > 0 && <SpotGallery name={spot.name} images={media.images} />}

@@ -4,7 +4,9 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Spot } from "@/lib/types";
 import { getSpotThumbnail } from "@/lib/media";
+import { formatDistance } from "@/lib/geo";
 import { HighlightedText } from "./HighlightedText";
+import { SaveButton } from "./SaveButton";
 
 interface SpotCardProps {
   spot: Spot;
@@ -12,20 +14,24 @@ interface SpotCardProps {
   onSelect: (id: string) => void;
   /** Current search term, highlighted wherever it appears in the card. */
   query?: string;
+  /** 내 위치에서의 직선거리. "내 주변"이 켜져 있을 때만 들어온다. */
+  distanceKm?: number;
 }
 
 // Photo first, then the name — the photo is what tells someone whether they
 // want to go. The whole image is the map-select target; the title links
 // through to the detail page.
-export function SpotCard({ spot, selected, onSelect, query }: SpotCardProps) {
+export function SpotCard({ spot, selected, onSelect, query, distanceKm }: SpotCardProps) {
   const thumbnail = getSpotThumbnail(spot.id);
 
   return (
     <div
-      className={`overflow-hidden rounded-2xl bg-surface transition ${
+      className={`relative overflow-hidden rounded-2xl bg-surface transition ${
         selected ? "ring-2 ring-accent" : "ring-1 ring-line"
       }`}
     >
+      {/* 사진 버튼 안에 넣으면 버튼 안의 버튼이 되므로 형제로 둔다. */}
+      <SaveButton spotId={spot.id} spotName={spot.name} />
       <button
         type="button"
         onClick={() => onSelect(spot.id)}
@@ -55,7 +61,9 @@ export function SpotCard({ spot, selected, onSelect, query }: SpotCardProps) {
           >
             <HighlightedText text={spot.name} query={query} />
           </Link>
-          <span className="shrink-0 text-xs text-text-faint">{spot.region}</span>
+          <span className="shrink-0 text-xs text-text-faint">
+            {distanceKm === undefined ? spot.region : `${spot.region} · ${formatDistance(distanceKm)}`}
+          </span>
         </div>
 
         <p className="line-clamp-2 text-[13px] leading-relaxed text-text-muted">
