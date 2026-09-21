@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { LoginButton } from "@/components/auth/LoginButton";
+import { LoginButtons } from "@/components/auth/LoginButtons";
+import { getEnabledProviders } from "@/lib/auth/enabledProviders";
 import { getCurrentUser } from "@/lib/supabase/server";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export const metadata: Metadata = {
   title: "로그인",
@@ -26,6 +26,9 @@ export default async function LoginPage({
   const { error, next } = await searchParams;
   const user = await getCurrentUser();
   if (user) redirect("/");
+
+  // 코드가 아니라 Supabase 설정이 어떤 수단을 쓸 수 있는지 정한다.
+  const providers = await getEnabledProviders();
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 px-5 pb-16 pt-10">
@@ -52,13 +55,7 @@ export default async function LoginPage({
         </p>
       )}
 
-      {isSupabaseConfigured ? (
-        <LoginButton next={next ?? "/"} />
-      ) : (
-        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
-          로그인 설정이 아직 끝나지 않았어요.
-        </p>
-      )}
+      <LoginButtons providers={providers} next={next ?? "/"} />
 
       {/*
         이용약관과 개인정보처리방침은 아직 준비 중이다. 없는 페이지로 링크를
