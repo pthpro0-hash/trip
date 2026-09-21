@@ -101,3 +101,114 @@ export function splitIntoVisits(shots: Shot[], radiusKm = VISIT_RADIUS_KM): Visi
 export function tripDays(trip: Trip): string[] {
   return [...new Set(trip.shots.map((shot) => dayKey(shot.takenAt)))].sort();
 }
+
+/*
+  아래 셋은 기계가 잘못 묶은 것을 사람이 바로잡기 위한 것들이다.
+
+  이틀 연속 나들이와 1박 2일 여행은 데이터가 똑같다. 실제 사진에서 재 보니
+  06-13→06-14 가 104km/21.8시간, 09-13→09-14 가 90km/20.7시간이었는데
+  앞은 따로 간 나들이였고 뒤는 한 여행이었다. 더 영리한 규칙을 짜내는 대신
+  사람이 나누고 합칠 수 있게 한다.
+*/
+
+/** 이만큼 떨어져 있으면 별개 나들이일 수 있다고 본다. */
+export const UNCERTAIN_GAP_KM = 30;
+
+export interface DayBoundary {
+  /** 이 날부터 뒤쪽이 갈라져 나간다. */
+  day: string;
+  km: number;
+  hours: number;
+  /** 멀리 떨어져 있어 한 여행인지 알 수 없는가. */
+  uncertain: boolean;
+}
+
+/** 여행 안에서 날이 바뀌는 지점들. 나눌 수 있는 자리이기도 하다. */
+export function dayBoundaries(trip: Trip): DayBoundary[] {
+  const days = tripDays(trip);
+  const boundaries: DayBoundary[] = [];
+
+  for (let i = 1; i < days.length; i += 1) {
+    const before = trip.shots.filter((shot) => dayKey(shot.takenAt) === days[i - 1]).at(-1);
+    const after = trip.shots.find((shot) => dayKey(shot.takenAt) === days[i]);
+    if (!before || !after) continue;
+
+    const km = distanceKm(before, after);
+    boundaries.push({
+      day: days[i],
+      km,
+      hours: (after.takenAt.getTime() - before.takenAt.getTime()) / 3_600_000,
+      uncertain: km > UNCERTAIN_GAP_KM,
+    });
+  }
+  return boundaries;
+}
+
+/** 여행을 어느 날 앞에서 둘로 나눈다. 그 날이 없거나 첫날이면 나누지 않는다. */
+export function splitTripAtDay(
+  trip: Trip,
+  day: string,
+  visitRadiusKm = VISIT_RADIUS_KM,
+): [Trip, Trip] | null {
+  const before = trip.shots.filter((shot) => dayKey(shot.takenAt) < day);
+  const after = trip.shots.filter((shot) => dayKey(shot.takenAt) >= day);
+  if (before.length === 0 || after.length === 0) return null;
+
+  return [
+    { shots: before, visits: splitIntoVisits(before, visitRadiusKm) },
+    { shots: after, visits: splitIntoVisits(after, visitRadiusKm) },
+  ];
+}
+
+/**
+ * 합치자고 물어볼 만큼 가까운가.
+ *
+ * 한 달 떨어진 두 여행에까지 "합치기"를 달면 단추만 늘어난다. 자동으로
+ * 묶는 기준이 "하루 이내"이므로, 여기서는 그보다 조금 넉넉히 본다.
+ * 가운데 날에 사진이 한 장도 없는 1박 2일이 실제로 이렇게 갈라진다.
+ */
+export const MERGEABLE_GAP_DAYS = 3;
+
+/** 나뉜 두 여행을 사람이 다시 붙일 만한 사이인가. */
+export function canMerge(a: Trip, b: Trip): boolean {
+  const end = a.shots.at(-1);
+  const start = b.shots[0];
+  if (!end || !start) return false;
+  const gap = dayIndex(start.takenAt) - dayIndex(end.takenAt);
+  return gap >= 0 && gap <= MERGEABLE_GAP_DAYS;
+}
+
+/** 두 여행을 하나로 합친다. 방문은 시간순으로 다시 나눈다. */
+export function mergeTrips(a: Trip, b: Trip, visitRadiusKm = VISIT_RADIUS_KM): Trip {
+  const shots = [...a.shots, ...b.shots].sort(
+    (x, y) => x.takenAt.getTime() - y.takenAt.getTime(),
+  );
+  return { shots, visits: splitIntoVisits(shots, visitRadiusKm) };
+}
+
+/**
+ * 이름이 같은 이웃 방문을 하나로 합친다.
+ *
+ * 산에서 1km 넘게 움직였다 돌아오면 같은 곳이 두 번 나온다. 규칙대로이긴
+ * 하지만 "매향리 → 매향리"처럼 늘어놓으면 읽는 사람만 어지럽다.
+ */
+export function mergeAdjacentVisits(
+  visits: Visit[],
+  labels: string[],
+): { visits: Visit[]; labels: string[] } {
+  const outVisits: Visit[] = [];
+  const outLabels: string[] = [];
+
+  visits.forEach((visit, index) => {
+    const label = labels[index];
+    if (outLabels.length > 0 && outLabels.at(-1) === label) {
+      const last = outVisits.at(-1)!;
+      outVisits[outVisits.length - 1] = { shots: [...last.shots, ...visit.shots] };
+      return;
+    }
+    outVisits.push(visit);
+    outLabels.push(label);
+  });
+
+  return { visits: outVisits, labels: outLabels };
+}

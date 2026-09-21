@@ -13,6 +13,8 @@ import { isChosungQuery, normalize, toChosung } from "./textMatch";
 /** 검색 대상이 되는 기록 한 건. 화면이 쓰는 모양과 따로 둔다. */
 export interface SearchableTrip {
   id: string;
+  /** 사용자가 직접 지은 이름. 가장 센 단서다. */
+  title: string | null;
   startedOn: string;
   endedOn: string;
   companions: string | null;
@@ -22,6 +24,9 @@ export interface SearchableTrip {
 }
 
 const SCORE = {
+  /* 제목은 사람이 손으로 적은 이름이라 장소명보다 앞선다. */
+  titleExact: 120,
+  titleIncludes: 70,
   companion: 60,
   placeExact: 100,
   placeIncludes: 55,
@@ -98,6 +103,12 @@ function scoreText(trip: SearchableTrip, term: string): number {
 
   let best = 0;
 
+  if (trip.title) {
+    const title = normalize(trip.title);
+    if (title === needle) best = Math.max(best, SCORE.titleExact);
+    else if (title.includes(needle)) best = Math.max(best, SCORE.titleIncludes);
+  }
+
   for (const place of trip.placeNames) {
     const name = normalize(place);
     if (name === needle) best = Math.max(best, SCORE.placeExact);
@@ -122,7 +133,7 @@ function scoreText(trip: SearchableTrip, term: string): number {
 
   // 초성으로만 친 검색어는 장소와 사람 이름에만 맞춰 본다.
   if (best === 0 && isChosungQuery(term)) {
-    const haystacks = [...trip.placeNames, trip.companions ?? ""];
+    const haystacks = [trip.title ?? "", ...trip.placeNames, trip.companions ?? ""];
     if (haystacks.some((text) => toChosung(normalize(text)).includes(term))) {
       best = SCORE.chosung;
     }

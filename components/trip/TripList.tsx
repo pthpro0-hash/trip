@@ -84,6 +84,7 @@ export function TripList() {
     () =>
       trips.map((trip) => ({
         id: trip.id,
+        title: trip.title,
         startedOn: trip.startedOn,
         endedOn: trip.endedOn,
         companions: trip.companions,
@@ -277,13 +278,13 @@ export function TripList() {
                   href={`/trips/${trip.id}`}
                   className="text-[17px] font-semibold tracking-tight text-text hover:text-accent"
                 >
-                  {formatSpan(trip.startedOn, trip.endedOn)}
+                  {trip.title || formatSpan(trip.startedOn, trip.endedOn)}
                 </Link>
-                {trip.companions && (
-                  <p className="mt-0.5 text-[13px] text-text-muted">
-                    {companionLabel(trip.companions)}
-                  </p>
-                )}
+                <p className="mt-0.5 text-[13px] text-text-muted">
+                  {trip.title && <span>{formatSpan(trip.startedOn, trip.endedOn)}</span>}
+                  {trip.title && trip.companions && <span className="text-text-faint"> · </span>}
+                  {trip.companions && <span>{companionLabel(trip.companions)}</span>}
+                </p>
               </div>
               <button
                 type="button"
@@ -292,8 +293,8 @@ export function TripList() {
                 disabled={removing === trip.id}
                 aria-label={
                   confirming === trip.id
-                    ? `${formatSpan(trip.startedOn, trip.endedOn)} 기록 정말 지우기`
-                    : `${formatSpan(trip.startedOn, trip.endedOn)} 기록 지우기`
+                    ? `${trip.title || formatSpan(trip.startedOn, trip.endedOn)} 기록 정말 지우기`
+                    : `${trip.title || formatSpan(trip.startedOn, trip.endedOn)} 기록 지우기`
                 }
                 className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
                   confirming === trip.id

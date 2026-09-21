@@ -15,6 +15,7 @@ const NOW = new Date(2026, 8, 22);
 
 function trip(partial: Partial<SearchableTrip> & { id: string }): SearchableTrip {
   return {
+    title: null,
     startedOn: "2026-09-13",
     endedOn: "2026-09-14",
     companions: null,
@@ -54,6 +55,32 @@ const 남산 = trip({
 });
 
 const ALL = [강릉, 대천, 남산];
+
+describe("사람이 지은 제목", () => {
+  const 첫휴가 = trip({
+    id: "첫휴가",
+    title: "민수랑 첫 휴가",
+    placeNames: ["화진포해변"],
+  });
+
+  it("제목으로 찾는다", () => {
+    expect(searchTrips([첫휴가, 대천], "첫 휴가", NOW).map((t) => t.id)).toEqual(["첫휴가"]);
+  });
+
+  it("제목이 장소명보다 앞선다", () => {
+    const 제목 = trip({ id: "제목", title: "바다" });
+    const 장소 = trip({ id: "장소", placeNames: ["바다"] });
+    expect(scoreTrip(제목, "바다", NOW)).toBeGreaterThan(scoreTrip(장소, "바다", NOW));
+  });
+
+  it("초성으로도 제목을 찾는다", () => {
+    expect(searchTrips([첫휴가, 대천], "ㅊㅎㄱ", NOW).map((t) => t.id)).toEqual(["첫휴가"]);
+  });
+
+  it("제목이 없어도 예전처럼 장소로 찾는다", () => {
+    expect(searchTrips(ALL, "안목", NOW).map((t) => t.id)).toEqual(["강릉"]);
+  });
+});
 
 describe("parseTimeTerm", () => {
   it("작년과 올해를 읽는다", () => {

@@ -22,6 +22,7 @@ export interface VisitDetail {
 
 export interface TripDetail {
   id: string;
+  title: string | null;
   startedOn: string;
   endedOn: string;
   companions: string | null;
@@ -46,7 +47,7 @@ export async function fetchTripDetail(
   const { data, error } = await supabase
     .from("trips")
     .select(
-      "id,started_on,ended_on,companions,note," +
+      "id,title,started_on,ended_on,companions,note," +
         "visits(id,place_name,spot_id,dong,lat,lng,started_at,ended_at,position," +
         "trip_photos(id,storage_path,taken_at,is_cover))",
     )
@@ -87,6 +88,7 @@ export async function fetchTripDetail(
 
   return {
     id: row.id as string,
+    title: row.title as string | null,
     startedOn: row.started_on as string,
     endedOn: row.ended_on as string,
     companions: row.companions as string | null,

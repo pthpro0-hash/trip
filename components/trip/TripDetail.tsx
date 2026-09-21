@@ -180,11 +180,13 @@ export function TripDetail({ tripId }: { tripId: string }) {
     <>
       <div>
         <h1 className="text-[28px] font-bold tracking-tight text-text md:text-[32px]">
-          {formatSpan(trip.startedOn, trip.endedOn)}
+          {trip.title || formatSpan(trip.startedOn, trip.endedOn)}
         </h1>
-        {trip.companions && (
-          <p className="mt-1 text-[15px] text-text-muted">{companionLabel(trip.companions)}</p>
-        )}
+        <p className="mt-1 text-[15px] text-text-muted">
+          {trip.title && <span>{formatSpan(trip.startedOn, trip.endedOn)}</span>}
+          {trip.title && trip.companions && <span className="text-text-faint"> · </span>}
+          {trip.companions && <span>{companionLabel(trip.companions)}</span>}
+        </p>
       </div>
 
       {stops.length > 0 && (

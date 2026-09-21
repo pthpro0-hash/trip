@@ -11,6 +11,8 @@ export interface VisitPlace {
 
 export interface SavedTrip {
   id: string;
+  /** 사용자가 지었거나 장소에서 지어진 제목. 없으면 날짜로 보여준다. */
+  title: string | null;
   startedOn: string;
   endedOn: string;
   companions: string | null;
@@ -89,6 +91,7 @@ export async function saveTrip(
   trip: Trip,
   places: VisitPlace[],
   companions: string,
+  title: string,
 ): Promise<{ ok: boolean; id?: string; visitIds?: string[] }> {
   const days = [...new Set(trip.shots.map((shot) => dayKey(shot.takenAt)))].sort();
 
@@ -98,6 +101,7 @@ export async function saveTrip(
       user_id: userId,
       started_on: days[0],
       ended_on: days.at(-1),
+      title: title.trim() || null,
       companions: companions.trim() || null,
     })
     .select("id")
@@ -168,7 +172,7 @@ export async function fetchTrips(
   const { data, error } = await supabase
     .from("trips")
     .select(
-      "id,started_on,ended_on,companions,note,visits(place_name,spot_id,dong,lat,lng,started_at,photo_count,position)",
+      "id,title,started_on,ended_on,companions,note,visits(place_name,spot_id,dong,lat,lng,started_at,photo_count,position)",
     )
     .eq("user_id", userId)
     .order("started_on", { ascending: false });
@@ -194,6 +198,7 @@ export async function fetchTrips(
 
   return data.map((row) => ({
     id: row.id as string,
+    title: row.title as string | null,
     coverPath: coverByTrip.get(row.id as string) ?? null,
     startedOn: row.started_on as string,
     endedOn: row.ended_on as string,
