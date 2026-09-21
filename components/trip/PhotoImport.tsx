@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
+import { uploadPhotos, type UploadTarget } from "@/lib/supabase/photos";
 import { readShots, type ReadResult } from "@/lib/photo/readShots";
 import { dayKey, findLivingArea, groupIntoTrips, tripDays } from "@/lib/photo/grouping";
 import type { Shot, Trip } from "@/lib/photo/types";
@@ -19,6 +20,9 @@ interface SaveOutcome {
   saved: number;
   skipped: number;
   failed: number;
+  photos: number;
+  unsupported: string[];
+  overLimit: number;
 }
 
 interface Stage {
@@ -51,6 +55,8 @@ async function fetchPlaces(points: { lat: number; lng: number }[]): Promise<Plac
 
 export function PhotoImport() {
   const inputRef = useRef<HTMLInputElement>(null);
+  // 사진을 올릴 때 원본 파일이 다시 필요하다. 읽을 때 이름으로 찾아 둔다.
+  const filesRef = useRef<Map<string, File>>(new Map());
   const [stage, setStage] = useState<Stage>({ name: "idle" });
   const [read, setRead] = useState<ReadResult | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -62,6 +68,8 @@ export function PhotoImport() {
   const [savedRanges, setSavedRanges] = useState<DateRange[]>([]);
   const [saving, setSaving] = useState(false);
   const [outcome, setOutcome] = useState<SaveOutcome | null>(null);
+  const [withPhotos, setWithPhotos] = useState(true);
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -97,6 +105,8 @@ export function PhotoImport() {
     setDismissed(new Set());
     setOutcome(null);
     setCompanions({});
+    setUploadNote(null);
+    filesRef.current = new Map(files.map((file) => [file.name, file]));
     setStage({ name: "reading", done: 0, total: files.length });
 
     const result = await readShots(files, (done, total) =>
@@ -137,7 +147,14 @@ export function PhotoImport() {
     if (!supabase || !userId) return;
 
     setSaving(true);
-    const result: SaveOutcome = { saved: 0, skipped: 0, failed: 0 };
+    const result: SaveOutcome = {
+      saved: 0,
+      skipped: 0,
+      failed: 0,
+      photos: 0,
+      unsupported: [],
+      overLimit: 0,
+    };
 
     for (const { trip, index } of visible) {
       // 같은 날짜의 여행이 이미 있으면 건너뛴다. 사진을 두 번 넣어도
@@ -155,13 +172,43 @@ export function PhotoImport() {
         };
       });
       const saved = await saveTrip(supabase, userId, trip, visitPlaces, companions[index] ?? "");
-      if (saved.ok) {
-        result.saved += 1;
-        savedRanges.push(tripRange(trip));
-      } else {
+      if (!saved.ok) {
         result.failed += 1;
+        continue;
       }
+
+      result.saved += 1;
+      savedRanges.push(tripRange(trip));
+
+      if (!withPhotos || !saved.visitIds) continue;
+
+      const targets: UploadTarget[] = [];
+      trip.visits.forEach((visit, visitIndex) => {
+        const visitId = saved.visitIds![visitIndex];
+        if (!visitId) return;
+        visit.shots.forEach((shot, shotIndex) => {
+          const file = filesRef.current.get(shot.id);
+          if (!file) return;
+          targets.push({
+            visitId,
+            file,
+            takenAt: shot.takenAt,
+            lat: shot.lat,
+            lng: shot.lng,
+            // 여행마다 첫 장을 대표로 둔다.
+            isCover: visitIndex === 0 && shotIndex === 0,
+          });
+        });
+      });
+
+      const uploaded = await uploadPhotos(supabase, userId, targets, (done, total) =>
+        setUploadNote(`사진 올리는 중… ${done}/${total}`),
+      );
+      result.photos += uploaded.uploaded;
+      result.unsupported.push(...uploaded.unsupported);
+      result.overLimit += uploaded.overLimit;
     }
+    setUploadNote(null);
 
     setSavedRanges([...savedRanges]);
     setOutcome(result);
@@ -320,9 +367,21 @@ export function PhotoImport() {
         <div className="flex flex-col gap-2 rounded-xl bg-accent-soft px-4 py-3 text-[14px] text-accent">
           <p className="font-medium">
             {outcome.saved > 0 ? `여행 ${outcome.saved}건을 기록했어요.` : "새로 기록한 여행이 없어요."}
+            {outcome.photos > 0 && ` 사진 ${outcome.photos}장을 함께 올렸어요.`}
             {outcome.skipped > 0 && ` 이미 있던 ${outcome.skipped}건은 건너뛰었어요.`}
             {outcome.failed > 0 && ` ${outcome.failed}건은 저장하지 못했어요.`}
           </p>
+          {outcome.unsupported.length > 0 && (
+            <p className="text-[13px]">
+              {outcome.unsupported.length}장은 이 브라우저가 열지 못하는 형식이라 올리지
+              못했어요. 기록 자체는 남아 있어요.
+            </p>
+          )}
+          {outcome.overLimit > 0 && (
+            <p className="text-[13px]">
+              보관할 수 있는 사진 수를 넘어 {outcome.overLimit}장은 올리지 못했어요.
+            </p>
+          )}
           <Link href="/trips" className="self-start font-medium underline underline-offset-2">
             내 여행 보기 →
           </Link>
@@ -339,6 +398,29 @@ export function PhotoImport() {
             로그인하기 →
           </Link>
         </div>
+      )}
+
+      {visible.length > 0 && userId && (
+        <label className="flex items-start gap-2.5 rounded-xl bg-bg-subtle px-4 py-3">
+          <input
+            type="checkbox"
+            checked={withPhotos}
+            onChange={(event) => setWithPhotos(event.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
+          />
+          <span className="text-[14px] leading-relaxed text-text-muted">
+            <span className="font-medium text-text">사진도 함께 올리기</span>
+            <br />
+            <span className="text-[13px] text-text-faint">
+              긴 변 2048px로 줄여 올리고 원본은 보관하지 않아요. 끄면 언제 어디를 다녀왔는지만
+              기록돼요.
+            </span>
+          </span>
+        </label>
+      )}
+
+      {uploadNote && (
+        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">{uploadNote}</p>
       )}
 
       {visible.length > 0 && userId && (

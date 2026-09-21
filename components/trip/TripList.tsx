@@ -6,6 +6,7 @@ import { getBrowserClient } from "@/lib/supabase/client";
 import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { companionLabel } from "@/lib/korean";
+import { signedUrls } from "@/lib/supabase/photos";
 
 type Status = "loading" | "guest" | "ready" | "failed";
 
@@ -30,6 +31,8 @@ export function TripList() {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  // 보관함이 비공개라 고정 주소가 없다. 볼 때마다 짧게 사는 주소를 받는다.
+  const [covers, setCovers] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -51,6 +54,12 @@ export function TripList() {
       }
       setTrips(rows);
       setStatus("ready");
+
+      const paths = rows.map((trip) => trip.coverPath).filter((path): path is string => !!path);
+      if (paths.length > 0) {
+        const urls = await signedUrls(supabase, paths);
+        if (active) setCovers(urls);
+      }
     });
 
     return () => {
@@ -171,6 +180,17 @@ export function TripList() {
                     : "지우기"}
               </button>
             </div>
+
+            {trip.coverPath && covers.get(trip.coverPath) && (
+              // 남의 서비스가 아니라 우리 보관함의 서명 주소다. 주소가 그때그때
+              // 달라져 next/image 로 미리 최적화할 수 없다.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={covers.get(trip.coverPath)}
+                alt=""
+                className="aspect-[16/10] w-full rounded-xl object-cover"
+              />
+            )}
 
             <ul className="flex flex-col gap-1">
               {trip.visits.map((visit, index) => (

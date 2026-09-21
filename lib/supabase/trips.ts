@@ -15,6 +15,8 @@ export interface SavedTrip {
   endedOn: string;
   companions: string | null;
   note: string | null;
+  /** 대표 사진의 보관함 경로. 사진을 올리지 않았으면 null. */
+  coverPath: string | null;
   visits: {
     placeName: string;
     spotId: string | null;
@@ -83,7 +85,7 @@ export async function saveTrip(
   trip: Trip,
   places: VisitPlace[],
   companions: string,
-): Promise<{ ok: boolean; id?: string }> {
+): Promise<{ ok: boolean; id?: string; visitIds?: string[] }> {
   const days = [...new Set(trip.shots.map((shot) => dayKey(shot.takenAt)))].sort();
 
   const { data: created, error: tripError } = await supabase
@@ -113,14 +115,24 @@ export async function saveTrip(
     photo_count: visit.shots.length,
   }));
 
-  const { error: visitError } = await supabase.from("visits").insert(rows);
-  if (visitError) {
+  // 사진을 어느 방문에 붙일지 알아야 하므로 만들어진 id 를 돌려받는다.
+  const { data: insertedVisits, error: visitError } = await supabase
+    .from("visits")
+    .insert(rows)
+    .select("id,position");
+
+  if (visitError || !insertedVisits) {
     // 껍데기만 남은 여행을 남기지 않는다.
     await supabase.from("trips").delete().eq("id", created.id);
     return { ok: false };
   }
 
-  return { ok: true, id: created.id };
+  const visitIds = insertedVisits
+    .slice()
+    .sort((a, b) => (a.position as number) - (b.position as number))
+    .map((visit) => visit.id as string);
+
+  return { ok: true, id: created.id, visitIds };
 }
 
 /**
@@ -159,8 +171,26 @@ export async function fetchTrips(
 
   if (error || !data) return null;
 
+  /*
+    대표 사진만 따로 가져온다. 방문에 딸린 사진을 통째로 끌어오면 수백 줄이
+    딸려 오는데, 목록에서 쓰는 것은 여행마다 한 장뿐이다.
+  */
+  const { data: covers } = await supabase
+    .from("trip_photos")
+    .select("storage_path, visits!inner(trip_id)")
+    .eq("user_id", userId)
+    .eq("is_cover", true);
+
+  const coverByTrip = new Map<string, string>();
+  for (const cover of covers ?? []) {
+    const visit = cover.visits as unknown as { trip_id: string } | { trip_id: string }[];
+    const tripId = Array.isArray(visit) ? visit[0]?.trip_id : visit?.trip_id;
+    if (tripId) coverByTrip.set(tripId, cover.storage_path as string);
+  }
+
   return data.map((row) => ({
     id: row.id as string,
+    coverPath: coverByTrip.get(row.id as string) ?? null,
     startedOn: row.started_on as string,
     endedOn: row.ended_on as string,
     companions: row.companions as string | null,
