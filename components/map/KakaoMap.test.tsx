@@ -25,7 +25,10 @@ function stubKakao() {
   const mapCalls: { center: { lat: number; lng: number }; level: number }[] = [];
   const markerCalls: {
     position: { lat: number; lng: number };
-    image?: { size: { width: number; height: number } };
+    image?: {
+      size: { width: number; height: number };
+      opts: { offset: { x: number; y: number } };
+    };
   }[] = [];
   const overlayCalls: {
     position: { lat: number; lng: number };
@@ -55,7 +58,10 @@ function stubKakao() {
       },
       Marker: function (options: {
         position: { lat: number; lng: number };
-        image?: { size: { width: number; height: number } };
+        image?: {
+          size: { width: number; height: number };
+          opts: { offset: { x: number; y: number } };
+        };
       }) {
         markerCalls.push(options);
         const marker = { setMap: () => {} };
@@ -200,7 +206,9 @@ describe("KakaoMap", () => {
     // used for the single-spot case, not a separate, larger pin shape.
     expect(markerCalls[0].image).toBeTruthy();
     expect(markerCalls[0].image).toBe(markerCalls[1].image);
-    expect(markerCalls[0].image!.size).toEqual({ width: 18, height: 18 });
+    expect(markerCalls[0].image!.size).toEqual({ width: 22, height: 22 });
+    // 마커를 키울 때 기준점이 따라오지 않으면 점이 실제 위치에서 밀린다.
+    expect(markerCalls[0].image!.opts).toEqual({ offset: { x: 11, y: 11 } });
   });
 
   it("마커를 클릭하면 해당 위치에 CustomOverlay 팝업이 열린다", () => {

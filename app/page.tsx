@@ -21,6 +21,7 @@ import { NearbyButton } from "@/components/filter/NearbyButton";
 import { SpotCard } from "@/components/spot/SpotCard";
 import { KakaoMap } from "@/components/map/KakaoMap";
 import { ViewToggle } from "@/components/layout/ViewToggle";
+import { RegionStrip } from "@/components/region/RegionStrip";
 
 const SPOTS = spotsData as Spot[];
 
@@ -72,30 +73,14 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-5 px-5 pb-16 pt-10">
-      <header className="flex flex-col gap-3">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h1 className="text-[34px] font-bold tracking-tight text-text md:text-[44px]">
-              여행세상
-            </h1>
-            <p className="mt-1 text-[15px] text-text-muted">
-              2025~2026 한국관광 100선, 조건으로 찾고 지도로 만나보세요
-            </p>
-          </div>
-          <Link
-            href="/regions"
-            className="hidden shrink-0 rounded-full bg-bg-subtle px-4 py-2 text-[13px] font-medium text-text transition hover:bg-line md:block"
-          >
-            권역별로 둘러보기
-          </Link>
-        </div>
-        <Link
-          href="/regions"
-          className="self-start rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text md:hidden"
-        >
-          권역별로 둘러보기
-        </Link>
+      <header>
+        <h1 className="text-[34px] font-bold tracking-tight text-text md:text-[44px]">여행세상</h1>
+        <p className="mt-1 text-[15px] text-text-muted">
+          2025~2026 한국관광 100선, 조건으로 찾고 지도로 만나보세요
+        </p>
       </header>
+
+      <RegionStrip spots={SPOTS} />
 
       <SearchBox
         value={criteria.query ?? ""}

@@ -38,13 +38,19 @@ const failedScriptSrcs = new Set<string>();
 // a larger pin shape. The white ring stays white regardless of the app's
 // theme: it exists purely for contrast against the map's own light-colored
 // tiles, which Kakao renders independently of the surrounding UI.
+const MARKER_SIZE = 22; // 기존 18에서 한 단계 키웠다 — 작은 점은 찾기 어렵다.
+
 function buildMarkerImage() {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><circle cx="9" cy="9" r="7" fill="#0071E3" stroke="white" stroke-width="2"/></svg>`;
+  const center = MARKER_SIZE / 2;
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${MARKER_SIZE}" height="${MARKER_SIZE}">` +
+    `<circle cx="${center}" cy="${center}" r="8.4" fill="#0071E3" stroke="white" stroke-width="2.4"/>` +
+    `</svg>`;
   const src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
   return new window.kakao.maps.MarkerImage(
     src,
-    new window.kakao.maps.Size(18, 18),
-    { offset: new window.kakao.maps.Point(9, 9) },
+    new window.kakao.maps.Size(MARKER_SIZE, MARKER_SIZE),
+    { offset: new window.kakao.maps.Point(center, center) },
   );
 }
 

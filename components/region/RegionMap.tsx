@@ -14,7 +14,7 @@ interface RegionMapProps {
   label?: string;
 }
 
-const PIN_HEIGHT = 24;
+const PIN_HEIGHT = 29; // 기존 24에서 한 단계 키웠다. 획 굵기·번호 크기가 모두 여기서 따라온다.
 const FONT_SIZE = 10;
 const BOUNDS_PADDING = 28;
 const INK = "#2B3440";

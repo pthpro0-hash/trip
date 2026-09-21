@@ -1,14 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import type { FilterCriteria } from "@/lib/filter";
+import { ALL_SEASONS, ALL_THEMES, type FilterCriteria } from "@/lib/filter";
 import { REGIONS } from "@/lib/regions";
-import type { Season, Theme } from "@/lib/types";
-
-const SEASONS: Season[] = ["봄", "여름", "가을", "겨울", "사계절"];
-const THEMES: Theme[] = [
-  "역사유적", "자연경관", "테마파크", "해변", "야경", "체험마을", "정원", "섬",
-];
 
 interface FilterBarProps {
   criteria: FilterCriteria;
@@ -46,13 +40,13 @@ export function FilterBar({ criteria, onChange }: FilterBarProps) {
         />
         <FilterGroup
           label="계절"
-          options={SEASONS}
+          options={ALL_SEASONS}
           selected={criteria.seasons ?? []}
           onToggle={(v) => onChange({ ...criteria, seasons: toggle(criteria.seasons, v) })}
         />
         <FilterGroup
           label="테마"
-          options={THEMES}
+          options={ALL_THEMES}
           selected={criteria.themes ?? []}
           onToggle={(v) => onChange({ ...criteria, themes: toggle(criteria.themes, v) })}
         />

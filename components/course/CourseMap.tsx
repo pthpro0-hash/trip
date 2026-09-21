@@ -10,14 +10,16 @@ interface CourseMapProps {
 
 const LINE_COLOR = "#0071E3";
 const BOUNDS_PADDING = 40;
+const MARKER_SIZE = 31; // 기존 26에서 한 단계 키웠다 — 순번이 또렷해야 목록과 이어 읽힌다.
 
 // 지도 위에 순번을 그대로 얹어야 목록의 1·2·3과 눈으로 이어진다.
 // 데이터 URI 안의 SVG는 페이지 CSS 변수를 볼 수 없어 색을 직접 적는다.
 function numberedMarkerImage(order: number) {
+  const center = MARKER_SIZE / 2;
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26">` +
-    `<circle cx="13" cy="13" r="11" fill="${LINE_COLOR}" stroke="white" stroke-width="2"/>` +
-    `<text x="13" y="17.5" text-anchor="middle" font-size="12" font-weight="700"` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${MARKER_SIZE}" height="${MARKER_SIZE}">` +
+    `<circle cx="${center}" cy="${center}" r="13.2" fill="${LINE_COLOR}" stroke="white" stroke-width="2.4"/>` +
+    `<text x="${center}" y="${center + 5.4}" text-anchor="middle" font-size="14.4" font-weight="700"` +
     ` font-family="-apple-system, BlinkMacSystemFont, sans-serif" fill="white">${order}</text>` +
     `</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
@@ -74,8 +76,8 @@ export function CourseMap({ spots }: CourseMapProps) {
             title: spot.name,
             image: new kakao.maps.MarkerImage(
               numberedMarkerImage(index + 1),
-              new kakao.maps.Size(26, 26),
-              { offset: new kakao.maps.Point(13, 13) },
+              new kakao.maps.Size(MARKER_SIZE, MARKER_SIZE),
+              { offset: new kakao.maps.Point(MARKER_SIZE / 2, MARKER_SIZE / 2) },
             ),
           });
           drawnRef.current.push(marker);

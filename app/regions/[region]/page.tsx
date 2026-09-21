@@ -3,10 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import spotsData from "@/lib/data/spots.json";
 import type { Region, Spot } from "@/lib/types";
-import { REGIONS } from "@/lib/regions";
+import { REGIONS, adjacentRegions } from "@/lib/regions";
 import { REGION_THEME } from "@/lib/regionTheme";
-import { splitRegionIntoClusters } from "@/lib/regionClusters";
-import { RegionMap } from "@/components/region/RegionMap";
+import { RegionExplorer } from "@/components/region/RegionExplorer";
 
 const SPOTS = spotsData as Spot[];
 
@@ -50,13 +49,10 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
 
   const theme = REGION_THEME[region];
   const spots = SPOTS.filter((s) => s.region === region);
-  // Regions with a lot of spots read as one crowded blob on a single card,
-  // so past a threshold they're split into geographically contiguous
-  // sub-maps (see lib/regionClusters.ts) rather than one dense map.
-  const clusters = splitRegionIntoClusters(spots);
+  const { prev, next } = adjacentRegions(region);
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-10 px-5 pb-16 pt-8">
+    <main className="mx-auto flex max-w-3xl flex-col gap-5 px-5 pb-16 pt-8">
       <div className="flex flex-col gap-4">
         <Link href="/regions" className="text-[15px] font-medium text-accent hover:text-accent-hover">
           ← 권역별로 둘러보기
@@ -65,19 +61,33 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
           <h1 className="text-[32px] font-bold tracking-tight text-text md:text-[40px]">{region}</h1>
           <p className="mt-1 text-[15px] text-text-muted">
             {theme.tagline} · {spots.length}곳
-            {clusters.length > 1 ? ` · ${clusters.length}개 지도로 나눠 표시` : ""}
           </p>
         </div>
       </div>
 
-      {clusters.map((cluster) => (
-        <RegionMap
-          key={cluster.label || region}
-          region={region}
-          spots={cluster.spots}
-          label={cluster.label}
-        />
-      ))}
+      <RegionExplorer region={region} spots={spots} />
+
+      {/* 한 권역을 다 본 사람이 목록으로 되돌아가지 않고 옆으로 넘어갈 수 있게. */}
+      <nav className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-5">
+        <Link
+          href={`/regions/${prev}`}
+          className="flex min-w-0 flex-col items-start gap-0.5 text-left"
+        >
+          <span className="text-[12px] text-text-faint">이전 권역</span>
+          <span className="truncate text-[15px] font-medium text-accent hover:text-accent-hover">
+            ← {prev}
+          </span>
+        </Link>
+        <Link
+          href={`/regions/${next}`}
+          className="flex min-w-0 flex-col items-end gap-0.5 text-right"
+        >
+          <span className="text-[12px] text-text-faint">다음 권역</span>
+          <span className="truncate text-[15px] font-medium text-accent hover:text-accent-hover">
+            {next} →
+          </span>
+        </Link>
+      </nav>
     </main>
   );
 }
