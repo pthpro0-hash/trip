@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Spot } from "@/lib/types";
 import { loadKakaoMaps } from "@/lib/kakaoLoader";
 
+/*
+  지도에 순서대로 찍을 지점. 여행지(Spot)도 방문 기록도 이 모양을 갖추면
+  그대로 쓸 수 있어, 같은 지도를 두 벌 만들지 않아도 된다.
+*/
+export interface MapStop {
+  lat: number;
+  lng: number;
+  name: string;
+}
+
 interface CourseMapProps {
-  spots: Spot[];
+  spots: MapStop[];
 }
 
 const LINE_COLOR = "#0071E3";

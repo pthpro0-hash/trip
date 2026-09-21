@@ -148,9 +148,12 @@ export function TripList() {
           <li key={trip.id} className="flex flex-col gap-2.5 rounded-2xl bg-surface p-5 ring-1 ring-line">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[17px] font-semibold tracking-tight text-text">
+                <Link
+                  href={`/trips/${trip.id}`}
+                  className="text-[17px] font-semibold tracking-tight text-text hover:text-accent"
+                >
                   {formatSpan(trip.startedOn, trip.endedOn)}
-                </p>
+                </Link>
                 {trip.companions && (
                   <p className="mt-0.5 text-[13px] text-text-muted">
                     {companionLabel(trip.companions)}
