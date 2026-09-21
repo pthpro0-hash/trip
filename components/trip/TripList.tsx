@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
-import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
+import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { companionLabel } from "@/lib/korean";
 
@@ -25,6 +25,11 @@ export function TripList() {
   // 않도록 처음 값으로 정한다.
   const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
   const [trips, setTrips] = useState<SavedTrip[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  // 지우는 일은 되돌릴 수 없다. 한 번 물어보고 나서 지운다.
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -37,6 +42,7 @@ export function TripList() {
         setStatus("guest");
         return;
       }
+      setUserId(data.user.id);
       const rows = await fetchTrips(supabase, data.user.id);
       if (!active) return;
       if (!rows) {
@@ -51,6 +57,19 @@ export function TripList() {
       active = false;
     };
   }, []);
+
+  const remove = async (tripId: string) => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId) return;
+
+    setRemoving(tripId);
+    setFailed(false);
+    const ok = await deleteTrip(supabase, userId, tripId);
+    if (ok) setTrips((current) => current.filter((trip) => trip.id !== tripId));
+    else setFailed(true);
+    setRemoving(null);
+    setConfirming(null);
+  };
 
   if (status === "loading") {
     return <p className="text-[15px] text-text-faint">불러오는 중…</p>;
@@ -109,18 +128,48 @@ export function TripList() {
         여행 {trips.length}건 · 다녀온 곳 {totalVisits}곳 · 사진 {totalPhotos}장
       </p>
 
+      {failed && (
+        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
+          지우지 못했어요. 잠시 후 다시 시도해 주세요.
+        </p>
+      )}
+
       <ol className="flex flex-col gap-4">
         {trips.map((trip) => (
           <li key={trip.id} className="flex flex-col gap-2.5 rounded-2xl bg-surface p-5 ring-1 ring-line">
-            <div>
-              <p className="text-[17px] font-semibold tracking-tight text-text">
-                {formatSpan(trip.startedOn, trip.endedOn)}
-              </p>
-              {trip.companions && (
-                <p className="mt-0.5 text-[13px] text-text-muted">
-                  {companionLabel(trip.companions)}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[17px] font-semibold tracking-tight text-text">
+                  {formatSpan(trip.startedOn, trip.endedOn)}
                 </p>
-              )}
+                {trip.companions && (
+                  <p className="mt-0.5 text-[13px] text-text-muted">
+                    {companionLabel(trip.companions)}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => (confirming === trip.id ? remove(trip.id) : setConfirming(trip.id))}
+                onBlur={() => setConfirming((current) => (current === trip.id ? null : current))}
+                disabled={removing === trip.id}
+                aria-label={
+                  confirming === trip.id
+                    ? `${formatSpan(trip.startedOn, trip.endedOn)} 기록 정말 지우기`
+                    : `${formatSpan(trip.startedOn, trip.endedOn)} 기록 지우기`
+                }
+                className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
+                  confirming === trip.id
+                    ? "bg-[#d70015] text-white"
+                    : "bg-bg-subtle text-text-muted hover:bg-line"
+                }`}
+              >
+                {removing === trip.id
+                  ? "지우는 중…"
+                  : confirming === trip.id
+                    ? "정말 지울까요?"
+                    : "지우기"}
+              </button>
             </div>
 
             <ul className="flex flex-col gap-1">

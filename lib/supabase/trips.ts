@@ -123,6 +123,27 @@ export async function saveTrip(
   return { ok: true, id: created.id };
 }
 
+/**
+ * 여행 하나를 지운다. 딸린 방문과 사진도 함께 사라진다
+ * (스키마의 on delete cascade).
+ *
+ * RLS 가 이미 남의 기록을 막지만, user_id 조건을 한 번 더 건다.
+ * 지우는 일에는 한 겹 더 있는 편이 낫다.
+ */
+export async function deleteTrip(
+  supabase: SupabaseClient,
+  userId: string,
+  tripId: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("trips")
+    .delete()
+    .eq("id", tripId)
+    .eq("user_id", userId);
+
+  return !error;
+}
+
 /** 저장해 둔 여행을 최근 순으로. */
 export async function fetchTrips(
   supabase: SupabaseClient,
