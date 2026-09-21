@@ -124,6 +124,27 @@ function createListStore(storageKey: string): ListStore {
 const wishlistStore = createListStore(WISHLIST_KEY);
 const tripStore = createListStore(TRIP_KEY);
 
+/*
+  아래 셋은 React 바깥(계정 동기화)에서 목록을 읽고 쓰기 위한 통로다.
+
+  로그인해도 화면은 계속 이 기기의 목록을 본다. 서버를 직접 읽게 하면
+  목록마다 로딩이 생기고 오프라인에서 아무것도 못 하게 된다. 대신
+  로그인할 때 양쪽을 합치고, 바뀔 때마다 서버로 밀어 올린다.
+*/
+export function readCollections() {
+  return { wishlist: wishlistStore.read(), trip: tripStore.read() };
+}
+
+export function writeCollections(next: { wishlist?: string[]; trip?: string[] }) {
+  if (next.wishlist) wishlistStore.write(next.wishlist);
+  if (next.trip) tripStore.write(next.trip);
+}
+
+export function subscribeToCollections(listener: () => void) {
+  const off = [wishlistStore.subscribe(listener), tripStore.subscribe(listener)];
+  return () => off.forEach((unsubscribe) => unsubscribe());
+}
+
 function useList(store: ListStore) {
   return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot);
 }

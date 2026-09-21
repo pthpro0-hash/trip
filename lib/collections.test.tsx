@@ -181,3 +181,50 @@ describe("예전 목록 옮기기", () => {
     expect(window.localStorage.getItem(WISHLIST_KEY)).toBeNull();
   });
 });
+
+describe("React 바깥에서 쓰는 통로 (계정 동기화가 의존한다)", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("두 목록을 한 번에 읽는다", async () => {
+    window.localStorage.setItem(WISHLIST_KEY, JSON.stringify(["경복궁"]));
+    window.localStorage.setItem(TRIP_KEY, JSON.stringify(["창경궁"]));
+
+    const { readCollections } = await load();
+    expect(readCollections()).toEqual({ wishlist: ["경복궁"], trip: ["창경궁"] });
+  });
+
+  it("한쪽만 써도 다른 쪽은 건드리지 않는다", async () => {
+    const { readCollections, writeCollections } = await load();
+    writeCollections({ wishlist: ["경복궁"], trip: ["창경궁"] });
+    writeCollections({ wishlist: ["남이섬"] });
+
+    expect(readCollections()).toEqual({ wishlist: ["남이섬"], trip: ["창경궁"] });
+  });
+
+  it("바뀌면 알려준다 — 이걸로 서버에 밀어 올린다", async () => {
+    const { writeCollections, subscribeToCollections } = await load();
+    let calls = 0;
+    const off = subscribeToCollections(() => {
+      calls += 1;
+    });
+
+    writeCollections({ wishlist: ["경복궁"] });
+    writeCollections({ trip: ["창경궁"] });
+    expect(calls).toBeGreaterThanOrEqual(2);
+
+    // 끊고 나면 더는 알리지 않아야 한다 — 로그아웃 뒤에도 서버로
+    // 밀어 올리면 남의 계정에 쓰게 된다.
+    off();
+    const before = calls;
+    writeCollections({ wishlist: [] });
+    expect(calls).toBe(before);
+  });
+
+  it("로그아웃할 때처럼 둘 다 비울 수 있다", async () => {
+    const { readCollections, writeCollections } = await load();
+    writeCollections({ wishlist: ["경복궁"], trip: ["창경궁"] });
+    writeCollections({ wishlist: [], trip: [] });
+
+    expect(readCollections()).toEqual({ wishlist: [], trip: [] });
+  });
+});

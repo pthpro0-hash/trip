@@ -22,6 +22,7 @@ import { SpotCard } from "@/components/spot/SpotCard";
 import { KakaoMap } from "@/components/map/KakaoMap";
 import { ViewToggle } from "@/components/layout/ViewToggle";
 import { RegionStrip } from "@/components/region/RegionStrip";
+import { AccountChip } from "@/components/auth/AccountChip";
 
 const SPOTS = spotsData as Spot[];
 
@@ -73,11 +74,14 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-5 px-5 pb-16 pt-10">
-      <header>
-        <h1 className="text-[34px] font-bold tracking-tight text-text md:text-[44px]">여행세상</h1>
-        <p className="mt-1 text-[15px] text-text-muted">
-          2025~2026 한국관광 100선, 조건으로 찾고 지도로 만나보세요
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[34px] font-bold tracking-tight text-text md:text-[44px]">여행세상</h1>
+          <p className="mt-1 text-[15px] text-text-muted">
+            2025~2026 한국관광 100선, 조건으로 찾고 지도로 만나보세요
+          </p>
+        </div>
+        <AccountChip />
       </header>
 
       <RegionStrip spots={SPOTS} />
