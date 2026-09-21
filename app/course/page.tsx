@@ -4,8 +4,8 @@ import { CoursePlanner } from "@/components/course/CoursePlanner";
 
 // 찜 목록은 이 브라우저에만 있으므로 검색엔진에 올릴 내용이 없다.
 export const metadata: Metadata = {
-  title: "내 코스",
-  description: "찜한 여행지를 순서대로 놓고 이동 거리를 확인하세요.",
+  title: "이번 여행",
+  description: "가고 싶은 곳에서 골라 순서를 정하고 이동 거리를 확인하세요.",
   robots: { index: false, follow: true },
 };
 
@@ -16,8 +16,10 @@ export default function CoursePage() {
         ← 목록으로
       </Link>
       <div>
-        <h1 className="text-[32px] font-bold tracking-tight text-text md:text-[40px]">내 코스</h1>
-        <p className="mt-1 text-[15px] text-text-muted">찜한 곳을 순서대로 놓고 거리를 확인하세요</p>
+        <h1 className="text-[32px] font-bold tracking-tight text-text md:text-[40px]">이번 여행</h1>
+        <p className="mt-1 text-[15px] text-text-muted">
+          가고 싶은 곳에서 골라 순서를 정하세요
+        </p>
       </div>
       <CoursePlanner />
     </main>

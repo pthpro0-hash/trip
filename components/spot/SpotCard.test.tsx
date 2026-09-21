@@ -23,14 +23,14 @@ describe("SpotCard", () => {
     expect(onSelect).toHaveBeenCalledWith("gyeongbokgung");
   });
 
-  it("찜 버튼을 누르면 눌린 상태로 바뀐다", () => {
+  it("가고 싶은 곳 버튼을 누르면 눌린 상태로 바뀐다", () => {
     window.localStorage.clear();
     render(<SpotCard spot={SPOT} selected={false} onSelect={() => {}} />);
-    const save = screen.getByRole("button", { name: "경복궁 찜하기" });
+    const save = screen.getByRole("button", { name: "경복궁 가고 싶은 곳에 담기" });
     expect(save).toHaveAttribute("aria-pressed", "false");
 
     fireEvent.click(save);
-    expect(screen.getByRole("button", { name: "경복궁 찜 해제" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "경복궁 가고 싶은 곳에서 빼기" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

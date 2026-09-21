@@ -90,10 +90,10 @@ describe("RegionExplorer", () => {
     expect(screen.queryByRole("link", { name: /자세히 보기/ })).toBeNull();
   });
 
-  it("목록의 카드에서 바로 찜할 수 있다", () => {
+  it("목록의 카드에서 바로 가고 싶은 곳에 담을 수 있다", () => {
     render(<RegionExplorer region="강원권" spots={SPOTS} />);
-    fireEvent.click(screen.getByRole("button", { name: "설악산 찜하기" }));
-    expect(screen.getByRole("button", { name: "설악산 찜 해제" })).toHaveAttribute(
+    fireEvent.click(screen.getByRole("button", { name: "설악산 가고 싶은 곳에 담기" }));
+    expect(screen.getByRole("button", { name: "설악산 가고 싶은 곳에서 빼기" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

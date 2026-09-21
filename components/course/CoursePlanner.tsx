@@ -6,7 +6,7 @@ import Image from "next/image";
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
 import { getSpotThumbnail } from "@/lib/media";
-import { useSavedSpots } from "@/lib/favorites";
+import { useTripPlan, useWishlist } from "@/lib/collections";
 import { useMyLocation } from "@/lib/useMyLocation";
 import { formatDistance, legDistancesKm, orderByProximity, totalDistanceKm } from "@/lib/geo";
 import { NearbyButton } from "@/components/filter/NearbyButton";
@@ -42,14 +42,25 @@ function kakaoDirectionsUrl(spot: Spot) {
 }
 
 export function CoursePlanner() {
-  const saved = useSavedSpots();
+  const trip = useTripPlan();
+  const wishlist = useWishlist();
   const { state: location, request: requestLocation, clear: clearLocation } = useMyLocation();
   const [confirmingClear, setConfirmingClear] = useState(false);
 
   // 데이터가 바뀌어 사라진 곳이 저장되어 있을 수 있다. 조용히 걸러낸다.
   const spots = useMemo(
-    () => saved.ids.map((id) => BY_ID.get(id)).filter((spot): spot is Spot => Boolean(spot)),
-    [saved.ids],
+    () => trip.ids.map((id) => BY_ID.get(id)).filter((spot): spot is Spot => Boolean(spot)),
+    [trip.ids],
+  );
+
+  // 가고 싶다고 담아뒀지만 이번 여행에는 아직 안 넣은 곳들.
+  const notYetAdded = useMemo(
+    () =>
+      wishlist.ids
+        .filter((id) => !trip.ids.includes(id))
+        .map((id) => BY_ID.get(id))
+        .filter((spot): spot is Spot => Boolean(spot)),
+    [wishlist.ids, trip.ids],
   );
 
   const legs = useMemo(() => legDistancesKm(spots), [spots]);
@@ -59,25 +70,30 @@ export function CoursePlanner() {
 
   const sortByProximity = () => {
     const start = location.status === "ready" ? location.point : undefined;
-    saved.reorder(orderByProximity(spots, start).map((spot) => spot.id));
+    trip.reorder(orderByProximity(spots, start).map((spot) => spot.id));
   };
 
   if (spots.length === 0) {
     return (
-      <div className="rounded-2xl bg-bg-subtle p-8 text-center">
-        <p className="text-[17px] font-medium text-text">아직 담은 곳이 없어요</p>
-        <p className="mt-2 text-[15px] leading-relaxed text-text-muted">
-          마음에 드는 곳의 하트를 누르면 여기에 모입니다.
-          <br />
-          담은 순서가 그대로 여행 순서가 돼요.
-        </p>
-        <Link
-          href="/"
-          className="mt-5 inline-block rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
-        >
-          여행지 둘러보기
-        </Link>
-      </div>
+      <>
+        <div className="rounded-2xl bg-bg-subtle p-8 text-center">
+          <p className="text-[17px] font-medium text-text">이번 여행에 담은 곳이 없어요</p>
+          <p className="mt-2 text-[15px] leading-relaxed text-text-muted">
+            {notYetAdded.length > 0
+              ? "가고 싶은 곳에서 골라 담아보세요."
+              : "마음에 드는 곳의 하트를 누르면 가고 싶은 곳에 모입니다."}
+          </p>
+          {notYetAdded.length === 0 && (
+            <Link
+              href="/"
+              className="mt-5 inline-block rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+            >
+              여행지 둘러보기
+            </Link>
+          )}
+        </div>
+        <WishlistPicker spots={notYetAdded} onAdd={trip.add} />
+      </>
     );
   }
 
@@ -109,7 +125,7 @@ export function CoursePlanner() {
             type="button"
             onClick={() => {
               if (confirmingClear) {
-                saved.clear();
+                trip.clear();
                 setConfirmingClear(false);
               } else {
                 setConfirmingClear(true);
@@ -122,7 +138,7 @@ export function CoursePlanner() {
                 : "bg-bg-subtle text-text-muted hover:bg-line"
             }`}
           >
-            {confirmingClear ? "정말 비울까요?" : "비우기"}
+            {confirmingClear ? "정말 비울까요?" : "이번 여행 비우기"}
           </button>
         </div>
       </div>
@@ -175,21 +191,21 @@ export function CoursePlanner() {
                     <IconButton
                       label={`${spot.name} 위로`}
                       disabled={index === 0}
-                      onClick={() => saved.move(index, index - 1)}
+                      onClick={() => trip.move(index, index - 1)}
                     >
                       ↑
                     </IconButton>
                     <IconButton
                       label={`${spot.name} 아래로`}
                       disabled={index === spots.length - 1}
-                      onClick={() => saved.move(index, index + 1)}
+                      onClick={() => trip.move(index, index + 1)}
                     >
                       ↓
                     </IconButton>
                   </div>
                   <IconButton
                     label={`${spot.name} 코스에서 빼기`}
-                    onClick={() => saved.remove(spot.id)}
+                    onClick={() => trip.remove(spot.id)}
                   >
                     빼기
                   </IconButton>
@@ -199,6 +215,8 @@ export function CoursePlanner() {
           );
         })}
       </ol>
+
+      <WishlistPicker spots={notYetAdded} onAdd={trip.add} />
 
       {googleUrl && (
         <div className="flex flex-col gap-2">
@@ -218,6 +236,36 @@ export function CoursePlanner() {
         </div>
       )}
     </>
+  );
+}
+
+/*
+  가고 싶은 곳과 이번 여행은 다른 서랍이다. 여기서 담아도 가고 싶은 곳에는
+  그대로 남고, 이번 여행에서 빼도 가고 싶은 곳은 풀리지 않는다.
+*/
+function WishlistPicker({ spots, onAdd }: { spots: Spot[]; onAdd: (id: string) => void }) {
+  if (spots.length === 0) return null;
+
+  return (
+    <section className="flex flex-col gap-2.5">
+      <h2 className="text-[15px] font-semibold tracking-tight text-text">
+        가고 싶은 곳에서 담기
+      </h2>
+      <div className="flex flex-wrap gap-2">
+        {spots.map((spot) => (
+          <button
+            key={spot.id}
+            type="button"
+            onClick={() => onAdd(spot.id)}
+            aria-label={`${spot.name} 이번 여행에 담기`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
+          >
+            <span aria-hidden="true" className="text-accent">+</span>
+            {spot.name}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 

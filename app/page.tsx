@@ -13,7 +13,7 @@ import {
 import { sortByRelevance, suggestCorrection } from "@/lib/search";
 import { reportEmptySearch } from "@/lib/searchTelemetry";
 import { distanceKm } from "@/lib/geo";
-import { useSavedSpots } from "@/lib/favorites";
+import { useWishlist } from "@/lib/collections";
 import { useMyLocation } from "@/lib/useMyLocation";
 import { FilterBar } from "@/components/filter/FilterBar";
 import { SearchBox } from "@/components/filter/SearchBox";
@@ -41,20 +41,20 @@ export default function HomePage() {
   // but only until the reader says otherwise, after which their choice sticks.
   const [viewChosenByUser, setViewChosenByUser] = useState(false);
 
-  const saved = useSavedSpots();
+  const wishlist = useWishlist();
   const { state: location, request: requestLocation, clear: clearLocation } = useMyLocation();
   const origin = location.status === "ready" ? location.point : undefined;
 
   const query = criteria.query?.trim() ?? "";
   const results = useMemo(() => {
     const filtered = filterSpots(SPOTS, criteria);
-    const scoped = savedOnly ? filtered.filter((spot) => saved.ids.includes(spot.id)) : filtered;
+    const scoped = savedOnly ? filtered.filter((spot) => wishlist.ids.includes(spot.id)) : filtered;
     const ranked = query ? sortByRelevance(scoped, query) : scoped;
     // 위치를 알고 있으면 가까운 순이 검색어 점수보다 우선한다. "내 주변"을
     // 누른 사람은 이미 무엇을 볼지 정했고, 남은 질문은 어디가 가깝냐다.
     if (!origin) return ranked;
     return [...ranked].sort((a, b) => distanceKm(origin, a) - distanceKm(origin, b));
-  }, [criteria, query, savedOnly, saved.ids, origin]);
+  }, [criteria, query, savedOnly, wishlist.ids, origin]);
 
   const suggestions = useMemo(
     () => (results.length === 0 && !savedOnly ? suggestRelaxedFilters(SPOTS, criteria) : []),
@@ -94,7 +94,7 @@ export default function HomePage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <NearbyButton state={location} onRequest={requestLocation} onClear={clearLocation} />
-        {saved.ids.length > 0 && (
+        {wishlist.ids.length > 0 && (
           <>
             <button
               type="button"
@@ -104,13 +104,13 @@ export default function HomePage() {
                 savedOnly ? "bg-accent text-on-accent" : "bg-bg-subtle text-text hover:bg-line"
               }`}
             >
-              찜한 곳 {saved.ids.length}
+              가고 싶은 곳 {wishlist.ids.length}
             </button>
             <Link
               href="/course"
               className="text-[13px] font-medium text-accent hover:text-accent-hover"
             >
-              내 코스 →
+              이번 여행 →
             </Link>
           </>
         )}
@@ -136,7 +136,9 @@ export default function HomePage() {
         // placed inside it would silently disappear along with the panel,
         // leaving an empty map with no explanation.
         <div className="rounded-2xl bg-bg-subtle p-5 text-[15px] text-text-muted">
-          {savedOnly ? "찜한 곳 중에는 조건에 맞는 곳이 없어요." : "조건에 맞는 곳이 없어요."}
+          {savedOnly
+            ? "가고 싶은 곳 중에는 조건에 맞는 곳이 없어요."
+            : "조건에 맞는 곳이 없어요."}
           {correction && (
             <div className="mt-2">
               혹시{" "}

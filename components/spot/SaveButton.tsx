@@ -1,6 +1,6 @@
 "use client";
 
-import { useSavedSpots } from "@/lib/favorites";
+import { useWishlist } from "@/lib/collections";
 
 interface SaveButtonProps {
   spotId: string;
@@ -24,9 +24,11 @@ function Heart({ filled }: { filled: boolean }) {
 }
 
 export function SaveButton({ spotId, spotName, variant = "overlay" }: SaveButtonProps) {
-  const { ids, toggle } = useSavedSpots();
+  const { ids, toggle } = useWishlist();
   const saved = ids.includes(spotId);
-  const label = saved ? `${spotName} 찜 해제` : `${spotName} 찜하기`;
+  const label = saved
+    ? `${spotName} 가고 싶은 곳에서 빼기`
+    : `${spotName} 가고 싶은 곳에 담기`;
 
   if (variant === "inline") {
     return (
@@ -42,7 +44,7 @@ export function SaveButton({ spotId, spotName, variant = "overlay" }: SaveButton
         }`}
       >
         <Heart filled={saved} />
-        {saved ? "찜함" : "찜하기"}
+        {saved ? "담아둠" : "가고 싶어요"}
       </button>
     );
   }
