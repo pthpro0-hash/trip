@@ -68,11 +68,32 @@ async function describe(key: string, lat: number, lng: number): Promise<PlaceAns
     }),
   ]);
 
-  const administrative = region?.documents?.find(
-    (doc: { region_type: string }) => doc.region_type === "H",
+  /*
+    행정동(H)이 아니라 법정동(B)을 쓴다.
+
+    시골에서 사람이 기억하는 단위는 "리"인데, 그건 법정동에만 있다.
+    같은 자리를 행정동은 "서산시 운산면"까지만 말하고, 법정동은
+    "서산시 운산면 용현리"까지 말해 준다.
+  */
+  const legal = region?.documents?.find(
+    (doc: { region_type: string }) => doc.region_type === "B",
   );
-  const dong = administrative
-    ? `${administrative.region_1depth_name} ${administrative.region_2depth_name} ${administrative.region_3depth_name}`
+  const dong = legal
+    ? [
+        legal.region_1depth_name,
+        legal.region_2depth_name,
+        legal.region_3depth_name,
+        legal.region_4depth_name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : null;
+
+  // 제목으로 쓸 때는 시·도를 떼는 편이 읽기 좋다.
+  const shortDong = legal
+    ? [legal.region_2depth_name, legal.region_3depth_name, legal.region_4depth_name]
+        .filter(Boolean)
+        .join(" ")
     : null;
 
   const nearby: NearbyPlace[] = [
@@ -83,9 +104,9 @@ async function describe(key: string, lat: number, lng: number): Promise<PlaceAns
     distanceM: Number(doc.distance),
   }));
 
-  const picked = pickPlaceName(nearby, SPOT_NAMES, dong ?? undefined);
+  const picked = pickPlaceName(nearby, SPOT_NAMES, shortDong ?? undefined);
   const answer: PlaceAnswer = {
-    title: picked?.title ?? dong ?? "알 수 없는 곳",
+    title: picked?.title ?? shortDong ?? "알 수 없는 곳",
     isCuratedSpot: picked?.isCuratedSpot ?? false,
     spotId: picked?.isCuratedSpot ? (ID_BY_NAME.get(picked.title) ?? null) : null,
     dong,
