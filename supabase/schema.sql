@@ -42,6 +42,9 @@ create table if not exists public.trips (
   -- 제목을 짓는 것이 곧 "이것들이 한 덩어리"라고 정하는 일이다.
   -- 비워 두면 화면에서 장소로 지어 보여준다.
   title      text,
+  -- 부제. 비워 두면 화면이 장소 요약("화진포해변 외 2곳")을 대신 보여준다.
+  -- 제목을 사람이 고치면 원래 이름이던 그 요약이 이 자리로 내려온다.
+  subtitle   text,
   companions text,                       -- 누구와 갔는지. 자유롭게 적는다.
   note       text,                       -- 그날의 특이사항
   created_at timestamptz not null default now()
@@ -123,5 +126,6 @@ end $$;
 -- 계정을 지우면 담아둔 것도 여행 기록도 사진도 함께 사라진다
 -- (위 references 의 on delete cascade).
 
--- 이미 만들어 둔 표에 제목 칸을 더한다.
-alter table public.trips add column if not exists title text;
+-- 이미 만들어 둔 표에 제목·부제 칸을 더한다.
+alter table public.trips add column if not exists title    text;
+alter table public.trips add column if not exists subtitle text;

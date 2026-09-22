@@ -23,6 +23,8 @@ export interface VisitDetail {
 export interface TripDetail {
   id: string;
   title: string | null;
+  /** 비어 있으면 화면이 장소 요약을 대신 보여준다. */
+  subtitle: string | null;
   startedOn: string;
   endedOn: string;
   companions: string | null;
@@ -47,7 +49,7 @@ export async function fetchTripDetail(
   const { data, error } = await supabase
     .from("trips")
     .select(
-      "id,title,started_on,ended_on,companions,note," +
+      "id,title,subtitle,started_on,ended_on,companions,note," +
         "visits(id,place_name,spot_id,dong,lat,lng,started_at,ended_at,position," +
         "trip_photos(id,storage_path,taken_at,is_cover))",
     )
@@ -89,6 +91,7 @@ export async function fetchTripDetail(
   return {
     id: row.id as string,
     title: row.title as string | null,
+    subtitle: row.subtitle as string | null,
     startedOn: row.started_on as string,
     endedOn: row.ended_on as string,
     companions: row.companions as string | null,
@@ -113,6 +116,47 @@ export async function saveTripTitle(
     .from("trips")
     .update({ title: title.trim() || null })
     .eq("id", tripId)
+    .eq("user_id", userId);
+
+  return !error;
+}
+
+/** 부제를 바꾼다. 비우면 지운다 — 그러면 화면이 장소 요약으로 되돌아간다. */
+export async function saveTripSubtitle(
+  supabase: SupabaseClient,
+  userId: string,
+  tripId: string,
+  subtitle: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("trips")
+    .update({ subtitle: subtitle.trim() || null })
+    .eq("id", tripId)
+    .eq("user_id", userId);
+
+  return !error;
+}
+
+/**
+ * 들른 곳의 이름을 바꾼다.
+ *
+ * 지도 서비스가 지어 주는 이름은 자주 틀린다 — 용현리를 "도소골"이라
+ * 부르고, 265m 떨어진 섬을 "여기"라고 한다. 다녀온 사람만 아는 이름이
+ * 있으므로 고칠 수 있어야 한다. 비우면 되돌리지 못하니 막는다.
+ */
+export async function saveVisitName(
+  supabase: SupabaseClient,
+  userId: string,
+  visitId: string,
+  placeName: string,
+): Promise<boolean> {
+  const name = placeName.trim();
+  if (name.length === 0) return false;
+
+  const { error } = await supabase
+    .from("visits")
+    .update({ place_name: name })
+    .eq("id", visitId)
     .eq("user_id", userId);
 
   return !error;

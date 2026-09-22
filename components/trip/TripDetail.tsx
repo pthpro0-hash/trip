@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   fetchTripDetail,
   saveTripNote,
+  saveTripSubtitle,
   saveTripTitle,
+  saveVisitName,
   type TripDetail as Detail,
 } from "@/lib/supabase/tripDetail";
+import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { deletePhoto, setCoverPhoto, signedUrls } from "@/lib/supabase/photos";
 import { companionLabel } from "@/lib/korean";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
@@ -41,8 +44,30 @@ export function TripDetail({ tripId }: { tripId: string }) {
     두면 무겁고, 무엇보다 이름은 고치다 만 채로 두는 법이 없다.
   */
   const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
   const [titleSaved, setTitleSaved] = useState(false);
   const [titleFailed, setTitleFailed] = useState(false);
+  /** 고치고 있는 장소. 한 번에 하나만 연다. */
+  const [editingVisit, setEditingVisit] = useState<string | null>(null);
+  const [visitName, setVisitName] = useState("");
+  const [visitFailed, setVisitFailed] = useState(false);
+  /*
+    Escape 로 버리는 중인지 표시한다.
+
+    되돌린 값은 다음 그림에서야 반영되는데 blur 는 그보다 먼저 온다.
+    그래서 깃발 없이는 "버렸다"고 해 놓고 고치던 값이 저장된다.
+    ref 를 쓰는 것은 다시 그리지 않고 지금 당장 읽어야 하기 때문이다.
+  */
+  const cancelling = useRef(false);
+
+  /** 버리는 중이면 저장을 건너뛴다. */
+  const onBlurUnless = (save: () => void) => () => {
+    if (cancelling.current) {
+      cancelling.current = false;
+      return;
+    }
+    save();
+  };
   const [note, setNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
@@ -72,6 +97,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
       }
       setTrip(detail);
       setTitle(detail.title ?? "");
+      setSubtitle(detail.subtitle ?? "");
       setNote(detail.note ?? "");
       setStatus("ready");
 
@@ -86,6 +112,22 @@ export function TripDetail({ tripId }: { tripId: string }) {
       active = false;
     };
   }, [tripId]);
+
+  /*
+    부제의 자동값은 장소 요약이다.
+
+    가져올 때 지어 준 이름이 바로 이것이었다. 사람이 제목을 "민수랑 첫
+    휴가"로 바꾸면 어디였는지가 사라지므로, 손대지 않은 부제가 그 자리를
+    이어받는다. 한 번이라도 직접 쓰면 그 뒤로는 건드리지 않는다.
+  */
+  const autoSubtitle = trip
+    ? buildTripTitle(
+        trip.visits.map((visit) => ({
+          label: visit.placeName,
+          photoCount: visit.photos.length,
+        })),
+      )
+    : "";
 
   /** 손을 뗄 때 저장한다. 바뀐 것이 없으면 아무 일도 하지 않는다. */
   const submitTitle = async () => {
@@ -102,6 +144,45 @@ export function TripDetail({ tripId }: { tripId: string }) {
     // 목록과 검색이 이 값을 쓰므로 화면이 들고 있는 것도 함께 맞춘다.
     setTrip({ ...trip, title: title.trim() || null });
     setTitleSaved(true);
+  };
+
+  const submitSubtitle = async () => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId || !trip) return;
+    if (subtitle.trim() === (trip.subtitle ?? "")) return;
+
+    setTitleFailed(false);
+    const ok = await saveTripSubtitle(supabase, userId, tripId, subtitle);
+    if (!ok) {
+      setTitleFailed(true);
+      return;
+    }
+    setTrip({ ...trip, subtitle: subtitle.trim() || null });
+    setTitleSaved(true);
+  };
+
+  const submitVisitName = async (visitId: string) => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId || !trip) return;
+
+    const name = visitName.trim();
+    const before = trip.visits.find((visit) => visit.id === visitId)?.placeName;
+    setEditingVisit(null);
+    // 이름 없는 곳은 나중에 다시 찾을 길이 없다. 비우면 되돌린다.
+    if (name.length === 0 || name === before) return;
+
+    setVisitFailed(false);
+    const ok = await saveVisitName(supabase, userId, visitId, name);
+    if (!ok) {
+      setVisitFailed(true);
+      return;
+    }
+    setTrip({
+      ...trip,
+      visits: trip.visits.map((visit) =>
+        visit.id === visitId ? { ...visit, placeName: name } : visit,
+      ),
+    });
   };
 
   const submitNote = async () => {
@@ -221,10 +302,11 @@ export function TripDetail({ tripId }: { tripId: string }) {
             setTitle(event.target.value);
             setTitleSaved(false);
           }}
-          onBlur={submitTitle}
+          onBlur={onBlurUnless(() => void submitTitle())}
           onKeyDown={(event) => {
             if (event.key === "Enter") event.currentTarget.blur();
             if (event.key === "Escape") {
+              cancelling.current = true;
               setTitle(trip.title ?? "");
               event.currentTarget.blur();
             }
@@ -232,19 +314,42 @@ export function TripDetail({ tripId }: { tripId: string }) {
           placeholder={formatSpan(trip.startedOn, trip.endedOn)}
           className="-mx-2 w-full rounded-xl bg-transparent px-2 py-1 text-[28px] font-bold tracking-tight text-text outline-none transition placeholder:text-text placeholder:opacity-100 hover:bg-bg-subtle focus:bg-bg-subtle focus:ring-2 focus:ring-accent md:text-[32px]"
         />
-        <p className="mt-1 text-[15px] text-text-muted">
-          {trip.title && <span>{formatSpan(trip.startedOn, trip.endedOn)}</span>}
-          {trip.title && trip.companions && <span className="text-text-faint"> · </span>}
-          {trip.companions && <span>{companionLabel(trip.companions)}</span>}
-          {titleSaved && <span className="text-text-faint"> · 이름을 바꿨어요</span>}
+        {/*
+          부제도 같은 규칙이다 — 자동값을 값이 아니라 안내 글로 둔다.
+          그래야 손만 댄 것과 직접 쓴 것이 구별된다.
+        */}
+        <input
+          type="text"
+          value={subtitle}
+          aria-label="부제"
+          onChange={(event) => {
+            setSubtitle(event.target.value);
+            setTitleSaved(false);
+          }}
+          onBlur={onBlurUnless(() => void submitSubtitle())}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Escape") {
+              cancelling.current = true;
+              setSubtitle(trip.subtitle ?? "");
+              event.currentTarget.blur();
+            }
+          }}
+          placeholder={autoSubtitle || "한 줄 덧붙이기"}
+          className="-mx-2 mt-0.5 w-full rounded-lg bg-transparent px-2 py-1 text-[16px] text-text-muted outline-none transition placeholder:text-text-muted placeholder:opacity-100 hover:bg-bg-subtle focus:bg-bg-subtle focus:ring-2 focus:ring-accent"
+        />
+        <p className="mt-0.5 px-0 text-[14px] text-text-faint">
+          <span>{formatSpan(trip.startedOn, trip.endedOn)}</span>
+          {trip.companions && <span> · {companionLabel(trip.companions)}</span>}
+          {titleSaved && <span> · 바꿨어요</span>}
         </p>
         {titleFailed && (
           <p className="mt-1 text-[14px] text-text-muted">
             이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.
           </p>
         )}
-        <p className="mt-1 text-[13px] text-text-faint">
-          제목을 눌러 이름을 바꿀 수 있어요. 비우면 날짜로 돌아가요.
+        <p className="mt-1.5 text-[13px] text-text-faint">
+          제목·부제·장소 이름을 눌러 고칠 수 있어요. 비우면 원래대로 돌아가요.
         </p>
       </div>
 
@@ -252,6 +357,12 @@ export function TripDetail({ tripId }: { tripId: string }) {
         <div className="h-[320px] overflow-hidden rounded-2xl ring-1 ring-line">
           <CourseMap spots={stops} />
         </div>
+      )}
+
+      {visitFailed && (
+        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
+          장소 이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.
+        </p>
       )}
 
       {photoError && (
@@ -269,17 +380,54 @@ export function TripDetail({ tripId }: { tripId: string }) {
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent text-[12px] font-bold text-on-accent">
                   {index + 1}
                 </span>
-                {visit.spotId ? (
-                  <Link
-                    href={`/spots/${visit.spotId}`}
-                    className="text-[17px] font-semibold tracking-tight text-accent hover:text-accent-hover"
-                  >
-                    {visit.placeName}
-                  </Link>
+                {editingVisit === visit.id ? (
+                  <input
+                    type="text"
+                    autoFocus
+                    value={visitName}
+                    aria-label={`${visit.placeName} 이름 고치기`}
+                    onChange={(event) => setVisitName(event.target.value)}
+                    onBlur={onBlurUnless(() => void submitVisitName(visit.id))}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                      if (event.key === "Escape") {
+                        cancelling.current = true;
+                        setEditingVisit(null);
+                        event.currentTarget.blur();
+                      }
+                    }}
+                    className="-mx-2 min-w-0 flex-1 rounded-lg bg-bg-subtle px-2 py-0.5 text-[17px] font-semibold tracking-tight text-text outline-none ring-2 ring-accent"
+                  />
                 ) : (
-                  <span className="text-[17px] font-semibold tracking-tight text-text">
-                    {visit.placeName}
-                  </span>
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                    {visit.spotId ? (
+                      <Link
+                        href={`/spots/${visit.spotId}`}
+                        className="text-[17px] font-semibold tracking-tight text-accent hover:text-accent-hover"
+                      >
+                        {visit.placeName}
+                      </Link>
+                    ) : (
+                      <span className="text-[17px] font-semibold tracking-tight text-text">
+                        {visit.placeName}
+                      </span>
+                    )}
+                    {/*
+                      100선으로 이어지는 곳은 이름 자체가 링크라, 눌러서
+                      고치게 하면 링크와 부딪힌다. 고치는 손잡이를 따로 둔다.
+                    */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVisitName(visit.placeName);
+                        setEditingVisit(visit.id);
+                      }}
+                      aria-label={`${visit.placeName} 이름 고치기`}
+                      className="shrink-0 rounded-full px-1.5 py-0.5 text-[12px] font-medium text-text-faint transition hover:bg-bg-subtle hover:text-text"
+                    >
+                      고치기
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -344,7 +492,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
       */}
       <section className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-5">
         <p className="text-[14px] leading-relaxed text-text-muted">
-          {clues.weekday}이었어요
+          {/* 요일만 있으면 어느 날인지 떠오르지 않는다. 날짜부터 말한다. */}
+          {formatSpan(trip.startedOn, trip.startedOn)} {clues.weekday}이었어요
           {clues.placeCount > 1 && ` · ${clues.placeCount}곳을 다니셨네요`}
           {clues.photoCount > 0 && ` · 사진 ${clues.photoCount}장`}
           {clues.busiestTime && ` · ${clues.busiestTime}에 가장 많이 찍으셨어요`}

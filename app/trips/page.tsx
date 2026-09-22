@@ -30,7 +30,7 @@ export default function TripsPage() {
             href="/trips/new"
             className="rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
           >
-            사진에서 찾기
+            사진등록
           </Link>
         </div>
       </div>

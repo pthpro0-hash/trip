@@ -24,11 +24,14 @@ vi.mock("@/lib/supabase/photos", () => ({
 }));
 
 const saveTripTitle = vi.fn();
+const saveTripSubtitle = vi.fn();
+const saveVisitName = vi.fn();
 
-function detail(title: string | null): Detail {
+function detail(title: string | null, subtitle: string | null = null): Detail {
   return {
     id: "t1",
     title,
+    subtitle,
     startedOn: "2026-09-13",
     endedOn: "2026-09-14",
     companions: "민수",
@@ -36,6 +39,17 @@ function detail(title: string | null): Detail {
     visits: [
       {
         id: "v1",
+        placeName: "화진포해변",
+        spotId: null,
+        dong: "고성군 거진읍",
+        lat: 38.4798,
+        lng: 128.4391,
+        startedAt: new Date("2026-09-13T09:21"),
+        endedAt: new Date("2026-09-13T11:04"),
+        photos: [],
+      },
+      {
+        id: "v2",
         placeName: "안목해변",
         spotId: null,
         dong: "강릉시 송정동",
@@ -56,10 +70,12 @@ vi.mock("@/lib/supabase/tripDetail", async (importOriginal) => ({
   fetchTripDetail: async () => current,
   saveTripNote: async () => true,
   saveTripTitle: (...args: unknown[]) => saveTripTitle(...args),
+  saveTripSubtitle: (...args: unknown[]) => saveTripSubtitle(...args),
+  saveVisitName: (...args: unknown[]) => saveVisitName(...args),
 }));
 
-async function 상세(title: string | null = "화진포해변 외 2곳") {
-  current = detail(title);
+async function 상세(title: string | null = "화진포해변 외 2곳", subtitle: string | null = null) {
+  current = detail(title, subtitle);
   vi.resetModules();
   const { TripDetail } = await import("./TripDetail");
   render(<TripDetail tripId="t1" />);
@@ -68,8 +84,10 @@ async function 상세(title: string | null = "화진포해변 외 2곳") {
 
 describe("TripDetail 이름 바꾸기", () => {
   beforeEach(() => {
-    saveTripTitle.mockReset();
-    saveTripTitle.mockResolvedValue(true);
+    for (const spy of [saveTripTitle, saveTripSubtitle, saveVisitName]) {
+      spy.mockReset();
+      spy.mockResolvedValue(true);
+    }
   });
 
   it("지금 이름이 제목칸에 들어 있다", async () => {
@@ -84,7 +102,7 @@ describe("TripDetail 이름 바꾸기", () => {
 
     await waitFor(() => expect(saveTripTitle).toHaveBeenCalled());
     expect(saveTripTitle.mock.calls[0].at(-1)).toBe("민수랑 첫 휴가");
-    expect(await screen.findByText(/이름을 바꿨어요/)).toBeTruthy();
+    expect(await screen.findByText(/바꿨어요/)).toBeTruthy();
   });
 
   it("바꾼 것이 없으면 저장하지 않는다", async () => {
@@ -105,11 +123,14 @@ describe("TripDetail 이름 바꾸기", () => {
 
   it("Escape 를 누르면 고치던 것을 버린다", async () => {
     const input = await 상세();
+    // 실제로 손가락이 올라간 상태여야 blur 가 뒤따른다. 포커스 없이
+    // 누르면 blur 가 나지 않아 시험이 통과해 버린다.
+    input.focus();
     fireEvent.change(input, { target: { value: "엉뚱한 이름" } });
     fireEvent.keyDown(input, { key: "Escape" });
 
-    expect(input.value).toBe("화진포해변 외 2곳");
-    await waitFor(() => expect(saveTripTitle).not.toHaveBeenCalled());
+    await waitFor(() => expect(input.value).toBe("화진포해변 외 2곳"));
+    expect(saveTripTitle).not.toHaveBeenCalled();
   });
 
   it("저장하지 못하면 그렇다고 말한다", async () => {
@@ -119,6 +140,135 @@ describe("TripDetail 이름 바꾸기", () => {
     fireEvent.blur(input);
 
     expect(await screen.findByText(/이름을 바꾸지 못했어요/)).toBeTruthy();
-    expect(screen.queryByText(/이름을 바꿨어요/)).toBeNull();
+    expect(screen.queryByText(/바꿨어요/)).toBeNull();
+  });
+});
+
+describe("부제", () => {
+  beforeEach(() => {
+    for (const spy of [saveTripTitle, saveTripSubtitle, saveVisitName]) {
+      spy.mockReset();
+      spy.mockResolvedValue(true);
+    }
+  });
+
+  it("손대지 않았으면 장소 요약이 자동으로 선다", async () => {
+    await 상세("민수랑 첫 휴가");
+    const sub = screen.getByLabelText("부제") as HTMLInputElement;
+    // 제목을 사람이 바꿔도 어디였는지를 잃지 않는다.
+    expect(sub.value).toBe("");
+    expect(sub.placeholder).toBe("화진포해변·안목해변");
+  });
+
+  it("직접 쓴 것이 있으면 그것을 보여준다", async () => {
+    await 상세("민수랑 첫 휴가", "비 오는 이틀, 커피만 마셨다");
+    expect((screen.getByLabelText("부제") as HTMLInputElement).value).toBe(
+      "비 오는 이틀, 커피만 마셨다",
+    );
+  });
+
+  it("손을 떼면 저장한다", async () => {
+    await 상세("민수랑 첫 휴가");
+    const sub = screen.getByLabelText("부제");
+    fireEvent.change(sub, { target: { value: "비 오는 이틀" } });
+    fireEvent.blur(sub);
+
+    await waitFor(() => expect(saveTripSubtitle).toHaveBeenCalled());
+    expect(saveTripSubtitle.mock.calls[0].at(-1)).toBe("비 오는 이틀");
+  });
+
+  it("바꾼 것이 없으면 저장하지 않는다", async () => {
+    await 상세("민수랑 첫 휴가");
+    fireEvent.blur(screen.getByLabelText("부제"));
+    expect(saveTripSubtitle).not.toHaveBeenCalled();
+  });
+
+  it("날짜와 동행자는 그대로 남는다", async () => {
+    await 상세("민수랑 첫 휴가");
+    expect(screen.getByText(/2026년 9월 13일 ~ 9월 14일/)).toBeTruthy();
+    expect(screen.getByText(/민수와/)).toBeTruthy();
+  });
+});
+
+describe("장소 이름 고치기", () => {
+  beforeEach(() => {
+    for (const spy of [saveTripTitle, saveTripSubtitle, saveVisitName]) {
+      spy.mockReset();
+      spy.mockResolvedValue(true);
+    }
+  });
+
+  it("고치기를 누르면 그 자리에서 고친다", async () => {
+    await 상세();
+    fireEvent.click(screen.getByRole("button", { name: "안목해변 이름 고치기" }));
+
+    const input = screen.getByLabelText("안목해변 이름 고치기") as HTMLInputElement;
+    expect(input.value).toBe("안목해변");
+
+    fireEvent.change(input, { target: { value: "우리가 커피 마신 곳" } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(saveVisitName).toHaveBeenCalled());
+    expect(saveVisitName.mock.calls[0].slice(-2)).toEqual(["v2", "우리가 커피 마신 곳"]);
+    expect(await screen.findByText("우리가 커피 마신 곳")).toBeTruthy();
+  });
+
+  it("비우면 되돌린다 — 이름 없는 곳은 다시 찾을 길이 없다", async () => {
+    await 상세();
+    fireEvent.click(screen.getByRole("button", { name: "안목해변 이름 고치기" }));
+    const input = screen.getByLabelText("안목해변 이름 고치기");
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.blur(input);
+
+    await waitFor(() => expect(screen.getByText("안목해변")).toBeTruthy());
+    expect(saveVisitName).not.toHaveBeenCalled();
+  });
+
+  it("Escape 를 누르면 고치던 것을 버린다", async () => {
+    await 상세();
+    fireEvent.click(screen.getByRole("button", { name: "화진포해변 이름 고치기" }));
+    const input = screen.getByLabelText("화진포해변 이름 고치기") as HTMLInputElement;
+    input.focus();
+    fireEvent.change(input, { target: { value: "엉뚱한 곳" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    await waitFor(() => expect(screen.getByText("화진포해변")).toBeTruthy());
+    expect(saveVisitName).not.toHaveBeenCalled();
+  });
+
+  it("부제도 Escape 로 버린다", async () => {
+    await 상세("민수랑 첫 휴가", "비 오는 이틀");
+    const sub = screen.getByLabelText("부제") as HTMLInputElement;
+    sub.focus();
+    fireEvent.change(sub, { target: { value: "엉뚱한 줄" } });
+    fireEvent.keyDown(sub, { key: "Escape" });
+
+    await waitFor(() => expect(sub.value).toBe("비 오는 이틀"));
+    expect(saveTripSubtitle).not.toHaveBeenCalled();
+  });
+
+  it("저장하지 못하면 그렇다고 말한다", async () => {
+    saveVisitName.mockResolvedValue(false);
+    await 상세();
+    fireEvent.click(screen.getByRole("button", { name: "안목해변 이름 고치기" }));
+    const input = screen.getByLabelText("안목해변 이름 고치기");
+    fireEvent.change(input, { target: { value: "다른 이름" } });
+    fireEvent.blur(input);
+
+    expect(await screen.findByText(/장소 이름을 바꾸지 못했어요/)).toBeTruthy();
+  });
+
+  it("한 번에 한 곳만 연다", async () => {
+    await 상세();
+    fireEvent.click(screen.getByRole("button", { name: "화진포해변 이름 고치기" }));
+    expect(screen.getAllByRole("textbox").filter((el) => el.getAttribute("aria-label")?.includes("이름 고치기"))).toHaveLength(1);
+  });
+});
+
+describe("그날의 실마리", () => {
+  it("요일 앞에 날짜를 적는다", async () => {
+    await 상세();
+    // 요일만 있으면 어느 날인지 떠오르지 않는다.
+    expect(screen.getByText(/2026년 9월 13일 일요일이었어요/)).toBeTruthy();
   });
 });
