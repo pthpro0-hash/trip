@@ -1,4 +1,6 @@
-import { KOREA_FULL_VIEWBOX, KOREA_LAND_PATHS, project } from "@/lib/koreaMap";
+import { KOREA_LAND_PATHS, project } from "@/lib/koreaMap";
+import { regionViewBox } from "@/lib/photo/regionView";
+import type { Region } from "@/lib/types";
 import { formatDistance } from "@/lib/geo";
 import {
   SEASON_COLOR,
@@ -24,6 +26,8 @@ const WIDTH = 720;
 const HEIGHT = 1060;
 const MAP_TOP = 190;
 const MAP_HEIGHT = 450;
+/* 전국을 세로 450 에 맞췄을 때의 가로. 권역을 골라도 이 자리는 그대로다. */
+const MAP_WIDTH = Math.round((340 / 600) * 450);
 
 const INK = "#1d1d1f";
 const MUTED = "#6e6e73";
@@ -45,14 +49,26 @@ interface SketchCardProps {
   headline: string;
   /** 열두 달의 띠. 빈 달이 더 많은 것을 말해 준다. */
   months: MonthCell[];
+  /** 고른 권역. 고르면 그쪽으로 당겨 본다. */
+  region: Region | null;
 }
 
-export function SketchCard({ sketch, shapes, title, headline, months }: SketchCardProps) {
-  const view = KOREA_FULL_VIEWBOX;
-  // 한국 지도를 카드 가운데에 앉힌다. 세로에 맞춰 비율을 지킨다.
-  const scale = MAP_HEIGHT / view.height;
-  const mapWidth = view.width * scale;
+export function SketchCard({
+  sketch,
+  shapes,
+  title,
+  headline,
+  months,
+  region,
+}: SketchCardProps) {
+  /*
+    지도 자리는 늘 같은 크기다. 권역을 고르면 그 안에 무엇을 비출지만
+    바뀐다 — 자리까지 바뀌면 카드마다 지도 크기가 달라져 어지럽다.
+  */
+  const mapWidth = MAP_WIDTH;
   const offsetX = (WIDTH - mapWidth) / 2;
+  const view = regionViewBox(region, shapes.dots, { width: mapWidth, height: MAP_HEIGHT });
+  const scale = MAP_HEIGHT / view.height;
 
   const place = (lat: number, lng: number) => {
     const point = project(lat, lng);

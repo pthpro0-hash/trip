@@ -13,7 +13,8 @@ import {
   type TripDetail as Detail,
 } from "@/lib/supabase/tripDetail";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
-import { deletePhoto, setCoverPhoto, thumbUrls } from "@/lib/supabase/photos";
+import { deletePhoto, setCoverPhoto, signedUrls, thumbUrls } from "@/lib/supabase/photos";
+import { PhotoViewer } from "./PhotoViewer";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
@@ -76,6 +77,12 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [confirmingPhoto, setConfirmingPhoto] = useState<string | null>(null);
   const [removingPhoto, setRemovingPhoto] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState(false);
+  /*
+    크게 보고 있는 사진. 목록에는 작은 판을 쓰지만 여기서는 보관본을
+    그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.
+  */
+  const [viewing, setViewing] = useState<number | null>(null);
+  const [bigUrls, setBigUrls] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -287,6 +294,32 @@ export function TripDetail({ tripId }: { tripId: string }) {
     );
   }
 
+  /*
+    크게 볼 때는 여행 전체를 한 줄로 이어 넘긴다. 방문 단위로 끊어
+    놓으면 여덟 장 보고 창을 닫았다 다시 열어야 한다.
+  */
+  const reel = trip.visits.flatMap((visit) => visit.photos);
+
+  const open = async (storagePath: string) => {
+    const at = reel.findIndex((photo) => photo.storagePath === storagePath);
+    if (at < 0) return;
+    setViewing(at);
+    if (bigUrls.has(storagePath)) return;
+
+    const supabase = getBrowserClient();
+    if (!supabase) return;
+    const urls = await signedUrls(supabase, [storagePath]);
+    const url = urls.get(storagePath);
+    if (url) setBigUrls((current) => new Map(current).set(storagePath, url));
+  };
+
+  /** 끝에서 넘기면 처음으로 돈다. 막다른 길을 만들지 않는다. */
+  const move = (step: number) => {
+    if (viewing === null || reel.length === 0) return;
+    const next = (viewing + step + reel.length) % reel.length;
+    void open(reel[next].storagePath);
+  };
+
   const allPhotoTimes = trip.visits.flatMap((visit) => visit.photos.map((p) => p.takenAt));
   const clues = tripClues(trip.visits[0]?.startedAt ?? new Date(), allPhotoTimes, trip.visits.length);
   const stops = trip.visits.map((visit) => ({
@@ -458,10 +491,17 @@ export function TripDetail({ tripId }: { tripId: string }) {
                         className="relative aspect-square overflow-hidden rounded-xl bg-bg-subtle"
                       >
                         {url && (
-                          // 우리 보관함의 서명 주소라 그때그때 달라진다.
-                          // next/image 로 미리 최적화할 수 없다.
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={url} alt="" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => void open(photo.storagePath)}
+                            aria-label="사진 크게 보기"
+                            className="h-full w-full cursor-zoom-in"
+                          >
+                            {/* 우리 보관함의 서명 주소라 그때그때 달라진다.
+                                next/image 로 미리 최적화할 수 없다. */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt="" className="h-full w-full object-cover" />
+                          </button>
                         )}
                         <button
                           type="button"
@@ -494,6 +534,17 @@ export function TripDetail({ tripId }: { tripId: string }) {
           );
         })}
       </ol>
+
+      {viewing !== null && reel[viewing] && (
+        <PhotoViewer
+          url={bigUrls.get(reel[viewing].storagePath) ?? null}
+          index={viewing + 1}
+          total={reel.length}
+          onClose={() => setViewing(null)}
+          onPrev={() => move(-1)}
+          onNext={() => move(1)}
+        />
+      )}
 
       {/*
         빈 칸을 먼저 내밀지 않는다. 그날로 데려간 다음에 묻는다.

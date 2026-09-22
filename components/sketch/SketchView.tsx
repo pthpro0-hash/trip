@@ -241,7 +241,13 @@ export function SketchView() {
         </p>
       ) : (
         years.map((entry) => (
-          <YearSketch key={entry.year} year={entry.year} trips={entry.trips} person={person} />
+          <YearSketch
+            key={entry.year}
+            year={entry.year}
+            trips={entry.trips}
+            person={person}
+            region={region}
+          />
         ))
       )}
     </>

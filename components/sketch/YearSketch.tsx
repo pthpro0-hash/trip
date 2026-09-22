@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { buildSketch, monthStrip, sketchShapes, type SketchTrip } from "@/lib/sketch";
 import { headline } from "@/lib/sketchWords";
+import type { Region } from "@/lib/types";
 import { downloadSvgAsPng } from "@/lib/svgToPng";
 import { SketchCard } from "./SketchCard";
 
@@ -18,9 +19,11 @@ interface YearSketchProps {
   trips: SketchTrip[];
   /** 사람으로 걸러 보고 있으면 제목에 함께 적는다. */
   person: string | null;
+  /** 고른 권역. 지도를 그쪽으로 당기고 제목에도 적는다. */
+  region: Region | null;
 }
 
-export function YearSketch({ year, trips, person }: YearSketchProps) {
+export function YearSketch({ year, trips, person, region }: YearSketchProps) {
   const holder = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState<"card" | "story" | null>(null);
   const [failed, setFailed] = useState(false);
@@ -30,7 +33,9 @@ export function YearSketch({ year, trips, person }: YearSketchProps) {
   const line = useMemo(() => headline(sketch, "year"), [sketch]);
   const months = useMemo(() => monthStrip(trips), [trips]);
 
-  const title = person ? `${year}년 · ${person}와` : `${year}년`;
+  const title = [`${year}년`, region ?? "", person ? `${person}와` : ""]
+    .filter(Boolean)
+    .join(" · ");
 
   const save = async (kind: "card" | "story") => {
     const svg = holder.current?.querySelector("svg");
@@ -52,6 +57,7 @@ export function YearSketch({ year, trips, person }: YearSketchProps) {
           title={title}
           headline={line}
           months={months}
+          region={region}
         />
       </div>
 

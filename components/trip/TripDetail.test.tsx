@@ -18,7 +18,11 @@ vi.mock("@/lib/supabase/client", () => ({
 vi.mock("@/components/course/CourseMap", () => ({ CourseMap: () => null }));
 
 vi.mock("@/lib/supabase/photos", () => ({
-  thumbUrls: async () => new Map(),
+  thumbUrls: async (_c: unknown, paths: string[]) =>
+    new Map(paths.map((path) => [path, `https://예시/작은/${path}`])),
+  // 크게 볼 때만 보관본 주소를 받아온다.
+  signedUrls: async (_c: unknown, paths: string[]) =>
+    new Map(paths.map((path) => [path, `https://예시/원본/${path}`])),
   deletePhoto: async () => true,
   setCoverPhoto: async () => true,
 }));
@@ -57,7 +61,10 @@ function detail(title: string | null, subtitle: string | null = null): Detail {
         lng: 128.9474,
         startedAt: new Date("2026-09-14T06:11"),
         endedAt: new Date("2026-09-14T08:41"),
-        photos: [],
+        photos: [
+          { id: "p1", storagePath: "나/v2/1.webp", takenAt: new Date("2026-09-14T06:20"), isCover: true },
+          { id: "p2", storagePath: "나/v2/2.webp", takenAt: new Date("2026-09-14T07:00"), isCover: false },
+        ],
       },
     ],
   };
@@ -157,7 +164,8 @@ describe("부제", () => {
     const sub = screen.getByLabelText("부제") as HTMLInputElement;
     // 제목을 사람이 바꿔도 어디였는지를 잃지 않는다.
     expect(sub.value).toBe("");
-    expect(sub.placeholder).toBe("화진포해변·안목해변");
+    // 사진을 많이 찍은 곳이 앞에 선다 — 안목해변 2장, 화진포해변 0장.
+    expect(sub.placeholder).toBe("안목해변·화진포해변");
   });
 
   it("직접 쓴 것이 있으면 그것을 보여준다", async () => {
@@ -270,5 +278,71 @@ describe("그날의 실마리", () => {
     await 상세();
     // 요일만 있으면 어느 날인지 떠오르지 않는다.
     expect(screen.getByText(/2026년 9월 13일 일요일이었어요/)).toBeTruthy();
+  });
+});
+
+describe("사진 크게 보기", () => {
+  beforeEach(() => {
+    for (const spy of [saveTripTitle, saveTripSubtitle, saveVisitName]) {
+      spy.mockReset();
+      spy.mockResolvedValue(true);
+    }
+  });
+
+  const 열기 = async () => {
+    await 상세();
+    const tiles = await screen.findAllByRole("button", { name: "사진 크게 보기" });
+    fireEvent.click(tiles[0]);
+    return screen.findByRole("dialog");
+  };
+
+  it("사진을 누르면 화면 가득 뜬다", async () => {
+    const dialog = await 열기();
+    // 목록의 작은 판이 아니라 보관본을 불러온다.
+    await waitFor(() =>
+      expect(dialog.querySelector("img")?.getAttribute("src")).toContain("원본"),
+    );
+  });
+
+  it("몇 번째인지 알려준다", async () => {
+    await 열기();
+    expect(await screen.findByText("1 / 2")).toBeTruthy();
+  });
+
+  it("잘라내지 않는다 — 세로 사진이 잘리면 찍은 것이 사라진다", async () => {
+    const dialog = await 열기();
+    await waitFor(() => expect(dialog.querySelector("img")).toBeTruthy());
+    expect(dialog.querySelector("img")!.className).toContain("object-contain");
+  });
+
+  it("Escape 로 닫는다", async () => {
+    await 열기();
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("바깥을 누르면 닫힌다", async () => {
+    const dialog = await 열기();
+    fireEvent.click(dialog);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("사진 자체를 눌러도 닫히지 않는다", async () => {
+    const dialog = await 열기();
+    await waitFor(() => expect(dialog.querySelector("img")).toBeTruthy());
+    fireEvent.click(dialog.querySelector("img")!);
+    expect(screen.queryByRole("dialog")).toBeTruthy();
+  });
+
+  it("화살표로 넘긴다", async () => {
+    await 열기();
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(await screen.findByText("2 / 2")).toBeTruthy();
+  });
+
+  it("끝에서 넘기면 처음으로 돈다 — 막다른 길을 만들지 않는다", async () => {
+    await 열기();
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(await screen.findByText("2 / 2")).toBeTruthy();
   });
 });
