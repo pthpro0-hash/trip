@@ -5,7 +5,7 @@ import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
-import { signedUrls } from "@/lib/supabase/photos";
+import { thumbUrls } from "@/lib/supabase/photos";
 
 /*
   첫 화면에서 "정보"와 "개인" 중 무엇을 볼지 사람에게 고르게 하지 않는다.
@@ -58,7 +58,7 @@ export function HomeIntro() {
         .slice(0, COVERS);
       if (paths.length === 0) return;
 
-      const urls = await signedUrls(supabase, paths);
+      const urls = await thumbUrls(supabase, paths);
       if (active) {
         setCovers(paths.map((path) => urls.get(path)).filter((url): url is string => !!url));
       }

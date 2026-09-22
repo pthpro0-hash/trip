@@ -7,7 +7,7 @@ import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
-import { signedUrls } from "@/lib/supabase/photos";
+import { backfillThumbs, missingThumbs, thumbUrls } from "@/lib/supabase/photos";
 import {
   companionOptions,
   searchTrips,
@@ -40,6 +40,12 @@ export function TripList() {
   const [failed, setFailed] = useState(false);
   // 보관함이 비공개라 고정 주소가 없다. 볼 때마다 짧게 사는 주소를 받는다.
   const [covers, setCovers] = useState<Map<string, string>>(new Map());
+  /*
+    썸네일을 붙이기 전에 올라간 사진은 목록에서 원본을 통째로 내려받는다.
+    한 번 훑어 두면 그 뒤로는 안 그러므로, 있을 때만 조용히 권한다.
+  */
+  const [stale, setStale] = useState<string[]>([]);
+  const [tidying, setTidying] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [person, setPerson] = useState<string | null>(null);
   const [year, setYear] = useState<number | null>(null);
@@ -63,11 +69,25 @@ export function TripList() {
         return;
       }
       setTrips(rows);
+      /*
+        곁다리다. 여기서 무엇이 잘못돼도 목록은 떠야 한다 — 정리를
+        권하지 못할 뿐이다.
+      */
+      try {
+        void Promise.resolve(missingThumbs(supabase, data.user.id)).then(
+          (paths) => {
+            if (active) setStale(paths);
+          },
+          () => undefined,
+        );
+      } catch {
+        // 권하지 못한 것뿐이다.
+      }
       setStatus("ready");
 
       const paths = rows.map((trip) => trip.coverPath).filter((path): path is string => !!path);
       if (paths.length > 0) {
-        const urls = await signedUrls(supabase, paths);
+        const urls = await thumbUrls(supabase, paths);
         if (active) setCovers(urls);
       }
     });
@@ -95,6 +115,18 @@ export function TripList() {
       })),
     [trips],
   );
+
+  const tidy = async () => {
+    const supabase = getBrowserClient();
+    if (!supabase || stale.length === 0) return;
+
+    const outcome = await backfillThumbs(supabase, stale, (done, total) =>
+      setTidying(`정리하는 중… ${done}/${total}`),
+    );
+    setTidying(null);
+    // 실패한 것이 남아 있으면 다음에 다시 권한다.
+    setStale(outcome.failed > 0 ? stale.slice(-outcome.failed) : []);
+  };
 
   const visible = useMemo(() => {
     const matchedIds = new Set(searchTrips(searchable, query).map((trip) => trip.id));
@@ -269,6 +301,28 @@ export function TripList() {
         <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
           지우지 못했어요. 잠시 후 다시 시도해 주세요.
         </p>
+      )}
+
+      {/*
+        한 번 하고 마는 일이다. 끝나면 이 줄은 다시 나오지 않는다.
+      */}
+      {stale.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl bg-bg-subtle px-4 py-3">
+          <p className="text-[14px] text-text-muted">
+            사진 {stale.length}장을 더 빠르게 열리도록 정리할 수 있어요.
+          </p>
+          {tidying ? (
+            <span className="text-[13px] font-medium text-text-muted">{tidying}</span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void tidy()}
+              className="rounded-full bg-surface px-3.5 py-1.5 text-[13px] font-medium text-accent ring-1 ring-line transition hover:bg-accent-soft"
+            >
+              정리하기
+            </button>
+          )}
+        </div>
       )}
 
       <ol className="flex flex-col gap-4">

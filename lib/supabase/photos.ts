@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { shrinkToWebp, UnsupportedImageError } from "@/lib/photo/resize";
+import {
+  shrinkToWebp,
+  thumbFromBlob,
+  UnsupportedImageError,
+  type Shrunk,
+} from "@/lib/photo/resize";
 
 export const BUCKET = "trip-photos";
 /**
@@ -58,6 +63,19 @@ export async function countPhotos(
   return error ? 0 : (count ?? 0);
 }
 
+/*
+  목록용 작은 판은 보관 경로 옆에 나란히 둔다.
+
+  표에 칸을 더하지 않는 것은, 경로가 규칙으로 정해져 있으면 줄을 고치지
+  않고도 있는지 없는지 물어볼 수 있기 때문이다. 아직 작은 판이 없는
+  예전 사진은 주소를 달라고 해도 안 오고, 그때는 원본으로 물러난다.
+*/
+export function thumbPath(storagePath: string): string {
+  // 두 번 걸어도 .thumb.thumb 이 되지 않게 한다.
+  if (/\.thumb\.webp$/i.test(storagePath)) return storagePath;
+  return storagePath.replace(/\.webp$/i, ".thumb.webp");
+}
+
 /** 한 장의 결말. 나란히 끝나도 세는 순서가 흔들리지 않게 자리에 담아 둔다. */
 type Slot =
   | { kind: "uploaded" }
@@ -75,16 +93,24 @@ async function putOne(
   supabase: SupabaseClient,
   userId: string,
   target: UploadTarget,
-  blob: Blob,
+  shrunk: Shrunk,
 ): Promise<Slot> {
   // 맨 앞 칸이 사용자 id 라야 보관함 정책이 남의 폴더를 막아 준다.
   const path = `${userId}/${target.visitId}/${crypto.randomUUID()}.webp`;
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
-    .upload(path, blob, { contentType: "image/webp", upsert: false });
+    .upload(path, shrunk.full, { contentType: "image/webp", upsert: false });
 
   if (uploadError) return { kind: "failed" };
+
+  /*
+    작은 판은 없어도 사진은 사진이다. 실패해도 여기서 멈추지 않는다 —
+    목록이 원본으로 물러날 뿐이고, 기록을 잃는 것보다는 낫다.
+  */
+  await supabase.storage
+    .from(BUCKET)
+    .upload(thumbPath(path), shrunk.thumb, { contentType: "image/webp", upsert: false });
 
   const { error: rowError } = await supabase.from("trip_photos").insert({
     visit_id: target.visitId,
@@ -97,8 +123,8 @@ async function putOne(
   });
 
   if (rowError) {
-    // 아무도 가리키지 않는 파일을 남기지 않는다.
-    await supabase.storage.from(BUCKET).remove([path]);
+    // 아무도 가리키지 않는 파일을 남기지 않는다. 작은 판도 함께.
+    await supabase.storage.from(BUCKET).remove([path, thumbPath(path)]);
     return { kind: "failed" };
   }
 
@@ -150,9 +176,9 @@ export async function uploadPhotos(
     }
 
     // 펼친 그림이 한 번에 하나만 살아 있도록 여기서 기다린다.
-    let blob: Blob;
+    let shrunk: Shrunk;
     try {
-      blob = await shrinkToWebp(target.file);
+      shrunk = await shrinkToWebp(target.file);
     } catch (error) {
       finish(
         index,
@@ -167,7 +193,7 @@ export async function uploadPhotos(
 
     const fly = async () => {
       try {
-        const slot = await putOne(supabase, userId, target, blob);
+        const slot = await putOne(supabase, userId, target, shrunk);
         if (slot.kind !== "uploaded") quota.left += 1;
         finish(index, slot);
       } finally {
@@ -219,6 +245,108 @@ export async function signedUrls(
 }
 
 /**
+ * 목록에 쓸 작은 판의 주소.
+ *
+ * 작은 판이 아직 없는 사진(썸네일을 붙이기 전에 올라간 것들)은 원본
+ * 주소로 물러난다. 돌려주는 map 의 열쇠는 언제나 **원본 경로**라,
+ * 부르는 쪽은 무엇이 왔는지 신경 쓰지 않아도 된다.
+ */
+export async function thumbUrls(
+  supabase: SupabaseClient,
+  paths: string[],
+  seconds = 3600,
+): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map();
+
+  const small = await signedUrls(supabase, paths.map(thumbPath), seconds);
+
+  const urls = new Map<string, string>();
+  const missing: string[] = [];
+  for (const path of paths) {
+    const hit = small.get(thumbPath(path));
+    if (hit) urls.set(path, hit);
+    else missing.push(path);
+  }
+
+  if (missing.length > 0) {
+    const big = await signedUrls(supabase, missing, seconds);
+    for (const [path, url] of big) urls.set(path, url);
+  }
+  return urls;
+}
+
+/*
+  뒤늦게 작은 판 챙기기.
+
+  썸네일을 붙이기 전에 올라간 사진들은 목록에서 원본을 통째로 내려받는다.
+  한 번 훑어 작은 판을 만들어 두면 그 뒤로는 안 그런다. 사진이 적을 때
+  하는 편이 싸다 — 나중엔 올라간 것 전부를 뒤져야 한다.
+*/
+
+/** 작은 판이 아직 없는 사진들의 보관 경로. */
+export async function missingThumbs(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("trip_photos")
+    .select("storage_path")
+    .eq("user_id", userId);
+
+  if (error || !data) return [];
+  const paths = data.map((row) => String(row.storage_path));
+  if (paths.length === 0) return [];
+
+  const small = await signedUrls(supabase, paths.map(thumbPath), 60);
+  return paths.filter((path) => !small.has(thumbPath(path)));
+}
+
+export interface BackfillOutcome {
+  made: number;
+  failed: number;
+}
+
+/**
+ * 원본을 받아 작은 판을 만들어 올린다.
+ *
+ * 한 장씩 차례로 한다. 펼친 그림이 한 번에 하나만 살아 있게 하는 것도
+ * 있지만, 무엇보다 한 번 하고 마는 일이라 빠를 이유가 없다.
+ */
+export async function backfillThumbs(
+  supabase: SupabaseClient,
+  paths: string[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<BackfillOutcome> {
+  const outcome: BackfillOutcome = { made: 0, failed: 0 };
+  onProgress?.(0, paths.length);
+
+  for (const [index, path] of paths.entries()) {
+    try {
+      const urls = await signedUrls(supabase, [path], 120);
+      const url = urls.get(path);
+      if (!url) throw new Error("no url");
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("fetch failed");
+
+      const thumb = await thumbFromBlob(await response.blob(), path);
+      const { error } = await supabase.storage
+        .from(BUCKET)
+        .upload(thumbPath(path), thumb, { contentType: "image/webp", upsert: true });
+
+      if (error) throw new Error("upload failed");
+      outcome.made += 1;
+    } catch {
+      // 한 장 실패했다고 나머지를 포기하지 않는다. 다음에 다시 하면 된다.
+      outcome.failed += 1;
+    }
+    onProgress?.(index + 1, paths.length);
+  }
+
+  return outcome;
+}
+
+/**
  * 사진 한 장을 지운다.
  *
  * 표에서 먼저 지우고 보관함 파일을 지운다. 순서가 중요하다 —
@@ -240,7 +368,7 @@ export async function deletePhoto(
 
   if (error) return false;
 
-  await supabase.storage.from(BUCKET).remove([photo.storagePath]);
+  await supabase.storage.from(BUCKET).remove([photo.storagePath, thumbPath(photo.storagePath)]);
   await syncPhotoCount(supabase, userId, photo.visitId);
   return true;
 }

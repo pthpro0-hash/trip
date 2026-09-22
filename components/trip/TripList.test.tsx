@@ -67,7 +67,9 @@ vi.mock("@/lib/supabase/trips", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/supabase/photos", () => ({
-  signedUrls: async () => new Map([["나/v1/cover.webp", "https://예시/cover.webp"]]),
+  thumbUrls: async () => new Map([["나/v1/cover.webp", "https://예시/cover.webp"]]),
+  missingThumbs: async () => [],
+  backfillThumbs: async () => ({ made: 0, failed: 0 }),
 }));
 
 async function 목록() {
@@ -132,5 +134,40 @@ describe("TripList", () => {
     // 제목 링크와 같은 곳으로 가므로, 화면 낭독기에는 한 번만 들린다.
     const detail = screen.getAllByText("상세보기 →")[0].closest("a")!;
     expect(detail).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
+describe("작은 판 정리 권유", () => {
+  it("정리할 것이 있으면 몇 장인지 밝히고 권한다", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/supabase/photos", () => ({
+      thumbUrls: async () => new Map(),
+      missingThumbs: async () => ["나/v1/a.webp", "나/v1/b.webp"],
+      backfillThumbs: async () => ({ made: 2, failed: 0 }),
+    }));
+    const { TripList } = await import("./TripList");
+    render(<TripList />);
+
+    expect(await screen.findByText(/사진 2장을 더 빠르게 열리도록/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "정리하기" })).toBeTruthy();
+    vi.doUnmock("@/lib/supabase/photos");
+  });
+
+  it("권유가 터져도 목록은 뜬다 — 곁다리가 본체를 막지 않게", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/supabase/photos", () => ({
+      thumbUrls: async () => new Map(),
+      missingThumbs: () => {
+        throw new Error("망가짐");
+      },
+      backfillThumbs: async () => ({ made: 0, failed: 0 }),
+    }));
+    const { TripList } = await import("./TripList");
+    render(<TripList />);
+
+    // 여행 목록은 그대로 나온다.
+    expect(await screen.findByText("민수랑 첫 휴가")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "정리하기" })).toBeNull();
+    vi.doUnmock("@/lib/supabase/photos");
   });
 });

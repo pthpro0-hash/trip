@@ -13,7 +13,7 @@ import {
   type TripDetail as Detail,
 } from "@/lib/supabase/tripDetail";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
-import { deletePhoto, setCoverPhoto, signedUrls } from "@/lib/supabase/photos";
+import { deletePhoto, setCoverPhoto, thumbUrls } from "@/lib/supabase/photos";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
@@ -104,7 +104,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
 
       const paths = detail.visits.flatMap((visit) => visit.photos.map((p) => p.storagePath));
       if (paths.length > 0) {
-        const urls = await signedUrls(supabase, paths);
+        const urls = await thumbUrls(supabase, paths);
         if (active) setPhotoUrls(urls);
       }
     });

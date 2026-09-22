@@ -18,7 +18,7 @@ vi.mock("@/lib/supabase/client", () => ({
 vi.mock("@/components/course/CourseMap", () => ({ CourseMap: () => null }));
 
 vi.mock("@/lib/supabase/photos", () => ({
-  signedUrls: async () => new Map(),
+  thumbUrls: async () => new Map(),
   deletePhoto: async () => true,
   setCoverPhoto: async () => true,
 }));

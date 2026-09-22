@@ -1,7 +1,14 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PHOTO_LIMIT, UPLOAD_LANES, uploadPhotos, type UploadTarget } from "./photos";
+import {
+  PHOTO_LIMIT,
+  UPLOAD_LANES,
+  thumbPath,
+  thumbUrls,
+  uploadPhotos,
+  type UploadTarget,
+} from "./photos";
 import { UnsupportedImageError } from "@/lib/photo/resize";
 
 /*
@@ -10,7 +17,7 @@ import { UnsupportedImageError } from "@/lib/photo/resize";
   돌리는 코드는 눈으로 읽어서는 맞는지 알 수 없다. 여기서 못 박는다.
 */
 
-const shrink = vi.fn<(file: File) => Promise<Blob>>();
+const shrink = vi.fn<(file: File) => Promise<{ full: Blob; thumb: Blob }>>();
 vi.mock("@/lib/photo/resize", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/photo/resize")>()),
   shrinkToWebp: (file: File) => shrink(file),
@@ -48,6 +55,7 @@ function fakeSupabase(options: FakeOptions = {}) {
     inserted: [] as Record<string, unknown>[],
     removed: [] as string[],
     nameOf: new Map<string, string>(),
+    thumbs: [] as string[],
     /** 올리기를 붙들어 두는 손잡이. 풀어 주기 전까지 끝나지 않는다. */
     release: [] as (() => void)[],
   };
@@ -68,6 +76,11 @@ function fakeSupabase(options: FakeOptions = {}) {
       from: () => ({
         upload: async (path: string, blob: Blob) => {
           const name = await blob.text();
+          // 작은 판은 큰 판을 따라 올라올 뿐이라 세지도 붙들지도 않는다.
+          if (name.startsWith("t:")) {
+            state.thumbs.push(path);
+            return { error: null };
+          }
           state.nameOf.set(path, name);
           state.inFlight += 1;
           state.peak = Math.max(state.peak, state.inFlight);
@@ -111,7 +124,10 @@ describe("uploadPhotos", () => {
   beforeEach(() => {
     shrink.mockReset();
     // 파일 이름을 그대로 물고 가야 어느 장이 실패했는지 가릴 수 있다.
-    shrink.mockImplementation(async (file) => new Blob([file.name]));
+    shrink.mockImplementation(async (file) => ({
+      full: new Blob([file.name]),
+      thumb: new Blob([`t:${file.name}`]),
+    }));
   });
 
   it("빈 목록이면 셈만 돌려주고 아무것도 묻지 않는다", async () => {
@@ -142,7 +158,7 @@ describe("uploadPhotos", () => {
       shrinkPeak = Math.max(shrinkPeak, shrinking);
       await new Promise((resolve) => setTimeout(resolve, 0));
       shrinking -= 1;
-      return new Blob([file.name]);
+      return { full: new Blob([file.name]), thumb: new Blob([`t:${file.name}`]) };
     });
 
     const run = uploadPhotos(supabase, "나", Array.from({ length: 12 }, (_, i) => target(`${i}.jpg`)));
@@ -158,7 +174,7 @@ describe("uploadPhotos", () => {
       if (file.name === "b.jpg" || file.name === "d.jpg") {
         throw new UnsupportedImageError(file.name);
       }
-      return new Blob([file.name]);
+      return { full: new Blob([file.name]), thumb: new Blob([`t:${file.name}`]) };
     });
 
     const run = uploadPhotos(
@@ -181,8 +197,9 @@ describe("uploadPhotos", () => {
 
     expect(outcome.uploaded).toBe(2);
     expect(outcome.failed).toBe(1);
-    // 아무도 가리키지 않는 파일이 보관함에 남지 않는다.
-    expect(state.removed).toHaveLength(1);
+    // 아무도 가리키지 않는 파일이 보관함에 남지 않는다. 작은 판까지.
+    expect(state.removed).toHaveLength(2);
+    expect(state.removed[1]).toBe(thumbPath(state.removed[0]));
   });
 
   it("한 장이 망에서 실패해도 나머지는 그대로 올라간다", async () => {
@@ -236,5 +253,67 @@ describe("uploadPhotos", () => {
     expect(seen.at(-1)).toBe(6);
     // 뒤로 가지 않는다.
     expect([...seen].sort((a, b) => a - b)).toEqual(seen);
+  });
+});
+
+/*
+  목록에 쓸 작은 판.
+
+  48px 자리에 2048px 짜리 400KB 를 내려받고 있었다. 사람이 늘수록 이
+  낭비가 곧 청구서가 된다. 다만 이미 올라간 사진에는 작은 판이 없으므로,
+  없을 때 원본으로 물러나는 길이 반드시 살아 있어야 한다.
+*/
+describe("thumbPath", () => {
+  it("보관 경로 옆에 나란히 둔다", () => {
+    expect(thumbPath("나/v1/abc.webp")).toBe("나/v1/abc.thumb.webp");
+  });
+
+  it("두 번 붙이지 않는다", () => {
+    // 이미 작은 판인 경로를 다시 넣어도 .thumb.thumb 이 되지 않는다.
+    expect(thumbPath(thumbPath("나/v1/abc.webp"))).toBe("나/v1/abc.thumb.webp");
+  });
+});
+
+describe("thumbUrls", () => {
+  /** 이 경로들만 보관함에 있는 셈 친다. */
+  function fakeStorage(있는것: string[]) {
+    return {
+      storage: {
+        from: () => ({
+          createSignedUrls: async (paths: string[]) => ({
+            data: paths.map((path) =>
+              있는것.includes(path)
+                ? { path, signedUrl: `https://예시/${path}` }
+                : { path: null, signedUrl: null },
+            ),
+            error: null,
+          }),
+        }),
+      },
+    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+  }
+
+  it("작은 판이 있으면 그것을 준다", async () => {
+    const urls = await thumbUrls(fakeStorage(["나/v1/a.thumb.webp"]), ["나/v1/a.webp"]);
+    // 열쇠는 언제나 원본 경로다. 부르는 쪽은 무엇이 왔는지 몰라도 된다.
+    expect(urls.get("나/v1/a.webp")).toBe("https://예시/나/v1/a.thumb.webp");
+  });
+
+  it("작은 판이 없으면 원본으로 물러난다 — 예전에 올린 사진들", async () => {
+    const urls = await thumbUrls(fakeStorage(["나/v1/a.webp"]), ["나/v1/a.webp"]);
+    expect(urls.get("나/v1/a.webp")).toBe("https://예시/나/v1/a.webp");
+  });
+
+  it("섞여 있어도 각자 제 것을 찾아간다", async () => {
+    const urls = await thumbUrls(fakeStorage(["나/v1/새.thumb.webp", "나/v1/옛.webp"]), [
+      "나/v1/새.webp",
+      "나/v1/옛.webp",
+    ]);
+    expect(urls.get("나/v1/새.webp")).toBe("https://예시/나/v1/새.thumb.webp");
+    expect(urls.get("나/v1/옛.webp")).toBe("https://예시/나/v1/옛.webp");
+  });
+
+  it("빈 목록에는 묻지 않는다", async () => {
+    expect(await thumbUrls(fakeStorage([]), [])).toEqual(new Map());
   });
 });

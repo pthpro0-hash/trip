@@ -24,7 +24,7 @@ vi.mock("@/lib/supabase/trips", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/supabase/photos", () => ({
-  signedUrls: async (_c: unknown, paths: string[]) =>
+  thumbUrls: async (_c: unknown, paths: string[]) =>
     new Map(paths.map((path) => [path, `https://예시/${path}`])),
 }));
 
