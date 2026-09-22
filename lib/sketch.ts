@@ -14,6 +14,8 @@ export interface SketchVisit {
   lat: number;
   lng: number;
   photoCount: number;
+  /** 법정동. 어느 권역인지 가리는 근거가 된다. */
+  dong?: string | null;
 }
 
 export interface SketchTrip {
