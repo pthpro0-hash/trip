@@ -22,7 +22,7 @@ interface YearSketchProps {
 
 export function YearSketch({ year, trips, person }: YearSketchProps) {
   const holder = useRef<HTMLDivElement>(null);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<"card" | "story" | null>(null);
   const [failed, setFailed] = useState(false);
 
   const sketch = useMemo(() => buildSketch(trips), [trips]);
@@ -32,14 +32,15 @@ export function YearSketch({ year, trips, person }: YearSketchProps) {
 
   const title = person ? `${year}년 · ${person}와` : `${year}년`;
 
-  const save = async () => {
+  const save = async (kind: "card" | "story") => {
     const svg = holder.current?.querySelector("svg");
     if (!svg) return;
-    setSaving(true);
+    setSaving(kind);
     setFailed(false);
-    const ok = await downloadSvgAsPng(svg, `여행스케치-${title}.png`);
+    const name = kind === "story" ? `여행스케치-${title}-세로.png` : `여행스케치-${title}.png`;
+    const ok = await downloadSvgAsPng(svg, name, { story: kind === "story" });
     if (!ok) setFailed(true);
-    setSaving(false);
+    setSaving(null);
   };
 
   return (
@@ -57,11 +58,20 @@ export function YearSketch({ year, trips, person }: YearSketchProps) {
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          onClick={save}
-          disabled={saving}
+          onClick={() => void save("card")}
+          disabled={saving !== null}
           className="rounded-full bg-bg-subtle px-4 py-2 text-[13px] font-medium text-text transition hover:bg-line disabled:opacity-60"
         >
-          {saving ? "만드는 중…" : `${year}년 저장하기`}
+          {saving === "card" ? "만드는 중…" : `${year}년 저장하기`}
+        </button>
+        {/* 공유는 대부분 세로다. */}
+        <button
+          type="button"
+          onClick={() => void save("story")}
+          disabled={saving !== null}
+          className="rounded-full bg-bg-subtle px-4 py-2 text-[13px] font-medium text-text transition hover:bg-line disabled:opacity-60"
+        >
+          {saving === "story" ? "만드는 중…" : "스토리용 세로로"}
         </button>
         {failed && <span className="text-[13px] text-text-muted">저장하지 못했어요.</span>}
         {/*

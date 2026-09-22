@@ -147,20 +147,31 @@ export function SketchCard({ sketch, shapes, title, headline, months }: SketchCa
           );
         })}
 
+        {/*
+          점을 누르면 그 여행으로 간다. 보는 것에서 여는 것으로 — 이 화면이
+          하려던 "소환"의 실제 동작이다.
+
+          SVG 안의 <a> 는 그림으로 저장할 때 아무것도 남기지 않으므로,
+          저장본에는 영향이 없다. 손가락으로 누를 것을 생각해 눈에 보이는
+          점보다 넉넉한 투명 원을 겹쳐 둔다.
+        */}
         {shapes.dots.map((dot, index) => {
           const { x, y } = place(dot.lat, dot.lng);
           if (!drawable({ x, y })) return null;
+          const r = dotRadius(dot.photoCount, busiest);
           return (
-            <circle
-              key={index}
-              cx={x}
-              cy={y}
-              r={dotRadius(dot.photoCount, busiest)}
-              fill={SEASON_COLOR[dot.season]}
-              fillOpacity={0.85}
-              stroke="#ffffff"
-              strokeWidth={2}
-            />
+            <a key={index} href={`/trips/${dot.tripId}`} aria-label={`${dot.photoCount}장 찍은 곳`}>
+              <circle
+                cx={x}
+                cy={y}
+                r={r}
+                fill={SEASON_COLOR[dot.season]}
+                fillOpacity={0.85}
+                stroke="#ffffff"
+                strokeWidth={2}
+              />
+              <circle cx={x} cy={y} r={Math.max(r, 16)} fill="transparent" />
+            </a>
           );
         })}
       </g>
