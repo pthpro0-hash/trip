@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { fetchTripDetail, saveTripNote, type TripDetail as Detail } from "@/lib/supabase/tripDetail";
+import {
+  fetchTripDetail,
+  saveTripNote,
+  saveTripTitle,
+  type TripDetail as Detail,
+} from "@/lib/supabase/tripDetail";
 import { deletePhoto, setCoverPhoto, signedUrls } from "@/lib/supabase/photos";
 import { companionLabel } from "@/lib/korean";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
@@ -31,6 +36,13 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [trip, setTrip] = useState<Detail | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [userId, setUserId] = useState<string | null>(null);
+  /*
+    제목은 적어 두기 단추 없이 손을 떼면 저장한다. 한 줄짜리라 단추까지
+    두면 무겁고, 무엇보다 이름은 고치다 만 채로 두는 법이 없다.
+  */
+  const [title, setTitle] = useState("");
+  const [titleSaved, setTitleSaved] = useState(false);
+  const [titleFailed, setTitleFailed] = useState(false);
   const [note, setNote] = useState("");
   const [savingNote, setSavingNote] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
@@ -59,6 +71,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
         return;
       }
       setTrip(detail);
+      setTitle(detail.title ?? "");
       setNote(detail.note ?? "");
       setStatus("ready");
 
@@ -73,6 +86,23 @@ export function TripDetail({ tripId }: { tripId: string }) {
       active = false;
     };
   }, [tripId]);
+
+  /** 손을 뗄 때 저장한다. 바뀐 것이 없으면 아무 일도 하지 않는다. */
+  const submitTitle = async () => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId || !trip) return;
+    if (title.trim() === (trip.title ?? "")) return;
+
+    setTitleFailed(false);
+    const ok = await saveTripTitle(supabase, userId, tripId, title);
+    if (!ok) {
+      setTitleFailed(true);
+      return;
+    }
+    // 목록과 검색이 이 값을 쓰므로 화면이 들고 있는 것도 함께 맞춘다.
+    setTrip({ ...trip, title: title.trim() || null });
+    setTitleSaved(true);
+  };
 
   const submitNote = async () => {
     const supabase = getBrowserClient();
@@ -179,13 +209,42 @@ export function TripDetail({ tripId }: { tripId: string }) {
   return (
     <>
       <div>
-        <h1 className="text-[28px] font-bold tracking-tight text-text md:text-[32px]">
-          {trip.title || formatSpan(trip.startedOn, trip.endedOn)}
-        </h1>
+        {/*
+          날짜를 값이 아니라 안내 글로 둔다. 값으로 넣으면 이름을 짓지
+          않은 사람이 손만 대도 날짜 문구가 제목으로 굳어 버린다.
+        */}
+        <input
+          type="text"
+          value={title}
+          aria-label="여행 제목"
+          onChange={(event) => {
+            setTitle(event.target.value);
+            setTitleSaved(false);
+          }}
+          onBlur={submitTitle}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Escape") {
+              setTitle(trip.title ?? "");
+              event.currentTarget.blur();
+            }
+          }}
+          placeholder={formatSpan(trip.startedOn, trip.endedOn)}
+          className="-mx-2 w-full rounded-xl bg-transparent px-2 py-1 text-[28px] font-bold tracking-tight text-text outline-none transition placeholder:text-text placeholder:opacity-100 hover:bg-bg-subtle focus:bg-bg-subtle focus:ring-2 focus:ring-accent md:text-[32px]"
+        />
         <p className="mt-1 text-[15px] text-text-muted">
           {trip.title && <span>{formatSpan(trip.startedOn, trip.endedOn)}</span>}
           {trip.title && trip.companions && <span className="text-text-faint"> · </span>}
           {trip.companions && <span>{companionLabel(trip.companions)}</span>}
+          {titleSaved && <span className="text-text-faint"> · 이름을 바꿨어요</span>}
+        </p>
+        {titleFailed && (
+          <p className="mt-1 text-[14px] text-text-muted">
+            이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.
+          </p>
+        )}
+        <p className="mt-1 text-[13px] text-text-faint">
+          제목을 눌러 이름을 바꿀 수 있어요. 비우면 날짜로 돌아가요.
         </p>
       </div>
 

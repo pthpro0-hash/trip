@@ -274,12 +274,27 @@ export function TripList() {
           <li key={trip.id} className="flex flex-col gap-2.5 rounded-2xl bg-surface p-5 ring-1 ring-line">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <Link
-                  href={`/trips/${trip.id}`}
-                  className="text-[17px] font-semibold tracking-tight text-text hover:text-accent"
-                >
-                  {trip.title || formatSpan(trip.startedOn, trip.endedOn)}
-                </Link>
+                {/*
+                  카드 전체를 링크로 감쌀 수 없다 — 안에 지우기 단추가 있어
+                  링크 안에 단추가 들어가는 꼴이 된다. 대신 누를 곳을 눈에
+                  보이게 둔다: 제목, 그 옆의 상세보기, 그리고 대표 사진.
+                */}
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <Link
+                    href={`/trips/${trip.id}`}
+                    className="text-[17px] font-semibold tracking-tight text-text hover:text-accent"
+                  >
+                    {trip.title || formatSpan(trip.startedOn, trip.endedOn)}
+                  </Link>
+                  <Link
+                    href={`/trips/${trip.id}`}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    className="shrink-0 rounded-full bg-bg-subtle px-2.5 py-1 text-[12px] font-medium text-text-muted transition hover:bg-accent-soft hover:text-accent"
+                  >
+                    상세보기 →
+                  </Link>
+                </div>
                 <p className="mt-0.5 text-[13px] text-text-muted">
                   {trip.title && <span>{formatSpan(trip.startedOn, trip.endedOn)}</span>}
                   {trip.title && trip.companions && <span className="text-text-faint"> · </span>}
@@ -311,14 +326,20 @@ export function TripList() {
             </div>
 
             {trip.coverPath && covers.get(trip.coverPath) && (
-              // 남의 서비스가 아니라 우리 보관함의 서명 주소다. 주소가 그때그때
-              // 달라져 next/image 로 미리 최적화할 수 없다.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={covers.get(trip.coverPath)}
-                alt=""
-                className="aspect-[16/10] w-full rounded-xl object-cover"
-              />
+              <Link
+                href={`/trips/${trip.id}`}
+                aria-label={`${trip.title || formatSpan(trip.startedOn, trip.endedOn)} 상세보기`}
+                className="group block overflow-hidden rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                {/* 남의 서비스가 아니라 우리 보관함의 서명 주소다. 주소가 그때그때
+                    달라져 next/image 로 미리 최적화할 수 없다. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={covers.get(trip.coverPath)}
+                  alt=""
+                  className="aspect-[16/10] w-full object-cover transition duration-200 group-hover:scale-[1.02] group-hover:brightness-105"
+                />
+              </Link>
             )}
 
             <ul className="flex flex-col gap-1">

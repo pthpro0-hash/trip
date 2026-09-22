@@ -97,6 +97,27 @@ export async function fetchTripDetail(
   };
 }
 
+/**
+ * 여행 이름을 바꾼다. 비우면 지운다 — 그러면 화면이 날짜로 되돌아간다.
+ *
+ * 가져올 때 지어 준 이름이 늘 맞지는 않는다. "화진포해변 외 2곳"보다
+ * "민수랑 첫 휴가"가 나중에 찾기 쉽다. 그 생각은 대개 한참 뒤에 난다.
+ */
+export async function saveTripTitle(
+  supabase: SupabaseClient,
+  userId: string,
+  tripId: string,
+  title: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("trips")
+    .update({ title: title.trim() || null })
+    .eq("id", tripId)
+    .eq("user_id", userId);
+
+  return !error;
+}
+
 /** 그날 있었던 일을 적어 둔다. 비우면 지운다. */
 export async function saveTripNote(
   supabase: SupabaseClient,
