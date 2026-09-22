@@ -17,6 +17,7 @@ import {
   splitTripAtDay,
   tripDays,
 } from "@/lib/photo/grouping";
+import { remainingText } from "@/lib/photo/eta";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import type { Shot, Trip } from "@/lib/photo/types";
 
@@ -286,9 +287,11 @@ export function PhotoImport() {
         });
       });
 
-      const uploaded = await uploadPhotos(supabase, userId, targets, (done, total) =>
-        setUploadNote(`사진 올리는 중… ${done}/${total}`),
-      );
+      // 남은 시간은 실제로 걸린 시간에서 어림한다. 망 사정이 사람마다 다르다.
+      const uploaded = await uploadPhotos(supabase, userId, targets, (done, total, elapsed) => {
+        const left = remainingText(done, total, elapsed);
+        setUploadNote(`사진 올리는 중… ${done}/${total}${left ? ` · ${left}` : ""}`);
+      });
       result.photos += uploaded.uploaded;
       result.unsupported.push(...uploaded.unsupported);
       result.overLimit += uploaded.overLimit;
@@ -573,7 +576,13 @@ export function PhotoImport() {
       )}
 
       {uploadNote && (
-        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">{uploadNote}</p>
+        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
+          {uploadNote}
+          <br />
+          <span className="text-[13px] text-text-faint">
+            다 올라갈 때까지 이 창을 닫지 마세요. 여행 기록은 이미 남았고, 사진만 이어서 올라가요.
+          </span>
+        </p>
       )}
 
       {visible.length > 0 && userId && (
