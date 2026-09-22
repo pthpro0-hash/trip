@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { buildSketch, sketchPoints, tripDistanceKm, type SketchTrip } from "./sketch";
+import { buildSketch, dotRadius, sketchShapes, tripDistanceKm, type SketchTrip } from "./sketch";
 
 function trip(partial: Partial<SketchTrip> & { id: string }): SketchTrip {
   return {
@@ -100,19 +100,86 @@ describe("buildSketch", () => {
   });
 });
 
-describe("sketchPoints", () => {
+describe("sketchShapes · 점", () => {
   it("같은 자리를 여러 번 갔어도 한 번만 찍는다", () => {
-    expect(sketchPoints(ALL)).toHaveLength(4);
+    expect(sketchShapes(ALL).dots).toHaveLength(4);
   });
 
   it("1km 안쪽은 같은 자리로 본다", () => {
     const 가까운곳 = { ...남산, lat: 남산.lat + 0.001, placeName: "남산 다른 입구" };
-    const points = sketchPoints([trip({ id: "a", visits: [남산, 가까운곳] })]);
-    expect(points).toHaveLength(1);
+    expect(sketchShapes([trip({ id: "a", visits: [남산, 가까운곳] })]).dots).toHaveLength(1);
   });
 
-  it("기록이 없으면 점도 없다", () => {
-    expect(sketchPoints([])).toEqual([]);
+  it("같은 자리의 사진은 모두 더한다 — 점의 크기가 된다", () => {
+    const 두번 = [
+      trip({ id: "a", startedOn: "2025-07-25", endedOn: "2025-07-25", visits: [대천] }),
+      trip({ id: "b", startedOn: "2025-08-02", endedOn: "2025-08-02", visits: [대천] }),
+    ];
+    const [dot] = sketchShapes(두번).dots;
+    expect(dot.photoCount).toBe(6);
+  });
+
+  it("가장 많이 찍은 때의 계절을 입는다", () => {
+    const dots = sketchShapes([
+      // 같은 자리를 봄에 한 장, 가을에 다섯 장 찍었다.
+      trip({ id: "봄", startedOn: "2026-04-01", endedOn: "2026-04-01", visits: [{ ...남산, photoCount: 1 }] }),
+      trip({ id: "가을", startedOn: "2026-10-01", endedOn: "2026-10-01", visits: [{ ...남산, photoCount: 5 }] }),
+    ]).dots;
+    expect(dots[0].season).toBe("가을");
+  });
+
+  it("가장 최근에 들른 여행으로 이어 준다", () => {
+    const dots = sketchShapes([
+      trip({ id: "먼저", startedOn: "2025-04-01", endedOn: "2025-04-01", visits: [남산] }),
+      trip({ id: "나중", startedOn: "2026-10-01", endedOn: "2026-10-01", visits: [남산] }),
+    ]).dots;
+    expect(dots[0].tripId).toBe("나중");
+  });
+
+  it("기록이 없으면 점도 길도 없다", () => {
+    expect(sketchShapes([])).toEqual({ dots: [], paths: [] });
+  });
+});
+
+describe("sketchShapes · 길", () => {
+  it("한 여행 안에서 옮겨 다닌 순서대로 잇는다", () => {
+    const [path] = sketchShapes([
+      trip({ id: "강릉", startedOn: "2026-09-13", endedOn: "2026-09-14", visits: [화진포, 안목] }),
+    ]).paths;
+    expect(path.points).toEqual([
+      { lat: 화진포.lat, lng: 화진포.lng },
+      { lat: 안목.lat, lng: 안목.lng },
+    ]);
+    expect(path.season).toBe("가을");
+  });
+
+  it("한 자리에 머문 여행에는 그릴 길이 없다", () => {
+    expect(sketchShapes([trip({ id: "a", visits: [남산] })]).paths).toEqual([]);
+  });
+
+  it("여행과 여행 사이는 잇지 않는다 — 집에 갔다 다시 나온 것이다", () => {
+    const paths = sketchShapes([
+      trip({ id: "1", startedOn: "2026-09-13", endedOn: "2026-09-13", visits: [화진포, 안목] }),
+      trip({ id: "2", startedOn: "2026-10-01", endedOn: "2026-10-01", visits: [남산, 대천] }),
+    ]).paths;
+    expect(paths).toHaveLength(2);
+    expect(paths.map((p) => p.tripId)).toEqual(["1", "2"]);
+  });
+});
+
+describe("dotRadius", () => {
+  it("많이 찍은 곳이 크다", () => {
+    expect(dotRadius(40, 40)).toBeGreaterThan(dotRadius(4, 40));
+  });
+
+  it("넓이가 사진 수에 비례한다 — 네 배면 반지름은 두 배", () => {
+    const min = 5;
+    expect(dotRadius(40, 40) - min).toBeCloseTo((dotRadius(10, 40) - min) * 2, 5);
+  });
+
+  it("사진이 없어도 점은 보인다", () => {
+    expect(dotRadius(0, 40)).toBe(5);
+    expect(dotRadius(3, 0)).toBe(5);
   });
 });
 
@@ -125,8 +192,9 @@ describe("좌표가 없는 방문", () => {
       lng: undefined as unknown as number,
       photoCount: 0,
     };
-    const points = sketchPoints([trip({ id: "a", visits: [좌표없음, 남산] })]);
-    expect(points).toEqual([{ lat: 남산.lat, lng: 남산.lng }]);
+    const { dots } = sketchShapes([trip({ id: "a", visits: [좌표없음, 남산] })]);
+    expect(dots).toHaveLength(1);
+    expect(dots[0].lat).toBe(남산.lat);
   });
 
   it("그래도 방문 수와 사진 수에는 들어간다", () => {

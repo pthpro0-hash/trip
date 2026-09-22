@@ -1,6 +1,13 @@
 import { KOREA_FULL_VIEWBOX, KOREA_LAND_PATHS, project } from "@/lib/koreaMap";
 import { formatDistance } from "@/lib/geo";
-import type { Sketch } from "@/lib/sketch";
+import {
+  SEASON_COLOR,
+  dotRadius,
+  type Season,
+  type Sketch,
+  type SketchShapes,
+} from "@/lib/sketch";
+import { distanceInWords, paceInWords, photoPaceInWords } from "@/lib/sketchWords";
 
 /*
   스케치 한 장.
@@ -14,8 +21,8 @@ import type { Sketch } from "@/lib/sketch";
 
 const WIDTH = 720;
 const HEIGHT = 1000;
-const MAP_TOP = 150;
-const MAP_HEIGHT = 470;
+const MAP_TOP = 190;
+const MAP_HEIGHT = 450;
 
 const INK = "#1d1d1f";
 const MUTED = "#6e6e73";
@@ -23,18 +30,21 @@ const FAINT = "#a1a1a6";
 const SEA = "#dbeafe";
 const LAND = "#f5f3ec";
 const COAST = "#b6c6d2";
-const DOT = "#0071e3";
 const FONT =
   "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard Variable', Pretendard, sans-serif";
 
+const SEASONS: Season[] = ["봄", "여름", "가을", "겨울"];
+
 interface SketchCardProps {
   sketch: Sketch;
-  points: { lat: number; lng: number }[];
-  /** 맨 위에 적을 말. 연도를 고르면 "2026년의 여행"처럼 바뀐다. */
+  shapes: SketchShapes;
+  /** 맨 위에 적을 말. 연도를 고르면 "2026년"처럼 바뀐다. */
   title: string;
+  /** 그 아래 한 문장. 그해가 어떤 해였는지. */
+  headline: string;
 }
 
-export function SketchCard({ sketch, points, title }: SketchCardProps) {
+export function SketchCard({ sketch, shapes, title, headline }: SketchCardProps) {
   const view = KOREA_FULL_VIEWBOX;
   // 한국 지도를 카드 가운데에 앉힌다. 세로에 맞춰 비율을 지킨다.
   const scale = MAP_HEIGHT / view.height;
@@ -49,14 +59,29 @@ export function SketchCard({ sketch, points, title }: SketchCardProps) {
     };
   };
 
-  const stats: [string, string][] = [
-    ["여행", `${sketch.tripCount}번`],
-    ["다녀온 곳", `${sketch.placeCount}곳`],
-    ["사진", `${sketch.photoCount}장`],
-  ];
-  if (sketch.distanceKm >= 1) stats.push(["오간 거리", formatDistance(sketch.distanceKm)]);
+  /** 그릴 수 없는 점은 조용히 건너뛴다. cx="NaN" 은 브라우저가 오류를 쏟는다. */
+  const drawable = (p: { x: number; y: number }) => Number.isFinite(p.x) && Number.isFinite(p.y);
 
-  const companions = sketch.byCompanion.slice(0, 4);
+  const busiest = Math.max(0, ...shapes.dots.map((dot) => dot.photoCount));
+  // 그해에 실제로 밟은 계절만 범례에 올린다. 안 간 계절을 설명할 이유가 없다.
+  const seasonsUsed = SEASONS.filter((season) => shapes.dots.some((dot) => dot.season === season));
+
+  const stats: [string, string, string | null][] = [
+    ["여행", `${sketch.tripCount}번`, paceInWords(sketch.tripCount, sketch.spanDays)],
+    [
+      "다녀온 곳",
+      `${sketch.placeCount}곳`,
+      sketch.curatedCount > 0 ? `100선 중 ${sketch.curatedCount}곳` : null,
+    ],
+    ["사진", `${sketch.photoCount}장`, photoPaceInWords(sketch.photoCount, sketch.tripCount)],
+  ];
+  if (sketch.distanceKm >= 1) {
+    stats.push([
+      "오간 거리",
+      formatDistance(sketch.distanceKm),
+      distanceInWords(sketch.distanceKm),
+    ]);
+  }
 
   return (
     <svg
@@ -64,16 +89,17 @@ export function SketchCard({ sketch, points, title }: SketchCardProps) {
       width="100%"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label={`${title} — 여행 ${sketch.tripCount}번, 다녀온 곳 ${sketch.placeCount}곳`}
+      aria-label={`${title} ${headline} — 여행 ${sketch.tripCount}번, 다녀온 곳 ${sketch.placeCount}곳`}
       style={{ display: "block", borderRadius: 16 }}
     >
       <rect width={WIDTH} height={HEIGHT} fill="#ffffff" />
 
-      <text x={48} y={82} fontFamily={FONT} fontSize={38} fontWeight={700} fill={INK}>
+      <text x={48} y={78} fontFamily={FONT} fontSize={30} fontWeight={600} fill={MUTED}>
         {title}
       </text>
-      <text x={48} y={116} fontFamily={FONT} fontSize={18} fill={MUTED}>
-        내가 밟은 곳
+      {/* 사람은 숫자가 아니라 문장을 기억한다. 이 줄이 이 카드에서 가장 크다. */}
+      <text x={48} y={132} fontFamily={FONT} fontSize={40} fontWeight={700} fill={INK}>
+        {headline}
       </text>
 
       {/*
@@ -95,53 +121,92 @@ export function SketchCard({ sketch, points, title }: SketchCardProps) {
             <path key={path.slice(0, 24)} d={path} fill={LAND} stroke={COAST} strokeWidth={1.4} />
           ))}
         </g>
+
+        {/*
+          한 여행 안에서 옮겨 다닌 길. 점만 있으면 스무 곳을 갔다는 것
+          말고는 알 수 없지만, 이어 놓으면 "동해안을 훑었구나"가 보인다.
+          여행과 여행 사이는 잇지 않는다 — 집에 갔다 다시 나온 것이다.
+        */}
+        {shapes.paths.map((path) => {
+          const points = path.points.map((p) => place(p.lat, p.lng)).filter(drawable);
+          if (points.length < 2) return null;
+          return (
+            <polyline
+              key={path.tripId}
+              points={points.map((p) => `${p.x},${p.y}`).join(" ")}
+              fill="none"
+              stroke={SEASON_COLOR[path.season]}
+              strokeWidth={2}
+              strokeOpacity={0.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          );
+        })}
+
+        {shapes.dots.map((dot, index) => {
+          const { x, y } = place(dot.lat, dot.lng);
+          if (!drawable({ x, y })) return null;
+          return (
+            <circle
+              key={index}
+              cx={x}
+              cy={y}
+              r={dotRadius(dot.photoCount, busiest)}
+              fill={SEASON_COLOR[dot.season]}
+              fillOpacity={0.85}
+              stroke="#ffffff"
+              strokeWidth={2}
+            />
+          );
+        })}
       </g>
 
-      {points.map((point, index) => {
-        const { x, y } = place(point.lat, point.lng);
+      {/* 색이 무엇을 뜻하는지 밝혀 두지 않으면 그냥 알록달록한 점이다. */}
+      {seasonsUsed.length > 1 && (
         /*
-          좌표가 없는 방문이 섞이면 cx="NaN" 이 그려지고 브라우저가 오류를
-          쏟는다. 그릴 수 없는 점은 조용히 건너뛴다 — 점 하나 때문에
-          스케치 전체가 망가질 이유는 없다.
+          지도 폭이 아니라 카드 폭에 맞춘다. 네 계절을 늘어놓으면 지도보다
+          넓어서, 지도 왼끝에 붙이면 오른쪽 설명과 겹친다.
         */
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-        return (
-          <circle key={index} cx={x} cy={y} r={7} fill={DOT} stroke="#ffffff" strokeWidth={2.5} />
-        );
-      })}
-
-      {/* 숫자 */}
-      <g transform={`translate(48 ${MAP_TOP + MAP_HEIGHT + 70})`}>
-        {stats.map(([label, value], index) => (
-          <g key={label} transform={`translate(${index * 160} 0)`}>
-            <text fontFamily={FONT} fontSize={15} fill={FAINT}>
-              {label}
-            </text>
-            <text y={38} fontFamily={FONT} fontSize={30} fontWeight={700} fill={INK}>
-              {value}
-            </text>
-          </g>
-        ))}
-      </g>
-
-      {/* 함께한 사람 */}
-      {companions.length > 0 && (
-        <g transform={`translate(48 ${MAP_TOP + MAP_HEIGHT + 180})`}>
-          <text fontFamily={FONT} fontSize={15} fill={FAINT}>
-            함께한 사람
-          </text>
-          {companions.map((person, index) => (
-            <g key={person.label} transform={`translate(0 ${34 + index * 34})`}>
-              <text fontFamily={FONT} fontSize={20} fontWeight={600} fill={INK}>
-                {person.label}
-              </text>
-              <text x={200} fontFamily={FONT} fontSize={20} fill={MUTED}>
-                {person.count}번
+        <g transform={`translate(48 ${MAP_TOP + MAP_HEIGHT + 38})`}>
+          {seasonsUsed.map((season, index) => (
+            <g key={season} transform={`translate(${index * 74} 0)`}>
+              <circle cx={7} cy={-5} r={7} fill={SEASON_COLOR[season]} fillOpacity={0.85} />
+              <text x={22} fontFamily={FONT} fontSize={16} fill={MUTED}>
+                {season}
               </text>
             </g>
           ))}
+          <text
+            x={WIDTH - 96}
+            textAnchor="end"
+            fontFamily={FONT}
+            fontSize={14}
+            fill={FAINT}
+          >
+            점이 클수록 사진이 많은 곳
+          </text>
         </g>
       )}
+
+      {/* 숫자 — 오른쪽 한 줄이 그 수가 무슨 뜻인지 풀어 준다. */}
+      <g transform={`translate(48 ${MAP_TOP + MAP_HEIGHT + 100})`}>
+        {stats.map(([label, value, aside], index) => (
+          <g key={label} transform={`translate(0 ${index * 54})`}>
+            <text y={4} fontFamily={FONT} fontSize={16} fill={FAINT}>
+              {label}
+            </text>
+            <text x={130} y={8} fontFamily={FONT} fontSize={30} fontWeight={700} fill={INK}>
+              {value}
+            </text>
+            {aside && (
+              <text x={300} y={6} fontFamily={FONT} fontSize={17} fill={MUTED}>
+                {aside}
+              </text>
+            )}
+          </g>
+        ))}
+      </g>
 
       <text x={48} y={HEIGHT - 40} fontFamily={FONT} fontSize={15} fill={FAINT}>
         나만의 여행 스케치

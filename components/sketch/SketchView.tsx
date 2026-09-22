@@ -5,7 +5,8 @@ import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
-import { buildSketch, sketchPoints, type SketchTrip } from "@/lib/sketch";
+import { buildSketch, sketchShapes, type SketchTrip } from "@/lib/sketch";
+import { headline } from "@/lib/sketchWords";
 import { downloadSvgAsPng } from "@/lib/svgToPng";
 import { SketchCard } from "./SketchCard";
 
@@ -76,13 +77,14 @@ export function SketchView() {
 
   const whole = useMemo(() => buildSketch(asSketchTrips), [asSketchTrips]);
   const sketch = useMemo(() => buildSketch(scoped), [scoped]);
-  const points = useMemo(() => sketchPoints(scoped), [scoped]);
+  const shapes = useMemo(() => sketchShapes(scoped), [scoped]);
+  // 제목은 "어느 범위인지", 한 문장은 "그게 어떤 해였는지". 둘은 다른 일을 한다.
+  const line = useMemo(
+    () => headline(sketch, year !== null ? "year" : "all"),
+    [sketch, year],
+  );
 
-  const title = person
-    ? `${person}와의 여행`
-    : year !== null
-      ? `${year}년의 여행`
-      : "나의 여행 스케치";
+  const title = person ? `${person}와의 여행` : year !== null ? `${year}년` : "지금까지";
 
   const save = async () => {
     const svg = holderRef.current?.querySelector("svg");
@@ -192,7 +194,7 @@ export function SketchView() {
         <>
           {/* 저장할 때 이 안의 SVG 를 그대로 꺼내 그림으로 바꾼다. */}
           <div ref={holderRef} className="overflow-hidden rounded-2xl ring-1 ring-line">
-            <SketchCard sketch={sketch} points={points} title={title} />
+            <SketchCard sketch={sketch} shapes={shapes} title={title} headline={line} />
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
