@@ -17,6 +17,7 @@ import {
   splitTripAtDay,
   tripDays,
 } from "@/lib/photo/grouping";
+import { logEvent } from "@/lib/supabase/serviceLog";
 import { remainingText } from "@/lib/photo/eta";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import type { Shot, Trip } from "@/lib/photo/types";
@@ -170,6 +171,17 @@ export function PhotoImport() {
     const grouped = groupIntoTrips(travelShots);
     setTrips(grouped);
 
+    // 무엇이 걸러졌는지가 곧 무엇이 안 되는지다. 수만 남긴다.
+    logEvent(getBrowserClient(), "photos_read", {
+      picked: files.length,
+      usable: result.shots.length,
+      daily: daily.length,
+      noLocation: result.withoutLocation.length,
+      screenshots: result.screenshots.length,
+      unreadable: result.unreadable.length,
+      trips: grouped.length,
+    });
+
     if (grouped.length === 0) {
       setStage({ name: "ready" });
       return;
@@ -207,11 +219,13 @@ export function PhotoImport() {
   const split = (index: number, day: string) => {
     const parts = splitTripAtDay(trips[index], day);
     if (!parts) return;
+    logEvent(getBrowserClient(), "trip_reshaped", { split: true });
     void reshape([...trips.slice(0, index), ...parts, ...trips.slice(index + 1)]);
   };
 
   /** 앞뒤로 이웃한 두 여행을 하나로 되돌린다. */
   const merge = (first: number, second: number) => {
+    logEvent(getBrowserClient(), "trip_reshaped", { split: false });
     const merged = mergeTrips(trips[first], trips[second]);
     void reshape(
       trips.map((trip, i) => (i === first ? merged : trip)).filter((_, i) => i !== second),
@@ -288,15 +302,35 @@ export function PhotoImport() {
       });
 
       // 남은 시간은 실제로 걸린 시간에서 어림한다. 망 사정이 사람마다 다르다.
+      // 걸린 시간은 올리는 쪽이 알려 준다. 화면이 시계를 들 일이 아니다.
+      let elapsedMs = 0;
       const uploaded = await uploadPhotos(supabase, userId, targets, (done, total, elapsed) => {
+        elapsedMs = elapsed;
         const left = remainingText(done, total, elapsed);
         setUploadNote(`사진 올리는 중… ${done}/${total}${left ? ` · ${left}` : ""}`);
       });
       result.photos += uploaded.uploaded;
       result.unsupported.push(...uploaded.unsupported);
       result.overLimit += uploaded.overLimit;
+
+      logEvent(supabase, "photos_uploaded", {
+        tried: targets.length,
+        uploaded: uploaded.uploaded,
+        // 아이폰 HEIC 가 여기로 온다. 이 수가 곧 남은 숙제의 크기다.
+        unsupported: uploaded.unsupported.length,
+        failed: uploaded.failed,
+        overLimit: uploaded.overLimit,
+        seconds: Math.round(elapsedMs / 1000),
+      });
     }
     setUploadNote(null);
+
+    logEvent(supabase, "trips_saved", {
+      saved: result.saved,
+      skipped: result.skipped,
+      failed: result.failed,
+      withPhotos,
+    });
 
     setSavedRanges([...savedRanges]);
     setOutcome(result);

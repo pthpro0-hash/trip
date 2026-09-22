@@ -14,6 +14,7 @@ import {
 } from "@/lib/supabase/tripDetail";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { deletePhoto, setCoverPhoto, signedUrls } from "@/lib/supabase/photos";
+import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
@@ -144,6 +145,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
     // 목록과 검색이 이 값을 쓰므로 화면이 들고 있는 것도 함께 맞춘다.
     setTrip({ ...trip, title: title.trim() || null });
     setTitleSaved(true);
+    logEvent(supabase, "trip_renamed", { title: true });
   };
 
   const submitSubtitle = async () => {
@@ -159,6 +161,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
     }
     setTrip({ ...trip, subtitle: subtitle.trim() || null });
     setTitleSaved(true);
+    logEvent(supabase, "trip_renamed", { subtitle: true });
   };
 
   const submitVisitName = async (visitId: string) => {
@@ -183,6 +186,9 @@ export function TripDetail({ tripId }: { tripId: string }) {
         visit.id === visitId ? { ...visit, placeName: name } : visit,
       ),
     });
+    // 지도 서비스가 지어 준 이름을 사람이 얼마나 고치는지. 이름 짓기
+    // 규칙이 맞는지 아는 유일한 신호다.
+    logEvent(supabase, "trip_renamed", { place: true });
   };
 
   const submitNote = async () => {
@@ -248,6 +254,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
         ),
       })),
     });
+    logEvent(supabase, "photo_deleted", { ok: false });
+    logEvent(supabase, "photo_deleted", { ok: true });
     setRemovingPhoto(null);
     setConfirmingPhoto(null);
   };

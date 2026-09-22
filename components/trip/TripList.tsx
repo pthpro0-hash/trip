@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
 import { signedUrls } from "@/lib/supabase/photos";
 import {
@@ -118,6 +119,7 @@ export function TripList() {
     const ok = await deleteTrip(supabase, userId, tripId);
     if (ok) setTrips((current) => current.filter((trip) => trip.id !== tripId));
     else setFailed(true);
+    logEvent(supabase, "trip_deleted", { ok });
     setRemoving(null);
     setConfirming(null);
   };
