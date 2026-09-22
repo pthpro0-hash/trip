@@ -15,10 +15,27 @@ export interface MapStop {
 
 interface CourseMapProps {
   spots: MapStop[];
+  /**
+   * 점들을 선으로 이을지. 한 여행의 코스는 이어야 하지만, 권역에
+   * 흩어진 방문을 이으면 있지도 않은 동선이 그려진다.
+   */
+  connect?: boolean;
 }
 
 const LINE_COLOR = "#0071E3";
-const BOUNDS_PADDING = 40;
+/*
+  틀 가장자리에 남기는 여백.
+
+  넉넉히 두면 작은 화면에서 한 단계를 통째로 잃는다 — 카카오 지도는
+  정수 단계로만 확대되고 한 단계가 곧 두 배라, 375px 폭에서 40px 씩
+  물리면 지도가 필요한 것의 두 배로 넓어진다. 표식이 31px 이므로
+  그 절반을 조금 넘게만 남긴다.
+
+  ※ setBounds 뒤에 한 단계 더 당겨 보는 방법을 시도했다가 되돌렸다.
+     setLevel 직후의 getBounds() 는 아직 이전 값이라 "다 들어온다"고
+     잘못 답하고, 모바일에서 핀이 잘렸다.
+*/
+const BOUNDS_PADDING = 18;
 const MARKER_SIZE = 31; // 기존 26에서 한 단계 키웠다 — 순번이 또렷해야 목록과 이어 읽힌다.
 
 // 지도 위에 순번을 그대로 얹어야 목록의 1·2·3과 눈으로 이어진다.
@@ -34,7 +51,7 @@ function numberedMarkerImage(order: number) {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-export function CourseMap({ spots }: CourseMapProps) {
+export function CourseMap({ spots, connect = true }: CourseMapProps) {
   const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Kakao Maps SDK has no official types
@@ -66,7 +83,7 @@ export function CourseMap({ spots }: CourseMapProps) {
 
         const path = spots.map((spot) => new kakao.maps.LatLng(spot.lat, spot.lng));
 
-        if (path.length > 1) {
+        if (connect && path.length > 1) {
           const line = new kakao.maps.Polyline({
             path,
             strokeWeight: 3,
@@ -96,6 +113,7 @@ export function CourseMap({ spots }: CourseMapProps) {
           const bounds = new kakao.maps.LatLngBounds();
           path.forEach((point: unknown) => bounds.extend(point));
           map.setBounds(bounds, BOUNDS_PADDING, BOUNDS_PADDING, BOUNDS_PADDING, BOUNDS_PADDING);
+
         } else {
           map.setCenter(path[0]);
           map.setLevel(5);
@@ -110,7 +128,7 @@ export function CourseMap({ spots }: CourseMapProps) {
     return () => {
       cancelled = true;
     };
-  }, [apiKey, spots]);
+  }, [apiKey, spots, connect]);
 
   useEffect(() => {
     const drawn = drawnRef;

@@ -5,11 +5,12 @@ import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
-import { buildSketch, groupByYear, type SketchTrip } from "@/lib/sketch";
+import { buildSketch, groupByYear, sketchShapes, type SketchTrip } from "@/lib/sketch";
 import { regionsOfTrip } from "@/lib/photo/region";
 import { REGIONS } from "@/lib/regions";
 import { searchTrips, type SearchableTrip } from "@/lib/tripSearch";
 import type { Region } from "@/lib/types";
+import { RegionPlaces } from "./RegionPlaces";
 import { YearSketch } from "./YearSketch";
 
 type Status = "loading" | "guest" | "failed" | "ready";
@@ -105,6 +106,15 @@ export function SketchView() {
       return true;
     });
   }, [asSketchTrips, searchable, query, person, year, region]);
+
+  /*
+    권역을 고른 사람은 "그 해가 어떤 해였나"가 아니라 "거기서 어디어디
+    갔더라"를 묻고 있다. 카드 위에 이름 붙은 목록을 먼저 펼친다.
+  */
+  const regionDots = useMemo(
+    () => (region ? sketchShapes(scoped).dots : []),
+    [region, scoped],
+  );
 
   const whole = useMemo(() => buildSketch(asSketchTrips), [asSketchTrips]);
   // 해마다 한 장. 연도를 고르는 단추가 필요 없어졌다 — 다 펼쳐 놓는다.
@@ -234,6 +244,8 @@ export function SketchView() {
           </button>
         )}
       </div>
+
+      {region && <RegionPlaces region={region} dots={regionDots} />}
 
       {years.length === 0 ? (
         <p className="rounded-2xl bg-bg-subtle p-5 text-[15px] text-text-muted">

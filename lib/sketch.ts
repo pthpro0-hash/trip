@@ -220,6 +220,10 @@ const SAME_SPOT_KM = 1;
 export interface SketchDot {
   lat: number;
   lng: number;
+  /** 그 자리에서 사진을 가장 많이 찍은 때의 이름. 여러 번 갔으면 그중 하나. */
+  placeName: string;
+  /** 마지막으로 간 날. 목록을 최근 순으로 세우는 데 쓴다. */
+  lastVisitedOn: string;
   /** 이 자리에서 찍은 사진을 모두 더한 수. 점의 크기가 된다. */
   photoCount: number;
   /** 이 자리에서 가장 많이 찍은 때의 계절. 점의 색이 된다. */
@@ -255,7 +259,10 @@ const drawable = (visit: { lat: number; lng: number }) =>
  * 말과 동작이 맞는다. 점 수가 많지 않아 다 비교해도 부담이 없다.
  */
 export function sketchShapes(trips: SketchTrip[]): SketchShapes {
-  const dots: (SketchDot & { bySeason: Map<Season, number>; startedOn: string })[] = [];
+  const dots: (SketchDot & {
+    bySeason: Map<Season, number>;
+    byName: Map<string, number>;
+  })[] = [];
 
   // 시간순으로 훑어야 "가장 최근 여행"이 마지막에 남는다.
   const ordered = [...trips].sort((a, b) => a.startedOn.localeCompare(b.startedOn));
@@ -271,19 +278,25 @@ export function sketchShapes(trips: SketchTrip[]): SketchShapes {
         (dots.push({
           lat: visit.lat,
           lng: visit.lng,
+          placeName: visit.placeName,
+          lastVisitedOn: trip.startedOn,
           photoCount: 0,
           season,
           tripId: trip.id,
           bySeason: new Map(),
-          startedOn: trip.startedOn,
+          byName: new Map(),
         }),
         dots.at(-1)!);
 
       target.photoCount += visit.photoCount;
       target.bySeason.set(season, (target.bySeason.get(season) ?? 0) + visit.photoCount);
+      // 한 자리를 여러 이름으로 불렀을 수 있다. 많이 찍은 때의 이름을 쓴다.
+      if (visit.placeName) {
+        target.byName.set(visit.placeName, (target.byName.get(visit.placeName) ?? 0) + visit.photoCount);
+      }
       // 마지막에 들른 여행으로 이어 준다.
       target.tripId = trip.id;
-      target.startedOn = trip.startedOn;
+      target.lastVisitedOn = trip.startedOn;
     }
   }
 
@@ -299,6 +312,9 @@ export function sketchShapes(trips: SketchTrip[]): SketchShapes {
     dots: dots.map((dot) => ({
       lat: dot.lat,
       lng: dot.lng,
+      placeName:
+        [...dot.byName.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? dot.placeName,
+      lastVisitedOn: dot.lastVisitedOn,
       photoCount: dot.photoCount,
       // 사진을 가장 많이 찍은 때의 색. 같으면 먼저 간 때를 쓴다.
       season: [...dot.bySeason.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? dot.season,
