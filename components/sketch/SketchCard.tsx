@@ -144,7 +144,7 @@ export function SketchCard({ sketch, points, title }: SketchCardProps) {
       )}
 
       <text x={48} y={HEIGHT - 40} fontFamily={FONT} fontSize={15} fill={FAINT}>
-        여행세상
+        나만의 여행 스케치
       </text>
     </svg>
   );

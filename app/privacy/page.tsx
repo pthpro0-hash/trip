@@ -3,7 +3,7 @@ import { Article, Bullets, Fill, LegalDocument } from "@/components/legal/LegalD
 
 export const metadata: Metadata = {
   title: "개인정보처리방침",
-  description: "여행세상이 어떤 정보를 어떻게 다루는지 알려드립니다.",
+  description: "나만의 여행 스케치이 어떤 정보를 어떻게 다루는지 알려드립니다.",
 };
 
 export default function PrivacyPage() {
@@ -11,7 +11,7 @@ export default function PrivacyPage() {
     <LegalDocument title="개인정보처리방침" effectiveDate="【시행일을 정해 적어주세요】">
       <Article heading="들어가며">
         <p>
-          <Fill>운영자명</Fill>(이하 &ldquo;회사&rdquo;)는 여행세상을 운영하면서 이용자의 개인정보를
+          <Fill>운영자명</Fill>(이하 &ldquo;회사&rdquo;)는 나만의 여행 스케치을 운영하면서 이용자의 개인정보를
           소중히 다룹니다. 이 방침은 회사가 어떤 정보를 왜 모으고, 얼마나 보관하며, 이용자가 무엇을
           요구할 수 있는지 알려드립니다.
         </p>

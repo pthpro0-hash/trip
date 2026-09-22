@@ -3,7 +3,7 @@ import { Article, Bullets, Fill, LegalDocument } from "@/components/legal/LegalD
 
 export const metadata: Metadata = {
   title: "이용약관",
-  description: "여행세상 서비스 이용약관",
+  description: "나만의 여행 스케치 서비스 이용약관",
 };
 
 export default function TermsPage() {
@@ -11,7 +11,7 @@ export default function TermsPage() {
     <LegalDocument title="이용약관" effectiveDate="【시행일을 정해 적어주세요】">
       <Article heading="제1조 (목적)">
         <p>
-          이 약관은 <Fill>운영자명</Fill>(이하 &ldquo;회사&rdquo;)가 제공하는 여행세상(이하
+          이 약관은 <Fill>운영자명</Fill>(이하 &ldquo;회사&rdquo;)가 제공하는 나만의 여행 스케치(이하
           &ldquo;서비스&rdquo;)의 이용 조건과 절차, 회사와 이용자의 권리·의무를 정하는 것을 목적으로
           합니다.
         </p>

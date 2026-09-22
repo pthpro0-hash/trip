@@ -3,7 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { CollectionSync } from "@/components/auth/CollectionSync";
 import "./globals.css";
 
-const SITE_NAME = "여행세상";
+const SITE_NAME = "나만의 여행 스케치";
 const DESCRIPTION =
   "2025~2026 한국관광 100선 121곳을 지역·테마·상황으로 검색하고, 사진과 이용 안내까지 한 번에 확인하세요.";
 
