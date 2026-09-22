@@ -3,6 +3,7 @@ import { formatDistance } from "@/lib/geo";
 import {
   SEASON_COLOR,
   dotRadius,
+  type MonthCell,
   type Season,
   type Sketch,
   type SketchShapes,
@@ -20,7 +21,7 @@ import { distanceInWords, paceInWords, photoPaceInWords } from "@/lib/sketchWord
 */
 
 const WIDTH = 720;
-const HEIGHT = 1000;
+const HEIGHT = 1060;
 const MAP_TOP = 190;
 const MAP_HEIGHT = 450;
 
@@ -42,9 +43,11 @@ interface SketchCardProps {
   title: string;
   /** 그 아래 한 문장. 그해가 어떤 해였는지. */
   headline: string;
+  /** 열두 달의 띠. 빈 달이 더 많은 것을 말해 준다. */
+  months: MonthCell[];
 }
 
-export function SketchCard({ sketch, shapes, title, headline }: SketchCardProps) {
+export function SketchCard({ sketch, shapes, title, headline, months }: SketchCardProps) {
   const view = KOREA_FULL_VIEWBOX;
   // 한국 지도를 카드 가운데에 앉힌다. 세로에 맞춰 비율을 지킨다.
   const scale = MAP_HEIGHT / view.height;
@@ -189,8 +192,40 @@ export function SketchCard({ sketch, shapes, title, headline }: SketchCardProps)
         </g>
       )}
 
+      {/*
+        열두 달. 다녀온 달보다 비어 있는 달이 더 많은 것을 말해 준다 —
+        "여름엔 한 번도 안 나갔네".
+      */}
+      <g transform={`translate(48 ${MAP_TOP + MAP_HEIGHT + 92})`}>
+        {months.map((cell, index) => {
+          const x = index * 52;
+          const filled = cell.season !== null;
+          return (
+            <g key={cell.month} transform={`translate(${x} 0)`}>
+              <rect
+                width={40}
+                height={8}
+                rx={4}
+                fill={filled ? SEASON_COLOR[cell.season!] : "#ececec"}
+                fillOpacity={filled ? 0.9 : 1}
+              />
+              <text
+                x={20}
+                y={26}
+                textAnchor="middle"
+                fontFamily={FONT}
+                fontSize={13}
+                fill={filled ? MUTED : FAINT}
+              >
+                {cell.month}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+
       {/* 숫자 — 오른쪽 한 줄이 그 수가 무슨 뜻인지 풀어 준다. */}
-      <g transform={`translate(48 ${MAP_TOP + MAP_HEIGHT + 100})`}>
+      <g transform={`translate(48 ${MAP_TOP + MAP_HEIGHT + 160})`}>
         {stats.map(([label, value, aside], index) => (
           <g key={label} transform={`translate(0 ${index * 54})`}>
             <text y={4} fontFamily={FONT} fontSize={16} fill={FAINT}>
@@ -208,7 +243,7 @@ export function SketchCard({ sketch, shapes, title, headline }: SketchCardProps)
         ))}
       </g>
 
-      <text x={48} y={HEIGHT - 40} fontFamily={FONT} fontSize={15} fill={FAINT}>
+      <text x={48} y={HEIGHT - 44} fontFamily={FONT} fontSize={15} fill={FAINT}>
         나만의 여행 스케치
       </text>
     </svg>

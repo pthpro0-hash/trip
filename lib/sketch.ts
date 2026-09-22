@@ -141,6 +141,76 @@ export function buildSketch(trips: SketchTrip[]): Sketch {
   };
 }
 
+/*
+  한 장은 한 해다.
+
+  "지금까지 전부"를 한 장에 담으면 뭉개진다. 2025년에 간 곳과 2026년에 간
+  곳이 같은 색으로 섞이고, 기록이 쌓일수록 지도는 점으로 덮인다. 사람도
+  해 단위로 기억한다 — "작년엔 어디 다녔더라".
+
+  해마다 한 장씩 쌓으면 열세 건이 백서른 건이 돼도 무너지지 않는다.
+*/
+export interface SketchYear {
+  year: number;
+  trips: SketchTrip[];
+}
+
+/** 해마다 묶어 최근 해부터. 여행이 없는 해는 아예 나오지 않는다. */
+export function groupByYear(trips: SketchTrip[]): SketchYear[] {
+  const years = new Map<number, SketchTrip[]>();
+
+  for (const trip of trips) {
+    // 해를 넘긴 여행은 떠난 해로 친다. 12월 31일에 떠났으면 그해 여행이다.
+    const year = Number(trip.startedOn.slice(0, 4));
+    if (!Number.isFinite(year)) continue;
+    const bucket = years.get(year);
+    if (bucket) bucket.push(trip);
+    else years.set(year, [trip]);
+  }
+
+  return [...years.entries()]
+    .map(([year, group]) => ({
+      year,
+      // 한 해 안에서는 최근 여행이 위로 온다.
+      trips: [...group].sort((a, b) => b.startedOn.localeCompare(a.startedOn)),
+    }))
+    .sort((a, b) => b.year - a.year);
+}
+
+/*
+  열두 달의 띠.
+
+  숫자만으로는 "언제" 가 안 보인다. 열세 번 다녔다는 말에는 그것이 한 해에
+  고르게 퍼진 건지 가을 두 달에 몰린 건지가 빠져 있다. 띠에서는 다녀온
+  달보다 **비어 있는 달**이 더 많은 것을 말해 준다 — "여름엔 한 번도
+  안 나갔네".
+*/
+export interface MonthCell {
+  month: number;
+  tripCount: number;
+  /** 그 달에 다닌 여행의 계절. 비어 있으면 null. */
+  season: Season | null;
+}
+
+export function monthStrip(trips: SketchTrip[]): MonthCell[] {
+  const counts = new Map<number, number>();
+  for (const trip of trips) {
+    const month = Number(trip.startedOn.slice(5, 7));
+    if (!(month >= 1 && month <= 12)) continue;
+    counts.set(month, (counts.get(month) ?? 0) + 1);
+  }
+
+  return Array.from({ length: 12 }, (_, i) => {
+    const month = i + 1;
+    const tripCount = counts.get(month) ?? 0;
+    return {
+      month,
+      tripCount,
+      season: tripCount > 0 ? SEASON_OF_MONTH[month] : null,
+    };
+  });
+}
+
 /** 이보다 가까운 두 곳은 지도에서 한 점으로 본다. */
 const SAME_SPOT_KM = 1;
 

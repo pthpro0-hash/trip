@@ -1,6 +1,14 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { buildSketch, dotRadius, sketchShapes, tripDistanceKm, type SketchTrip } from "./sketch";
+import {
+  buildSketch,
+  dotRadius,
+  groupByYear,
+  monthStrip,
+  sketchShapes,
+  tripDistanceKm,
+  type SketchTrip,
+} from "./sketch";
 
 function trip(partial: Partial<SketchTrip> & { id: string }): SketchTrip {
   return {
@@ -208,5 +216,65 @@ describe("좌표가 없는 방문", () => {
     const sketch = buildSketch([trip({ id: "a", visits: [좌표없음] })]);
     expect(sketch.visitCount).toBe(1);
     expect(sketch.photoCount).toBe(4);
+  });
+});
+
+describe("groupByYear", () => {
+  it("최근 해부터 쌓는다", () => {
+    expect(groupByYear(ALL).map((y) => y.year)).toEqual([2026, 2025]);
+  });
+
+  it("한 해 안에서는 최근 여행이 위로", () => {
+    const [올해] = groupByYear(ALL);
+    expect(올해.trips.map((t) => t.id)).toEqual(["강릉", "남산"]);
+  });
+
+  it("여행이 없는 해는 나오지 않는다", () => {
+    const years = groupByYear([
+      trip({ id: "a", startedOn: "2020-05-01", endedOn: "2020-05-01" }),
+      trip({ id: "b", startedOn: "2026-05-01", endedOn: "2026-05-01" }),
+    ]);
+    // 2021~2025 를 빈 장으로 끼워 넣지 않는다.
+    expect(years.map((y) => y.year)).toEqual([2026, 2020]);
+  });
+
+  it("해를 넘긴 여행은 떠난 해로 친다", () => {
+    const years = groupByYear([
+      trip({ id: "해넘이", startedOn: "2025-12-31", endedOn: "2026-01-01" }),
+    ]);
+    expect(years).toHaveLength(1);
+    expect(years[0].year).toBe(2025);
+  });
+
+  it("기록이 없으면 장도 없다", () => {
+    expect(groupByYear([])).toEqual([]);
+  });
+});
+
+describe("monthStrip", () => {
+  const strip = monthStrip([
+    trip({ id: "1", startedOn: "2026-09-13", endedOn: "2026-09-14" }),
+    trip({ id: "2", startedOn: "2026-09-28", endedOn: "2026-09-28" }),
+    trip({ id: "3", startedOn: "2026-03-02", endedOn: "2026-03-02" }),
+  ]);
+
+  it("열두 달이 빠짐없이 나온다 — 빈 달이 말해 주는 것이 있다", () => {
+    expect(strip).toHaveLength(12);
+    expect(strip.map((cell) => cell.month)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it("그 달에 몇 번 다녔는지 센다", () => {
+    expect(strip[8].tripCount).toBe(2);
+    expect(strip[2].tripCount).toBe(1);
+  });
+
+  it("안 다닌 달은 색이 없다", () => {
+    expect(strip[6].tripCount).toBe(0);
+    expect(strip[6].season).toBeNull();
+  });
+
+  it("다닌 달은 그 달의 계절을 입는다", () => {
+    expect(strip[8].season).toBe("가을");
+    expect(strip[2].season).toBe("봄");
   });
 });

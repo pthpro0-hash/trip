@@ -1,25 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
-import { buildSketch, sketchShapes, type SketchTrip } from "@/lib/sketch";
-import { headline } from "@/lib/sketchWords";
-import { downloadSvgAsPng } from "@/lib/svgToPng";
-import { SketchCard } from "./SketchCard";
+import { buildSketch, groupByYear, type SketchTrip } from "@/lib/sketch";
+import { YearSketch } from "./YearSketch";
 
 type Status = "loading" | "guest" | "failed" | "ready";
 
 export function SketchView() {
-  const holderRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
   const [trips, setTrips] = useState<SavedTrip[]>([]);
-  const [year, setYear] = useState<number | null>(null);
   const [person, setPerson] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -67,34 +61,15 @@ export function SketchView() {
 
   const scoped = useMemo(
     () =>
-      asSketchTrips.filter((trip) => {
-        if (year !== null && Number(trip.startedOn.slice(0, 4)) !== year) return false;
-        if (person && trip.companions?.trim() !== person) return false;
-        return true;
-      }),
-    [asSketchTrips, year, person],
+      person
+        ? asSketchTrips.filter((trip) => trip.companions?.trim() === person)
+        : asSketchTrips,
+    [asSketchTrips, person],
   );
 
   const whole = useMemo(() => buildSketch(asSketchTrips), [asSketchTrips]);
-  const sketch = useMemo(() => buildSketch(scoped), [scoped]);
-  const shapes = useMemo(() => sketchShapes(scoped), [scoped]);
-  // 제목은 "어느 범위인지", 한 문장은 "그게 어떤 해였는지". 둘은 다른 일을 한다.
-  const line = useMemo(
-    () => headline(sketch, year !== null ? "year" : "all"),
-    [sketch, year],
-  );
-
-  const title = person ? `${person}와의 여행` : year !== null ? `${year}년` : "지금까지";
-
-  const save = async () => {
-    const svg = holderRef.current?.querySelector("svg");
-    if (!svg) return;
-    setSaving(true);
-    setSaveFailed(false);
-    const ok = await downloadSvgAsPng(svg, `여행스케치-${title}.png`);
-    if (!ok) setSaveFailed(true);
-    setSaving(false);
-  };
+  // 해마다 한 장. 연도를 고르는 단추가 필요 없어졌다 — 다 펼쳐 놓는다.
+  const years = useMemo(() => groupByYear(scoped), [scoped]);
 
   if (status === "loading") return <p className="text-[15px] text-text-faint">불러오는 중…</p>;
 
@@ -141,81 +116,39 @@ export function SketchView() {
 
   return (
     <>
-      <div className="flex flex-col gap-2.5">
-        {whole.byYear.length > 1 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="w-8 shrink-0 text-[13px] font-medium text-text-faint">해</span>
-            {whole.byYear.map((entry) => {
-              const value = Number(entry.label);
-              return (
-                <button
-                  key={entry.label}
-                  type="button"
-                  aria-pressed={year === value}
-                  onClick={() => setYear(year === value ? null : value)}
-                  className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
-                    year === value ? "bg-accent text-on-accent" : "bg-bg-subtle text-text hover:bg-line"
-                  }`}
-                >
-                  {entry.label}년
-                </button>
-              );
-            })}
-          </div>
-        )}
+      {/*
+        연도 단추는 없앴다. 해마다 한 장씩 펼쳐 놓으므로 고를 것이 없다.
+        사람은 남긴다 — 그건 여러 해에 걸쳐 걸러 보고 싶은 것이다.
+      */}
+      {whole.byCompanion.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="shrink-0 text-[13px] font-medium text-text-faint">함께</span>
+          {whole.byCompanion.map((entry) => (
+            <button
+              key={entry.label}
+              type="button"
+              aria-pressed={person === entry.label}
+              onClick={() => setPerson(person === entry.label ? null : entry.label)}
+              className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
+                person === entry.label
+                  ? "bg-accent text-on-accent"
+                  : "bg-bg-subtle text-text hover:bg-line"
+              }`}
+            >
+              {entry.label} {entry.count}
+            </button>
+          ))}
+        </div>
+      )}
 
-        {whole.byCompanion.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="w-8 shrink-0 text-[13px] font-medium text-text-faint">사람</span>
-            {whole.byCompanion.map((entry) => (
-              <button
-                key={entry.label}
-                type="button"
-                aria-pressed={person === entry.label}
-                onClick={() => setPerson(person === entry.label ? null : entry.label)}
-                className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
-                  person === entry.label
-                    ? "bg-accent text-on-accent"
-                    : "bg-bg-subtle text-text hover:bg-line"
-                }`}
-              >
-                {entry.label} {entry.count}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {sketch.tripCount === 0 ? (
+      {years.length === 0 ? (
         <p className="rounded-2xl bg-bg-subtle p-5 text-[15px] text-text-muted">
-          그 조건에 맞는 여행이 없어요.
+          {person}와 다녀온 기록이 없어요.
         </p>
       ) : (
-        <>
-          {/* 저장할 때 이 안의 SVG 를 그대로 꺼내 그림으로 바꾼다. */}
-          <div ref={holderRef} className="overflow-hidden rounded-2xl ring-1 ring-line">
-            <SketchCard sketch={sketch} shapes={shapes} title={title} headline={line} />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={save}
-              disabled={saving}
-              className="rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
-            >
-              {saving ? "만드는 중…" : "그림으로 저장하기"}
-            </button>
-            {saveFailed && (
-              <span className="text-[13px] text-text-muted">저장하지 못했어요.</span>
-            )}
-            {sketch.topCompanion && !person && (
-              <span className="text-[13px] text-text-faint">
-                {sketch.topCompanion.label}와 가장 많이 다니셨어요
-              </span>
-            )}
-          </div>
-        </>
+        years.map((entry) => (
+          <YearSketch key={entry.year} year={entry.year} trips={entry.trips} person={person} />
+        ))
       )}
     </>
   );
