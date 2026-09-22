@@ -97,7 +97,16 @@ export function AccountChip() {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={account.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
       )}
-      <span className="max-w-[10ch] truncate text-[13px] font-medium text-text">
+      {/*
+        좁은 화면에서는 이름을 접는다. 위 띠에 서비스 이름과 갈래 둘이
+        함께 서 있어 375px 에서 이 칩이 화면 밖으로 밀려났다. 사진이
+        있으면 그것으로 누구인지 알 수 있으니 이름은 접어도 된다.
+      */}
+      <span
+        className={`max-w-[10ch] truncate text-[13px] font-medium text-text ${
+          account.avatar ? "hidden sm:inline" : ""
+        }`}
+      >
         {account.name}
       </span>
       <button

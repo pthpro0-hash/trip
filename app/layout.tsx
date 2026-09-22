@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { CollectionSync } from "@/components/auth/CollectionSync";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import "./globals.css";
 
 const SITE_NAME = "나만의 여행 스케치";
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-bg text-text antialiased">
+        <SiteHeader />
         {children}
         {/* 이 기기의 목록과 계정의 목록을 이어 준다. 그리는 것은 없다. */}
         <CollectionSync />

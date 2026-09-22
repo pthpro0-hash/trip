@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { PhotoImport } from "@/components/trip/PhotoImport";
 
 export const metadata: Metadata = {
@@ -11,9 +10,6 @@ export const metadata: Metadata = {
 export default function NewTripPage() {
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-5 px-5 pb-16 pt-8">
-      <Link href="/" className="text-[15px] font-medium text-accent hover:text-accent-hover">
-        ← 목록으로
-      </Link>
       <div>
         <h1 className="text-[28px] font-bold tracking-tight text-text md:text-[32px]">
           사진에서 여행 찾기

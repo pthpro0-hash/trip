@@ -32,9 +32,6 @@ export default async function LoginPage({
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 px-5 pb-16 pt-10">
-      <Link href="/" className="text-[15px] font-medium text-accent hover:text-accent-hover">
-        ← 목록으로
-      </Link>
 
       <div>
         <h1 className="text-[28px] font-bold tracking-tight text-text md:text-[32px]">

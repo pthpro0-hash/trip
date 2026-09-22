@@ -17,9 +17,6 @@ export const metadata: Metadata = {
 export default function RegionsIndexPage() {
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-5 px-5 pb-16 pt-8">
-      <Link href="/" className="text-[15px] font-medium text-accent hover:text-accent-hover">
-        ← 목록으로
-      </Link>
       <h1 className="text-[32px] font-bold tracking-tight text-text md:text-[40px]">
         권역별로 둘러보기
       </h1>

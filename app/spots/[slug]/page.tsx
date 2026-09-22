@@ -94,9 +94,6 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
         // 구조화 데이터는 우리가 만든 값만 담는다 (사용자 입력 없음).
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <Link href="/" className="text-[15px] font-medium text-accent hover:text-accent-hover">
-        ← 목록으로
-      </Link>
       <div className="flex flex-col gap-2">
         <h1 className="text-[32px] font-bold tracking-tight text-text md:text-[40px]">{spot.name}</h1>
         <p className="text-[17px] leading-relaxed text-text-muted">{spot.summary}</p>

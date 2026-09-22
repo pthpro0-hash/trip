@@ -22,7 +22,7 @@ import { SpotCard } from "@/components/spot/SpotCard";
 import { KakaoMap } from "@/components/map/KakaoMap";
 import { ViewToggle } from "@/components/layout/ViewToggle";
 import { RegionStrip } from "@/components/region/RegionStrip";
-import { AccountChip } from "@/components/auth/AccountChip";
+import { HomeIntro } from "@/components/home/HomeIntro";
 
 const SPOTS = spotsData as Spot[];
 
@@ -74,15 +74,20 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-5 px-5 pb-16 pt-10">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[34px] font-bold tracking-tight text-text md:text-[44px]">나만의 여행 스케치</h1>
-          <p className="mt-1 text-[15px] text-text-muted">
-            2025~2026 한국관광 100선, 조건으로 찾고 지도로 만나보세요
-          </p>
-        </div>
-        <AccountChip />
+      {/*
+        머리글은 서비스 이름이 아니라 이 면이 무엇인지를 말한다. 이름은
+        위 띠가 이미 들고 있고, 사람들이 찾는 말은 "한국관광 100선"이다.
+      */}
+      <header>
+        <h1 className="text-[34px] font-bold tracking-tight text-text md:text-[44px]">
+          한국관광 100선
+        </h1>
+        <p className="mt-1 text-[15px] text-text-muted">
+          2025~2026년 121곳, 조건으로 찾고 지도로 만나보세요
+        </p>
       </header>
+
+      <HomeIntro />
 
       <RegionStrip spots={SPOTS} />
 
@@ -98,12 +103,6 @@ export default function HomePage() {
 
       <div className="flex flex-wrap items-center gap-2">
         <NearbyButton state={location} onRequest={requestLocation} onClear={clearLocation} />
-        <Link
-          href="/trips"
-          className="rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
-        >
-          내 여행
-        </Link>
         {wishlist.ids.length > 0 && (
           <>
             <button
@@ -190,6 +189,18 @@ export default function HomePage() {
           <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
         </div>
       </div>
+
+      {/*
+        어디까지 내려가 있든 사진을 넣을 수 있게 떠 있는다. 목록이 길어
+        아래에서 다시 위로 올라가야 하는 일이 없도록.
+      */}
+      <Link
+        href="/trips/new"
+        className="fixed bottom-5 right-5 z-20 flex items-center gap-1.5 rounded-full bg-accent px-4 py-3 text-[14px] font-medium text-on-accent shadow-lg transition hover:bg-accent-hover"
+      >
+        <span aria-hidden="true">✏️</span>
+        여행 스케치 그리기
+      </Link>
     </main>
   );
 }
