@@ -28,6 +28,7 @@ const rows: SavedTrip[] = [
     coverPath: "나/v1/cover.webp",
     visits: [
       {
+        id: "v1",
         placeName: "안목해변",
         spotId: null,
         dong: "강릉시 송정동",
@@ -48,6 +49,7 @@ const rows: SavedTrip[] = [
     coverPath: null,
     visits: [
       {
+        id: "v2",
         placeName: "대천해수욕장",
         spotId: "대천해수욕장",
         dong: "보령시 대천5동",

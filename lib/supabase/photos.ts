@@ -245,6 +245,36 @@ export async function signedUrls(
 }
 
 /**
+ * 방문마다 대표로 쓸 사진 한 장.
+ *
+ * 스케치 지도에 점 대신 사진을 얹는 데 쓴다. 방문마다 첫 장을 고른다 —
+ * 도착해서 찍은 것이 그곳을 가장 잘 말해 준다.
+ *
+ * "방문마다 한 줄"을 SQL 로 뽑는 길이 마땅치 않아 경로만 통째로 받아
+ * 여기서 추린다. 경로 하나가 60바이트 남짓이라 500장이어야 30KB 다.
+ * 수천 장이 쌓이면 그때 다시 볼 일이다.
+ */
+export async function visitCovers(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Map<string, string>> {
+  const { data, error } = await supabase
+    .from("trip_photos")
+    .select("visit_id,storage_path")
+    .eq("user_id", userId)
+    .order("taken_at", { ascending: true });
+
+  if (error || !data) return new Map();
+
+  const first = new Map<string, string>();
+  for (const row of data) {
+    const visitId = String(row.visit_id);
+    if (!first.has(visitId)) first.set(visitId, String(row.storage_path));
+  }
+  return first;
+}
+
+/**
  * 목록에 쓸 작은 판의 주소.
  *
  * 작은 판이 아직 없는 사진(썸네일을 붙이기 전에 올라간 것들)은 원본

@@ -51,6 +51,11 @@ interface SketchCardProps {
   months: MonthCell[];
   /** 고른 권역. 고르면 그쪽으로 당겨 본다. */
   region: Region | null;
+  /**
+   * 지도에 얹을 사진. 보관 경로 → 심을 수 있는 글자.
+   * 아직 못 받았거나 실패한 자리는 그냥 점으로 남는다.
+   */
+  photos: Map<string, string>;
 }
 
 export function SketchCard({
@@ -60,6 +65,7 @@ export function SketchCard({
   headline,
   months,
   region,
+  photos,
 }: SketchCardProps) {
   /*
     지도 자리는 늘 같은 크기다. 권역을 고르면 그 안에 무엇을 비출지만
@@ -82,6 +88,38 @@ export function SketchCard({
   const drawable = (p: { x: number; y: number }) => Number.isFinite(p.x) && Number.isFinite(p.y);
 
   const busiest = Math.max(0, ...shapes.dots.map((dot) => dot.photoCount));
+
+  /** 사진으로 얹을 때의 한 변. 점보다 넉넉하되 지도를 덮지는 않게. */
+  const shotSize = (photoCount: number) =>
+    Math.round(Math.min(46, Math.max(28, dotRadius(photoCount, busiest) * 3)));
+
+  /*
+    어느 자리에 사진을 얹을지 고른다.
+
+    사진 많은 순으로만 고르면 가까운 곳들이 뽑혀 서로 겹친다 — 실제로
+    여섯 장이 두 무더기로 포개졌다. 많이 찍은 곳부터 훑되, 이미 얹은
+    사진과 **화면에서** 부딪히면 건너뛴다. 실제 거리가 아니라 화면 거리로
+    재야 전국을 볼 때나 한 권역을 볼 때나 똑같이 맞는다.
+  */
+  const shotAt = new Set<number>();
+  {
+    const taken: { x: number; y: number; reach: number }[] = [];
+    shapes.dots
+      .map((dot, index) => ({ dot, index }))
+      .filter(({ dot }) => dot.photoPath && photos.has(dot.photoPath))
+      .sort((a, b) => b.dot.photoCount - a.dot.photoCount)
+      .forEach(({ dot, index }) => {
+        const point = place(dot.lat, dot.lng);
+        if (!drawable(point)) return;
+        const reach = shotSize(dot.photoCount) / 2 + 5;
+        const clash = taken.some(
+          (one) => Math.hypot(one.x - point.x, one.y - point.y) < one.reach + reach,
+        );
+        if (clash) return;
+        taken.push({ x: point.x, y: point.y, reach });
+        shotAt.add(index);
+      });
+  }
   // 그해에 실제로 밟은 계절만 범례에 올린다. 안 간 계절을 설명할 이유가 없다.
   const seasonsUsed = SEASONS.filter((season) => shapes.dots.some((dot) => dot.season === season));
 
@@ -171,21 +209,58 @@ export function SketchCard({
           저장본에는 영향이 없다. 손가락으로 누를 것을 생각해 눈에 보이는
           점보다 넉넉한 투명 원을 겹쳐 둔다.
         */}
+        {/*
+          사진이 있는 자리는 사진을 얹는다. 507장을 찍어 놓고 색깔 점만
+          보여 주면 그건 기록이지 스케치가 아니다.
+
+          다만 스무 자리에 스무 장을 다 얹으면 난장판이 된다. 사진은
+          아래에서 고른 몇 곳만 받아 오고, 나머지는 점 그대로 둔다.
+        */}
         {shapes.dots.map((dot, index) => {
           const { x, y } = place(dot.lat, dot.lng);
           if (!drawable({ x, y })) return null;
+
           const r = dotRadius(dot.photoCount, busiest);
+          const data = shotAt.has(index) ? photos.get(dot.photoPath!) : undefined;
+          const size = shotSize(dot.photoCount);
+          const ring = SEASON_COLOR[dot.season];
+
           return (
             <a key={index} href={`/trips/${dot.tripId}`} aria-label={`${dot.photoCount}장 찍은 곳`}>
-              <circle
-                cx={x}
-                cy={y}
-                r={r}
-                fill={SEASON_COLOR[dot.season]}
-                fillOpacity={0.85}
-                stroke="#ffffff"
-                strokeWidth={2}
-              />
+              {data ? (
+                <g>
+                  <rect
+                    x={x - size / 2 - 2.5}
+                    y={y - size / 2 - 2.5}
+                    width={size + 5}
+                    height={size + 5}
+                    rx={9}
+                    fill={ring}
+                  />
+                  <clipPath id={`shot-${index}`}>
+                    <rect x={x - size / 2} y={y - size / 2} width={size} height={size} rx={7} />
+                  </clipPath>
+                  <image
+                    href={data}
+                    x={x - size / 2}
+                    y={y - size / 2}
+                    width={size}
+                    height={size}
+                    clipPath={`url(#shot-${index})`}
+                    preserveAspectRatio="xMidYMid slice"
+                  />
+                </g>
+              ) : (
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={r}
+                  fill={ring}
+                  fillOpacity={0.85}
+                  stroke="#ffffff"
+                  strokeWidth={2}
+                />
+              )}
               <circle cx={x} cy={y} r={Math.max(r, 16)} fill="transparent" />
             </a>
           );

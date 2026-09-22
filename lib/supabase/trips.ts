@@ -20,6 +20,8 @@ export interface SavedTrip {
   /** 대표 사진의 보관함 경로. 사진을 올리지 않았으면 null. */
   coverPath: string | null;
   visits: {
+    /** 방문 id. 그 자리에서 찍은 사진을 찾아오는 열쇠다. */
+    id: string;
     placeName: string;
     spotId: string | null;
     /** 행정동. 장소 이름을 몰라도 "강릉시"로 찾을 수 있게 한다. */
@@ -172,7 +174,7 @@ export async function fetchTrips(
   const { data, error } = await supabase
     .from("trips")
     .select(
-      "id,title,started_on,ended_on,companions,note,visits(place_name,spot_id,dong,lat,lng,started_at,photo_count,position)",
+      "id,title,started_on,ended_on,companions,note,visits(id,place_name,spot_id,dong,lat,lng,started_at,photo_count,position)",
     )
     .eq("user_id", userId)
     .order("started_on", { ascending: false });
@@ -208,6 +210,7 @@ export async function fetchTrips(
       .slice()
       .sort((a, b) => (a.position as number) - (b.position as number))
       .map((visit) => ({
+        id: visit.id as string,
         placeName: visit.place_name as string,
         spotId: visit.spot_id as string | null,
         dong: visit.dong as string | null,

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
+import { fetchHeadlines, saveHeadline } from "@/lib/supabase/sketchYears";
+import { visitCovers } from "@/lib/supabase/photos";
 import { buildSketch, groupByYear, sketchShapes, type SketchTrip } from "@/lib/sketch";
 import { regionsOfTrip } from "@/lib/photo/region";
 import { REGIONS } from "@/lib/regions";
@@ -22,6 +24,11 @@ export function SketchView() {
   const [region, setRegion] = useState<Region | null>(null);
   const [year, setYear] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  /** 해마다 적어 둔 한 줄. 적지 않은 해는 없다. */
+  const [written, setWritten] = useState<Map<number, string>>(new Map());
+  const [userId, setUserId] = useState<string | null>(null);
+  /** 방문마다 대표 사진 한 장. 지도에 점 대신 얹는다. */
+  const [covers, setCovers] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -41,7 +48,22 @@ export function SketchView() {
         return;
       }
       setTrips(rows);
+      setUserId(data.user.id);
       setStatus("ready");
+
+      // 둘 다 곁다리다. 못 불러와도 스케치는 그려져야 한다.
+      try {
+        const lines = await fetchHeadlines(supabase, data.user.id);
+        if (active) setWritten(lines);
+      } catch {
+        // 적어 둔 말을 못 불러온 것뿐이다.
+      }
+      try {
+        const shots = await visitCovers(supabase, data.user.id);
+        if (active) setCovers(shots);
+      } catch {
+        // 사진을 못 얹으면 점으로 그려진다.
+      }
     });
 
     return () => {
@@ -63,9 +85,10 @@ export function SketchView() {
           lng: visit.lng,
           photoCount: visit.photoCount,
           dong: visit.dong,
+          photoPath: covers.get(visit.id) ?? null,
         })),
       })),
-    [trips],
+    [trips, covers],
   );
 
   /*
@@ -163,6 +186,26 @@ export function SketchView() {
     );
   }
 
+  /*
+    걸러 보는 중에는 고쳐 적게 하지 않는다. 그때 화면에 적히는 말은
+    그 해가 아니라 걸러낸 것을 가리키기 때문이다.
+  */
+  const filtered = Boolean(person || region || query.trim());
+
+  const write = async (forYear: number, line: string) => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId) return false;
+    if (!(await saveHeadline(supabase, userId, forYear, line))) return false;
+
+    setWritten((current) => {
+      const next = new Map(current);
+      if (line.trim()) next.set(forYear, line.trim());
+      else next.delete(forYear);
+      return next;
+    });
+    return true;
+  };
+
   const chosen = Boolean(person || region || year !== null || query.trim());
 
   /** 고른 것을 모두 푼다. 걸러 놓고 빠져나오지 못하는 일이 없게. */
@@ -259,6 +302,8 @@ export function SketchView() {
             trips={entry.trips}
             person={person}
             region={region}
+            written={filtered ? undefined : written.get(entry.year)}
+            onWrite={filtered ? undefined : write}
           />
         ))
       )}
