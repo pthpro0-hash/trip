@@ -7,6 +7,9 @@ import type { TripDetail as Detail } from "@/lib/supabase/tripDetail";
   나중에 "민수랑 첫 휴가"가 떠오르는 식이다. 상세에서 고칠 수 있어야 한다.
 */
 
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
 vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: true }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -27,6 +30,7 @@ vi.mock("@/lib/supabase/photos", () => ({
   setCoverPhoto: async () => true,
 }));
 
+const deleteTrip = vi.fn();
 const saveTripTitle = vi.fn();
 const saveTripSubtitle = vi.fn();
 const saveVisitName = vi.fn();
@@ -71,6 +75,11 @@ function detail(title: string | null, subtitle: string | null = null): Detail {
 }
 
 let current: Detail = detail("화진포해변 외 2곳");
+
+vi.mock("@/lib/supabase/trips", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/supabase/trips")>()),
+  deleteTrip: (...args: unknown[]) => deleteTrip(...args),
+}));
 
 vi.mock("@/lib/supabase/tripDetail", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/supabase/tripDetail")>()),
@@ -344,5 +353,54 @@ describe("사진 크게 보기", () => {
     await 열기();
     fireEvent.keyDown(window, { key: "ArrowLeft" });
     expect(await screen.findByText("2 / 2")).toBeTruthy();
+  });
+});
+
+describe("여행 통째로 지우기", () => {
+  beforeEach(() => {
+    push.mockReset();
+    deleteTrip.mockReset();
+    deleteTrip.mockResolvedValue(true);
+  });
+
+  it("한 번 물어보고 나서 지운다", async () => {
+    await 상세();
+    fireEvent.click(await screen.findByRole("button", { name: "이 여행 지우기" }));
+
+    // 사진도 함께 사라진다는 것을 이때 알려 준다.
+    const sure = await screen.findByRole("button", { name: /정말 지울까요\? 사진도 함께 사라져요/ });
+    expect(deleteTrip).not.toHaveBeenCalled();
+
+    fireEvent.click(sure);
+    await waitFor(() => expect(deleteTrip).toHaveBeenCalled());
+    expect(deleteTrip.mock.calls[0].at(-1)).toBe("t1");
+  });
+
+  it("지우고 나면 목록으로 보낸다", async () => {
+    await 상세();
+    fireEvent.click(await screen.findByRole("button", { name: "이 여행 지우기" }));
+    fireEvent.click(await screen.findByRole("button", { name: /정말 지울까요/ }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/trips"));
+  });
+
+  it("손을 떼면 묻던 것을 거둔다 — 잘못 눌러도 지워지지 않게", async () => {
+    await 상세();
+    const button = await screen.findByRole("button", { name: "이 여행 지우기" });
+    fireEvent.click(button);
+    fireEvent.blur(button);
+
+    expect(await screen.findByRole("button", { name: "이 여행 지우기" })).toBeTruthy();
+    expect(deleteTrip).not.toHaveBeenCalled();
+  });
+
+  it("지우지 못하면 그렇다고 말하고 그 자리에 머문다", async () => {
+    deleteTrip.mockResolvedValue(false);
+    await 상세();
+    fireEvent.click(await screen.findByRole("button", { name: "이 여행 지우기" }));
+    fireEvent.click(await screen.findByRole("button", { name: /정말 지울까요/ }));
+
+    expect(await screen.findByText(/지우지 못했어요/)).toBeTruthy();
+    expect(push).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/lib/supabase/tripDetail";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { deletePhoto, setCoverPhoto, signedUrls, thumbUrls } from "@/lib/supabase/photos";
+import { deleteTrip } from "@/lib/supabase/trips";
 import { PhotoViewer } from "./PhotoViewer";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
@@ -37,6 +39,7 @@ function hourMinute(date: Date) {
 }
 
 export function TripDetail({ tripId }: { tripId: string }) {
+  const router = useRouter();
   const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
   const [trip, setTrip] = useState<Detail | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
@@ -77,6 +80,10 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [confirmingPhoto, setConfirmingPhoto] = useState<string | null>(null);
   const [removingPhoto, setRemovingPhoto] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState(false);
+  // 여행 통째로 지우는 일도 되돌릴 수 없다. 한 번 물어보고 나서 지운다.
+  const [confirmingTrip, setConfirmingTrip] = useState(false);
+  const [removingTrip, setRemovingTrip] = useState(false);
+  const [tripError, setTripError] = useState(false);
   /*
     크게 보고 있는 사진. 목록에는 작은 판을 쓰지만 여기서는 보관본을
     그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.
@@ -138,6 +145,28 @@ export function TripDetail({ tripId }: { tripId: string }) {
     : "";
 
   /** 손을 뗄 때 저장한다. 바뀐 것이 없으면 아무 일도 하지 않는다. */
+  const removeTrip = async () => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId) return;
+
+    setRemovingTrip(true);
+    setTripError(false);
+    const ok = await deleteTrip(supabase, userId, tripId);
+    logEvent(supabase, "trip_deleted", { ok });
+
+    if (!ok) {
+      setTripError(true);
+      setRemovingTrip(false);
+      setConfirmingTrip(false);
+      return;
+    }
+    /*
+      지운 여행의 자리로 돌아갈 수는 없다. 목록을 처음부터 보여 준다 —
+      askRestore 를 부르지 않으므로 저절로 맨 위다.
+    */
+    router.push("/trips");
+  };
+
   const submitTitle = async () => {
     const supabase = getBrowserClient();
     if (!supabase || !userId || !trip) return;
@@ -392,6 +421,33 @@ export function TripDetail({ tripId }: { tripId: string }) {
         <p className="mt-1.5 text-[13px] text-text-faint">
           제목·부제·장소 이름을 눌러 고칠 수 있어요. 비우면 원래대로 돌아가요.
         </p>
+      </div>
+
+      {/*
+        지우기는 맨 아래가 아니라 여기에 둔다. 사진을 다 훑어 내려간
+        끝에서 지우기를 만나면 손이 미끄러진다.
+      */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => (confirmingTrip ? void removeTrip() : setConfirmingTrip(true))}
+          onBlur={() => setConfirmingTrip(false)}
+          disabled={removingTrip}
+          className={`self-start rounded-full px-3.5 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
+            confirmingTrip
+              ? "bg-[#d70015] text-white"
+              : "bg-bg-subtle text-text-muted hover:bg-line"
+          }`}
+        >
+          {removingTrip
+            ? "지우는 중…"
+            : confirmingTrip
+              ? "정말 지울까요? 사진도 함께 사라져요"
+              : "이 여행 지우기"}
+        </button>
+        {tripError && (
+          <span className="text-[13px] text-text-muted">지우지 못했어요. 잠시 후 다시 시도해 주세요.</span>
+        )}
       </div>
 
       {stops.length > 0 && (

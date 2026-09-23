@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { BackToSketches } from "@/components/trip/BackToSketches";
+import { ScrollTop } from "@/components/layout/ScrollTop";
 import { TripDetail } from "@/components/trip/TripDetail";
 
 export const metadata: Metadata = {
@@ -12,10 +13,10 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-5 px-5 pb-16 pt-8">
-      <Link href="/trips" className="text-[15px] font-medium text-accent hover:text-accent-hover">
-        ← 내 여행
-      </Link>
+      <BackToSketches />
       <TripDetail tripId={id} />
+      {/* 사진이 수십 장이라 화면이 길다. 늘 같은 자리에 둔다. */}
+      <ScrollTop />
     </main>
   );
 }

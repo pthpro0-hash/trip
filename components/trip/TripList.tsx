@@ -7,6 +7,7 @@ import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
+import { rememberScroll, takeScroll } from "@/lib/scrollMemory";
 import { backfillThumbs, missingThumbs, thumbUrls } from "@/lib/supabase/photos";
 import {
   companionOptions,
@@ -127,6 +128,29 @@ export function TripList() {
     // 실패한 것이 남아 있으면 다음에 다시 권한다.
     setStale(outcome.failed > 0 ? stale.slice(-outcome.failed) : []);
   };
+
+  /*
+    보던 자리를 적어 둔다. 상세에 들어갔다 "← 내 스케치"로 돌아오면
+    거기서부터 다시 본다.
+  */
+  useEffect(() => {
+    const onScroll = () => rememberScroll(window.scrollY);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  /*
+    목록이 다 그려진 뒤에 옮긴다. 그리기 전에는 문서가 짧아 그만큼
+    내려갈 수가 없다. 사진이 늦게 들어와도 높이는 미리 잡혀 있다.
+  */
+  useEffect(() => {
+    if (status !== "ready") return;
+    const y = takeScroll();
+    if (y === null) return;
+    // 한 번 그려진 다음 프레임에 옮긴다.
+    const id = requestAnimationFrame(() => window.scrollTo(0, y));
+    return () => cancelAnimationFrame(id);
+  }, [status]);
 
   const visible = useMemo(() => {
     const matchedIds = new Set(searchTrips(searchable, query).map((trip) => trip.id));

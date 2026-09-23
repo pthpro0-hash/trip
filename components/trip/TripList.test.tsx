@@ -173,3 +173,43 @@ describe("작은 판 정리 권유", () => {
     vi.doUnmock("@/lib/supabase/photos");
   });
 });
+
+describe("보던 자리로 돌아오기", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  /** 다음 프레임에 옮기므로, 그때까지 기다려 준다. */
+  const 다음프레임 = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+
+  it("상세에서 돌아오면 보던 자리로 데려간다", async () => {
+    window.sessionStorage.setItem("trips:scroll", "1840");
+    window.sessionStorage.setItem("trips:restore", "1");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+    await 목록();
+    await 다음프레임();
+
+    expect(scrollTo).toHaveBeenCalledWith(0, 1840);
+  });
+
+  it("그냥 들어온 사람은 맨 위에서 시작한다", async () => {
+    // 위 띠의 "내 스케치"를 눌러 온 경우 — 돌아가 달라는 표시가 없다.
+    window.sessionStorage.setItem("trips:scroll", "1840");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+    await 목록();
+    await 다음프레임();
+
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("목록을 굴리면 그 자리를 적어 둔다", async () => {
+    await 목록();
+    Object.defineProperty(window, "scrollY", { value: 920, configurable: true });
+    window.dispatchEvent(new Event("scroll"));
+
+    expect(window.sessionStorage.getItem("trips:scroll")).toBe("920");
+  });
+});
