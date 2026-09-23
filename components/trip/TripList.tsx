@@ -7,7 +7,7 @@ import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
-import { rememberScroll, takeScroll } from "@/lib/scrollMemory";
+import { rememberScroll, restoreScroll, takeScroll } from "@/lib/scrollMemory";
 import { backfillThumbs, missingThumbs, thumbUrls } from "@/lib/supabase/photos";
 import {
   companionOptions,
@@ -142,15 +142,17 @@ export function TripList() {
 
   /*
     목록이 다 그려진 뒤에 옮긴다. 그리기 전에는 문서가 짧아 그만큼
-    내려갈 수가 없다. 사진이 늦게 들어와도 높이는 미리 잡혀 있다.
+    내려갈 수가 없다.
+
+    한 번 옮기고 마는 대신 잠깐 되짚는다. 사진 주소는 목록보다 늦게
+    오고, Next 도 새 화면을 그린 뒤 한 번 맨 위로 끌어올린다. 사람이
+    손을 대면 그 즉시 그만둔다.
   */
   useEffect(() => {
     if (status !== "ready") return;
     const y = takeScroll();
     if (y === null) return;
-    // 한 번 그려진 다음 프레임에 옮긴다.
-    const id = requestAnimationFrame(() => window.scrollTo(0, y));
-    return () => cancelAnimationFrame(id);
+    return restoreScroll(y);
   }, [status]);
 
   const visible = useMemo(() => {
@@ -420,20 +422,29 @@ export function TripList() {
               </button>
             </div>
 
-            {trip.coverPath && covers.get(trip.coverPath) && (
+            {/*
+              사진이 오기 전에도 자리는 미리 잡아 둔다.
+
+              주소가 도착한 다음에 자리를 내주면 목록이 그때 한 번 길어진다.
+              보던 자리로 돌아오려면 이미 옮겨 놓은 뒤라, 스물다섯 장이
+              한꺼번에 끼어들면서 사람을 맨 위로 밀어 올린다.
+            */}
+            {trip.coverPath && (
               <Link
                 href={`/trips/${trip.id}`}
                 aria-label={`${trip.title || formatSpan(trip.startedOn, trip.endedOn)} 상세보기`}
-                className="group block overflow-hidden rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="group block aspect-[16/10] w-full overflow-hidden rounded-xl bg-bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 {/* 남의 서비스가 아니라 우리 보관함의 서명 주소다. 주소가 그때그때
                     달라져 next/image 로 미리 최적화할 수 없다. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={covers.get(trip.coverPath)}
-                  alt=""
-                  className="aspect-[16/10] w-full object-cover transition duration-200 group-hover:scale-[1.02] group-hover:brightness-105"
-                />
+                {covers.get(trip.coverPath) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={covers.get(trip.coverPath)}
+                    alt=""
+                    className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.02] group-hover:brightness-105"
+                  />
+                )}
               </Link>
             )}
 

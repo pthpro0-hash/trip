@@ -68,8 +68,15 @@ vi.mock("@/lib/supabase/trips", async (importOriginal) => ({
   deleteTrip: async () => true,
 }));
 
+/** 사진 주소는 목록보다 늦게 온다. 그 늦음을 손으로 잡아 둘 수 있게. */
+let 주소도착: () => void = () => undefined;
+let 주소늦추기 = false;
+
 vi.mock("@/lib/supabase/photos", () => ({
-  thumbUrls: async () => new Map([["나/v1/cover.webp", "https://예시/cover.webp"]]),
+  thumbUrls: async () => {
+    if (주소늦추기) await new Promise<void>((resolve) => (주소도착 = resolve));
+    return new Map([["나/v1/cover.webp", "https://예시/cover.webp"]]);
+  },
   missingThumbs: async () => [],
   backfillThumbs: async () => ({ made: 0, failed: 0 }),
 }));
@@ -114,6 +121,27 @@ describe("TripList", () => {
     // 그림이 링크 안에 들어 있어야 눌러진다.
     expect(within(cover).getByRole("presentation", { hidden: true })).toBeTruthy();
     expect(링크들(view, "t1").length).toBeGreaterThanOrEqual(3);
+  });
+
+  /*
+    사진 주소가 오기 전에도 그림 자리는 잡혀 있어야 한다.
+
+    주소가 온 다음에 자리를 내주면 목록이 그때 한 번 길어진다. 보던
+    자리로 돌아온 사람은 이미 옮겨진 뒤라, 스물다섯 장이 한꺼번에
+    끼어들면서 맨 위로 밀려 올라간다.
+  */
+  it("사진 주소가 오기 전에도 그림 자리를 잡아 둔다", async () => {
+    주소늦추기 = true;
+    try {
+      await 목록();
+      const cover = await screen.findByRole("link", { name: "민수랑 첫 휴가 상세보기" });
+      // 그림은 아직 없지만 높이는 이미 잡혀 있다.
+      expect(cover.querySelector("img")).toBeNull();
+      expect(cover.className).toContain("aspect-[16/10]");
+    } finally {
+      주소도착();
+      주소늦추기 = false;
+    }
   });
 
   it("사진이 없는 여행에는 그림 링크가 없다", async () => {
