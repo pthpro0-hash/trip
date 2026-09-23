@@ -14,6 +14,7 @@ import { searchTrips, type SearchableTrip } from "@/lib/tripSearch";
 import type { Region } from "@/lib/types";
 import { RegionPlaces } from "./RegionPlaces";
 import { YearSketch } from "./YearSketch";
+import { Waiting } from "@/components/layout/Waiting";
 
 type Status = "loading" | "guest" | "failed" | "ready";
 
@@ -143,7 +144,7 @@ export function SketchView() {
   // 해마다 한 장. 연도를 고르는 단추가 필요 없어졌다 — 다 펼쳐 놓는다.
   const years = useMemo(() => groupByYear(scoped), [scoped]);
 
-  if (status === "loading") return <p className="text-[15px] text-text-faint">불러오는 중…</p>;
+  if (status === "loading") return <Waiting title="스케치를 그리고 있어요" />;
 
   if (status === "guest") {
     return (

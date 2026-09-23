@@ -20,6 +20,7 @@ import {
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { remainingText } from "@/lib/photo/eta";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
+import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 import type { Shot, Trip } from "@/lib/photo/types";
 
 interface PlaceAnswer {
@@ -114,6 +115,13 @@ export function PhotoImport() {
   const [outcome, setOutcome] = useState<SaveOutcome | null>(null);
   const [withPhotos, setWithPhotos] = useState(true);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
+  /*
+    고르기 창을 닫은 뒤, 브라우저가 파일 목록을 건네줄 때까지의 틈.
+
+    onChange 는 그 목록이 다 만들어진 다음에야 온다. 삼백 장이면 그 사이가
+    몇 초다. 그동안 화면이 그대로면 사람은 안 눌렸다고 생각하고 다시 누른다.
+  */
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -147,7 +155,47 @@ export function PhotoImport() {
     [visible, savedRanges],
   );
 
+  /*
+    고르기 창을 연다.
+
+    창이 닫히는 순간은 창에 초점이 돌아오는 것으로 안다 — 그 뒤부터가
+    브라우저가 파일을 모으는 시간이라, 안내는 그때부터 내민다. 창이 떠
+    있는 동안 뒤에서 "불러오는 중"이라 적어 두면 거짓말이다.
+  */
+  const pick = () => {
+    const input = inputRef.current;
+    if (!input) return;
+    // 같은 사진을 다시 골라도 onChange 가 오도록 비워 둔다.
+    input.value = "";
+    input.click();
+
+    const onBack = () => {
+      window.removeEventListener("focus", onBack);
+      setPicking(true);
+    };
+    window.addEventListener("focus", onBack);
+  };
+
+  /*
+    고르지 않고 창을 닫으면 cancel 이 온다. 이 행사를 모르는 브라우저를
+    위해 시간 제한도 함께 둔다 — "불러오는 중"이 영영 남아 있지 않게.
+
+    cancel 은 React 가 아는 이름이 아니라 직접 매단다.
+  */
+  useEffect(() => {
+    if (!picking) return;
+    const input = inputRef.current;
+    const give = () => setPicking(false);
+    input?.addEventListener("cancel", give);
+    const id = setTimeout(give, 60_000);
+    return () => {
+      input?.removeEventListener("cancel", give);
+      clearTimeout(id);
+    };
+  }, [picking]);
+
   const handleFiles = async (files: File[]) => {
+    setPicking(false);
     if (files.length === 0) return;
     setDismissed(new Set());
     setOutcome(null);
@@ -307,7 +355,7 @@ export function PhotoImport() {
       const uploaded = await uploadPhotos(supabase, userId, targets, (done, total, elapsed) => {
         elapsedMs = elapsed;
         const left = remainingText(done, total, elapsed);
-        setUploadNote(`사진 올리는 중… ${done}/${total}${left ? ` · ${left}` : ""}`);
+        setUploadNote(`${done}장 / ${total}장${left ? ` · ${left}` : ""}`);
       });
       result.photos += uploaded.uploaded;
       result.unsupported.push(...uploaded.unsupported);
@@ -355,24 +403,53 @@ export function PhotoImport() {
     );
   };
 
+  /*
+    고르는 칸은 화면이 어떻게 바뀌어도 늘 같은 자리에 둔다.
+
+    고르기 창이 닫히면 화면이 "불러오는 중"으로 바뀌는데, 그때 칸까지
+    사라지면 아무것도 고르지 않고 닫았다는 소식(cancel)이 올 데가 없어
+    안내가 그대로 얼어붙는다. 자리가 바뀌어도 React 가 새로 만들므로,
+    어느 갈래로 가든 맨 앞에 놓는다.
+  */
+  const picker = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="image/*"
+      multiple
+      className="sr-only"
+      onChange={(event) => void handleFiles([...(event.target.files ?? [])])}
+    />
+  );
+
+  if (picking) {
+    return (
+      <>
+        {picker}
+        <Waiting
+          title="고르신 사진을 불러오고 있어요"
+          note="사진이 많으면 여기서 조금 걸려요. 사진은 아직 어디로도 올라가지 않았어요."
+        />
+      </>
+    );
+  }
+
   if (stage.name === "reading" || stage.name === "naming") {
     return (
-      <div className="rounded-2xl bg-bg-subtle p-8 text-center">
-        <p className="text-[17px] font-medium text-text">
-          {stage.name === "reading" ? "사진을 읽고 있어요" : "장소를 찾고 있어요"}
-        </p>
-        {stage.name === "reading" && (
-          <p className="mt-2 text-[15px] text-text-muted">
-            {stage.done}장 / {stage.total}장
-          </p>
-        )}
-        <p className="mt-3 text-[13px] text-text-faint">사진은 아직 어디로도 올라가지 않았어요.</p>
-      </div>
+      <>
+        {picker}
+        <Waiting
+          title={stage.name === "reading" ? "사진을 읽고 있어요" : "장소를 찾고 있어요"}
+          detail={stage.name === "reading" ? `${stage.done}장 / ${stage.total}장` : undefined}
+          note="사진은 아직 어디로도 올라가지 않았어요."
+        />
+      </>
     );
   }
 
   return (
     <>
+      {picker}
       <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6">
         <p className="text-[15px] leading-relaxed text-text-muted">
           사진을 고르면 언제 어디서 찍었는지 읽어 여행으로 묶어 드려요.
@@ -381,17 +458,9 @@ export function PhotoImport() {
             읽기는 이 브라우저 안에서만 일어나고, 사진은 올라가지 않아요.
           </span>
         </p>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="sr-only"
-          onChange={(event) => void handleFiles([...(event.target.files ?? [])])}
-        />
         <button
           type="button"
-          onClick={() => inputRef.current?.click()}
+          onClick={pick}
           className="self-start rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
         >
           사진 고르기
@@ -609,14 +678,21 @@ export function PhotoImport() {
         </label>
       )}
 
-      {uploadNote && (
-        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
-          {uploadNote}
-          <br />
-          <span className="text-[13px] text-text-faint">
-            다 올라갈 때까지 이 창을 닫지 마세요. 여행 기록은 이미 남았고, 사진만 이어서 올라가요.
-          </span>
-        </p>
+      {/*
+        기록하는 동안은 화면을 덮는다. 알리려는 것보다 막으려는 것이 크다 —
+        올리는 중에 다시 누르면 같은 사진이 두 번 올라가고, 자리를 뜨면
+        절반만 올라간 채로 끝난다.
+      */}
+      {saving && (
+        <WaitingOverlay
+          title={uploadNote ? "사진을 올리고 있어요" : "여행을 기록하고 있어요"}
+          detail={uploadNote ?? undefined}
+          note={
+            uploadNote
+              ? "다 올라갈 때까지 이 창을 닫지 마세요. 여행 기록은 이미 남았고, 사진만 이어서 올라가요."
+              : undefined
+          }
+        />
       )}
 
       {visible.length > 0 && userId && (

@@ -15,6 +15,7 @@ import {
   yearOptions,
   type SearchableTrip,
 } from "@/lib/tripSearch";
+import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 
 type Status = "loading" | "guest" | "ready" | "failed";
 
@@ -122,7 +123,7 @@ export function TripList() {
     if (!supabase || stale.length === 0) return;
 
     const outcome = await backfillThumbs(supabase, stale, (done, total) =>
-      setTidying(`정리하는 중… ${done}/${total}`),
+      setTidying(`${done}장 / ${total}장`),
     );
     setTidying(null);
     // 실패한 것이 남아 있으면 다음에 다시 권한다.
@@ -181,7 +182,7 @@ export function TripList() {
   };
 
   if (status === "loading") {
-    return <p className="text-[15px] text-text-faint">불러오는 중…</p>;
+    return <Waiting title="기록을 불러오고 있어요" />;
   }
 
   if (status === "guest") {
@@ -237,6 +238,20 @@ export function TripList() {
 
   return (
     <>
+      {/*
+        사진 수백 장을 다시 만드는 일이다. 도는 동안 다른 데를 누르면
+        절반만 만들어진 채로 끝나므로, 끝날 때까지 화면을 덮는다.
+      */}
+      {tidying && (
+        <WaitingOverlay
+          title="사진을 정리하고 있어요"
+          detail={tidying}
+          note="끝날 때까지 이 창을 닫지 마세요. 원본 사진은 그대로예요."
+        />
+      )}
+
+      {removing && <WaitingOverlay title="기록을 지우고 있어요" />}
+
       <div className="flex flex-col gap-2.5">
         <input
           type="search"
@@ -336,7 +351,7 @@ export function TripList() {
             사진 {stale.length}장을 더 빠르게 열리도록 정리할 수 있어요.
           </p>
           {tidying ? (
-            <span className="text-[13px] font-medium text-text-muted">{tidying}</span>
+            <span className="text-[13px] font-medium text-text-muted">정리하는 중… {tidying}</span>
           ) : (
             <button
               type="button"

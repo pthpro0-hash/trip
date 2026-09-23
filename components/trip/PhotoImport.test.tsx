@@ -187,4 +187,47 @@ describe("PhotoImport", () => {
     expect(screen.getByText(/사진 3장 · 방문 2곳/)).toBeTruthy();
     expect(screen.getByText("송정해변")).toBeTruthy();
   });
+  /*
+    고르기 창을 닫고 나서 파일이 도착할 때까지의 틈.
+
+    수백 장이면 여기서 몇 초가 그냥 흐른다. 그동안 화면이 그대로면
+    사람은 안 눌렸다고 보고 다시 누르므로, 처음부터 다시 시작한다.
+  */
+  describe("고르기 창을 닫은 뒤", () => {
+    async function 창열기() {
+      const { PhotoImport } = await import("./PhotoImport");
+      const view = render(<PhotoImport />);
+      fireEvent.click(screen.getByRole("button", { name: "사진 고르기" }));
+      // 창이 닫히면 초점이 돌아온다. 화면이 안내를 내미는 건 그때부터다.
+      fireEvent.focus(window);
+      return view;
+    }
+
+    it("파일을 기다리는 동안 기다려 달라고 말한다", async () => {
+      await 창열기();
+      await screen.findByText("고르신 사진을 불러오고 있어요");
+      expect(screen.getByText("잠시만 기다려 주세요.")).toBeTruthy();
+    });
+
+    it("창이 떠 있는 동안에는 말하지 않는다", async () => {
+      const { PhotoImport } = await import("./PhotoImport");
+      render(<PhotoImport />);
+      fireEvent.click(screen.getByRole("button", { name: "사진 고르기" }));
+      // 아직 초점이 돌아오지 않았다 — 창은 열려 있다.
+      expect(screen.queryByText("고르신 사진을 불러오고 있어요")).toBeNull();
+    });
+
+    it("고르지 않고 닫으면 안내를 거둔다", async () => {
+      const view = await 창열기();
+      await screen.findByText("고르신 사진을 불러오고 있어요");
+
+      const input = view.container.querySelector('input[type="file"]')!;
+      fireEvent(input, new Event("cancel"));
+
+      await waitFor(() =>
+        expect(screen.queryByText("고르신 사진을 불러오고 있어요")).toBeNull(),
+      );
+      expect(screen.getByRole("button", { name: "사진 고르기" })).toBeTruthy();
+    });
+  });
 });

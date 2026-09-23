@@ -9,6 +9,7 @@ import { getBrowserClient } from "@/lib/supabase/client";
 import { thumbUrls } from "@/lib/supabase/photos";
 import { inlinePhotos } from "@/lib/photo/inlinePhoto";
 import { SketchCard } from "./SketchCard";
+import { WaitingOverlay } from "@/components/layout/Waiting";
 
 /*
   사진을 받아 둘 자리 수.
@@ -116,6 +117,17 @@ export function YearSketch({ year, trips, person, region, written, onWrite }: Ye
 
   return (
     <section className="flex flex-col gap-3">
+      {/*
+        사진을 얹은 카드를 그림 한 장으로 굽는 동안은 브라우저가 멈춘 것처럼
+        보인다. 단추 글씨만으로는 모자라서 화면에 대고 말한다.
+      */}
+      {saving && (
+        <WaitingOverlay
+          title="그림을 만들고 있어요"
+          note="사진을 얹은 카드라 조금 걸려요. 다 되면 저절로 받아져요."
+        />
+      )}
+
       <div ref={holder} className="overflow-hidden rounded-2xl ring-1 ring-line">
         <SketchCard
           sketch={sketch}

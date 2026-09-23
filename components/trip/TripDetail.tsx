@@ -21,6 +21,7 @@ import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
+import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 
 type Status = "loading" | "guest" | "missing" | "ready";
 
@@ -296,7 +297,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
     setConfirmingPhoto(null);
   };
 
-  if (status === "loading") return <p className="text-[15px] text-text-faint">불러오는 중…</p>;
+  if (status === "loading") return <Waiting title="여행을 불러오고 있어요" />;
 
   if (status === "guest") {
     return (
@@ -359,6 +360,13 @@ export function TripDetail({ tripId }: { tripId: string }) {
 
   return (
     <>
+      {/*
+        사진까지 함께 지운다. 장수가 많으면 시간이 걸리고, 도는 동안
+        다른 데를 누르면 절반만 지워진 기록이 남는다.
+      */}
+      {removingTrip && <WaitingOverlay title="여행을 지우고 있어요" />}
+      {removingPhoto && <WaitingOverlay title="사진을 지우고 있어요" />}
+
       <div>
         {/*
           날짜를 값이 아니라 안내 글로 둔다. 값으로 넣으면 이름을 짓지
