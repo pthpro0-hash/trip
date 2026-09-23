@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   shrinkToWebp,
+  THUMB_EDGE,
   thumbFromBlob,
   UnsupportedImageError,
   type Shrunk,
@@ -64,16 +65,30 @@ export async function countPhotos(
 }
 
 /*
-  목록용 작은 판은 보관 경로 옆에 나란히 둔다.
+  목록용 판은 보관 경로 옆에 나란히 둔다.
 
   표에 칸을 더하지 않는 것은, 경로가 규칙으로 정해져 있으면 줄을 고치지
-  않고도 있는지 없는지 물어볼 수 있기 때문이다. 아직 작은 판이 없는
-  예전 사진은 주소를 달라고 해도 안 오고, 그때는 원본으로 물러난다.
+  않고도 있는지 없는지 물어볼 수 있기 때문이다. 아직 없는 예전 사진은
+  주소를 달라고 해도 안 오고, 그때는 원본으로 물러난다.
+
+  이름에 크기를 박아 둔다(.t960.webp). 나중에 크기를 바꾸면 이름이
+  달라지므로, "없다"는 답이 곧 "다시 만들어야 한다"는 뜻이 된다 —
+  따로 표를 뒤지거나 기억해 둘 필요가 없다.
 */
+const SIZED = /\.t\d+\.webp$/i;
+/** 크기를 이름에 넣기 전에 쓰던 이름. 다시 만든 뒤 지운다. */
+const LEGACY = ".thumb.webp";
+
 export function thumbPath(storagePath: string): string {
-  // 두 번 걸어도 .thumb.thumb 이 되지 않게 한다.
-  if (/\.thumb\.webp$/i.test(storagePath)) return storagePath;
-  return storagePath.replace(/\.webp$/i, ".thumb.webp");
+  // 두 번 걸어도 겹치지 않게 한다.
+  if (SIZED.test(storagePath)) return storagePath;
+  return storagePath.replace(/\.webp$/i, `.t${THUMB_EDGE}.webp`);
+}
+
+/** 예전 이름. 낡은 판을 치우는 데만 쓴다. */
+export function legacyThumbPath(storagePath: string): string {
+  if (storagePath.endsWith(LEGACY)) return storagePath;
+  return storagePath.replace(/\.webp$/i, LEGACY);
 }
 
 /** 한 장의 결말. 나란히 끝나도 세는 순서가 흔들리지 않게 자리에 담아 둔다. */
@@ -365,6 +380,12 @@ export async function backfillThumbs(
         .upload(thumbPath(path), thumb, { contentType: "image/webp", upsert: true });
 
       if (error) throw new Error("upload failed");
+
+      /*
+        새 판이 올라간 뒤에야 낡은 판을 치운다. 순서가 바뀌면 중간에
+        끊겼을 때 아무 판도 없는 사진이 생긴다.
+      */
+      await supabase.storage.from(BUCKET).remove([legacyThumbPath(path)]);
       outcome.made += 1;
     } catch {
       // 한 장 실패했다고 나머지를 포기하지 않는다. 다음에 다시 하면 된다.
@@ -398,7 +419,10 @@ export async function deletePhoto(
 
   if (error) return false;
 
-  await supabase.storage.from(BUCKET).remove([photo.storagePath, thumbPath(photo.storagePath)]);
+  await supabase.storage
+    .from(BUCKET)
+    // 낡은 이름도 함께 치운다. 아직 다시 만들지 않은 사진일 수 있다.
+    .remove([photo.storagePath, thumbPath(photo.storagePath), legacyThumbPath(photo.storagePath)]);
   await syncPhotoCount(supabase, userId, photo.visitId);
   return true;
 }

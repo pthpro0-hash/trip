@@ -2,13 +2,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  backfillThumbs,
   PHOTO_LIMIT,
   UPLOAD_LANES,
+  legacyThumbPath,
   thumbPath,
   thumbUrls,
   uploadPhotos,
   type UploadTarget,
 } from "./photos";
+import { THUMB_EDGE } from "@/lib/photo/resize";
 import { UnsupportedImageError } from "@/lib/photo/resize";
 
 /*
@@ -21,6 +24,8 @@ const shrink = vi.fn<(file: File) => Promise<{ full: Blob; thumb: Blob }>>();
 vi.mock("@/lib/photo/resize", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/photo/resize")>()),
   shrinkToWebp: (file: File) => shrink(file),
+  // node 에는 createImageBitmap 이 없다. 줄이는 일 자체는 여기서 볼 것이 아니다.
+  thumbFromBlob: async () => new Blob(["t"]),
 }));
 
 function target(name: string): UploadTarget {
@@ -264,13 +269,23 @@ describe("uploadPhotos", () => {
   없을 때 원본으로 물러나는 길이 반드시 살아 있어야 한다.
 */
 describe("thumbPath", () => {
-  it("보관 경로 옆에 나란히 둔다", () => {
-    expect(thumbPath("나/v1/abc.webp")).toBe("나/v1/abc.thumb.webp");
+  it("이름에 크기를 박아 둔다", () => {
+    // 크기가 이름에 있으면 "없다"는 답이 곧 "다시 만들어야 한다"가 된다.
+    expect(thumbPath("나/v1/abc.webp")).toBe(`나/v1/abc.t${THUMB_EDGE}.webp`);
   });
 
   it("두 번 붙이지 않는다", () => {
-    // 이미 작은 판인 경로를 다시 넣어도 .thumb.thumb 이 되지 않는다.
-    expect(thumbPath(thumbPath("나/v1/abc.webp"))).toBe("나/v1/abc.thumb.webp");
+    expect(thumbPath(thumbPath("나/v1/abc.webp"))).toBe(`나/v1/abc.t${THUMB_EDGE}.webp`);
+  });
+
+  it("크기를 바꾸면 이름이 달라진다 — 그래서 저절로 다시 만들어진다", () => {
+    // 예전 480px 판은 지금 이름과 다르므로 "없는 것"으로 잡힌다.
+    expect(thumbPath("나/v1/abc.webp")).not.toBe("나/v1/abc.t480.webp");
+  });
+
+  it("예전 이름도 따로 알아본다 — 다시 만든 뒤 치우려고", () => {
+    expect(legacyThumbPath("나/v1/abc.webp")).toBe("나/v1/abc.thumb.webp");
+    expect(legacyThumbPath(legacyThumbPath("나/v1/abc.webp"))).toBe("나/v1/abc.thumb.webp");
   });
 });
 
@@ -294,9 +309,9 @@ describe("thumbUrls", () => {
   }
 
   it("작은 판이 있으면 그것을 준다", async () => {
-    const urls = await thumbUrls(fakeStorage(["나/v1/a.thumb.webp"]), ["나/v1/a.webp"]);
+    const urls = await thumbUrls(fakeStorage([`나/v1/a.t${THUMB_EDGE}.webp`]), ["나/v1/a.webp"]);
     // 열쇠는 언제나 원본 경로다. 부르는 쪽은 무엇이 왔는지 몰라도 된다.
-    expect(urls.get("나/v1/a.webp")).toBe("https://예시/나/v1/a.thumb.webp");
+    expect(urls.get("나/v1/a.webp")).toBe(`https://예시/나/v1/a.t${THUMB_EDGE}.webp`);
   });
 
   it("작은 판이 없으면 원본으로 물러난다 — 예전에 올린 사진들", async () => {
@@ -305,15 +320,68 @@ describe("thumbUrls", () => {
   });
 
   it("섞여 있어도 각자 제 것을 찾아간다", async () => {
-    const urls = await thumbUrls(fakeStorage(["나/v1/새.thumb.webp", "나/v1/옛.webp"]), [
+    const urls = await thumbUrls(fakeStorage([`나/v1/새.t${THUMB_EDGE}.webp`, "나/v1/옛.webp"]), [
       "나/v1/새.webp",
       "나/v1/옛.webp",
     ]);
-    expect(urls.get("나/v1/새.webp")).toBe("https://예시/나/v1/새.thumb.webp");
+    expect(urls.get("나/v1/새.webp")).toBe(`https://예시/나/v1/새.t${THUMB_EDGE}.webp`);
     expect(urls.get("나/v1/옛.webp")).toBe("https://예시/나/v1/옛.webp");
   });
 
   it("빈 목록에는 묻지 않는다", async () => {
     expect(await thumbUrls(fakeStorage([]), [])).toEqual(new Map());
+  });
+});
+
+/*
+  크기를 바꾸면 이름이 달라지므로 예전 판이 고아로 남는다.
+  다시 만든 뒤 치우되, 순서가 중요하다 — 먼저 치우고 만들다 끊기면
+  아무 판도 없는 사진이 생긴다.
+*/
+describe("backfillThumbs · 낡은 판 치우기", () => {
+  function fake(옵션: { uploadFails?: boolean } = {}) {
+    const state = { uploaded: [] as string[], removed: [] as string[] };
+    const supabase = {
+      storage: {
+        from: () => ({
+          createSignedUrls: async (paths: string[]) => ({
+            data: paths.map((path) => ({ path, signedUrl: `https://예시/${path}` })),
+            error: null,
+          }),
+          upload: async (path: string) => {
+            if (옵션.uploadFails) return { error: { message: "nope" } };
+            state.uploaded.push(path);
+            return { error: null };
+          },
+          remove: async (paths: string[]) => {
+            state.removed.push(...paths);
+            return { error: null };
+          },
+        }),
+      },
+    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    return { supabase, state };
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", async () => ({ ok: true, blob: async () => new Blob(["x"]) }));
+  });
+
+  it("새 판을 만들고 예전 판을 치운다", async () => {
+    const { supabase, state } = fake();
+    const outcome = await backfillThumbs(supabase, ["나/v1/a.webp"]);
+
+    expect(outcome).toEqual({ made: 1, failed: 0 });
+    expect(state.uploaded).toEqual([`나/v1/a.t${THUMB_EDGE}.webp`]);
+    expect(state.removed).toEqual(["나/v1/a.thumb.webp"]);
+  });
+
+  it("만들지 못하면 예전 판을 치우지 않는다", async () => {
+    const { supabase, state } = fake({ uploadFails: true });
+    const outcome = await backfillThumbs(supabase, ["나/v1/a.webp"]);
+
+    expect(outcome).toEqual({ made: 0, failed: 1 });
+    // 치웠다면 아무 판도 없는 사진이 됐을 것이다.
+    expect(state.removed).toEqual([]);
   });
 });
