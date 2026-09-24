@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
@@ -131,11 +131,29 @@ export function TripList() {
   };
 
   /*
+    돌아갈 자리는 무엇보다 먼저 꺼낸다.
+
+    늦게 꺼내면 이미 지워져 있다. 돌아오는 길에 목록은 반드시 한 번 맨
+    위로 튕긴다 — 새 화면은 아직 비어 있어 문서가 짧고, 브라우저는 갈
+    수 없는 자리에서 사람을 끌어내린다. Next 도 새 화면을 그리면 맨
+    위로 올린다. 그 튕김을 "보던 자리"로 적어 버리면 1840 자리에 0 이
+    덮여, 옮길 때가 되어도 돌아갈 자리 자체가 없다.
+
+    그래서 그리기 전에, 아직 아무 소식도 들을 수 없는 이때 꺼내 둔다.
+  */
+  const [wanted] = useState(() => takeScroll());
+  /** 되짚는 동안 적은 자리는 사람이 고른 자리가 아니다. */
+  const restoring = useRef(wanted !== null);
+
+  /*
     보던 자리를 적어 둔다. 상세에 들어갔다 "← 내 스케치"로 돌아오면
     거기서부터 다시 본다.
   */
   useEffect(() => {
-    const onScroll = () => rememberScroll(window.scrollY);
+    const onScroll = () => {
+      if (restoring.current) return;
+      rememberScroll(window.scrollY);
+    };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -145,15 +163,20 @@ export function TripList() {
     내려갈 수가 없다.
 
     한 번 옮기고 마는 대신 잠깐 되짚는다. 사진 주소는 목록보다 늦게
-    오고, Next 도 새 화면을 그린 뒤 한 번 맨 위로 끌어올린다. 사람이
-    손을 대면 그 즉시 그만둔다.
+    오고, 정리 권유 띠도 늦게 끼어든다. 사람이 손을 대면 그 즉시
+    그만두고, 그때부터 다시 자리를 적는다.
   */
   useEffect(() => {
-    if (status !== "ready") return;
-    const y = takeScroll();
-    if (y === null) return;
-    return restoreScroll(y);
-  }, [status]);
+    if (wanted === null) return;
+    // 목록이 오지 않을 자리라면 — 손님이거나 실패했거나 — 붙잡지 않는다.
+    if (status !== "ready") {
+      if (status !== "loading") restoring.current = false;
+      return;
+    }
+    return restoreScroll(wanted, () => {
+      restoring.current = false;
+    });
+  }, [status, wanted]);
 
   const visible = useMemo(() => {
     const matchedIds = new Set(searchTrips(searchable, query).map((trip) => trip.id));

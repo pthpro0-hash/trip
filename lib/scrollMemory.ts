@@ -52,47 +52,65 @@ export function takeScroll(): number | null {
   return Number.isFinite(saved) && saved > 0 ? saved : null;
 }
 
-/** 자리를 되짚는 시간. 60프레임이면 1초쯤이다. */
-const TRIES = 60;
+/** 되짚기를 포기하는 한계. 프레임으로 센다 — 화면이 멈춰 있는 동안은 흐르지 않는다. */
+const LIMIT = 180;
+
+/** 자리와 길이가 이만큼 그대로면 다 앉은 것으로 본다. */
+const SETTLED = 30;
 
 /**
- * 그 자리로 옮긴다. 한 번으로 끝내지 않고 잠깐 되짚는다.
+ * 그 자리로 옮긴다. 한 번으로 끝내지 않고 자리가 앉을 때까지 되짚는다.
  *
  * 한 번만 옮기면 대개 실패한다. 그때의 문서는 아직 짧아서 — 사진이
  * 덜 왔거나 이제 막 그려졌거나 — 브라우저가 갈 수 있는 데까지만
  * 데려다 놓고 만다. 문서가 길어지고 나면 사람은 이미 맨 위에 있다.
  *
- * 그래서 자리가 잡힐 때까지 매 프레임 되짚는다. 사람이 손을 대면
- * 그 순간 그만둔다 — 되짚기가 사람과 힘겨루기를 하면 안 된다.
+ * 시간이 아니라 프레임으로 센다. 화면을 옮겨 가는 동안 브라우저는 그림
+ * 그리기를 멈추는데, 초로 세면 그 멈춘 시간이 그대로 깎여 정작 그릴 수
+ * 있게 되었을 때는 이미 포기한 뒤다.
  *
+ * 자리와 길이가 한동안 그대로면 그만둔다. 늦게 끼어드는 것이 — 사진,
+ * 권유 띠 — 다 들어왔다는 뜻이다. 사람이 손을 대면 그 즉시 그만둔다.
+ *
+ * @param onStop 되짚기가 끝났을 때. 끝나고 나서야 자리를 다시 적을 수 있다.
  * @returns 되짚기를 멈추는 함수.
  */
-export function restoreScroll(y: number): () => void {
-  let left = TRIES;
-  let frame = 0;
+export function restoreScroll(y: number, onStop?: () => void): () => void {
+  let frames = 0;
+  /** 아무것도 변하지 않은 채 지나간 프레임 수. */
+  let still = 0;
+  let height = -1;
+  let id = 0;
   let stopped = false;
 
   const stop = () => {
     if (stopped) return;
     stopped = true;
-    cancelAnimationFrame(frame);
+    cancelAnimationFrame(id);
     window.removeEventListener("wheel", stop);
     window.removeEventListener("touchstart", stop);
     window.removeEventListener("keydown", stop);
+    onStop?.();
   };
 
   const tick = () => {
     if (stopped) return;
+
+    const grown = document.documentElement.scrollHeight;
     // 1px 차이로 다시 옮기면 사람이 살짝 굴린 것까지 되돌린다.
-    if (Math.abs(window.scrollY - y) > 2) window.scrollTo(0, y);
-    if (--left > 0) frame = requestAnimationFrame(tick);
-    else stop();
+    const there = Math.abs(window.scrollY - y) <= 2;
+    still = there && grown === height ? still + 1 : 0;
+    height = grown;
+    if (!there) window.scrollTo(0, y);
+
+    if (still >= SETTLED || ++frames >= LIMIT) stop();
+    else id = requestAnimationFrame(tick);
   };
 
   window.addEventListener("wheel", stop, { passive: true });
   window.addEventListener("touchstart", stop, { passive: true });
   window.addEventListener("keydown", stop);
-  frame = requestAnimationFrame(tick);
+  id = requestAnimationFrame(tick);
 
   return stop;
 }

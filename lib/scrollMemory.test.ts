@@ -142,6 +142,20 @@ describe("restoreScroll", () => {
     expect(y).toBe(0);
   });
 
+  it("자리가 앉으면 일찍 그만둔다", () => {
+    끝 = 4000;
+    let 끝났나 = false;
+    restoreScroll(1200, () => {
+      끝났나 = true;
+    });
+    프레임(40);
+
+    expect(y).toBe(1200);
+    // 다 앉았으니 더 붙잡고 있지 않는다. 그래야 다시 자리를 적기 시작한다.
+    expect(대기).toHaveLength(0);
+    expect(끝났나).toBe(true);
+  });
+
   it("끝내 닿지 못해도 언젠가 멈춘다", () => {
     // 목록이 영영 짧으면 — 기록을 지운 뒤 같은 때 — 붙잡고 있지 않는다.
     끝 = 50;

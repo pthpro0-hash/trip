@@ -222,6 +222,65 @@ describe("보던 자리로 돌아오기", () => {
     expect(scrollTo).toHaveBeenCalledWith(0, 1840);
   });
 
+  /*
+    돌아오는 길에 목록은 반드시 한 번 맨 위로 튕긴다.
+
+    새 화면은 아직 비어 있어 문서가 짧고, 브라우저는 갈 수 없는 자리에서
+    사람을 끌어내린다. Next 도 새 화면을 그리면 맨 위로 올린다. 그 튕김이
+    "보던 자리"로 적히면 1840 자리에 0 이 덮여, 돌아갈 자리 자체가 사라진다.
+  */
+  it("돌아오는 길에 맨 위로 튕겨도 자리를 잃지 않는다", async () => {
+    window.sessionStorage.setItem("trips:scroll", "1840");
+    window.sessionStorage.setItem("trips:restore", "1");
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+    vi.resetModules();
+    const { TripList } = await import("./TripList");
+    render(<TripList />);
+    // 목록이 오기 전. 여기서 브라우저가 맨 위로 끌어내린다.
+    window.dispatchEvent(new Event("scroll"));
+
+    await screen.findByText("민수랑 첫 휴가");
+    await 다음프레임();
+
+    expect(scrollTo).toHaveBeenCalledWith(0, 1840);
+  });
+
+  it("되짚는 동안 튕긴 자리는 적어 두지 않는다", async () => {
+    window.sessionStorage.setItem("trips:scroll", "1840");
+    window.sessionStorage.setItem("trips:restore", "1");
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+    vi.resetModules();
+    const { TripList } = await import("./TripList");
+    render(<TripList />);
+    window.dispatchEvent(new Event("scroll"));
+    await screen.findByText("민수랑 첫 휴가");
+    await 다음프레임();
+    window.dispatchEvent(new Event("scroll"));
+
+    // 되짚는 중에 들리는 자리는 사람이 고른 자리가 아니다.
+    expect(window.sessionStorage.getItem("trips:scroll")).toBe("1840");
+  });
+
+  it("사람이 손을 대면 그때부터 다시 적는다", async () => {
+    window.sessionStorage.setItem("trips:scroll", "1840");
+    window.sessionStorage.setItem("trips:restore", "1");
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+
+    vi.resetModules();
+    const { TripList } = await import("./TripList");
+    render(<TripList />);
+    await screen.findByText("민수랑 첫 휴가");
+    await 다음프레임();
+
+    // 사람이 굴렸다. 되짚기는 손을 떼고, 지금 자리가 곧 보던 자리가 된다.
+    window.dispatchEvent(new Event("wheel"));
+    window.dispatchEvent(new Event("scroll"));
+
+    expect(window.sessionStorage.getItem("trips:scroll")).toBe("0");
+  });
+
   it("그냥 들어온 사람은 맨 위에서 시작한다", async () => {
     // 위 띠의 "내 스케치"를 눌러 온 경우 — 돌아가 달라는 표시가 없다.
     window.sessionStorage.setItem("trips:scroll", "1840");
