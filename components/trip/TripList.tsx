@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
-import { rememberScroll, restoreScroll, takeScroll } from "@/lib/scrollMemory";
+import { cardId, forgetTrip, peekTrip, restoreToTrip } from "@/lib/scrollMemory";
 import { backfillThumbs, missingThumbs, thumbUrls } from "@/lib/supabase/photos";
 import {
   companionOptions,
@@ -131,52 +131,25 @@ export function TripList() {
   };
 
   /*
-    돌아갈 자리는 무엇보다 먼저 꺼낸다.
+    돌아가 설 여행은 무엇보다 먼저 꺼낸다.
 
-    늦게 꺼내면 이미 지워져 있다. 돌아오는 길에 목록은 반드시 한 번 맨
-    위로 튕긴다 — 새 화면은 아직 비어 있어 문서가 짧고, 브라우저는 갈
-    수 없는 자리에서 사람을 끌어내린다. Next 도 새 화면을 그리면 맨
-    위로 올린다. 그 튕김을 "보던 자리"로 적어 버리면 1840 자리에 0 이
-    덮여, 옮길 때가 되어도 돌아갈 자리 자체가 없다.
-
-    그래서 그리기 전에, 아직 아무 소식도 들을 수 없는 이때 꺼내 둔다.
+    늦게 꺼낼수록 잃을 일만 많아진다. 그리기 전에, 아직 아무 소식도
+    들을 수 없는 이때가 가장 안전하다.
   */
-  const [wanted] = useState(() => takeScroll());
-  /** 되짚는 동안 적은 자리는 사람이 고른 자리가 아니다. */
-  const restoring = useRef(wanted !== null);
+  const [focus] = useState(() => peekTrip());
 
   /*
-    보던 자리를 적어 둔다. 상세에 들어갔다 "← 내 스케치"로 돌아오면
-    거기서부터 다시 본다.
+    그 여행 카드 앞에 세운다.
+
+    목록이 다 온 뒤에 시작한다. 그 전에는 카드가 아예 없다. 시작한
+    뒤에도 한 번에 되지 않는다 — 사진과 권유 띠가 뒤늦게 끼어들며
+    높이가 바뀌므로, 카드가 제자리에 앉을 때까지 되짚는다. 사람이 손을
+    대면 그 즉시 그만둔다.
   */
   useEffect(() => {
-    const onScroll = () => {
-      if (restoring.current) return;
-      rememberScroll(window.scrollY);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  /*
-    목록이 다 그려진 뒤에 옮긴다. 그리기 전에는 문서가 짧아 그만큼
-    내려갈 수가 없다.
-
-    한 번 옮기고 마는 대신 잠깐 되짚는다. 사진 주소는 목록보다 늦게
-    오고, 정리 권유 띠도 늦게 끼어든다. 사람이 손을 대면 그 즉시
-    그만두고, 그때부터 다시 자리를 적는다.
-  */
-  useEffect(() => {
-    if (wanted === null) return;
-    // 목록이 오지 않을 자리라면 — 손님이거나 실패했거나 — 붙잡지 않는다.
-    if (status !== "ready") {
-      if (status !== "loading") restoring.current = false;
-      return;
-    }
-    return restoreScroll(wanted, () => {
-      restoring.current = false;
-    });
-  }, [status, wanted]);
+    if (!focus || status !== "ready") return;
+    return restoreToTrip(focus, forgetTrip);
+  }, [status, focus]);
 
   const visible = useMemo(() => {
     const matchedIds = new Set(searchTrips(searchable, query).map((trip) => trip.id));
@@ -391,7 +364,19 @@ export function TripList() {
 
       <ol className="flex flex-col gap-4">
         {visible.map((trip) => (
-          <li key={trip.id} className="flex flex-col gap-2.5 rounded-2xl bg-surface p-5 ring-1 ring-line">
+          /*
+            카드마다 이름표를 단다. 돌아온 사람을 세울 때 이걸로 찾는다.
+
+            돌아와 선 카드는 잠깐 테를 두른다. 목록 한가운데 떨어뜨려
+            놓고 아무 말이 없으면 "내가 보던 게 이거 맞나" 싶다.
+          */
+          <li
+            key={trip.id}
+            id={cardId(trip.id)}
+            className={`flex flex-col gap-2.5 rounded-2xl bg-surface p-5 ring-1 transition-[box-shadow] duration-700 ${
+              focus === trip.id ? "ring-2 ring-accent" : "ring-line"
+            }`}
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 {/*

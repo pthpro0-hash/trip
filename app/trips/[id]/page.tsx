@@ -13,7 +13,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-5 px-5 pb-16 pt-8">
-      <BackToSketches />
+      <BackToSketches tripId={id} />
       <TripDetail tripId={id} />
       {/* 사진이 수십 장이라 화면이 길다. 늘 같은 자리에 둔다. */}
       <ScrollTop />

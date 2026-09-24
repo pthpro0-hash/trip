@@ -1,51 +1,32 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { askRestore, rememberScroll, restoreScroll, takeScroll } from "./scrollMemory";
+import { cardId, forgetTrip, peekTrip, rememberTrip, restoreToTrip } from "./scrollMemory";
 
 /*
   스물다섯 번째 여행을 보려고 한참 내려갔다 상세로 들어갔다 돌아오면
-  맨 위였다. 그 자리로 데려가되, 아무 때나 끌고 가지는 않는다.
+  맨 위였다. 그 여행 카드 앞에 다시 세운다.
 */
 describe("scrollMemory", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
   });
 
-  it("돌아가 달라고 했을 때만 자리를 되살린다", () => {
-    rememberScroll(1200);
-    // 위 띠의 "내 스케치"를 눌러 온 사람은 처음부터 보려는 것이다.
-    expect(takeScroll()).toBeNull();
+  it("적어 둔 여행을 읽되, 읽는다고 지우지는 않는다", () => {
+    rememberTrip("t8");
+    // 두 번 물어도 같은 답이라야 한다. React 는 시작을 두 번 하기도 한다.
+    expect(peekTrip()).toBe("t8");
+    expect(peekTrip()).toBe("t8");
 
-    rememberScroll(1200);
-    askRestore();
-    expect(takeScroll()).toBe(1200);
-  });
-
-  it("한 번 꺼내면 표시가 지워진다 — 새로고침마다 끌려가지 않게", () => {
-    rememberScroll(800);
-    askRestore();
-    expect(takeScroll()).toBe(800);
-    expect(takeScroll()).toBeNull();
-  });
-
-  it("맨 위였으면 되살릴 것이 없다", () => {
-    rememberScroll(0);
-    askRestore();
-    expect(takeScroll()).toBeNull();
+    forgetTrip();
+    expect(peekTrip()).toBeNull();
   });
 
   it("적어 둔 적이 없으면 null", () => {
-    askRestore();
-    expect(takeScroll()).toBeNull();
+    expect(peekTrip()).toBeNull();
   });
 
-  it("소수점과 음수를 정리해 둔다", () => {
-    rememberScroll(640.7);
-    askRestore();
-    expect(takeScroll()).toBe(641);
-
-    rememberScroll(-5);
-    askRestore();
-    expect(takeScroll()).toBeNull();
+  it("빈 이름은 적지 않는다", () => {
+    rememberTrip("");
+    expect(peekTrip()).toBeNull();
   });
 
   it("저장소가 막혀 있어도 던지지 않는다", () => {
@@ -55,9 +36,9 @@ describe("scrollMemory", () => {
     const original = Object.getOwnPropertyDescriptor(window, "sessionStorage");
     Object.defineProperty(window, "sessionStorage", { get: blocked, configurable: true });
 
-    expect(() => rememberScroll(100)).not.toThrow();
-    expect(() => askRestore()).not.toThrow();
-    expect(takeScroll()).toBeNull();
+    expect(() => rememberTrip("t1")).not.toThrow();
+    expect(() => forgetTrip()).not.toThrow();
+    expect(peekTrip()).toBeNull();
 
     if (original) Object.defineProperty(window, "sessionStorage", original);
   });
@@ -66,17 +47,21 @@ describe("scrollMemory", () => {
 /*
   되짚기.
 
-  한 번만 옮기면 거의 늘 실패한다. 그때의 목록은 아직 짧아서 — 사진
-  주소가 덜 왔다 — 브라우저가 갈 수 있는 데까지만 데려다 놓는다.
-  사진이 들어와 목록이 길어지고 나면 사람은 이미 맨 위에 있다.
+  한 번만 옮기면 거의 늘 실패한다. 그때의 목록은 아직 짧아서 — 카드가
+  아예 없거나, 사진과 권유 띠가 덜 왔다 — 브라우저가 갈 수 있는 데까지만
+  데려다 놓는다. 목록이 길어지고 나면 사람은 엉뚱한 자리에 있다.
 */
-describe("restoreScroll", () => {
+describe("restoreToTrip", () => {
   let y = 0;
   /** 문서가 짧으면 여기까지밖에 못 내려간다. 브라우저가 하는 그대로. */
   let 끝 = 0;
+  /** 문서 맨 위에서 카드까지의 거리. 목록이 길어지면 이것도 밀린다. */
+  let 카드자리: number | null = null;
   let 대기: FrameRequestCallback[] = [];
+
   const 원래 = {
     scrollY: Object.getOwnPropertyDescriptor(window, "scrollY"),
+    innerHeight: Object.getOwnPropertyDescriptor(window, "innerHeight"),
     scrollTo: window.scrollTo,
     raf: window.requestAnimationFrame,
     caf: window.cancelAnimationFrame,
@@ -87,11 +72,26 @@ describe("restoreScroll", () => {
     for (let i = 0; i < 번; i += 1) 대기.shift()?.(0);
   };
 
+  /** 목록에 카드를 놓는다. 화면 기준 위치는 문서상 자리에서 스크롤을 뺀 값이다. */
+  const 카드놓기 = (문서상: number) => {
+    카드자리 = 문서상;
+    let el = document.getElementById(cardId("t8"));
+    if (!el) {
+      el = document.createElement("div");
+      el.id = cardId("t8");
+      document.body.appendChild(el);
+    }
+    el.getBoundingClientRect = () => ({ top: 카드자리! - y }) as DOMRect;
+  };
+
   beforeEach(() => {
     y = 0;
     끝 = 0;
+    카드자리 = null;
     대기 = [];
+    document.body.innerHTML = "";
     Object.defineProperty(window, "scrollY", { get: () => y, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 800, configurable: true });
     window.scrollTo = ((_x: number, to: number) => {
       y = Math.max(0, Math.min(to, 끝));
     }) as typeof window.scrollTo;
@@ -102,65 +102,104 @@ describe("restoreScroll", () => {
 
   afterEach(() => {
     if (원래.scrollY) Object.defineProperty(window, "scrollY", 원래.scrollY);
+    if (원래.innerHeight) Object.defineProperty(window, "innerHeight", 원래.innerHeight);
     window.scrollTo = 원래.scrollTo;
     window.requestAnimationFrame = 원래.raf;
     window.cancelAnimationFrame = 원래.caf;
+    document.body.innerHTML = "";
   });
 
-  it("목록이 길어질 때까지 되짚는다", () => {
-    // 사진이 아직 안 왔다. 갈 수 있는 데까지만 간다.
-    끝 = 300;
-    restoreScroll(1200);
-    프레임();
-    expect(y).toBe(300);
+  it("카드를 화면 위에서 조금 내려온 자리에 세운다", () => {
+    끝 = 9000;
+    카드놓기(4000);
+    restoreToTrip("t8");
+    프레임(3);
 
-    // 사진이 들어와 목록이 길어졌다. 이제야 제자리에 닿는다.
-    끝 = 4000;
-    프레임();
-    expect(y).toBe(1200);
+    // 800 의 30% = 240. 카드가 딱 맨 위에 붙으면 위 띠에 가린다.
+    expect(y).toBe(4000 - 240);
+  });
+
+  it("카드가 아직 없으면 생길 때까지 기다린다", () => {
+    끝 = 9000;
+    restoreToTrip("t8");
+    프레임(5);
+    expect(y).toBe(0);
+
+    // 목록이 도착했다.
+    카드놓기(4000);
+    프레임(3);
+    expect(y).toBe(3760);
+  });
+
+  it("목록이 길어져 카드가 밀리면 따라간다", () => {
+    // 사진도 권유 띠도 아직. 문서가 짧아 갈 수 있는 데까지만 간다.
+    끝 = 500;
+    카드놓기(4000);
+    restoreToTrip("t8");
+    프레임(2);
+    expect(y).toBe(500);
+
+    // 사진이 들어오고 권유 띠가 끼어들며 카드가 더 아래로 밀렸다.
+    끝 = 12000;
+    카드놓기(6000);
+    프레임(3);
+    expect(y).toBe(6000 - 240);
   });
 
   it("사람이 손을 대면 그만둔다", () => {
-    끝 = 4000;
-    restoreScroll(1200);
-    프레임();
-    expect(y).toBe(1200);
+    끝 = 9000;
+    카드놓기(4000);
+    let 끝났나 = false;
+    restoreToTrip("t8", () => {
+      끝났나 = true;
+    });
+    프레임(3);
+    expect(y).toBe(3760);
 
-    // 사람이 위로 굴렸다. 되짚기가 힘겨루기를 하면 안 된다.
     window.dispatchEvent(new Event("wheel"));
     y = 400;
     프레임(5);
+
     expect(y).toBe(400);
+    // 사람이 그만두라 한 것도 다 한 것이다. 적어 둔 여행은 지운다.
+    expect(끝났나).toBe(true);
   });
 
-  it("그만두라면 그만둔다", () => {
-    끝 = 4000;
-    const 그만 = restoreScroll(1200);
-    그만();
-    y = 0;
-    프레임(5);
-    expect(y).toBe(0);
+  /*
+    화면이 접히면서 손을 떼는 것은 "다 했다"가 아니다. 그때 적어 둔
+    여행까지 지워 버리면, 곧바로 다시 그려질 때 돌아갈 곳을 잃는다.
+  */
+  it("도중에 걷히면 적어 둔 것을 지우지 않는다", () => {
+    끝 = 9000;
+    카드놓기(4000);
+    let 끝났나 = false;
+    const 걷기 = restoreToTrip("t8", () => {
+      끝났나 = true;
+    });
+    프레임(2);
+    걷기();
+
+    expect(끝났나).toBe(false);
   });
 
   it("자리가 앉으면 일찍 그만둔다", () => {
-    끝 = 4000;
+    끝 = 9000;
+    카드놓기(4000);
     let 끝났나 = false;
-    restoreScroll(1200, () => {
+    restoreToTrip("t8", () => {
       끝났나 = true;
     });
     프레임(40);
 
-    expect(y).toBe(1200);
-    // 다 앉았으니 더 붙잡고 있지 않는다. 그래야 다시 자리를 적기 시작한다.
+    expect(y).toBe(3760);
     expect(대기).toHaveLength(0);
     expect(끝났나).toBe(true);
   });
 
-  it("끝내 닿지 못해도 언젠가 멈춘다", () => {
-    // 목록이 영영 짧으면 — 기록을 지운 뒤 같은 때 — 붙잡고 있지 않는다.
-    끝 = 50;
-    restoreScroll(1200);
-    프레임(200);
+  it("카드가 끝내 나타나지 않아도 언젠가 멈춘다", () => {
+    끝 = 9000;
+    restoreToTrip("t8");
+    프레임(220);
     expect(대기).toHaveLength(0);
   });
 });

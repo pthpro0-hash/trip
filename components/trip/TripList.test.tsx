@@ -202,7 +202,7 @@ describe("작은 판 정리 권유", () => {
   });
 });
 
-describe("보던 자리로 돌아오기", () => {
+describe("보던 여행으로 돌아오기", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
     vi.restoreAllMocks();
@@ -211,79 +211,37 @@ describe("보던 자리로 돌아오기", () => {
   /** 다음 프레임에 옮기므로, 그때까지 기다려 준다. */
   const 다음프레임 = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
-  it("상세에서 돌아오면 보던 자리로 데려간다", async () => {
-    window.sessionStorage.setItem("trips:scroll", "1840");
-    window.sessionStorage.setItem("trips:restore", "1");
+  /*
+    돌아오면 그 여행 카드 앞에 선다.
+
+    픽셀이 아니라 여행을 적어 둔다. 상세로 오는 길은 목록 말고도
+    여럿이고(한 장으로 보기의 점, 권역 목록, 주소 직접 열기), 돌아오는
+    동안 목록은 한 번 튕기고 사진과 권유 띠가 뒤늦게 끼어들며 높이가
+    바뀐다. 카드는 그 모든 것을 견딘다.
+  */
+  it("돌아오면 그 여행 카드 앞에 선다", async () => {
+    window.sessionStorage.setItem("trips:focus", "t2");
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
 
     await 목록();
     await 다음프레임();
 
-    expect(scrollTo).toHaveBeenCalledWith(0, 1840);
+    expect(document.getElementById("trip-t2")).toBeTruthy();
+    expect(scrollTo).toHaveBeenCalled();
   });
 
-  /*
-    돌아오는 길에 목록은 반드시 한 번 맨 위로 튕긴다.
-
-    새 화면은 아직 비어 있어 문서가 짧고, 브라우저는 갈 수 없는 자리에서
-    사람을 끌어내린다. Next 도 새 화면을 그리면 맨 위로 올린다. 그 튕김이
-    "보던 자리"로 적히면 1840 자리에 0 이 덮여, 돌아갈 자리 자체가 사라진다.
-  */
-  it("돌아오는 길에 맨 위로 튕겨도 자리를 잃지 않는다", async () => {
-    window.sessionStorage.setItem("trips:scroll", "1840");
-    window.sessionStorage.setItem("trips:restore", "1");
-    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-
-    vi.resetModules();
-    const { TripList } = await import("./TripList");
-    render(<TripList />);
-    // 목록이 오기 전. 여기서 브라우저가 맨 위로 끌어내린다.
-    window.dispatchEvent(new Event("scroll"));
-
-    await screen.findByText("민수랑 첫 휴가");
-    await 다음프레임();
-
-    expect(scrollTo).toHaveBeenCalledWith(0, 1840);
-  });
-
-  it("되짚는 동안 튕긴 자리는 적어 두지 않는다", async () => {
-    window.sessionStorage.setItem("trips:scroll", "1840");
-    window.sessionStorage.setItem("trips:restore", "1");
+  it("돌아와 선 카드에 테를 둘러 어디인지 알린다", async () => {
+    window.sessionStorage.setItem("trips:focus", "t2");
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
 
-    vi.resetModules();
-    const { TripList } = await import("./TripList");
-    render(<TripList />);
-    window.dispatchEvent(new Event("scroll"));
-    await screen.findByText("민수랑 첫 휴가");
-    await 다음프레임();
-    window.dispatchEvent(new Event("scroll"));
+    await 목록();
 
-    // 되짚는 중에 들리는 자리는 사람이 고른 자리가 아니다.
-    expect(window.sessionStorage.getItem("trips:scroll")).toBe("1840");
-  });
-
-  it("사람이 손을 대면 그때부터 다시 적는다", async () => {
-    window.sessionStorage.setItem("trips:scroll", "1840");
-    window.sessionStorage.setItem("trips:restore", "1");
-    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
-
-    vi.resetModules();
-    const { TripList } = await import("./TripList");
-    render(<TripList />);
-    await screen.findByText("민수랑 첫 휴가");
-    await 다음프레임();
-
-    // 사람이 굴렸다. 되짚기는 손을 떼고, 지금 자리가 곧 보던 자리가 된다.
-    window.dispatchEvent(new Event("wheel"));
-    window.dispatchEvent(new Event("scroll"));
-
-    expect(window.sessionStorage.getItem("trips:scroll")).toBe("0");
+    expect(document.getElementById("trip-t2")?.className).toContain("ring-accent");
+    expect(document.getElementById("trip-t1")?.className).not.toContain("ring-accent");
   });
 
   it("그냥 들어온 사람은 맨 위에서 시작한다", async () => {
-    // 위 띠의 "내 스케치"를 눌러 온 경우 — 돌아가 달라는 표시가 없다.
-    window.sessionStorage.setItem("trips:scroll", "1840");
+    // 위 띠의 "내 스케치"를 눌러 온 경우 — 적어 둔 여행이 없다.
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
 
     await 목록();
@@ -292,11 +250,9 @@ describe("보던 자리로 돌아오기", () => {
     expect(scrollTo).not.toHaveBeenCalled();
   });
 
-  it("목록을 굴리면 그 자리를 적어 둔다", async () => {
+  it("카드마다 찾을 이름표를 단다", async () => {
     await 목록();
-    Object.defineProperty(window, "scrollY", { value: 920, configurable: true });
-    window.dispatchEvent(new Event("scroll"));
-
-    expect(window.sessionStorage.getItem("trips:scroll")).toBe("920");
+    expect(document.getElementById("trip-t1")).toBeTruthy();
+    expect(document.getElementById("trip-t2")).toBeTruthy();
   });
 });
