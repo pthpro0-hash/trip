@@ -3,7 +3,7 @@ import { SketchView } from "@/components/sketch/SketchView";
 
 export const metadata: Metadata = {
   title: "한 장으로 보기",
-  description: "지금까지 다녀온 곳을 한 장으로 모아 봅니다.",
+  description: "한 해의 여행을 한 장의 그림과 이야기로 모아 봅니다.",
   robots: { index: false, follow: false },
 };
 
@@ -14,7 +14,7 @@ export default function SketchPage() {
         <h1 className="text-[28px] font-bold tracking-tight text-text md:text-[32px]">
           한 장으로 보기
         </h1>
-        <p className="mt-1 text-[15px] text-text-muted">지금까지 다녀온 곳을 한 장으로</p>
+        <p className="mt-1 text-[15px] text-text-muted">한 해를 한 장의 그림과 이야기로</p>
       </div>
       <SketchView />
     </main>

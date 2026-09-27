@@ -26,6 +26,7 @@ import {
   replayOrder,
   withinMonths,
   echoOf,
+  yearRange,
   type MonthRange,
 } from "@/lib/timeline";
 import { HubSheet, PEEK, PEEK_EMPTY, snapHeights, type Snap } from "./HubSheet";
@@ -48,9 +49,11 @@ type Status = "loading" | "guest" | "ready" | "failed";
 interface SketchHubProps {
   /** 지도 위에 띄울 큰 갈래(내 스케치 · 여행 100선). */
   switcher: ReactNode;
+  /** 이 해를 골라 둔 채 연다. 한 장으로 보기에서 "다시 걷기"로 넘어올 때. */
+  initialYear?: string;
 }
 
-export function SketchHub({ switcher }: SketchHubProps) {
+export function SketchHub({ switcher, initialYear }: SketchHubProps) {
   const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
   const [userId, setUserId] = useState<string | null>(null);
   const [trips, setTrips] = useState<SavedTrip[]>([]);
@@ -129,6 +132,7 @@ export function SketchHub({ switcher }: SketchHubProps) {
       pinUrls={pinUrls}
       returnTrip={returnTrip}
       today={today}
+      initialYear={initialYear}
       switcher={switcher}
     />
   );
@@ -144,6 +148,8 @@ export interface HubViewProps {
   returnTrip: string | null;
   /** "YYYY-MM-DD". 비어 있으면 "몇 해 전 이맘때"를 찾지 않는다. */
   today?: string;
+  /** 이 해를 골라 둔 채 연다. */
+  initialYear?: string;
   switcher: ReactNode;
 }
 
@@ -161,15 +167,19 @@ export function HubView({
   pinUrls,
   returnTrip,
   today = "",
+  initialYear,
   switcher,
 }: HubViewProps) {
   const wide = useWide();
   const [view, setView] = useState<Bounds | null>(null);
   const [picked, setPicked] = useState<HubPlace[] | null>(null);
   const [focused, setFocused] = useState<string | null>(returnTrip);
-  const [flyTo, setFlyTo] = useState<FlyTarget | null>(() =>
-    returnTrip ? { key: 0, places: places.filter((place) => place.tripId === returnTrip) } : null,
-  );
+  const [flyTo, setFlyTo] = useState<FlyTarget | null>(() => {
+    if (returnTrip) return { key: 0, places: places.filter((place) => place.tripId === returnTrip) };
+    const whole = initialYear ? yearRange(monthSpan(places), initialYear) : null;
+    const within = whole ? withinMonths(places, whole) : [];
+    return within.length > 0 ? { key: 0, places: within } : null;
+  });
   const [snap, setSnap] = useState<Snap>("peek");
   const [frame, setFrame] = useState(0);
   const [dragHeight, setDragHeight] = useState<number | null>(null);
@@ -177,7 +187,14 @@ export function HubView({
   const flights = useRef(0);
   const mapHandle = useRef<HubMapHandle>(null);
   /** 달 막대로 고른 기간. 지도와 목록이 이 기간만 남긴다. */
-  const [range, setRange] = useState<MonthRange | null>(null);
+  /*
+    한 장으로 보기에서 "그해를 지도에서 다시 걷기"로 넘어오면 그해가
+    골라진 채로 연다. 막대에서 그해가 켜져 있고 ▶ 는 "이 기간 다시
+    걷기"가 된다 — 누르기만 하면 된다.
+  */
+  const [range, setRange] = useState<MonthRange | null>(() =>
+    initialYear ? yearRange(monthSpan(places), initialYear) : null,
+  );
   /** 다시 걷는 중이면 걸을 곳들. */
   const [replay, setReplay] = useState<HubPlace[] | null>(null);
   const [walkingAt, setWalkingAt] = useState<HubPlace | null>(null);

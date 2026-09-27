@@ -9,14 +9,8 @@
   거기 있다.
 */
 
-/** 북에서 남으로, 서에서 동으로. 지도를 떠올리며 읽히는 차례. */
-export const SIDO_ORDER = [
-  "서울", "인천", "경기", "강원",
-  "충북", "충남", "대전", "세종",
-  "전북", "전남", "광주", "경북",
-  "대구", "경남", "울산", "부산",
-  "제주",
-];
+export { SIDO_ORDER } from "@/lib/sidoOrder";
+import { SIDO_ORDER } from "@/lib/sidoOrder";
 
 interface CollectionPanelProps {
   /** 시도마다 다녀온 곳 수. */

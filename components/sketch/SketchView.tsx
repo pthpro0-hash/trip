@@ -7,29 +7,36 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { fetchHeadlines, saveHeadline } from "@/lib/supabase/sketchYears";
 import { visitCovers } from "@/lib/supabase/photos";
-import { buildSketch, groupByYear, sketchShapes, type SketchTrip } from "@/lib/sketch";
-import { regionsOfTrip } from "@/lib/photo/region";
-import { REGIONS } from "@/lib/regions";
-import { searchTrips, type SearchableTrip } from "@/lib/tripSearch";
-import type { Region } from "@/lib/types";
-import { RegionPlaces } from "./RegionPlaces";
-import { YearSketch } from "./YearSketch";
+import type { SketchTrip } from "@/lib/sketch";
+import { yearsOf, type SidoOf } from "@/lib/sketchStory";
+import { SketchShowcase } from "./SketchShowcase";
 import { Waiting } from "@/components/layout/Waiting";
+
+/*
+  한 장으로 보기 — 남에게 보여 주는 얼굴.
+
+  예전에는 이 위에 검색·권역·해·함께 거르개가 쌓여 있었다. 찾고 거르는
+  일은 이제 내 스케치 지도가 더 잘한다. 여기서는 한 해를 작품으로 보여
+  주는 데만 힘을 쓴다. 해를 고르는 탭 하나만 남긴다.
+
+  "지금까지 전부"는 아직 없다. 한 장에 모든 해를 담으면 해가 섞여
+  뭉개진다(lib/sketch 참고). 해마다 색을 달리해 뭉개지지 않게 만들 때
+  함께 넣는다.
+*/
 
 type Status = "loading" | "guest" | "failed" | "ready";
 
 export function SketchView() {
   const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
   const [trips, setTrips] = useState<SavedTrip[]>([]);
-  const [person, setPerson] = useState<string | null>(null);
-  const [region, setRegion] = useState<Region | null>(null);
   const [year, setYear] = useState<number | null>(null);
-  const [query, setQuery] = useState("");
   /** 해마다 적어 둔 한 줄. 적지 않은 해는 없다. */
   const [written, setWritten] = useState<Map<number, string>>(new Map());
   const [userId, setUserId] = useState<string | null>(null);
   /** 방문마다 대표 사진 한 장. 지도에 점 대신 얹는다. */
   const [covers, setCovers] = useState<Map<string, string>>(new Map());
+  /** 시도 경계(60KB)는 따로 불러온다. 없으면 시도 장면만 비어 있다. */
+  const [sidoOf, setSidoOf] = useState<SidoOf | undefined>(undefined);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -67,12 +74,17 @@ export function SketchView() {
       }
     });
 
+    void import("@/lib/sido").then((module) => {
+      // 상태에 함수를 넣을 때는 한 겹 감싼다 — 그대로 넘기면 React 가 갱신 함수로 부른다.
+      if (active) setSidoOf(() => module.sidoOf);
+    });
+
     return () => {
       active = false;
     };
   }, []);
 
-  const asSketchTrips: SketchTrip[] = useMemo(
+  const all: SketchTrip[] = useMemo(
     () =>
       trips.map((trip) => ({
         id: trip.id,
@@ -92,57 +104,9 @@ export function SketchView() {
     [trips, covers],
   );
 
-  /*
-    찾기는 목록과 같은 규칙을 쓴다. "작년 가족 해변"처럼 시기·사람·장소를
-    한 줄에 섞어 던져도 받아낸다 — 두 화면이 다르게 찾으면 사람이 헷갈린다.
-  */
-  const searchable: SearchableTrip[] = useMemo(
-    () =>
-      trips.map((trip) => ({
-        id: trip.id,
-        title: trip.title,
-        startedOn: trip.startedOn,
-        endedOn: trip.endedOn,
-        companions: trip.companions,
-        note: trip.note,
-        placeNames: trip.visits.map((visit) => visit.placeName),
-        dongs: trip.visits.map((visit) => visit.dong).filter((d): d is string => !!d),
-      })),
-    [trips],
-  );
-
-  /** 기록에 실제로 나오는 권역만 단추로 내놓는다. */
-  const regionsSeen = useMemo(() => {
-    const seen = new Set<Region>();
-    for (const trip of asSketchTrips) {
-      for (const found of regionsOfTrip(trip.visits)) seen.add(found);
-    }
-    return REGIONS.filter((one) => seen.has(one));
-  }, [asSketchTrips]);
-
-  const scoped = useMemo(() => {
-    const matched = new Set(searchTrips(searchable, query).map((trip) => trip.id));
-    return asSketchTrips.filter((trip) => {
-      if (query.trim() && !matched.has(trip.id)) return false;
-      if (person && trip.companions?.trim() !== person) return false;
-      if (year !== null && Number(trip.startedOn.slice(0, 4)) !== year) return false;
-      if (region && !regionsOfTrip(trip.visits).includes(region)) return false;
-      return true;
-    });
-  }, [asSketchTrips, searchable, query, person, year, region]);
-
-  /*
-    권역을 고른 사람은 "그 해가 어떤 해였나"가 아니라 "거기서 어디어디
-    갔더라"를 묻고 있다. 카드 위에 이름 붙은 목록을 먼저 펼친다.
-  */
-  const regionDots = useMemo(
-    () => (region ? sketchShapes(scoped).dots : []),
-    [region, scoped],
-  );
-
-  const whole = useMemo(() => buildSketch(asSketchTrips), [asSketchTrips]);
-  // 해마다 한 장. 연도를 고르는 단추가 필요 없어졌다 — 다 펼쳐 놓는다.
-  const years = useMemo(() => groupByYear(scoped), [scoped]);
+  const years = useMemo(() => yearsOf(all), [all]);
+  /** 고르지 않았으면 가장 최근 해. 보여 주고 싶은 것은 대개 올해다. */
+  const shown = year ?? years[0] ?? null;
 
   if (status === "loading") return <Waiting title="스케치를 그리고 있어요" />;
 
@@ -150,7 +114,7 @@ export function SketchView() {
     return (
       <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6">
         <p className="text-[15px] text-text-muted">
-          로그인하시면 지금까지의 여행을 한 장으로 모아 보여드려요.
+          로그인하시면 한 해의 여행을 한 장의 그림과 이야기로 모아 드려요.
         </p>
         <Link
           href="/login?next=%2Fsketch"
@@ -170,34 +134,27 @@ export function SketchView() {
     );
   }
 
-  if (trips.length === 0) {
+  if (trips.length === 0 || shown === null) {
     return (
       <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6 text-center">
         <p className="text-[17px] font-medium text-text">아직 그릴 것이 없어요</p>
         <p className="text-[15px] leading-relaxed text-text-muted">
-          여행을 기록하면 여기에 하나씩 쌓입니다.
+          사진을 고르면 한 해가 한 장의 그림이 돼요.
         </p>
         <Link
           href="/trips/new"
           className="self-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
         >
-          사진에서 찾기
+          사진 고르기
         </Link>
       </div>
     );
   }
 
-  /*
-    걸러 보는 중에는 고쳐 적게 하지 않는다. 그때 화면에 적히는 말은
-    그 해가 아니라 걸러낸 것을 가리키기 때문이다.
-  */
-  const filtered = Boolean(person || region || query.trim());
-
   const write = async (forYear: number, line: string) => {
     const supabase = getBrowserClient();
     if (!supabase || !userId) return false;
     if (!(await saveHeadline(supabase, userId, forYear, line))) return false;
-
     setWritten((current) => {
       const next = new Map(current);
       if (line.trim()) next.set(forYear, line.trim());
@@ -207,140 +164,39 @@ export function SketchView() {
     return true;
   };
 
-  const chosen = Boolean(person || region || year !== null || query.trim());
-
-  /** 고른 것을 모두 푼다. 걸러 놓고 빠져나오지 못하는 일이 없게. */
-  const clear = () => {
-    setPerson(null);
-    setRegion(null);
-    setYear(null);
-    setQuery("");
-  };
-
   return (
     <>
-      <div className="flex flex-col gap-2.5">
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="작년 가족, 해변, 강릉시…"
-          aria-label="기록 찾기"
-          className="w-full rounded-xl bg-bg-subtle px-4 py-2.5 text-[15px] text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
-        />
-
-        {regionsSeen.length > 1 && (
-          <Chips label="권역">
-            {regionsSeen.map((one) => (
-              <Chip
-                key={one}
-                on={region === one}
-                onClick={() => setRegion(region === one ? null : one)}
-              >
-                {one}
-              </Chip>
-            ))}
-          </Chips>
-        )}
-
-        {/*
-          해마다 한 장씩 펼치므로 연도를 고르지 않아도 다 보인다. 다만
-          해가 쌓이면 한 해만 보고 싶어진다 — 그때를 위한 것이다.
-        */}
-        {whole.byYear.length > 1 && (
-          <Chips label="해">
-            {whole.byYear.map((entry) => {
-              const value = Number(entry.label);
-              return (
-                <Chip
-                  key={entry.label}
-                  on={year === value}
-                  onClick={() => setYear(year === value ? null : value)}
-                >
-                  {entry.label}년
-                </Chip>
-              );
-            })}
-          </Chips>
-        )}
-
-        {whole.byCompanion.length > 0 && (
-          <Chips label="함께">
-            {whole.byCompanion.map((entry) => (
-              <Chip
-                key={entry.label}
-                on={person === entry.label}
-                onClick={() => setPerson(person === entry.label ? null : entry.label)}
-              >
-                {entry.label} {entry.count}
-              </Chip>
-            ))}
-          </Chips>
-        )}
-
-        {chosen && (
-          <button
-            type="button"
-            onClick={clear}
-            className="self-start text-[13px] font-medium text-accent hover:text-accent-hover"
-          >
-            조건 모두 풀기
-          </button>
-        )}
-      </div>
-
-      {region && <RegionPlaces region={region} dots={regionDots} />}
-
-      {years.length === 0 ? (
-        <p className="rounded-2xl bg-bg-subtle p-5 text-[15px] text-text-muted">
-          그 조건에 맞는 여행이 없어요. 조건을 하나씩 빼 보세요.
-        </p>
-      ) : (
-        years.map((entry) => (
-          <YearSketch
-            key={entry.year}
-            year={entry.year}
-            trips={entry.trips}
-            person={person}
-            region={region}
-            written={filtered ? undefined : written.get(entry.year)}
-            onWrite={filtered ? undefined : write}
-          />
-        ))
+      {/* 해가 하나뿐이면 고를 것이 없다. 탭을 두지 않는다. */}
+      {years.length > 1 && (
+        <div role="tablist" aria-label="해 고르기" className="flex flex-wrap gap-1.5">
+          {years.map((entry) => (
+            <button
+              key={entry}
+              type="button"
+              role="tab"
+              aria-selected={entry === shown}
+              onClick={() => {
+                setYear(entry);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              className={`rounded-full px-4 py-2 text-[15px] font-semibold tabular-nums transition ${
+                entry === shown ? "bg-text text-bg" : "bg-bg-subtle text-text-muted hover:bg-line hover:text-text"
+              }`}
+            >
+              {entry}
+            </button>
+          ))}
+        </div>
       )}
+
+      <SketchShowcase
+        key={shown}
+        year={shown}
+        all={all}
+        written={written.get(shown)}
+        onWrite={write}
+        sidoOf={sidoOf}
+      />
     </>
-  );
-}
-
-/** 이름표 하나에 단추 여럿. 줄이 여럿이어도 왼쪽 끝이 맞는다. */
-function Chips({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="w-9 shrink-0 text-[13px] font-medium text-text-faint">{label}</span>
-      {children}
-    </div>
-  );
-}
-
-function Chip({
-  on,
-  onClick,
-  children,
-}: {
-  on: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
-        on ? "bg-accent text-on-accent" : "bg-bg-subtle text-text hover:bg-line"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

@@ -21,13 +21,15 @@ export const metadata: Metadata = {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ v?: string | string[] }>;
+  searchParams: Promise<{ v?: string | string[]; y?: string | string[] }>;
 }) {
-  const { v } = await searchParams;
+  const { v, y } = await searchParams;
+  // 한 장으로 보기의 "그해를 지도에서 다시 걷기"가 해를 적어 보낸다.
+  const year = typeof y === "string" && /^\d{4}$/.test(y) ? y : undefined;
   const start = startOf(typeof v === "string" ? v : undefined, (await cookies()).get(START_COOKIE)?.value);
 
   if (start === "sketch") {
-    return <SketchHub switcher={<StartSwitch current="sketch" floating />} />;
+    return <SketchHub switcher={<StartSwitch current="sketch" floating />} initialYear={year} />;
   }
   return <SpotsHome switcher={<StartSwitch current="spots" />} />;
 }
