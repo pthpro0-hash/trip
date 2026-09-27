@@ -16,8 +16,8 @@ import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 export type Snap = "peek" | "half" | "full";
 
-/** 살짝 올린 높이. 요약 한 줄과 갈림길 단추가 들어간다. */
-export const PEEK = 132;
+/** 살짝 올린 높이. 요약 한 줄, 달 막대, 갈림길 단추가 들어간다. */
+export const PEEK = 196;
 /**
  * 아직 얹을 것이 없을 때의 살짝 높이. 로그인·사진 고르기 안내가 두 줄에
  * 단추까지 들어가야 한다 — 132px 로는 단추가 잘려 정작 누를 것이 안 보였다.
@@ -68,7 +68,8 @@ export function HubSheet({ snap, onSnap, heights, onHeight, header, children }: 
       고장 난 것처럼 보인다(실제로 그랬다).
     */
     const target = event.target as HTMLElement;
-    if (!target.closest("[data-handle]") && target.closest("a,button,input")) return;
+    // 달 막대처럼 제 손가락 처리를 가진 것도 끌기가 아니다.
+    if (!target.closest("[data-handle]") && target.closest("a,button,input,[data-no-drag]")) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     start.current = { y: event.clientY, height: heights[snap], at: event.timeStamp };
     last.current = { y: event.clientY, at: event.timeStamp };

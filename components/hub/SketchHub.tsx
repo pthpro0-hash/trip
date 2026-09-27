@@ -10,7 +10,17 @@ import { hubPlaces, placesIn, tripsIn, type Bounds, type HubPlace, type TripInVi
 import { tripFocus } from "@/lib/scrollMemory";
 import { useWide } from "@/lib/useWide";
 import { Waiting } from "@/components/layout/Waiting";
-import { HubMap, type FlyTarget } from "./HubMap";
+import { HubMap, type FlyTarget, type HubMapHandle } from "./HubMap";
+import { MonthBars } from "./MonthBars";
+import { REPLAY_HEIGHT, ReplayPanel } from "./ReplayPanel";
+import {
+  monthSpan,
+  monthTotals,
+  rangeLabel,
+  replayOrder,
+  withinMonths,
+  type MonthRange,
+} from "@/lib/timeline";
 import { HubSheet, PEEK, PEEK_EMPTY, snapHeights, type Snap } from "./HubSheet";
 import { PlacePanel } from "./PlacePanel";
 import { TripsPanel } from "./TripsPanel";
@@ -140,6 +150,12 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const flights = useRef(0);
+  const mapHandle = useRef<HubMapHandle>(null);
+  /** 달 막대로 고른 기간. 지도와 목록이 이 기간만 남긴다. */
+  const [range, setRange] = useState<MonthRange | null>(null);
+  /** 다시 걷는 중이면 걸을 곳들. */
+  const [replay, setReplay] = useState<HubPlace[] | null>(null);
+  const [walkingAt, setWalkingAt] = useState<HubPlace | null>(null);
 
   const fly = useCallback((targets: HubPlace[]) => {
     flights.current += 1;
@@ -156,10 +172,22 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
   }, []);
   const empty = places.length === 0;
   const heights = useMemo(() => snapHeights(frame, empty ? PEEK_EMPTY : PEEK), [frame, empty]);
-  /** 지도 아래를 시트가 덮은 높이. 넓은 화면에서는 옆에 서므로 0. */
-  const inset = wide ? 0 : (dragHeight ?? heights[snap]);
+  /*
+    지도 아래를 덮은 높이. 걷는 중이면 걷기 판이, 아니면 시트가 덮는다.
+    넓은 화면에서 시트는 옆에 서므로 0.
+  */
+  const inset = replay ? REPLAY_HEIGHT : wide ? 0 : (dragHeight ?? heights[snap]);
 
-  const inView = useMemo(() => (view ? placesIn(places, view) : places), [places, view]);
+  /*
+    막대는 언제나 전체 기간을 보여 준다. 고른 기간만 남기면 막대가 줄어
+    어디를 골랐는지, 앞뒤에 무엇이 있었는지가 사라진다.
+  */
+  const months = useMemo(() => monthSpan(places), [places]);
+  const totals = useMemo(() => monthTotals(places), [places]);
+  /** 기간으로 거른 것. 지도와 목록은 이것을 본다. */
+  const shown = useMemo(() => withinMonths(places, range), [places, range]);
+
+  const inView = useMemo(() => (view ? placesIn(shown, view) : shown), [shown, view]);
   const startedOn = useMemo(() => new Map(trips.map((trip) => [trip.id, trip.startedOn])), [trips]);
   const tripsInView = useMemo(
     () => tripsIn(inView, (id) => startedOn.get(id) ?? ""),
@@ -174,9 +202,41 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
         : null,
     [places, focused],
   );
-  const pickedIds = useMemo(() => new Set((picked ?? []).map((place) => place.visitId)), [picked]);
+  const pickedIds = useMemo(
+    () => new Set(walkingAt ? [walkingAt.visitId] : (picked ?? []).map((place) => place.visitId)),
+    [picked, walkingAt],
+  );
 
-  const totalPhotos = places.reduce((sum, place) => sum + place.photoCount, 0);
+  const shownTrips = new Set(shown.map((place) => place.tripId)).size;
+  const shownPhotos = shown.reduce((sum, place) => sum + place.photoCount, 0);
+
+  /*
+    다시 걸을 것은 지금 고른 것이다. 여행을 골랐으면 그 여행, 기간을
+    골랐으면 그 기간, 아무것도 안 골랐으면 전부. 따로 묻지 않는다 —
+    무엇을 걷고 싶은지는 이미 화면에 골라 두었다.
+  */
+  const walkable = route ?? shown;
+  const walkLabel = route ? "이 여행 다시 걷기" : range ? "이 기간 다시 걷기" : "전부 다시 걷기";
+
+  const startWalk = () => {
+    if (walkable.length === 0) return;
+    setPicked(null);
+    setReplay(replayOrder(walkable));
+  };
+
+  const stopWalk = () => {
+    mapHandle.current?.clearTrail();
+    setWalkingAt(null);
+    setReplay(null);
+  };
+
+  const chooseRange = (next: MonthRange | null) => {
+    setRange(next);
+    setPicked(null);
+    setFocused(null);
+    const within = withinMonths(places, next);
+    if (within.length > 0) fly(within);
+  };
 
   const pick = (targets: HubPlace[]) => {
     setPicked(targets);
@@ -193,11 +253,29 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
   const header = (
     <SheetHeader
       status={status}
-      tripCount={trips.length}
-      photoCount={totalPhotos}
+      tripCount={range ? shownTrips : trips.length}
+      photoCount={shownPhotos}
+      rangeText={range ? rangeLabel(range) : null}
       placesOnScreen={inView.length}
       focusedLabel={focused ? (tripsInView.find((trip) => trip.tripId === focused)?.label ?? null) : null}
       onClearFocus={() => setFocused(null)}
+      timeline={
+        months.length > 1 ? (
+          <MonthBars months={months} totals={totals} range={range} onRange={chooseRange} />
+        ) : null
+      }
+      walkLabel={walkable.length > 0 ? walkLabel : null}
+      onWalk={startWalk}
+    />
+  );
+
+  const walking = replay && (
+    <ReplayPanel
+      userId={userId}
+      stops={replay}
+      map={mapHandle}
+      onAt={setWalkingAt}
+      onClose={stopWalk}
     />
   );
 
@@ -219,9 +297,11 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
 
   const map = (
     <HubMap
-      places={places}
+      ref={mapHandle}
+      places={shown}
       photoUrls={pinUrls}
-      route={route}
+      // 걷는 동안에는 걸음 자국이 선을 대신한다.
+      route={replay ? null : route}
       pickedIds={pickedIds}
       flyTo={flyTo}
       bottomInset={inset}
@@ -241,6 +321,7 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
           <div className="relative">
             {map}
             <Floating>{switcher}</Floating>
+            {walking && <div className="absolute inset-x-4 bottom-0 z-20 mx-auto max-w-xl">{walking}</div>}
           </div>
           <aside aria-label="내 여행 목록" className="flex min-h-0 flex-col border-l border-line bg-surface">
             <div className="shrink-0 border-b border-line px-5 py-4">{header}</div>
@@ -251,6 +332,9 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
         <>
           {map}
           <Floating>{switcher}</Floating>
+          {walking ? (
+            <div className="absolute inset-x-0 bottom-0 z-20">{walking}</div>
+          ) : (
           <HubSheet
             snap={snap}
             onSnap={(next) => {
@@ -263,6 +347,7 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
           >
             {body}
           </HubSheet>
+          )}
         </>
       )}
     </div>
@@ -282,9 +367,16 @@ interface SheetHeaderProps {
   status: Status;
   tripCount: number;
   photoCount: number;
+  /** 기간을 골랐으면 그 기간. 요약 앞에 붙인다. */
+  rangeText: string | null;
   placesOnScreen: number;
   focusedLabel: string | null;
   onClearFocus: () => void;
+  /** 달 막대. 자료가 한 달뿐이면 없다. */
+  timeline: ReactNode;
+  /** 다시 걷기 단추의 이름. 걸을 것이 없으면 null. */
+  walkLabel: string | null;
+  onWalk: () => void;
 }
 
 /*
@@ -295,9 +387,13 @@ function SheetHeader({
   status,
   tripCount,
   photoCount,
+  rangeText,
   placesOnScreen,
   focusedLabel,
   onClearFocus,
+  timeline,
+  walkLabel,
+  onWalk,
 }: SheetHeaderProps) {
   if (status === "guest") {
     return (
@@ -337,7 +433,7 @@ function SheetHeader({
     <div className="flex flex-col gap-2.5">
       <div className="flex items-baseline justify-between gap-3">
         <p className="min-w-0 truncate text-[15px] font-semibold text-text">
-          {focusedLabel ?? `여행 ${tripCount} · 사진 ${photoCount}장`}
+          {focusedLabel ?? `${rangeText ? `${rangeText} · ` : ""}여행 ${tripCount} · 사진 ${photoCount}장`}
         </p>
         {focusedLabel ? (
           <button
@@ -351,10 +447,24 @@ function SheetHeader({
           <span className="shrink-0 text-[13px] text-text-faint">이 화면 {placesOnScreen}곳</span>
         )}
       </div>
+      {timeline}
       <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+        {/*
+          다시 걷기가 맨 앞이다. 이 화면에서 다른 데서는 못 하는 일이
+          이것이다.
+        */}
+        {walkLabel && (
+          <button
+            type="button"
+            onClick={onWalk}
+            className="shrink-0 rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-on-accent transition hover:bg-accent-hover"
+          >
+            ▶ {walkLabel}
+          </button>
+        )}
         <Link
           href="/trips/new"
-          className="shrink-0 rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-on-accent transition hover:bg-accent-hover"
+          className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
         >
           + 사진등록
         </Link>

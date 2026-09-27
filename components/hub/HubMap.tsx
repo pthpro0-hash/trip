@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { loadKakaoMaps } from "@/lib/kakaoLoader";
 import { groupPins, inseparable, type Bounds, type HubPlace } from "@/lib/hub";
 
@@ -47,6 +47,29 @@ interface HubMapProps {
   bottomInset: number;
   onView: (bounds: Bounds) => void;
   onPick: (places: HubPlace[]) => void;
+  /** 다시 걷기가 지도를 직접 부리는 손잡이. */
+  ref?: Ref<HubMapHandle>;
+}
+
+interface Point {
+  lat: number;
+  lng: number;
+}
+
+/*
+  다시 걷기는 지도를 한 걸음씩 부린다. 걸음마다 상태를 바꿔 화면
+  전체를 다시 그리면 선 하나 늘이는 데 1초에 예순 번 화면이 새로 그려진다.
+  그래서 지도에 손잡이를 달아 직접 부린다.
+*/
+export interface HubMapHandle {
+  /** 이 점들이 다 들어오게 맞춘다. 아래를 덮은 만큼 비워 둔다. */
+  frame(points: Point[]): void;
+  /** 지나온 길을 한 번에 그린다. 여행마다 따로 끊긴 토막들이다. */
+  trail(segments: Point[][]): void;
+  /** 마지막 토막 끝에서 다음 점까지 선을 늘인다. 다 늘이면 끝난다. */
+  grow(segments: Point[][], to: Point, ms: number): Promise<void>;
+  /** 걸은 자국을 지운다. */
+  clearTrail(): void;
 }
 
 export function HubMap({
@@ -58,6 +81,7 @@ export function HubMap({
   bottomInset,
   onView,
   onPick,
+  ref,
 }: HubMapProps) {
   const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ?? "";
   const containerRef = useRef<HTMLDivElement>(null);
@@ -94,7 +118,7 @@ export function HubMap({
   };
 
   /** 곳들이 다 들어오게 맞춘다. 시트가 덮은 만큼 아래를 비워 둔다. */
-  const fit = (targets: HubPlace[]) => {
+  const fit = (targets: Point[]) => {
     const map = mapRef.current;
     if (!map || targets.length === 0) return;
     const kakao: Kakao = (window as Kakao).kakao;
@@ -243,6 +267,120 @@ export function HubMap({
     reportView();
      
   }, [bottomInset]);
+
+  /*
+    다시 걷기의 자국. 고른 여행을 잇는 선(route)과 따로 둔다 — 걷는 동안
+    그 선은 치우고, 걷기를 마치면 원래대로 돌아가야 한다.
+  */
+  const trailRef = useRef<Kakao[]>([]);
+  const headRef = useRef<Kakao>(null);
+  const growing = useRef<{ frame: number; done: () => void } | null>(null);
+
+  const stopGrowing = () => {
+    if (!growing.current) return;
+    cancelAnimationFrame(growing.current.frame);
+    growing.current.done();
+    growing.current = null;
+  };
+
+  const drawTrail = (segments: Point[][]) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const kakao: Kakao = (window as Kakao).kakao;
+
+    // 토막 수만큼 선을 맞춘다. 모자라면 새로 긋고, 남으면 걷는다.
+    while (trailRef.current.length > segments.length) trailRef.current.pop()?.setMap(null);
+    segments.forEach((segment, index) => {
+      const path = segment.map((point) => new kakao.maps.LatLng(point.lat, point.lng));
+      const line = trailRef.current[index];
+      if (line) line.setPath(path);
+      else {
+        trailRef.current.push(
+          new kakao.maps.Polyline({
+            map,
+            path,
+            strokeWeight: 5,
+            strokeColor: LINE_COLOR,
+            strokeOpacity: 0.9,
+            strokeStyle: "solid",
+          }),
+        );
+      }
+    });
+
+    const tip = segments.at(-1)?.at(-1);
+    if (!tip) return;
+    const last = new kakao.maps.LatLng(tip.lat, tip.lng);
+    if (!headRef.current) {
+      const dot = document.createElement("span");
+      Object.assign(dot.style, {
+        display: "block",
+        width: "16px",
+        height: "16px",
+        borderRadius: "999px",
+        background: LINE_COLOR,
+        border: "3px solid #ffffff",
+        boxShadow: "0 0 0 6px rgba(0,113,227,0.25), 0 2px 6px rgba(0,0,0,0.3)",
+      });
+      headRef.current = new kakao.maps.CustomOverlay({
+        map,
+        position: last,
+        content: dot,
+        xAnchor: 0.5,
+        yAnchor: 0.5,
+        zIndex: 20_000,
+      });
+    } else {
+      headRef.current.setPosition(last);
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    frame: (points) => fit(points),
+    trail: (segments) => {
+      stopGrowing();
+      drawTrail(segments);
+    },
+    grow: (segments, to, ms) => {
+      stopGrowing();
+      const done = segments.slice(0, -1);
+      const current = segments.at(-1) ?? [];
+      const from = current.at(-1);
+      if (!from || ms <= 0) {
+        drawTrail([...done, [...current, to]]);
+        return Promise.resolve();
+      }
+      return new Promise<void>((resolve) => {
+        const began = performance.now();
+        const step = (now: number) => {
+          const t = Math.min(1, (now - began) / ms);
+          // 처음엔 빠르게, 닿을 때쯤 천천히. 사람 걸음이 그렇다.
+          const eased = 1 - (1 - t) ** 3;
+          drawTrail([
+            ...done,
+            [
+              ...current,
+              { lat: from.lat + (to.lat - from.lat) * eased, lng: from.lng + (to.lng - from.lng) * eased },
+            ],
+          ]);
+          if (t < 1) {
+            growing.current = { frame: requestAnimationFrame(step), done: resolve };
+          } else {
+            growing.current = null;
+            resolve();
+          }
+        };
+        growing.current = { frame: requestAnimationFrame(step), done: resolve };
+      });
+    },
+    clearTrail: () => {
+      stopGrowing();
+      for (const line of trailRef.current) line.setMap(null);
+      trailRef.current = [];
+      headRef.current?.setMap(null);
+      headRef.current = null;
+    },
+  }));
 
   if (!apiKey || failed) {
     return (
