@@ -75,6 +75,7 @@ export function dotsViewBox(
   dots: { lat: number; lng: number }[],
   frame: { width: number; height: number },
   minSpan = 150,
+  margin = MARGIN,
 ): ViewBox {
   const points = dots
     .filter((dot) => Number.isFinite(dot.lat) && Number.isFinite(dot.lng))
@@ -91,7 +92,7 @@ export function dotsViewBox(
   // 너무 좁으면 가운데를 두고 넓힌다.
   const growX = Math.max(0, minSpan - (right - left)) / 2;
   const growY = Math.max(0, minSpan - (bottom - top)) / 2;
-  return fitFrame(left - growX, right + growX, top - growY, bottom + growY, frame);
+  return fitFrame(left - growX, right + growX, top - growY, bottom + growY, frame, margin);
 }
 
 /** 둘레를 남기고, 틀의 가로세로 비율에 맞춘다. */
@@ -101,10 +102,11 @@ function fitFrame(
   top: number,
   bottom: number,
   frame: { width: number; height: number },
+  margin = MARGIN,
 ): ViewBox {
   // 둘레를 남긴다.
-  const padX = (right - left) * MARGIN;
-  const padY = (bottom - top) * MARGIN;
+  const padX = (right - left) * margin;
+  const padY = (bottom - top) * margin;
   left -= padX;
   right += padX;
   top -= padY;

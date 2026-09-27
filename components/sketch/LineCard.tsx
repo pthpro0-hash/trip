@@ -1,10 +1,21 @@
 import { KOREA_LAND_PATHS, project } from "@/lib/koreaMap";
 import { dotsViewBox } from "@/lib/photo/regionView";
 import { formatDistance } from "@/lib/geo";
-import { fitText, textWidth } from "@/lib/collage";
+import { fitText, textWidth } from "@/lib/svgText";
 import { smoothPath } from "@/lib/smoothPath";
-import type { MonthCell, Sketch, SketchShapes } from "@/lib/sketch";
-import { CARD_HEIGHT, CARD_MARGIN, CARD_WIDTH, FAINT, FONT, INK, MUTED, PAPER, SIGNATURE } from "./cardInk";
+import type { MonthCell, SketchShapes } from "@/lib/sketch";
+import {
+  CARD_HEIGHT,
+  CARD_MARGIN,
+  CARD_WIDTH,
+  FAINT,
+  FONT,
+  INK,
+  MUTED,
+  PAPER,
+  SIGNATURE,
+  type CardStats,
+} from "./cardInk";
 
 /*
   선 그림 — 벽에 걸어 둘 만한 한 장.
@@ -36,7 +47,7 @@ const LABEL_SIZE = 17;
 const MIN_SPAN = 240;
 
 interface LineCardProps {
-  sketch: Sketch;
+  sketch: CardStats;
   shapes: SketchShapes;
   year: number;
   headline: string;

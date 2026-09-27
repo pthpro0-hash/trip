@@ -103,6 +103,16 @@ describe("headline", () => {
     expect(headline(s)).toBe("민수와 두 번");
   });
 
+  it("남에게 보여 줄 때는 사람 이름을 쓰지 않고 다음 말로 넘어간다", () => {
+    const s = 스케치([
+      trip({ id: "1", companions: "민수", visits: [바다("화진포해변", 38.4)] }),
+      trip({ id: "2", companions: "민수", visits: [바다("안목해변", 37.7)] }),
+    ]);
+    const line = headline(s, "year", { people: false });
+    expect(line).not.toContain("민수");
+    expect(line).toBe("바다만 두 번 다닌 해");
+  });
+
   it("바다가 절반을 넘으면 바다의 해", () => {
     const s = 스케치([
       trip({ id: "1", visits: [바다("화진포해변", 38.4)] }),

@@ -57,7 +57,7 @@ describe("SketchShowcase · 한 줄", () => {
   it("저장 단추가 늘 붙어 있다", () => {
     render(<SketchShowcase year={2026} all={all} written={undefined} onWrite={async () => true} sidoOf={undefined} />);
     expect(screen.getByRole("button", { name: "2026년 이미지 저장" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "스토리용 세로로" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "스토리용 세로" })).toBeTruthy();
   });
 });
 
@@ -115,5 +115,38 @@ describe("SketchShowcase · 카드 모양", () => {
     show(all);
     expect(screen.getByRole("radio", { name: "지도" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText("이 해에는 올린 사진이 없어 지도로 보여 드려요.")).toBeTruthy();
+  });
+});
+
+describe("SketchShowcase · 링크", () => {
+  it("로그인한 사람에게만 링크 공유 단추가 있다", () => {
+    const { unmount } = show(withPhotos);
+    expect(screen.queryByRole("button", { name: "2026년 링크로 보여 주기" })).toBeNull();
+    unmount();
+    render(
+      <SketchShowcase year={2026} all={withPhotos} written={undefined} onWrite={async () => true} sidoOf={undefined} userId="u1" />,
+    );
+    expect(screen.getByRole("button", { name: "2026년 링크로 보여 주기" })).toBeTruthy();
+  });
+});
+
+/*
+  화면이 지은 한 줄에는 함께한 사람의 이름이 들어갈 수 있다("민수와 두 번").
+  내 화면에서는 괜찮지만 링크로 남에게 보여 줄 때는 빼야 한다.
+*/
+describe("SketchShowcase · 링크의 한 줄", () => {
+  const withFriend: SketchTrip[] = [
+    { ...withPhotos[0], id: "a", startedOn: "2026-05-01", endedOn: "2026-05-01", companions: "민수" },
+    { ...withPhotos[0], id: "b", startedOn: "2026-06-01", endedOn: "2026-06-01", companions: "민수" },
+  ];
+
+  it("내 화면에는 이름이 보여도, 링크 창의 미리보기에는 없다", async () => {
+    render(
+      <SketchShowcase year={2026} all={withFriend} written={undefined} onWrite={async () => true} sidoOf={undefined} userId="u1" />,
+    );
+    expect(screen.getAllByText(/민수와/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "2026년 링크로 보여 주기" }));
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+    expect(dialog.textContent).not.toContain("민수");
   });
 });

@@ -48,25 +48,13 @@ export interface SaveOptions {
   background?: string;
 }
 
-export async function downloadSvgAsPng(
-  svg: SVGSVGElement,
-  fileName: string,
-  options: SaveOptions = {},
-): Promise<boolean> {
-  const viewBox = svg.viewBox.baseVal;
-  const width = viewBox.width || svg.clientWidth;
-  const height = viewBox.height || svg.clientHeight;
-  if (!width || !height) return false;
-
-  // 바깥으로 꺼내는 순간 페이지의 CSS 는 따라오지 않는다. 크기만 박아 둔다.
-  const clone = svg.cloneNode(true) as SVGSVGElement;
-  clone.setAttribute("width", String(width));
-  clone.setAttribute("height", String(height));
-
-  const markup = new XMLSerializer().serializeToString(clone);
-  const blob = new Blob([markup], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-
+/** SVG 글자를 그림으로 읽어 캔버스에 그리고 PNG 로. 못 그리면 null. */
+async function rasterize(
+  markup: string,
+  size: { width: number; height: number },
+  draw: (context: CanvasRenderingContext2D, image: HTMLImageElement) => void,
+): Promise<Blob | null> {
+  const url = URL.createObjectURL(new Blob([markup], { type: "image/svg+xml;charset=utf-8" }));
   try {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const element = new Image();
@@ -76,42 +64,66 @@ export async function downloadSvgAsPng(
     });
 
     const canvas = document.createElement("canvas");
-    const context = (() => {
-      if (!options.story) {
-        canvas.width = width * SCALE;
-        canvas.height = height * SCALE;
-        return canvas.getContext("2d");
-      }
-      canvas.width = STORY.width;
-      canvas.height = STORY.height;
-      return canvas.getContext("2d");
-    })();
-    if (!context) return false;
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    draw(context, image);
 
-    if (options.story) {
-      // 바탕을 먼저 칠한다. 칠하지 않으면 남는 자리가 투명하게 나가고,
-      // 스토리에 올리면 그 부분이 시커멓게 된다.
-      context.fillStyle = options.background ?? "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-
-      const box = fitInStory(width, height);
-      context.drawImage(image, box.x, box.y, box.width, box.height);
-    } else {
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    }
-
-    const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-    if (!png) return false;
-
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(png);
-    link.download = fileName;
-    link.click();
-    URL.revokeObjectURL(link.href);
-    return true;
+    return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   } catch {
-    return false;
+    return null;
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/** 화면의 SVG 를 PNG 로. 못 그리면 null. */
+export async function svgToPngBlob(svg: SVGSVGElement, options: SaveOptions = {}): Promise<Blob | null> {
+  const viewBox = svg.viewBox.baseVal;
+  const width = viewBox.width || svg.clientWidth;
+  const height = viewBox.height || svg.clientHeight;
+  if (!width || !height) return null;
+
+  // 바깥으로 꺼내는 순간 페이지의 CSS 는 따라오지 않는다. 크기만 박아 둔다.
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute("width", String(width));
+  clone.setAttribute("height", String(height));
+  const markup = new XMLSerializer().serializeToString(clone);
+
+  if (!options.story) {
+    return rasterize(markup, { width: width * SCALE, height: height * SCALE }, (context, image) =>
+      context.drawImage(image, 0, 0, width * SCALE, height * SCALE),
+    );
+  }
+
+  return rasterize(markup, STORY, (context, image) => {
+    // 바탕을 먼저 칠한다. 칠하지 않으면 남는 자리가 투명하게 나가고,
+    // 스토리에 올리면 그 부분이 시커멓게 된다.
+    context.fillStyle = options.background ?? "#ffffff";
+    context.fillRect(0, 0, STORY.width, STORY.height);
+    const box = fitInStory(width, height);
+    context.drawImage(image, box.x, box.y, box.width, box.height);
+  });
+}
+
+/** 이미 짜 둔 SVG 글자를 그 크기 그대로 PNG 로. */
+export function markupToPngBlob(markup: string, size: { width: number; height: number }): Promise<Blob | null> {
+  return rasterize(markup, size, (context, image) => context.drawImage(image, 0, 0, size.width, size.height));
+}
+
+export async function downloadSvgAsPng(
+  svg: SVGSVGElement,
+  fileName: string,
+  options: SaveOptions = {},
+): Promise<boolean> {
+  const png = await svgToPngBlob(svg, options);
+  if (!png) return false;
+
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(png);
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  return true;
 }

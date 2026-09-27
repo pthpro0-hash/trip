@@ -196,6 +196,7 @@ export function SketchView() {
         written={written.get(shown)}
         onWrite={write}
         sidoOf={sidoOf}
+        userId={userId}
       />
     </>
   );

@@ -23,19 +23,24 @@ interface StoryScenesProps {
   story: YearStory;
   /** 원본 경로 → 목록 판(960px) 주소. */
   photoUrls: Map<string, string>;
+  /**
+   * 링크로 남에게 보여 주는 중. 원본을 받으러 가지 않고(남에게는 열리지
+   * 않는다), 날짜를 적지 않고, 내 지도로 넘어가는 "다시 걷기"를 두지 않는다.
+   */
+  shared?: boolean;
 }
 
 /** "2026-08-13" → "8월 13일" */
 const monthDay = (day: string) => `${Number(day.slice(5, 7))}월 ${Number(day.slice(8, 10))}일`;
 
-export function StoryScenes({ story, photoUrls }: StoryScenesProps) {
+export function StoryScenes({ story, photoUrls, shared = false }: StoryScenesProps) {
   const [viewing, setViewing] = useState<number | null>(null);
   const [big, setBig] = useState<Map<string, string>>(new Map());
 
   const open = async (index: number) => {
     setViewing(index);
     const path = story.photoPaths[index];
-    if (!path || big.has(path)) return;
+    if (shared || !path || big.has(path)) return;
     const supabase = getBrowserClient();
     if (!supabase) return;
     const url = (await signedUrls(supabase, [path])).get(path);
@@ -80,7 +85,8 @@ export function StoryScenes({ story, photoUrls }: StoryScenesProps) {
                 {story.topPlace.placeName}
               </p>
               <p className="text-[14px] text-text-muted">
-                사진 {story.topPlace.photoCount}장 · 마지막으로 {monthDay(story.topPlace.lastVisitedOn)}
+                사진 {story.topPlace.photoCount}장
+                {story.topPlace.lastVisitedOn && ` · 마지막으로 ${monthDay(story.topPlace.lastVisitedOn)}`}
               </p>
             </div>
           </div>
@@ -177,14 +183,16 @@ export function StoryScenes({ story, photoUrls }: StoryScenesProps) {
         읽고 나면 걷고 싶어진다. 그해가 골라진 채로 지도로 넘어간다 —
         거기서 ▶ 를 누르면 그해를 찍은 순서대로 따라간다.
       */}
-      <Scene label="다시 걷기">
-        <Link
-          href={`/?v=sketch&y=${story.year}`}
-          className="inline-flex items-center gap-2 rounded-full bg-bg-subtle px-4 py-2.5 text-[15px] font-medium text-accent transition hover:bg-accent-soft"
-        >
-          ▶ {story.year}년을 지도에서 다시 걷기
-        </Link>
-      </Scene>
+      {!shared && (
+        <Scene label="다시 걷기">
+          <Link
+            href={`/?v=sketch&y=${story.year}`}
+            className="inline-flex items-center gap-2 rounded-full bg-bg-subtle px-4 py-2.5 text-[15px] font-medium text-accent transition hover:bg-accent-soft"
+          >
+            ▶ {story.year}년을 지도에서 다시 걷기
+          </Link>
+        </Scene>
+      )}
 
       {viewing !== null && story.photoPaths[viewing] && (
         <PhotoViewer

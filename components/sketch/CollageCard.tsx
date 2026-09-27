@@ -1,8 +1,9 @@
 import { formatDistance } from "@/lib/geo";
-import { collageTiles, fitText } from "@/lib/collage";
-import type { Sketch, SketchDot } from "@/lib/sketch";
+import { collageTiles } from "@/lib/collage";
+import { fitText } from "@/lib/svgText";
+import type { SketchDot } from "@/lib/sketch";
 import { distanceInWords, paceInWords } from "@/lib/sketchWords";
-import { CARD_HEIGHT, CARD_MARGIN, CARD_WIDTH, FAINT, FONT, INK, MUTED, SIGNATURE } from "./cardInk";
+import { CARD_HEIGHT, CARD_MARGIN, CARD_WIDTH, FAINT, FONT, INK, MUTED, SIGNATURE, type CardStats } from "./cardInk";
 
 /*
   사진 콜라주 — 그해를 사진으로 보여 주는 한 장.
@@ -22,7 +23,7 @@ const EMPTY = "#eeede8";
 const LABEL_MIN = { width: 150, height: 110 };
 
 interface CollageCardProps {
-  sketch: Sketch;
+  sketch: CardStats;
   title: string;
   headline: string;
   /** 얹을 곳. 첫째가 큰 칸에 간다(lib/collage 의 collagePicks). */
@@ -83,12 +84,8 @@ export function CollageCard({ sketch, title, headline, picks, photos }: CollageC
         const fontSize = hero ? 24 : 17;
         const fade = Math.min(tile.height * 0.45, hero ? 130 : 80);
 
-        return (
-          /*
-            칸을 누르면 그 여행으로 간다. 저장한 그림에는 링크가 남지 않으니
-            저장본에는 영향이 없다.
-          */
-          <a key={index} href={`/trips/${pick.tripId}`} aria-label={`${pick.placeName} 여행 열기`}>
+        const tileArt = (
+          <>
             <g clipPath={`url(#collage-tile-${index})`}>
               <rect x={tile.x} y={tile.y} width={tile.width} height={tile.height} fill={EMPTY} />
               {data && (
@@ -137,7 +134,19 @@ export function CollageCard({ sketch, title, headline, picks, photos }: CollageC
                 </text>
               </>
             )}
+          </>
+        );
+
+        /*
+          칸을 누르면 그 여행으로 간다. 저장한 그림에는 링크가 남지 않으니
+          저장본에는 영향이 없다. 링크로 보여 줄 때는 여행 id 가 없어 걸지 않는다.
+        */
+        return pick.tripId ? (
+          <a key={index} href={`/trips/${pick.tripId}`} aria-label={`${pick.placeName} 여행 열기`}>
+            {tileArt}
           </a>
+        ) : (
+          <g key={index}>{tileArt}</g>
         );
       })}
 

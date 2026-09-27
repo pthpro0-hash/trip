@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import { buildSketch, monthStrip, sketchShapes, type SketchTrip } from "@/lib/sketch";
 import { headline } from "@/lib/sketchWords";
 import { tripsOfYear, yearStory, type SidoOf } from "@/lib/sketchStory";
@@ -23,6 +24,14 @@ import { LineCard } from "./LineCard";
 import { PAPER } from "./cardInk";
 import { StoryScenes } from "./StoryScenes";
 import { WaitingOverlay } from "@/components/layout/Waiting";
+
+/*
+  링크 창은 누를 때만 받는다. 시도 칠하기 경계(60KB)가 딸려 있어,
+  처음부터 받으면 링크를 만들지 않는 사람도 그만큼 기다린다.
+*/
+const ShareDialog = dynamic(() => import("@/components/share/ShareDialog").then((module) => module.ShareDialog), {
+  ssr: false,
+});
 
 /*
   한 해를 한 장으로 — 그리고 그 아래 이야기.
@@ -58,9 +67,11 @@ interface SketchShowcaseProps {
   onWrite: (year: number, line: string) => Promise<boolean>;
   /** 시도를 가리는 셈. 불러오기 전에는 없다. */
   sidoOf: SidoOf | undefined;
+  /** 로그인한 사람. 있어야 링크로 보여 줄 수 있다. */
+  userId?: string | null;
 }
 
-export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchShowcaseProps) {
+export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = null }: SketchShowcaseProps) {
   const holder = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState<"card" | "story" | null>(null);
   const [failed, setFailed] = useState(false);
@@ -76,6 +87,12 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
   const months = useMemo(() => monthStrip(trips), [trips]);
   const story = useMemo(() => yearStory(all, year, sidoOf), [all, year, sidoOf]);
   const made = useMemo(() => headline(sketch, "year"), [sketch]);
+  /*
+    링크로 보여 줄 한 줄. 화면이 지은 말에는 함께한 사람의 이름이 들어갈
+    수 있어("민지와 세 번") 이름 없는 말로 바꾼다. 직접 적어 둔 한 줄은
+    본인이 고른 말이라 그대로 싣고, 창에서 그 사실을 알린다.
+  */
+  const sharedLine = written ?? headline(sketch, "year", { people: false });
   const line = written ?? made;
 
   /*
@@ -178,6 +195,12 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
   }, [scenePaths]);
 
   const title = `${year}년`;
+
+  const [sharing, setSharing] = useState(false);
+  // 창의 Esc 는 onClose 가 바뀔 때마다 다시 건다. 같은 함수를 넘긴다.
+  const closeShare = useCallback(() => setSharing(false), []);
+  /** 링크 미리보기에 쓸, 이미 받아 둔 사진들. */
+  const localPhotos = useMemo(() => new Map([...cardPhotos, ...collagePhotos]), [cardPhotos, collagePhotos]);
   /* 콜라주 사진을 얹는 중에 저장하면 빈 칸이 찍힌다. 다 얹을 때까지 기다린다. */
   const waitingPhotos = style === "collage" && collageBusy;
 
@@ -319,27 +342,58 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
 
       {/*
         저장은 늘 손 닿는 데. 어디까지 읽어 내려가든 그 자리에서 저장한다.
-        공유는 대개 세로라 스토리용을 따로 둔다.
+        공유는 대개 세로라 스토리용을 따로 둔다. 그림 대신 링크로 보내면
+        받는 사람이 그해 이야기까지 넘겨 볼 수 있다.
       */}
-      <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex items-center gap-2 border-t border-line bg-bg/95 px-5 py-3 backdrop-blur-md [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
-        <button
-          type="button"
-          onClick={() => void save("card")}
-          disabled={saving !== null || waitingPhotos}
-          className="rounded-full bg-accent px-4 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
-        >
-          {year}년 이미지 저장
-        </button>
-        <button
-          type="button"
-          onClick={() => void save("story")}
-          disabled={saving !== null || waitingPhotos}
-          className="rounded-full bg-bg-subtle px-4 py-2.5 text-[14px] font-medium text-text transition hover:bg-line disabled:opacity-60"
-        >
-          스토리용 세로로
-        </button>
-        {failed && <span className="text-[13px] text-text-muted">저장하지 못했어요.</span>}
+      <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex flex-col gap-1.5 border-t border-line bg-bg/95 px-5 py-3 backdrop-blur-md [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+        {failed && <p className="text-[13px] text-text-muted">저장하지 못했어요.</p>}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => void save("card")}
+            disabled={saving !== null || waitingPhotos}
+            aria-label={`${year}년 이미지 저장`}
+            className="flex-1 rounded-full bg-accent px-1.5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
+          >
+            이미지 저장
+          </button>
+          <button
+            type="button"
+            onClick={() => void save("story")}
+            disabled={saving !== null || waitingPhotos}
+            className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-text transition hover:bg-line disabled:opacity-60"
+          >
+            스토리용 세로
+          </button>
+          {userId && (
+            <button
+              type="button"
+              onClick={() => setSharing(true)}
+              disabled={saving !== null || waitingPhotos}
+              aria-label={`${year}년 링크로 보여 주기`}
+              className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-accent transition hover:bg-line disabled:opacity-60"
+            >
+              링크 공유
+            </button>
+          )}
+        </div>
       </div>
+
+      {sharing && userId && (
+        <ShareDialog
+          userId={userId}
+          year={year}
+          style={style}
+          headline={sharedLine}
+          ownLine={written !== undefined}
+          sketch={sketch}
+          shapes={shapes}
+          months={months}
+          story={story}
+          localPhotos={localPhotos}
+          onClose={closeShare}
+        />
+      )}
     </article>
   );
 }

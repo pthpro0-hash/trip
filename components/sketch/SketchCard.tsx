@@ -7,11 +7,10 @@ import {
   dotRadius,
   type MonthCell,
   type Season,
-  type Sketch,
   type SketchShapes,
 } from "@/lib/sketch";
 import { distanceInWords, paceInWords, photoPaceInWords } from "@/lib/sketchWords";
-import { CARD_HEIGHT, CARD_WIDTH, FAINT, FONT, INK, MUTED, SIGNATURE } from "./cardInk";
+import { CARD_HEIGHT, CARD_WIDTH, FAINT, FONT, INK, MUTED, SIGNATURE, type CardStats } from "./cardInk";
 
 /*
   스케치 한 장.
@@ -38,7 +37,7 @@ const COAST = "#b6c6d2";
 const SEASONS: Season[] = ["봄", "여름", "가을", "겨울"];
 
 interface SketchCardProps {
-  sketch: Sketch;
+  sketch: CardStats;
   shapes: SketchShapes;
   /** 맨 위에 적을 말. 연도를 고르면 "2026년"처럼 바뀐다. */
   title: string;
@@ -222,8 +221,8 @@ export function SketchCard({
           const size = shotSize(dot.photoCount);
           const ring = SEASON_COLOR[dot.season];
 
-          return (
-            <a key={index} href={`/trips/${dot.tripId}`} aria-label={`${dot.photoCount}장 찍은 곳`}>
+          const mark = (
+            <>
               {data ? (
                 <g>
                   <rect
@@ -259,7 +258,15 @@ export function SketchCard({
                 />
               )}
               <circle cx={x} cy={y} r={Math.max(r, 16)} fill="transparent" />
+            </>
+          );
+          // 링크로 보여 줄 때는 여행 id 가 없다 — 남에게는 열리지 않는 주소다.
+          return dot.tripId ? (
+            <a key={index} href={`/trips/${dot.tripId}`} aria-label={`${dot.photoCount}장 찍은 곳`}>
+              {mark}
             </a>
+          ) : (
+            <g key={index}>{mark}</g>
           );
         })}
       </g>

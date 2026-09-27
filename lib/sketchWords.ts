@@ -89,14 +89,21 @@ export function photoPaceInWords(photoCount: number, tripCount: number): string 
  *
  * 한 해를 고른 게 아니라 전체를 보고 있을 때는 "…한 해"라고 하면 안 된다.
  * 그때는 해가 여럿이다.
+ *
+ * people 을 끄면 함께한 사람의 이름을 쓰지 않는다. 링크로 남에게 보여 줄
+ * 때다 — 그 사람은 공개에 동의한 적이 없다.
  */
-export function headline(sketch: Sketch, scope: "year" | "all" = "year"): string {
+export function headline(
+  sketch: Sketch,
+  scope: "year" | "all" = "year",
+  { people = true }: { people?: boolean } = {},
+): string {
   const { tripCount, topCompanion, seaTripCount, jeju, bySeason, placeCount } = sketch;
 
   if (tripCount === 0) return "";
 
   // ① 한 사람과 절반 넘게 다녔으면 그 사람이 그해다.
-  if (topCompanion && topCompanion.count * 2 > tripCount && topCompanion.count >= 2) {
+  if (people && topCompanion && topCompanion.count * 2 > tripCount && topCompanion.count >= 2) {
     return `${topCompanion.label}와 ${times(topCompanion.count)}`;
   }
 

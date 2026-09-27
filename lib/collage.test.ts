@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { COLLAGE_MAX, collagePicks, collageTiles, fitText, textWidth, type Tile } from "./collage";
+import { COLLAGE_MAX, collagePicks, collageTiles, type Tile } from "./collage";
 
 const BOX: Tile = { x: 48, y: 168, width: 624, height: 680 };
 const GAP = 8;
@@ -66,23 +66,5 @@ describe("collagePicks", () => {
 
   it("사진이 하나도 없으면 빈 배열", () => {
     expect(collagePicks([dot("가", 0, "2026-01-01", null)])).toEqual([]);
-  });
-});
-
-describe("fitText", () => {
-  it("들어가면 그대로", () => {
-    expect(fitText("안목해변", 200, 15)).toBe("안목해변");
-  });
-
-  it("넘치면 잘라서 … 를 붙이고, 폭을 넘지 않는다", () => {
-    const text = "강릉 안목해변 커피거리 앞 모래사장";
-    const fitted = fitText(text, 120, 15);
-    expect(fitted.endsWith("…")).toBe(true);
-    expect(fitted.length).toBeLessThan(text.length);
-    expect(textWidth(fitted, 15)).toBeLessThanOrEqual(120);
-  });
-
-  it("한글은 영문보다 넓게 어림한다", () => {
-    expect(textWidth("가나다", 20)).toBeGreaterThan(textWidth("abc", 20));
   });
 });

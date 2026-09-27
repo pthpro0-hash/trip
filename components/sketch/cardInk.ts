@@ -1,3 +1,5 @@
+import type { Sketch } from "@/lib/sketch";
+
 /*
   카드 세 모양(지도·사진 콜라주·선 그림)이 함께 쓰는 판과 먹.
 
@@ -18,6 +20,15 @@ export const FONT =
 
 /** 선 그림 카드의 종이. 스토리용 세로 바탕도 이 색으로 칠한다. */
 export const PAPER = "#f6f2e9";
+
+/**
+ * 카드가 쓰는 숫자. 내 기록에서 센 Sketch 도, 링크로 베껴 둔 숫자도
+ * 이 모양이면 그릴 수 있다.
+ */
+export type CardStats = Pick<
+  Sketch,
+  "tripCount" | "placeCount" | "photoCount" | "distanceKm" | "spanDays" | "curatedCount"
+>;
 
 /** 카드 맨 아래 서명. */
 export const SIGNATURE = "나만의 여행 스케치";

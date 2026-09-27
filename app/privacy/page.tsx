@@ -71,6 +71,12 @@ export default function PrivacyPage() {
             "서비스 개선(어떤 검색어에 결과가 없었는지 등)",
           ]}
         />
+        <p>
+          &ldquo;링크로 보여 주기&rdquo;를 쓰시면, 고르신 범위(사진까지·지도만·시도 이름만) 안에서 그해의
+          모습을 따로 베껴 두고 <strong className="text-text">그 링크를 아는 누구나</strong> 볼 수 있게
+          합니다. 고르지 않은 것(예: &ldquo;지도만&rdquo;일 때의 사진)은 베껴 두지 않으며, 함께한 사람의
+          이름은 어느 범위에서도 싣지 않습니다. 검색 엔진에는 나오지 않게 합니다.
+        </p>
         <p>회사는 개인정보를 광고나 마케팅에 사용하지 않습니다.</p>
       </Article>
 
@@ -78,6 +84,10 @@ export default function PrivacyPage() {
         <p>
           개인정보는 <strong className="text-text">회원 탈퇴 시 지체 없이 파기</strong>합니다. 올리신
           사진도 함께 삭제되며 복구할 수 없습니다.
+        </p>
+        <p>
+          링크로 보여 주려고 베껴 둔 내용과 사진은 <strong className="text-text">링크를 끊으시면 바로
+          삭제</strong>되고, 그 링크로는 다시 볼 수 없습니다.
         </p>
         <p>
           서비스 이용 내역(위 1항의 마지막 줄)은{" "}
