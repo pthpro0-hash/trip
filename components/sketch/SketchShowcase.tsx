@@ -1,14 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { buildSketch, monthStrip, sketchShapes, type SketchTrip } from "@/lib/sketch";
 import { headline } from "@/lib/sketchWords";
 import { tripsOfYear, yearStory, type SidoOf } from "@/lib/sketchStory";
 import { downloadSvgAsPng } from "@/lib/svgToPng";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { markerUrls, thumbUrls } from "@/lib/supabase/photos";
-import { inlinePhotos } from "@/lib/photo/inlinePhoto";
+import { inlinePhoto, inlinePhotos } from "@/lib/photo/inlinePhoto";
+import { collagePicks } from "@/lib/collage";
+import {
+  CARD_STYLES,
+  keepCardStyle,
+  readCardStyle,
+  styleSuffix,
+  subscribeCardStyle,
+  type CardStyle,
+} from "@/lib/cardStyle";
 import { SketchCard } from "./SketchCard";
+import { CollageCard } from "./CollageCard";
+import { LineCard } from "./LineCard";
+import { PAPER } from "./cardInk";
 import { StoryScenes } from "./StoryScenes";
 import { WaitingOverlay } from "@/components/layout/Waiting";
 
@@ -29,6 +41,14 @@ import { WaitingOverlay } from "@/components/layout/Waiting";
 */
 const PHOTOS_ON_MAP = 10;
 
+/*
+  콜라주 칸에 심을 사진의 긴 변. 큰 칸은 카드 폭을 거의 다 차지해서
+  목록 판(960px)을 그대로, 작은 칸은 그보다 작게 — 아홉 장을 다 크게
+  심으면 카드 하나가 몇 MB 가 된다.
+*/
+const COLLAGE_HERO_EDGE = 960;
+const COLLAGE_EDGE = 600;
+
 interface SketchShowcaseProps {
   year: number;
   /** 모든 해의 여행. 작년과 견주는 데도 쓴다. */
@@ -48,6 +68,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
   const [writeFailed, setWriteFailed] = useState(false);
   /** Escape 로 버리는 중이면 손을 뗄 때 저장하지 않는다. */
   const cancelling = useRef(false);
+  const chosen = useSyncExternalStore(subscribeCardStyle, readCardStyle, () => "map" as const);
 
   const trips = useMemo(() => tripsOfYear(all, year), [all, year]);
   const sketch = useMemo(() => buildSketch(trips), [trips]);
@@ -89,6 +110,55 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
     };
   }, [featured]);
 
+  /*
+    콜라주에 얹을 곳. 사진이 한 장도 없는 해에는 콜라주를 고를 수 없고,
+    예전에 콜라주를 골라 뒀어도 지도로 보인다.
+  */
+  const picks = useMemo(() => collagePicks(shapes.dots), [shapes]);
+  const style: CardStyle = chosen === "collage" && picks.length === 0 ? "map" : chosen;
+
+  /*
+    콜라주 사진은 콜라주를 골랐을 때만 받는다. 칸이 크므로 핀용 작은 판이
+    아니라 목록 판에서 심는다. 받는 대로 한 칸씩 채운다 — 아홉 장을 다
+    받을 때까지 빈 판을 보여 줄 이유가 없다.
+  */
+  const [collagePhotos, setCollagePhotos] = useState<Map<string, string>>(new Map());
+  const [collageBusy, setCollageBusy] = useState(false);
+  useEffect(() => {
+    const supabase = getBrowserClient();
+    if (style !== "collage" || !supabase) return;
+    const paths = picks.map((pick) => pick.photoPath!).filter((path) => !collagePhotos.has(path));
+    if (paths.length === 0) return;
+    let active = true;
+    void (async () => {
+      setCollageBusy(true);
+      try {
+        const urls = await thumbUrls(supabase, paths);
+        for (const path of paths) {
+          const url = urls.get(path);
+          if (!url) continue;
+          const hero = path === picks[0]?.photoPath;
+          const data = await inlinePhoto(url, {
+            edge: hero ? COLLAGE_HERO_EDGE : COLLAGE_EDGE,
+            square: false,
+            quality: 0.8,
+          });
+          if (!active) return;
+          if (data) setCollagePhotos((current) => new Map(current).set(path, data));
+        }
+      } catch {
+        // 못 받은 칸은 빈 칸으로 남는다.
+      } finally {
+        if (active) setCollageBusy(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // 받아 둔 사진이 늘 때마다 다시 돌 이유는 없다. 모양이나 고를 곳이 바뀔 때만.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [style, picks]);
+
   /* 장면 속 사진은 크게 보이므로 목록 판(960px)을 받는다. */
   const scenePaths = useMemo(
     () => [...new Set([story.topPlace?.photoPath, ...story.photoPaths].filter((p): p is string => !!p))],
@@ -108,14 +178,20 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
   }, [scenePaths]);
 
   const title = `${year}년`;
+  /* 콜라주 사진을 얹는 중에 저장하면 빈 칸이 찍힌다. 다 얹을 때까지 기다린다. */
+  const waitingPhotos = style === "collage" && collageBusy;
 
   const save = async (kind: "card" | "story") => {
     const svg = holder.current?.querySelector("svg");
     if (!svg) return;
     setSaving(kind);
     setFailed(false);
-    const name = kind === "story" ? `여행스케치-${title}-세로.png` : `여행스케치-${title}.png`;
-    const ok = await downloadSvgAsPng(svg, name, { story: kind === "story" });
+    const base = `여행스케치-${title}${styleSuffix(style)}`;
+    const name = kind === "story" ? `${base}-세로.png` : `${base}.png`;
+    const ok = await downloadSvgAsPng(svg, name, {
+      story: kind === "story",
+      background: style === "line" ? PAPER : undefined,
+    });
     if (!ok) setFailed(true);
     setSaving(null);
   };
@@ -131,7 +207,11 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
       {saving && (
         <WaitingOverlay
           title="그림을 만들고 있어요"
-          note="사진을 얹은 카드라 조금 걸려요. 다 되면 저절로 받아져요."
+          note={
+            style === "line"
+              ? "다 되면 저절로 받아져요."
+              : "사진을 얹은 카드라 조금 걸려요. 다 되면 저절로 받아져요."
+          }
         />
       )}
 
@@ -182,16 +262,57 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
         </div>
       </header>
 
+      {/*
+        카드 모양. 같은 한 해라도 보여 줄 곳에 따라 어울리는 모양이 다르다.
+        고른 모양 그대로 저장된다.
+      */}
+      <div className="flex flex-col gap-2">
+        <div role="radiogroup" aria-label="카드 모양" className="flex gap-1.5">
+          {CARD_STYLES.map((option) => {
+            const blocked = option.id === "collage" && picks.length === 0;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={option.id === style}
+                disabled={blocked}
+                onClick={() => keepCardStyle(option.id)}
+                className={`flex-1 rounded-xl px-2 py-2 text-[14px] font-medium transition disabled:opacity-40 ${
+                  option.id === style
+                    ? "bg-text text-bg"
+                    : "bg-bg-subtle text-text-muted hover:bg-line hover:text-text"
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[13px] text-text-faint">
+          {picks.length === 0 && chosen === "collage"
+            ? "이 해에는 올린 사진이 없어 지도로 보여 드려요."
+            : CARD_STYLES.find((option) => option.id === style)?.hint}
+          {style === "collage" && collageBusy && " · 사진을 얹고 있어요…"}
+        </p>
+      </div>
+
       <div ref={holder} className="overflow-hidden rounded-2xl ring-1 ring-line">
-        <SketchCard
-          sketch={sketch}
-          shapes={shapes}
-          title={title}
-          headline={line}
-          months={months}
-          region={null}
-          photos={cardPhotos}
-        />
+        {style === "collage" ? (
+          <CollageCard sketch={sketch} title={title} headline={line} picks={picks} photos={collagePhotos} />
+        ) : style === "line" ? (
+          <LineCard sketch={sketch} shapes={shapes} year={year} headline={line} months={months} />
+        ) : (
+          <SketchCard
+            sketch={sketch}
+            shapes={shapes}
+            title={title}
+            headline={line}
+            months={months}
+            region={null}
+            photos={cardPhotos}
+          />
+        )}
       </div>
 
       <StoryScenes story={story} photoUrls={sceneUrls} />
@@ -204,7 +325,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
         <button
           type="button"
           onClick={() => void save("card")}
-          disabled={saving !== null}
+          disabled={saving !== null || waitingPhotos}
           className="rounded-full bg-accent px-4 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
         >
           {year}년 이미지 저장
@@ -212,7 +333,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf }: SketchSh
         <button
           type="button"
           onClick={() => void save("story")}
-          disabled={saving !== null}
+          disabled={saving !== null || waitingPhotos}
           className="rounded-full bg-bg-subtle px-4 py-2.5 text-[14px] font-medium text-text transition hover:bg-line disabled:opacity-60"
         >
           스토리용 세로로

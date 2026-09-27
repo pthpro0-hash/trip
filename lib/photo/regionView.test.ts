@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { KOREA_FULL_VIEWBOX, project } from "@/lib/koreaMap";
-import { regionViewBox } from "./regionView";
+import { dotsViewBox, regionViewBox } from "./regionView";
 
 const FRAME = { width: 290, height: 450 };
 
@@ -64,5 +64,33 @@ describe("regionViewBox", () => {
     const 제 = regionViewBox("제주권", [], FRAME);
     // 제주는 한참 남쪽이다 (y 가 클수록 남쪽).
     expect(제.y).toBeGreaterThan(수도.y);
+  });
+});
+
+describe("dotsViewBox", () => {
+  const 속초 = { lat: 38.207, lng: 128.5918 };
+  const 삼척 = { lat: 37.4499, lng: 129.1652 };
+
+  it("다녀온 곳을 모두 담고, 전국보다 좁게 당긴다", () => {
+    const box = dotsViewBox([강릉, 속초, 삼척], FRAME);
+    for (const dot of [강릉, 속초, 삼척]) expect(holds(box, dot.lat, dot.lng)).toBe(true);
+    expect(box.height).toBeLessThan(KOREA_FULL_VIEWBOX.height);
+  });
+
+  it("한 곳만 다녀도 골목 지도가 되지 않게 가장 좁은 폭을 지킨다", () => {
+    const box = dotsViewBox([강릉], FRAME, 150);
+    expect(box.width).toBeGreaterThanOrEqual(150);
+    expect(box.height).toBeGreaterThanOrEqual(150);
+    expect(holds(box, 강릉.lat, 강릉.lng)).toBe(true);
+  });
+
+  it("틀의 가로세로 비율을 따른다 — 지도가 찌그러지지 않게", () => {
+    const box = dotsViewBox([강릉, 제주], FRAME);
+    expect(box.width / box.height).toBeCloseTo(FRAME.width / FRAME.height);
+  });
+
+  it("그릴 곳이 없으면 전국", () => {
+    expect(dotsViewBox([], FRAME)).toEqual(KOREA_FULL_VIEWBOX);
+    expect(dotsViewBox([{ lat: NaN, lng: 127 }], FRAME)).toEqual(KOREA_FULL_VIEWBOX);
   });
 });

@@ -15,41 +15,57 @@
 export const INLINE_EDGE = 160;
 export const INLINE_QUALITY = 0.72;
 
-/**
- * 주소 하나를 받아 작은 정사각 그림 글자로.
- *
- * 가운데를 잘라 정사각으로 만든다. 지도 위 표식은 정사각이라야 자리를
- * 예측할 수 있고, 찌그러뜨리는 것보다 잘라내는 편이 덜 흉하다.
- */
-export async function inlinePhoto(url: string): Promise<string | null> {
+export interface InlineOptions {
+  /** 정사각이면 한 변, 아니면 긴 변. 원본보다 키우지는 않는다. */
+  edge?: number;
+  /**
+   * 가운데를 잘라 정사각으로 만든다. 지도 위 표식은 정사각이라야 자리를
+   * 예측할 수 있고, 찌그러뜨리는 것보다 잘라내는 편이 덜 흉하다.
+   *
+   * 콜라주처럼 칸 모양이 제각각이면 자르지 않고 넘긴다 — 칸에 맞춰
+   * 자르는 것은 그리는 쪽이 한다. 여기서 먼저 정사각으로 자르면 가로로
+   * 긴 칸에서 위아래가 두 번 잘린다.
+   */
+  square?: boolean;
+  quality?: number;
+}
+
+/** 주소 하나를 받아 그림 글자로. */
+export async function inlinePhoto(url: string, options: InlineOptions = {}): Promise<string | null> {
+  const { edge = INLINE_EDGE, square = true, quality = INLINE_QUALITY } = options;
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
 
     const bitmap = await createImageBitmap(await response.blob());
     try {
+      // 정사각이면 짧은 변에 맞춰 가운데를, 아니면 통째로.
+      const side = Math.min(bitmap.width, bitmap.height);
+      const source = square
+        ? { x: (bitmap.width - side) / 2, y: (bitmap.height - side) / 2, width: side, height: side }
+        : { x: 0, y: 0, width: bitmap.width, height: bitmap.height };
+      const shrink = Math.min(1, edge / Math.max(source.width, source.height));
+
       const canvas = document.createElement("canvas");
-      canvas.width = INLINE_EDGE;
-      canvas.height = INLINE_EDGE;
+      canvas.width = Math.max(1, Math.round(source.width * shrink));
+      canvas.height = Math.max(1, Math.round(source.height * shrink));
 
       const context = canvas.getContext("2d");
       if (!context) return null;
 
-      // 짧은 변에 맞춰 가운데를 잘라낸다.
-      const side = Math.min(bitmap.width, bitmap.height);
       context.drawImage(
         bitmap,
-        (bitmap.width - side) / 2,
-        (bitmap.height - side) / 2,
-        side,
-        side,
+        source.x,
+        source.y,
+        source.width,
+        source.height,
         0,
         0,
-        INLINE_EDGE,
-        INLINE_EDGE,
+        canvas.width,
+        canvas.height,
       );
 
-      return canvas.toDataURL("image/webp", INLINE_QUALITY);
+      return canvas.toDataURL("image/webp", quality);
     } finally {
       bitmap.close();
     }
@@ -67,10 +83,11 @@ export async function inlinePhoto(url: string): Promise<string | null> {
  */
 export async function inlinePhotos(
   urls: Map<string, string>,
+  options?: InlineOptions,
 ): Promise<Map<string, string>> {
   const inlined = new Map<string, string>();
   for (const [key, url] of urls) {
-    const data = await inlinePhoto(url);
+    const data = await inlinePhoto(url, options);
     if (data) inlined.set(key, data);
   }
   return inlined;

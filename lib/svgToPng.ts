@@ -44,6 +44,8 @@ export function fitInStory(
 export interface SaveOptions {
   /** 세로(9:16) 바탕에 앉혀 내보낸다. */
   story?: boolean;
+  /** 세로 바탕의 색. 카드 바탕과 같아야 카드가 액자에 끼운 듯 떠 보이지 않는다. */
+  background?: string;
 }
 
 export async function downloadSvgAsPng(
@@ -89,7 +91,7 @@ export async function downloadSvgAsPng(
     if (options.story) {
       // 바탕을 먼저 칠한다. 칠하지 않으면 남는 자리가 투명하게 나가고,
       // 스토리에 올리면 그 부분이 시커멓게 된다.
-      context.fillStyle = "#ffffff";
+      context.fillStyle = options.background ?? "#ffffff";
       context.fillRect(0, 0, canvas.width, canvas.height);
 
       const box = fitInStory(width, height);

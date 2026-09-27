@@ -60,11 +60,48 @@ export function regionViewBox(
   const ys = points.map((p) => p.y).filter(Number.isFinite);
   if (xs.length === 0 || ys.length === 0) return KOREA_FULL_VIEWBOX;
 
-  let left = Math.min(...xs);
-  let right = Math.max(...xs);
-  let top = Math.min(...ys);
-  let bottom = Math.max(...ys);
+  return fitFrame(Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys), frame);
+}
 
+/**
+ * 다녀온 곳만 담는 틀. 선 그림 카드처럼 길의 모양이 곧 그림일 때 쓴다.
+ *
+ * 전국을 비추면 한 권역만 다닌 해의 길은 손톱만 해진다. 그렇다고 점에
+ * 딱 맞추면 한 동네만 다닌 해는 골목 지도가 된다 — 땅 모양이 사라져
+ * 어디인지 읽히지 않는다. 그래서 가장 좁아도 minSpan(지도 단위, 1 ≈ 1km)
+ * 보다는 넓게 비춘다.
+ */
+export function dotsViewBox(
+  dots: { lat: number; lng: number }[],
+  frame: { width: number; height: number },
+  minSpan = 150,
+): ViewBox {
+  const points = dots
+    .filter((dot) => Number.isFinite(dot.lat) && Number.isFinite(dot.lng))
+    .map((dot) => project(dot.lat, dot.lng));
+  if (points.length === 0) return KOREA_FULL_VIEWBOX;
+
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const left = Math.min(...xs);
+  const right = Math.max(...xs);
+  const top = Math.min(...ys);
+  const bottom = Math.max(...ys);
+
+  // 너무 좁으면 가운데를 두고 넓힌다.
+  const growX = Math.max(0, minSpan - (right - left)) / 2;
+  const growY = Math.max(0, minSpan - (bottom - top)) / 2;
+  return fitFrame(left - growX, right + growX, top - growY, bottom + growY, frame);
+}
+
+/** 둘레를 남기고, 틀의 가로세로 비율에 맞춘다. */
+function fitFrame(
+  left: number,
+  right: number,
+  top: number,
+  bottom: number,
+  frame: { width: number; height: number },
+): ViewBox {
   // 둘레를 남긴다.
   const padX = (right - left) * MARGIN;
   const padY = (bottom - top) * MARGIN;

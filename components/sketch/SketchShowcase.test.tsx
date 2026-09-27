@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { SketchTrip } from "@/lib/sketch";
 
@@ -58,5 +58,62 @@ describe("SketchShowcase · 한 줄", () => {
     render(<SketchShowcase year={2026} all={all} written={undefined} onWrite={async () => true} sidoOf={undefined} />);
     expect(screen.getByRole("button", { name: "2026년 이미지 저장" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "스토리용 세로로" })).toBeTruthy();
+  });
+});
+
+const withPhotos: SketchTrip[] = [
+  {
+    ...all[0],
+    visits: [
+      { placeName: "안목해변", spotId: null, lat: 37.77, lng: 128.95, photoCount: 18, dong: null, photoPath: "a.webp" },
+      { placeName: "속초해변", spotId: null, lat: 38.19, lng: 128.6, photoCount: 8, dong: null, photoPath: "b.webp" },
+    ],
+  },
+];
+
+const show = (trips: SketchTrip[]) =>
+  render(<SketchShowcase year={2026} all={trips} written={undefined} onWrite={async () => true} sidoOf={undefined} />);
+
+/*
+  같은 한 해라도 보여 줄 곳에 따라 어울리는 모양이 다르다. 고른 모양
+  그대로 보이고, 그대로 저장되고, 다음에 와도 그 모양이어야 한다.
+*/
+describe("SketchShowcase · 카드 모양", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("세 모양 가운데 처음에는 지도", () => {
+    show(withPhotos);
+    const radios = screen.getAllByRole("radio");
+    expect(radios.map((radio) => radio.textContent)).toEqual(["지도", "사진 콜라주", "선 그림"]);
+    expect(screen.getByRole("radio", { name: "지도" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("선 그림을 고르면 선 그림 카드가 보이고, 다음에도 기억한다", () => {
+    const { unmount } = show(withPhotos);
+    fireEvent.click(screen.getByRole("radio", { name: "선 그림" }));
+    expect(screen.getByRole("img", { name: /선 그림/ })).toBeTruthy();
+    unmount();
+
+    show(withPhotos);
+    expect(screen.getByRole("radio", { name: "선 그림" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("사진이 있는 해는 콜라주를 고를 수 있다 — 칸마다 그곳 여행으로 이어진다", () => {
+    show(withPhotos);
+    fireEvent.click(screen.getByRole("radio", { name: "사진 콜라주" }));
+    expect(screen.getByRole("img", { name: /사진 콜라주, 안목해변, 속초해변/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "안목해변 여행 열기" }).getAttribute("href")).toBe("/trips/t1");
+  });
+
+  it("사진이 없는 해는 콜라주를 고를 수 없다", () => {
+    show(all);
+    expect((screen.getByRole("radio", { name: "사진 콜라주" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("콜라주를 골라 뒀어도 사진이 없는 해는 지도로 보이고 그 까닭을 말한다", () => {
+    window.localStorage.setItem("sketch:cardStyle", "collage");
+    show(all);
+    expect(screen.getByRole("radio", { name: "지도" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("이 해에는 올린 사진이 없어 지도로 보여 드려요.")).toBeTruthy();
   });
 });

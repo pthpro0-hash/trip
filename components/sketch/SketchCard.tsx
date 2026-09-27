@@ -11,6 +11,7 @@ import {
   type SketchShapes,
 } from "@/lib/sketch";
 import { distanceInWords, paceInWords, photoPaceInWords } from "@/lib/sketchWords";
+import { CARD_HEIGHT, CARD_WIDTH, FAINT, FONT, INK, MUTED, SIGNATURE } from "./cardInk";
 
 /*
   스케치 한 장.
@@ -19,24 +20,20 @@ import { distanceInWords, paceInWords, photoPaceInWords } from "@/lib/sketchWord
   html2canvas 같은 것을 끌어오면 화면과 저장본이 미묘하게 달라지고,
   무거운 의존성이 하나 늘어난다. SVG 는 그대로 그림으로 바꿀 수 있다.
 
-  글꼴은 시스템 것을 쓴다 — 저장본을 만들 때 바깥 글꼴은 따라오지 않는다.
+  세 모양 가운데 처음부터 있던 지도형이다. 나머지 둘은 CollageCard,
+  LineCard 에 있고, 판 크기와 먹은 cardInk 에서 함께 쓴다.
 */
 
-const WIDTH = 720;
-const HEIGHT = 1060;
+const WIDTH = CARD_WIDTH;
+const HEIGHT = CARD_HEIGHT;
 const MAP_TOP = 190;
 const MAP_HEIGHT = 450;
 /* 전국을 세로 450 에 맞췄을 때의 가로. 권역을 골라도 이 자리는 그대로다. */
 const MAP_WIDTH = Math.round((340 / 600) * 450);
 
-const INK = "#1d1d1f";
-const MUTED = "#6e6e73";
-const FAINT = "#a1a1a6";
 const SEA = "#dbeafe";
 const LAND = "#f5f3ec";
 const COAST = "#b6c6d2";
-const FONT =
-  "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard Variable', Pretendard, sans-serif";
 
 const SEASONS: Season[] = ["봄", "여름", "가을", "겨울"];
 
@@ -346,7 +343,7 @@ export function SketchCard({
       </g>
 
       <text x={48} y={HEIGHT - 44} fontFamily={FONT} fontSize={15} fill={FAINT}>
-        나만의 여행 스케치
+        {SIGNATURE}
       </text>
     </svg>
   );
