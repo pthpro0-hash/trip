@@ -32,7 +32,9 @@ function placeOf(from: string | null): { href: string; label: string } {
   const region = REGIONS.find((name: Region) => from.startsWith(`/regions/${encodeURIComponent(name)}`));
   if (region) return { href: from, label: `← ${region}` };
   if (from.startsWith("/regions")) return { href: from, label: "← 권역별" };
-  // 첫 화면에서 왔으면 어느 쪽이었는지는 뻔하다 — 여행지 카드는 100선에만 있다.
+  // 내 스케치 지도에서 100선을 겹쳐 보다가 들어온 사람은 지도로 돌려보낸다.
+  if (from.startsWith("/?v=sketch")) return { href: "/?v=sketch", label: "← 내 스케치" };
+  // 그 밖의 첫 화면은 100선 쪽이다 — 여행지 카드는 100선에만 있다.
   if (from === "/" || from.startsWith("/?")) return HOME;
   if (from.startsWith("/")) return { href: from, label: HOME.label };
   return HOME;

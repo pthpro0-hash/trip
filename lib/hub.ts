@@ -20,6 +20,10 @@ export interface HubPlace {
   photoCount: number;
   /** 핀에 얹을 사진. 사진을 올리지 않은 방문이면 null. */
   coverPath: string | null;
+  /** 법정동. 어느 시도인지 가리는 근거다. */
+  dong?: string | null;
+  /** 한국관광 100선이면 그 id. 100선 겹쳐 보기에서 "다녀온 곳"을 가린다. */
+  spotId?: string | null;
 }
 
 /** hubPlaces 가 읽는 여행의 모양. 저장된 여행(SavedTrip)이 이 꼴을 갖췄다. */
@@ -35,6 +39,8 @@ export interface HubTripInput {
     lng: number;
     startedAt: string;
     photoCount: number;
+    dong?: string | null;
+    spotId?: string | null;
   }[];
 }
 
@@ -62,6 +68,8 @@ export function hubPlaces(trips: HubTripInput[], covers: Map<string, string>): H
         startedAt: visit.startedAt,
         photoCount: visit.photoCount,
         coverPath: covers.get(visit.id) ?? null,
+        dong: visit.dong ?? null,
+        spotId: visit.spotId ?? null,
       })),
   );
 }

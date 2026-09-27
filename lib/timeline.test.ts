@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   dwellMs,
+  echoLabel,
+  echoOf,
   indexAt,
   monthOf,
   monthSpan,
@@ -136,5 +138,59 @@ describe("trailSegments", () => {
       [{ lat: 36.3, lng: 127 }],
     ]);
     expect(trailSegments(stops, 0)).toEqual([]);
+  });
+});
+
+describe("echoOf", () => {
+  const 안목 = at("v1", "2025-09-27 10:00:00", 18);
+  const 속초 = at("v2", "2024-09-29 09:00:00", 30);
+  const 올해 = at("v3", "2026-09-27 09:00:00", 5);
+
+  it("몇 해 전 오늘 다녀온 곳", () => {
+    const echo = echoOf([안목, 올해], "2026-09-27");
+    expect(echo?.place.visitId).toBe("v1");
+    expect(echo?.yearsAgo).toBe(1);
+    expect(echo?.exact).toBe(true);
+  });
+
+  it("올해 것은 추억이 아니다", () => {
+    expect(echoOf([올해], "2026-09-27")).toBeNull();
+  });
+
+  it("딱 그날이 아니어도 앞뒤 사흘은 봐준다", () => {
+    const echo = echoOf([속초], "2026-09-27");
+    expect(echo?.place.visitId).toBe("v2");
+    expect(echo?.yearsAgo).toBe(2);
+    expect(echo?.exact).toBe(false);
+  });
+
+  it("더 가까운 날을 먼저 고른다", () => {
+    expect(echoOf([속초, 안목], "2026-09-27")?.place.visitId).toBe("v1");
+  });
+
+  it("너무 멀면 없다", () => {
+    expect(echoOf([at("x", "2025-08-01 10:00:00")], "2026-09-27")).toBeNull();
+  });
+
+  it("연말연시를 넘나든다", () => {
+    const echo = echoOf([at("y", "2024-12-31 22:00:00")], "2026-01-02");
+    expect(echo?.yearsAgo).toBe(1);
+    expect(echo?.exact).toBe(false);
+  });
+
+  it("2월 29일은 없는 해에 28일로 친다", () => {
+    const echo = echoOf([at("z", "2024-02-29 10:00:00")], "2026-02-28");
+    expect(echo?.place.visitId).toBe("z");
+  });
+
+  it("날짜를 못 읽으면 없다", () => {
+    expect(echoOf([안목], "엉망")).toBeNull();
+  });
+});
+
+describe("echoLabel", () => {
+  it("오늘과 이맘때를 가른다", () => {
+    expect(echoLabel({ yearsAgo: 1, exact: true })).toBe("1년 전 오늘");
+    expect(echoLabel({ yearsAgo: 2, exact: false })).toBe("2년 전 이맘때");
   });
 });

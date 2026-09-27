@@ -28,10 +28,34 @@ const LINE_COLOR = "#0071E3";
 /** 가장자리 여백. 핀이 반쯤 잘리지 않게 핀 크기만큼. */
 const EDGE = 36;
 
+/** 100선 겹쳐 보기의 한 곳. */
+export interface CuratedPin {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
+  /** 가고 싶은 곳에 담아 둔 곳. 채워서 그린다. */
+  wished: boolean;
+}
+
+/** 칠할 시도. 조각마다 [바깥 고리, ...구멍], 점은 [경도, 위도]. */
+export interface PaintedSido {
+  name: string;
+  polygons: [number, number][][][];
+}
+
+/*
+  이만큼 멀리서 볼 때만 칠한다. 동네를 볼 때 도 하나가 화면을 온통
+  파랗게 덮으면 지도가 안 보인다. 칠하기는 "어디를 밟았나"를 한눈에
+  보는 일이라 멀리서 볼 때의 것이다.
+*/
+const PAINT_FROM_LEVEL = 9;
+
 export interface FlyTarget {
   /** 같은 곳으로 두 번 날아가도 알아듣도록 매번 바꾼다. */
   key: number;
-  places: HubPlace[];
+  /** 다 들어오게 맞출 점들. 다녀온 곳일 수도, 시도의 두 모서리일 수도 있다. */
+  places: { lat: number; lng: number }[];
 }
 
 interface HubMapProps {
@@ -47,6 +71,11 @@ interface HubMapProps {
   bottomInset: number;
   onView: (bounds: Bounds) => void;
   onPick: (places: HubPlace[]) => void;
+  /** 다녀온 시도. 멀리서 볼 때만 칠한다. */
+  painted: PaintedSido[];
+  /** 100선 겹쳐 보기. 꺼져 있으면 null. */
+  curated: CuratedPin[] | null;
+  onPickSpot: (id: string) => void;
   /** 다시 걷기가 지도를 직접 부리는 손잡이. */
   ref?: Ref<HubMapHandle>;
 }
@@ -81,6 +110,9 @@ export function HubMap({
   bottomInset,
   onView,
   onPick,
+  painted,
+  curated,
+  onPickSpot,
   ref,
 }: HubMapProps) {
   const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY ?? "";
@@ -89,15 +121,18 @@ export function HubMap({
   const overlaysRef = useRef<Kakao[]>([]);
   const lineRef = useRef<Kakao>(null);
   const [failed, setFailed] = useState(false);
+  /** 지도가 섰는가. 칠하기처럼 지도가 있어야 하는 일은 이것을 기다린다. */
+  const [ready, setReady] = useState(false);
 
   /*
     지도의 행사(idle)는 한 번 걸어 두고 끝까지 쓴다. 그 안에서 읽는 값이
     처음 그대로 굳지 않도록, 늘 최신 값을 여기서 꺼내 쓴다.
   */
-  const latest = useRef({ places, photoUrls, pickedIds, bottomInset, onView, onPick, flyTo });
+  const latest = useRef({ places, photoUrls, pickedIds, bottomInset, onView, onPick, flyTo, curated, onPickSpot });
   useEffect(() => {
-    latest.current = { places, photoUrls, pickedIds, bottomInset, onView, onPick, flyTo };
+    latest.current = { places, photoUrls, pickedIds, bottomInset, onView, onPick, flyTo, curated, onPickSpot };
   });
+  const paintRef = useRef<Kakao[]>([]);
 
   /** 지금 시트 위로 보이는 땅의 범위. */
   const reportView = () => {
@@ -139,7 +174,11 @@ export function HubMap({
     const box = containerRef.current;
     if (!map || !box) return;
     const kakao: Kakao = (window as Kakao).kakao;
-    const { places: all, photoUrls: urls, pickedIds: picked } = latest.current;
+    const { places: all, photoUrls: urls, pickedIds: picked, curated: spots } = latest.current;
+
+    // 칠한 시도는 멀리서 볼 때만 보인다.
+    const far = map.getLevel() >= PAINT_FROM_LEVEL;
+    for (const polygon of paintRef.current) polygon.setMap(far ? map : null);
 
     for (const overlay of overlaysRef.current) overlay.setMap(null);
     overlaysRef.current = [];
@@ -184,6 +223,32 @@ export function HubMap({
         }),
       );
     }
+
+    /*
+      100선은 사진 핀 밑에 깐다. 이미 다녀온 곳은 빼고 넘어온다 — 그곳은
+      내 사진이 대신 서 있다. 묶지 않는다. 작은 점이라 겹쳐도 읽히고,
+      묶으면 "몇 곳이 남았나"가 가려진다.
+    */
+    for (const spot of spots ?? []) {
+      const point = projection.containerPointFromCoords(new kakao.maps.LatLng(spot.lat, spot.lng));
+      if (point.x < -20 || point.y < -20 || point.x > width + 20 || point.y > height + 20) continue;
+      const dot = curatedElement(spot);
+      dot.addEventListener("click", (event) => {
+        event.stopPropagation();
+        latest.current.onPickSpot(spot.id);
+      });
+      overlaysRef.current.push(
+        new kakao.maps.CustomOverlay({
+          map,
+          position: new kakao.maps.LatLng(spot.lat, spot.lng),
+          content: dot,
+          xAnchor: 0.5,
+          yAnchor: 0.5,
+          zIndex: spot.wished ? 1 : 0,
+          clickable: true,
+        }),
+      );
+    }
   };
 
   // 처음 한 번: 지도를 세우고 모든 곳이 들어오게 맞춘다.
@@ -217,6 +282,7 @@ export function HubMap({
         */
         const start = latest.current.flyTo?.places ?? latest.current.places;
         if (start.length > 0) fit(start);
+        setReady(true);
         redraw();
         reportView();
       })
@@ -235,7 +301,37 @@ export function HubMap({
   useEffect(() => {
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [places, photoUrls, pickedIds]);
+  }, [places, photoUrls, pickedIds, curated]);
+
+  /*
+    다녀온 시도를 칠한다. 기간을 고르면 그 기간에 밟은 시도만 남는다.
+    바다 위 섬까지 조각마다 따로 칠한다.
+  */
+  useEffect(() => {
+    const map = mapRef.current;
+    for (const polygon of paintRef.current) polygon.setMap(null);
+    paintRef.current = [];
+    if (!map) return;
+    const kakao: Kakao = (window as Kakao).kakao;
+    const far = map.getLevel() >= PAINT_FROM_LEVEL;
+
+    for (const sido of painted) {
+      for (const polygon of sido.polygons) {
+        paintRef.current.push(
+          new kakao.maps.Polygon({
+            map: far ? map : null,
+            path: polygon.map((ring) => ring.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng))),
+            strokeWeight: 1.5,
+            strokeColor: LINE_COLOR,
+            strokeOpacity: 0.55,
+            fillColor: LINE_COLOR,
+            fillOpacity: 0.14,
+            zIndex: 0,
+          }),
+        );
+      }
+    }
+  }, [painted, ready]);
 
   // 고른 여행을 들른 순서대로 잇는다.
   useEffect(() => {
@@ -455,4 +551,26 @@ function pinElement({
     pin.appendChild(badge);
   }
   return pin;
+}
+
+/*
+  100선 한 곳. 아직 안 간 곳은 속이 빈 동그라미, 가고 싶은 곳에 담아
+  둔 곳은 채운 동그라미다. 내 사진 핀보다 작고 흐리게 — 주인공은 다녀온
+  곳이고, 이것은 그 사이사이의 빈칸이다.
+*/
+function curatedElement(spot: CuratedPin): HTMLButtonElement {
+  const dot = document.createElement("button");
+  dot.type = "button";
+  dot.setAttribute("aria-label", `${spot.name} (100선${spot.wished ? " · 가고 싶은 곳" : ""})`);
+  Object.assign(dot.style, {
+    width: "18px",
+    height: "18px",
+    padding: "0",
+    borderRadius: "999px",
+    border: spot.wished ? "2.5px solid #ffffff" : `2.5px solid ${LINE_COLOR}`,
+    background: spot.wished ? LINE_COLOR : "#ffffff",
+    boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+    cursor: "pointer",
+  });
+  return dot;
 }

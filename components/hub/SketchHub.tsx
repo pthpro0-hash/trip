@@ -10,7 +10,12 @@ import { hubPlaces, placesIn, tripsIn, type Bounds, type HubPlace, type TripInVi
 import { tripFocus } from "@/lib/scrollMemory";
 import { useWide } from "@/lib/useWide";
 import { Waiting } from "@/components/layout/Waiting";
-import { HubMap, type FlyTarget, type HubMapHandle } from "./HubMap";
+import { HubMap, type CuratedPin, type FlyTarget, type HubMapHandle, type PaintedSido } from "./HubMap";
+import { CollectionPanel } from "./CollectionPanel";
+import { EchoCard } from "./EchoCard";
+import { SpotPeek } from "./SpotPeek";
+import { thumbUrls } from "@/lib/supabase/photos";
+import { useWishlist } from "@/lib/collections";
 import { MonthBars } from "./MonthBars";
 import { REPLAY_HEIGHT, ReplayPanel } from "./ReplayPanel";
 import {
@@ -19,6 +24,7 @@ import {
   rangeLabel,
   replayOrder,
   withinMonths,
+  echoOf,
   type MonthRange,
 } from "@/lib/timeline";
 import { HubSheet, PEEK, PEEK_EMPTY, snapHeights, type Snap } from "./HubSheet";
@@ -50,6 +56,8 @@ export function SketchHub({ switcher }: SketchHubProps) {
   const [places, setPlaces] = useState<HubPlace[]>([]);
   const [pinUrls, setPinUrls] = useState<Map<string, string>>(new Map());
   const [returnTrip, setReturnTrip] = useState<string | null>(null);
+  /** 오늘 날짜. "몇 해 전 이맘때"를 찾는 기준. 화면을 그리는 중에는 시계를 보지 않는다. */
+  const [today, setToday] = useState("");
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -87,6 +95,10 @@ export function SketchHub({ switcher }: SketchHubProps) {
 
       setTrips(rows);
       setPlaces(laid);
+      const now = new Date();
+      setToday(
+        `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+      );
       setStatus("ready");
 
       const paths = [...new Set(laid.map((place) => place.coverPath).filter((p): p is string => !!p))];
@@ -115,6 +127,7 @@ export function SketchHub({ switcher }: SketchHubProps) {
       places={places}
       pinUrls={pinUrls}
       returnTrip={returnTrip}
+      today={today}
       switcher={switcher}
     />
   );
@@ -128,6 +141,8 @@ export interface HubViewProps {
   pinUrls: Map<string, string>;
   /** 상세에서 돌아왔으면 그 여행. 처음부터 이어 두고 그리로 난다. */
   returnTrip: string | null;
+  /** "YYYY-MM-DD". 비어 있으면 "몇 해 전 이맘때"를 찾지 않는다. */
+  today?: string;
   switcher: ReactNode;
 }
 
@@ -137,7 +152,16 @@ export interface HubViewProps {
  * 둘을 나눈 까닭은 이것만 따로 띄워 볼 수 있게 하려는 것이다. 로그인
  * 없이는 받아 올 것이 없는데, 지도 위의 일은 로그인과 상관이 없다.
  */
-export function HubView({ status, userId, trips, places, pinUrls, returnTrip, switcher }: HubViewProps) {
+export function HubView({
+  status,
+  userId,
+  trips,
+  places,
+  pinUrls,
+  returnTrip,
+  today = "",
+  switcher,
+}: HubViewProps) {
   const wide = useWide();
   const [view, setView] = useState<Bounds | null>(null);
   const [picked, setPicked] = useState<HubPlace[] | null>(null);
@@ -156,6 +180,38 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
   /** 다시 걷는 중이면 걸을 곳들. */
   const [replay, setReplay] = useState<HubPlace[] | null>(null);
   const [walkingAt, setWalkingAt] = useState<HubPlace | null>(null);
+  /** 시트 속에 무엇을 펼쳤나. 칠한 곳 모음은 목록 대신 들어선다. */
+  const [panel, setPanel] = useState<"trips" | "collection">("trips");
+  /** 100선 겹쳐 보기. */
+  const [showCurated, setShowCurated] = useState(false);
+  const [pickedSpot, setPickedSpot] = useState<string | null>(null);
+  const wishlist = useWishlist();
+
+  /*
+    시도 경계(60KB)와 100선 자료(370KB)는 지도를 여는 데 필요 없다. 경계는
+    곧바로, 100선은 겹쳐 보기를 켤 때 따로 불러온다.
+  */
+  const [sido, setSido] = useState<typeof import("@/lib/sido") | null>(null);
+  const [curated, setCurated] = useState<typeof import("@/lib/curatedData") | null>(null);
+  useEffect(() => {
+    let active = true;
+    void import("@/lib/sido").then((module) => {
+      if (active) setSido(module);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (!showCurated || curated) return;
+    let active = true;
+    void import("@/lib/curatedData").then((module) => {
+      if (active) setCurated(module);
+    });
+    return () => {
+      active = false;
+    };
+  }, [showCurated, curated]);
 
   const fly = useCallback((targets: HubPlace[]) => {
     flights.current += 1;
@@ -238,7 +294,107 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
     if (within.length > 0) fly(within);
   };
 
+  /*
+    칠하기와 셈은 지금 보는 것(기간으로 거른 것)을 따른다. 기간을 골랐는데
+    칠한 곳이 그대로면 무엇을 센 것인지 헷갈린다.
+  */
+  const tally = useMemo(() => (sido ? sido.sidoTally(shown) : new Map<string, number>()), [sido, shown]);
+  const painted: PaintedSido[] = useMemo(
+    () =>
+      sido
+        ? sido.SIDO.filter((entry) => tally.has(entry.name)).map((entry) => ({
+            name: entry.name,
+            polygons: entry.polygons,
+          }))
+        : [],
+    [sido, tally],
+  );
+  const curatedSeen = useMemo(
+    () => new Set(shown.map((place) => place.spotId).filter((id): id is string => !!id)),
+    [shown],
+  );
+  /*
+    100선 겹쳐 보기에서 빼는 것은 평생 다녀온 곳이다. 작년에 간 곳을 올해
+    기간으로 걸렀다고 빈 동그라미로 되살리면 안 간 곳처럼 보인다.
+  */
+  const everSeen = useMemo(
+    () => new Set(places.map((place) => place.spotId).filter((id): id is string => !!id)),
+    [places],
+  );
+  const curatedPins: CuratedPin[] | null = useMemo(
+    () =>
+      showCurated && curated
+        ? curated.SPOTS.filter((spot) => !everSeen.has(spot.id)).map((spot) => ({
+            id: spot.id,
+            name: spot.name,
+            lat: spot.lat,
+            lng: spot.lng,
+            wished: wishlist.ids.includes(spot.id),
+          }))
+        : null,
+    [showCurated, curated, everSeen, wishlist.ids],
+  );
+  const spot = pickedSpot && curated ? (curated.SPOTS.find((entry) => entry.id === pickedSpot) ?? null) : null;
+
+  const echo = useMemo(() => (today ? echoOf(places, today) : null), [places, today]);
+  const [echoPhoto, setEchoPhoto] = useState<string | undefined>();
+  useEffect(() => {
+    const path = echo?.place.coverPath;
+    const supabase = getBrowserClient();
+    if (!path || !supabase) return;
+    let active = true;
+    void thumbUrls(supabase, [path]).then((urls) => {
+      if (active) setEchoPhoto(urls.get(path));
+    });
+    return () => {
+      active = false;
+    };
+  }, [echo]);
+
+  /** 시트 속을 목록으로 되돌린다. */
+  const backToList = () => {
+    setPicked(null);
+    setPickedSpot(null);
+    setPanel("trips");
+  };
+
+  const openCollection = () => {
+    setPicked(null);
+    setPickedSpot(null);
+    setPanel("collection");
+    if (snap === "peek") setSnap("half");
+  };
+
+  const toggleCurated = () => {
+    if (showCurated) setPickedSpot(null);
+    setShowCurated(!showCurated);
+  };
+
+  /*
+    밟은 시도는 그곳 여행으로 날아간다. 안 밟은 시도는 그리로 날아가
+    100선을 겹쳐 보인다 — 다음에 갈 곳이 거기 있다. 지도가 보이게
+    시트는 내린다.
+  */
+  const flyToSido = (name: string, visited: boolean) => {
+    if (!sido) return;
+    if (visited) {
+      fly(shown.filter((place) => sido.sidoOf(place) === name));
+    } else {
+      setShowCurated(true);
+      flights.current += 1;
+      setFlyTo({ key: flights.current, places: sido.sidoBounds(name) });
+    }
+    setSnap("peek");
+  };
+
+  const pickSpot = (id: string) => {
+    setPicked(null);
+    setPickedSpot(id);
+    if (snap === "peek") setSnap("half");
+  };
+
   const pick = (targets: HubPlace[]) => {
+    setPickedSpot(null);
     setPicked(targets);
     // 사진을 보려고 누른 것이다. 사진이 보일 만큼 올린다.
     if (snap === "peek") setSnap("half");
@@ -280,19 +436,42 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
   );
 
   const body =
-    status !== "ready" || places.length === 0 ? null : picked && userId ? (
-      <PlacePanel userId={userId} places={picked} onBack={() => setPicked(null)} />
-    ) : (
-      <TripsPanel
-        trips={tripsInView}
-        focused={focused}
-        photoUrls={pinUrls}
-        onFocus={focusTrip}
-        onShowAll={() => {
-          setFocused(null);
-          fly(places);
-        }}
+    status !== "ready" || places.length === 0 ? null : spot ? (
+      <SpotPeek spot={spot} thumbnail={curated?.thumbnailOf(spot.id)} onBack={backToList} />
+    ) : picked && userId ? (
+      <PlacePanel userId={userId} places={picked} onBack={backToList} />
+    ) : panel === "collection" ? (
+      <CollectionPanel
+        tally={tally}
+        rangeText={range ? rangeLabel(range) : null}
+        curatedVisited={curatedSeen.size}
+        curatedTotal={121}
+        onSido={flyToSido}
+        onBack={backToList}
       />
+    ) : (
+      <>
+        {echo && !range && !focused && (
+          <EchoCard
+            echo={echo}
+            photo={echoPhoto}
+            onOpen={(place) => {
+              pick([place]);
+              fly([place]);
+            }}
+          />
+        )}
+        <TripsPanel
+          trips={tripsInView}
+          focused={focused}
+          photoUrls={pinUrls}
+          onFocus={focusTrip}
+          onShowAll={() => {
+            setFocused(null);
+            fly(places);
+          }}
+        />
+      </>
     );
 
   const map = (
@@ -307,7 +486,46 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
       bottomInset={inset}
       onView={setView}
       onPick={pick}
+      painted={painted}
+      curated={replay ? null : curatedPins}
+      onPickSpot={pickSpot}
     />
+  );
+
+  /*
+    지도 위 왼쪽에 띄우는 두 단추. 칠한 곳 모음과 100선 겹쳐 보기.
+    아직 얹을 것이 없으면 띄우지 않는다.
+  */
+  const controls = !empty && !replay && (
+    <div className="pointer-events-none absolute left-3 top-[68px] z-20 flex flex-col items-start gap-2">
+      <button
+        type="button"
+        onClick={openCollection}
+        className="pointer-events-auto rounded-full bg-surface px-3 py-1.5 text-[13px] font-semibold text-text shadow-[0_2px_10px_rgba(0,0,0,0.15)] ring-1 ring-line transition hover:bg-bg-subtle"
+      >
+        시도 {sido ? tally.size : "…"}/17
+      </button>
+      <button
+        type="button"
+        onClick={toggleCurated}
+        aria-pressed={showCurated}
+        className={`pointer-events-auto rounded-full px-3 py-1.5 text-[13px] font-semibold shadow-[0_2px_10px_rgba(0,0,0,0.15)] ring-1 transition ${
+          showCurated
+            ? "bg-accent text-on-accent ring-accent"
+            : "bg-surface text-text ring-line hover:bg-bg-subtle"
+        }`}
+      >
+        {showCurated ? "100선 끄기" : "100선 겹쳐 보기"}
+      </button>
+      {showCurated && (
+        <p className="pointer-events-auto rounded-lg bg-surface/95 px-2.5 py-1.5 text-[11px] leading-relaxed text-text-muted shadow-sm ring-1 ring-line">
+          <span className="mr-1 inline-block h-2.5 w-2.5 rounded-full border-2 border-accent bg-white align-[-1px]" />
+          아직 안 간 곳
+          <span className="ml-2 mr-1 inline-block h-2.5 w-2.5 rounded-full border-2 border-white bg-accent align-[-1px]" />
+          가고 싶은 곳
+        </p>
+      )}
+    </div>
   );
 
   return (
@@ -321,6 +539,7 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
           <div className="relative">
             {map}
             <Floating>{switcher}</Floating>
+            {controls}
             {walking && <div className="absolute inset-x-4 bottom-0 z-20 mx-auto max-w-xl">{walking}</div>}
           </div>
           <aside aria-label="내 여행 목록" className="flex min-h-0 flex-col border-l border-line bg-surface">
@@ -332,6 +551,7 @@ export function HubView({ status, userId, trips, places, pinUrls, returnTrip, sw
         <>
           {map}
           <Floating>{switcher}</Floating>
+          {controls}
           {walking ? (
             <div className="absolute inset-x-0 bottom-0 z-20">{walking}</div>
           ) : (

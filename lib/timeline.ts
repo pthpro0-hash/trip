@@ -127,3 +127,63 @@ export function trailSegments(stops: Stop[], upTo: number): { lat: number; lng: 
   }
   return segments;
 }
+
+/** 몇 해 전 오늘 다녀온 곳. */
+export interface Echo<T> {
+  place: T;
+  yearsAgo: number;
+  /** 날짜까지 같은가. 같으면 "오늘", 며칠 어긋나면 "이맘때". */
+  exact: boolean;
+}
+
+/** "YYYY-MM-DD" 를 날수로. 한국은 서머타임이 없지만, 셈은 UTC 로 해 둔다. */
+function dayNumber(year: number, month: number, day: number): number {
+  // 2월 29일이 없는 해로 옮기면 28일로 친다.
+  const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return Date.UTC(year, month - 1, Math.min(day, last)) / 86_400_000;
+}
+
+/**
+ * 몇 해 전 이맘때 다녀온 곳 하나.
+ *
+ * 사진을 새로 넣지 않아도 들어올 이유가 생긴다. 딱 그날만 찾으면 거의
+ * 걸리지 않으므로 앞뒤 며칠을 봐준다. 가장 가까운 날, 그다음 가장 최근
+ * 해, 그다음 사진이 많은 곳을 고른다.
+ *
+ * 연말연시를 넘나드는 것도 챙긴다 — 1월 2일에 보면 재작년 12월 31일은
+ * "1년 전 이맘때"다.
+ */
+export function echoOf<T extends Dated>(places: T[], today: string, windowDays = 3): Echo<T> | null {
+  const [ty, tm, td] = today.split("-").map(Number);
+  if (!ty || !tm || !td) return null;
+
+  let best: (Echo<T> & { gap: number }) | null = null;
+  for (const place of places) {
+    const [py, pm, pd] = place.startedAt.slice(0, 10).split("-").map(Number);
+    if (!py || py >= ty) continue;
+    const at = dayNumber(py, pm, pd);
+
+    // 그해, 그리고 앞뒤 해로 오늘을 옮겨 보고 가장 가까운 것을 쓴다.
+    for (const year of [py - 1, py, py + 1]) {
+      if (year >= ty) continue;
+      const gap = Math.abs(dayNumber(year, tm, td) - at);
+      if (gap > windowDays) continue;
+      const candidate = { place, yearsAgo: ty - year, exact: gap === 0, gap };
+      if (
+        !best ||
+        gap < best.gap ||
+        (gap === best.gap && candidate.yearsAgo < best.yearsAgo) ||
+        (gap === best.gap && candidate.yearsAgo === best.yearsAgo && place.photoCount > best.place.photoCount)
+      ) {
+        best = candidate;
+      }
+    }
+  }
+  if (!best) return null;
+  return { place: best.place, yearsAgo: best.yearsAgo, exact: best.exact };
+}
+
+/** "1년 전 오늘" · "2년 전 이맘때" */
+export function echoLabel(echo: { yearsAgo: number; exact: boolean }): string {
+  return `${echo.yearsAgo}년 전 ${echo.exact ? "오늘" : "이맘때"}`;
+}

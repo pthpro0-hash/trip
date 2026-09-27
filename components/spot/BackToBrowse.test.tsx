@@ -40,6 +40,14 @@ describe("BackToBrowse", () => {
     남이 건넨 주소로 딴 데로 보내지 않는다. 적힌 것이 우리 주소가
     아니면 둘러보기로 돌린다.
   */
+  it("내 스케치 지도에서 100선을 겹쳐 보다 들어왔으면 지도로 돌려보낸다", () => {
+    spotFocus.rememberFrom("/?v=sketch");
+    render(<BackToBrowse spotId="경복궁" />);
+    const back = screen.getByRole("link");
+    expect(back).toHaveAttribute("href", "/?v=sketch");
+    expect(back.textContent).toContain("내 스케치");
+  });
+
   it("바깥 주소가 적혀 있으면 따라가지 않는다", () => {
     spotFocus.rememberFrom("https://남의곳/훔치기");
     render(<BackToBrowse spotId="경복궁" />);
