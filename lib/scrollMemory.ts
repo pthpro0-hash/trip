@@ -1,8 +1,8 @@
 /*
-  보던 여행으로 돌아간다.
+  보던 카드로 돌아간다.
 
-  스물다섯 번째 여행을 보려고 한참 내려간 뒤 상세로 들어갔다 돌아오면
-  맨 위였다. 다시 스물다섯 번을 내려가야 한다.
+  한참 내려간 뒤 상세로 들어갔다 돌아오면 맨 위였다. 다시 그만큼
+  내려가야 한다. 내 스케치도, 둘러보기도, 권역별도 마찬가지다.
 
   자리를 픽셀로 적어 두는 길도 있다. 그 길은 두 번 틀렸다.
 
@@ -14,12 +14,13 @@
   사진과 권유 띠가 뒤늦게 끼어들며 높이가 바뀐다. 그 틈마다 적어 둔
   숫자가 흐트러진다.
 
-  그래서 숫자가 아니라 여행을 적어 둔다. "1840px" 이 아니라 "이한도예
+  그래서 숫자가 아니라 카드를 적어 둔다. "1840px" 이 아니라 "이한도예
   외 2곳". 목록이 얼마나 길어지든, 사진이 언제 들어오든, 어느 길로
   들어왔든, 그 카드를 찾아 세우면 된다.
-*/
 
-const FOCUS = "trips:focus";
+  목록마다 장부를 따로 둔다. 여행 장부와 여행지 장부가 섞이면, 스케치를
+  보다 나와서 둘러보기를 열었을 때 엉뚱한 카드 앞에 서게 된다.
+*/
 
 /** 저장소가 막혀 있어도(사생활 보호 창 등) 앱이 멈추지 않게 한다. */
 function session(): Storage | null {
@@ -30,32 +31,64 @@ function session(): Storage | null {
   }
 }
 
-/** 목록으로 돌아가면 이 여행 앞에 세워 달라고 적어 둔다. */
-export function rememberTrip(tripId: string): void {
-  if (!tripId) return;
-  session()?.setItem(FOCUS, tripId);
+/** 한 목록의 장부. */
+export interface FocusMemory {
+  /** 목록으로 돌아가면 이 카드 앞에 세워 달라고 적어 둔다. */
+  remember(id: string): void;
+  /**
+   * 세울 카드. 읽기만 하고 지우지는 않는다.
+   *
+   * 읽으면서 지우면 두 번 물었을 때 두 번째가 빈손이 된다. React 는
+   * 개발 중에 시작을 일부러 두 번 하고, 화면이 다시 그려지는 경우도
+   * 있다. 지우는 것은 실제로 다 세우고 난 뒤에 따로 한다.
+   */
+  peek(): string | null;
+  /** 다 세웠다. 새로고침할 때마다 같은 카드로 끌려가지 않게 지운다. */
+  forget(): void;
+  /** 카드를 찾는 이름표. 목록이 다는 것과 여기서 찾는 것이 같아야 한다. */
+  cardId(id: string): string;
+  /**
+   * 어느 목록에서 왔는지 적어 둔다.
+   *
+   * 여행지 상세는 둘러보기에서도 권역별에서도 열린다. 돌아갈 곳이
+   * 둘이라 상세 혼자서는 알 수 없고, 떠나올 때 적어 두는 수밖에 없다.
+   */
+  rememberFrom(href: string): void;
+  /** 돌아갈 목록. 적어 둔 적이 없으면 null — 주소를 바로 연 사람이다. */
+  from(): string | null;
 }
 
-/**
- * 세울 여행. 읽기만 하고 지우지는 않는다.
- *
- * 읽으면서 지우면 두 번 물었을 때 두 번째가 빈손이 된다. React 는 개발
- * 중에 시작을 일부러 두 번 하고, 화면이 다시 그려지는 경우도 있다.
- * 지우는 것은 실제로 다 세우고 난 뒤에 따로 한다.
- */
-export function peekTrip(): string | null {
-  return session()?.getItem(FOCUS) || null;
+export function focusMemory(ns: string): FocusMemory {
+  const FOCUS = `${ns}:focus`;
+  const FROM = `${ns}:from`;
+
+  return {
+    remember(id) {
+      if (id) session()?.setItem(FOCUS, id);
+    },
+    peek() {
+      return session()?.getItem(FOCUS) || null;
+    },
+    forget() {
+      session()?.removeItem(FOCUS);
+    },
+    cardId(id) {
+      return `${ns}-${id}`;
+    },
+    rememberFrom(href) {
+      if (href) session()?.setItem(FROM, href);
+    },
+    from() {
+      return session()?.getItem(FROM) || null;
+    },
+  };
 }
 
-/** 다 세웠다. 새로고침할 때마다 같은 여행으로 끌려가지 않게 지운다. */
-export function forgetTrip(): void {
-  session()?.removeItem(FOCUS);
-}
+/** 내 스케치의 여행들. */
+export const tripFocus = focusMemory("trip");
 
-/** 카드를 찾는 이름표. 목록이 다는 것과 여기서 찾는 것이 같아야 한다. */
-export function cardId(tripId: string): string {
-  return `trip-${tripId}`;
-}
+/** 둘러보기와 권역별의 여행지들. 둘은 같은 카드를 쓰므로 장부도 하나다. */
+export const spotFocus = focusMemory("spot");
 
 /** 되짚기를 포기하는 한계. 프레임으로 센다 — 화면이 멈춘 동안은 흐르지 않는다. */
 const LIMIT = 180;
@@ -67,7 +100,7 @@ const SETTLED = 20;
 const FROM_TOP = 0.3;
 
 /**
- * 그 여행 카드 앞에 세운다.
+ * 그 카드 앞에 세운다.
  *
  * 한 번 옮기고 마는 것으로는 안 된다. 그때의 목록은 아직 짧아서 —
  * 이제 막 그려졌고, 사진도 권유 띠도 덜 왔다 — 브라우저가 갈 수 있는
@@ -85,7 +118,7 @@ const FROM_TOP = 0.3;
  *
  * @returns 되짚기를 멈추는 함수.
  */
-export function restoreToTrip(tripId: string, onDone?: () => void): () => void {
+export function restoreToCard(elementId: string, onDone?: () => void): () => void {
   let frames = 0;
   /** 아무것도 변하지 않은 채 지나간 프레임 수. */
   let still = 0;
@@ -119,7 +152,7 @@ export function restoreToTrip(tripId: string, onDone?: () => void): () => void {
   const tick = () => {
     if (stopped) return;
 
-    const card = document.getElementById(cardId(tripId));
+    const card = document.getElementById(elementId);
     if (card) {
       const box = card.getBoundingClientRect();
       const grown = document.documentElement.scrollHeight;

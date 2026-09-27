@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SpotCard } from "./SpotCard";
+import { spotFocus } from "@/lib/scrollMemory";
 import type { Spot } from "@/lib/types";
 
 const SPOT: Spot = {
@@ -34,6 +35,28 @@ describe("SpotCard", () => {
       "aria-pressed",
       "true",
     );
+  });
+
+  /*
+    여행지 상세는 둘러보기에서도 권역별에서도 열린다. 돌아갈 곳이 둘이라
+    상세 혼자서는 알 수 없고, 떠나올 때 카드가 적어 두어야 한다.
+  */
+  it("이름을 눌러 떠날 때 어디서 떠났는지 적어 둔다", () => {
+    window.sessionStorage.clear();
+    render(<SpotCard spot={SPOT} selected={false} onSelect={() => {}} />);
+
+    fireEvent.click(screen.getByText("경복궁"));
+
+    expect(spotFocus.from()).toBe(window.location.pathname + window.location.search);
+  });
+
+  it("돌아와 선 카드에는 찾을 이름표와 테가 있다", () => {
+    const { container } = render(
+      <SpotCard spot={SPOT} selected={false} onSelect={() => {}} focused />,
+    );
+    const card = container.querySelector("#spot-gyeongbokgung");
+    expect(card).toBeTruthy();
+    expect(card?.className).toContain("ring-accent");
   });
 
   it("내 주변이 켜져 있으면 거리를 함께 보여준다", () => {

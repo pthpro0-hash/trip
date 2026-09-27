@@ -9,6 +9,7 @@ import { SpotGallery } from "@/components/spot/SpotGallery";
 import { VisitInfo } from "@/components/spot/VisitInfo";
 import { DirectionsLinks } from "@/components/spot/DirectionsLinks";
 import { SaveButton } from "@/components/spot/SaveButton";
+import { BackToBrowse } from "@/components/spot/BackToBrowse";
 import { WeatherStrip } from "@/components/spot/WeatherStrip";
 import Link from "next/link";
 
@@ -94,6 +95,7 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
         // 구조화 데이터는 우리가 만든 값만 담는다 (사용자 입력 없음).
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <BackToBrowse spotId={spot.id} />
       <div className="flex flex-col gap-2">
         <h1 className="text-[32px] font-bold tracking-tight text-text md:text-[40px]">{spot.name}</h1>
         <p className="text-[17px] leading-relaxed text-text-muted">{spot.summary}</p>

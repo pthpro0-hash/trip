@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Region, Season, Spot, Theme } from "@/lib/types";
 import { ALL_SEASONS, ALL_THEMES, filterSpots } from "@/lib/filter";
 import { splitRegionIntoClusters } from "@/lib/regionClusters";
 import { availableSeasons, availableThemes, regionStats } from "@/lib/regionStats";
 import { SpotCard } from "@/components/spot/SpotCard";
 import { RegionMap } from "./RegionMap";
+import { restoreToCard, spotFocus } from "@/lib/scrollMemory";
+import { useHydrated } from "@/lib/useHydrated";
 
 interface RegionExplorerProps {
   region: Region;
@@ -24,6 +26,24 @@ export function RegionExplorer({ region, spots }: RegionExplorerProps) {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [selectedId, setSelectedId] = useState<string>();
+  /*
+    상세를 보고 돌아온 사람. 어느 카드 앞에 세울지.
+
+    붙기 전에는 모르는 척한다 — 서버가 그린 화면에는 이 사실이 없고,
+    처음부터 다르게 그리면 React 가 고쳐 주지 않는다. useHydrated 참고.
+  */
+  const hydrated = useHydrated();
+  const [mark] = useState(() => spotFocus.peek());
+  const focus = hydrated ? mark : null;
+
+  /*
+    그 여행지 카드 앞에 세운다. 지도가 자리를 잡고 사진이 들어오며
+    높이가 바뀌므로, 제자리에 앉을 때까지 되짚는다.
+  */
+  useEffect(() => {
+    if (!focus) return;
+    return restoreToCard(spotFocus.cardId(focus), spotFocus.forget);
+  }, [focus]);
 
   const stats = useMemo(() => regionStats(spots), [spots]);
   const themeOptions = useMemo(() => availableThemes(spots, ALL_THEMES), [spots]);
@@ -148,6 +168,7 @@ export function RegionExplorer({ region, spots }: RegionExplorerProps) {
                   spot={spot}
                   selected={spot.id === selectedId}
                   onSelect={setSelectedId}
+                  focused={focus === spot.id}
                 />
               ))}
             </div>

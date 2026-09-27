@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { rememberTrip } from "@/lib/scrollMemory";
+import { tripFocus } from "@/lib/scrollMemory";
 
 /*
   목록으로 돌아가는 길.
@@ -16,7 +16,7 @@ export function BackToSketches({ tripId }: { tripId: string }) {
   return (
     <Link
       href="/trips"
-      onClick={() => rememberTrip(tripId)}
+      onClick={() => tripFocus.remember(tripId)}
       className="self-start text-[15px] font-medium text-accent hover:text-accent-hover"
     >
       ← 내 스케치

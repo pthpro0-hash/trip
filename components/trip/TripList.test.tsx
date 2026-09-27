@@ -220,7 +220,7 @@ describe("보던 여행으로 돌아오기", () => {
     바뀐다. 카드는 그 모든 것을 견딘다.
   */
   it("돌아오면 그 여행 카드 앞에 선다", async () => {
-    window.sessionStorage.setItem("trips:focus", "t2");
+    window.sessionStorage.setItem("trip:focus", "t2");
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
 
     await 목록();
@@ -231,7 +231,7 @@ describe("보던 여행으로 돌아오기", () => {
   });
 
   it("돌아와 선 카드에 테를 둘러 어디인지 알린다", async () => {
-    window.sessionStorage.setItem("trips:focus", "t2");
+    window.sessionStorage.setItem("trip:focus", "t2");
     vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
 
     await 목록();

@@ -7,7 +7,7 @@ import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
-import { cardId, forgetTrip, peekTrip, restoreToTrip } from "@/lib/scrollMemory";
+import { restoreToCard, tripFocus } from "@/lib/scrollMemory";
 import { backfillThumbs, missingThumbs, thumbUrls } from "@/lib/supabase/photos";
 import {
   companionOptions,
@@ -136,7 +136,7 @@ export function TripList() {
     늦게 꺼낼수록 잃을 일만 많아진다. 그리기 전에, 아직 아무 소식도
     들을 수 없는 이때가 가장 안전하다.
   */
-  const [focus] = useState(() => peekTrip());
+  const [focus] = useState(() => tripFocus.peek());
 
   /*
     그 여행 카드 앞에 세운다.
@@ -148,7 +148,7 @@ export function TripList() {
   */
   useEffect(() => {
     if (!focus || status !== "ready") return;
-    return restoreToTrip(focus, forgetTrip);
+    return restoreToCard(tripFocus.cardId(focus), tripFocus.forget);
   }, [status, focus]);
 
   const visible = useMemo(() => {
@@ -372,7 +372,7 @@ export function TripList() {
           */
           <li
             key={trip.id}
-            id={cardId(trip.id)}
+            id={tripFocus.cardId(trip.id)}
             className={`flex flex-col gap-2.5 rounded-2xl bg-surface p-5 ring-1 transition-[box-shadow] duration-700 ${
               focus === trip.id ? "ring-2 ring-accent" : "ring-line"
             }`}

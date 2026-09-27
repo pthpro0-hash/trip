@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { spotFocus } from "@/lib/scrollMemory";
 import type { Spot } from "@/lib/types";
 import { getSpotThumbnail } from "@/lib/media";
 import { formatDistance } from "@/lib/geo";
@@ -16,18 +17,28 @@ interface SpotCardProps {
   query?: string;
   /** 내 위치에서의 직선거리. "내 주변"이 켜져 있을 때만 들어온다. */
   distanceKm?: number;
+  /** 상세를 보고 돌아와 선 카드. 어디였는지 테로 알린다. */
+  focused?: boolean;
 }
 
 // Photo first, then the name — the photo is what tells someone whether they
 // want to go. The whole image is the map-select target; the title links
 // through to the detail page.
-export function SpotCard({ spot, selected, onSelect, query, distanceKm }: SpotCardProps) {
+export function SpotCard({
+  spot,
+  selected,
+  onSelect,
+  query,
+  distanceKm,
+  focused,
+}: SpotCardProps) {
   const thumbnail = getSpotThumbnail(spot.id);
 
   return (
     <div
+      id={spotFocus.cardId(spot.id)}
       className={`relative overflow-hidden rounded-2xl bg-surface transition ${
-        selected ? "ring-2 ring-accent" : "ring-1 ring-line"
+        selected || focused ? "ring-2 ring-accent" : "ring-1 ring-line"
       }`}
     >
       {/* 사진 버튼 안에 넣으면 버튼 안의 버튼이 되므로 형제로 둔다. */}
@@ -55,8 +66,14 @@ export function SpotCard({ spot, selected, onSelect, query, distanceKm }: SpotCa
 
       <div className="flex flex-col gap-2 p-4">
         <div className="flex items-baseline justify-between gap-2">
+          {/*
+            떠나올 때 어디서 떠났는지 적어 둔다. 여행지 상세는 둘러보기
+            에서도 권역별에서도 열려, 돌아갈 곳이 둘이다. 상세 혼자서는
+            알 수 없으니 여기서 알려 주는 수밖에 없다.
+          */}
           <Link
             href={`/spots/${spot.id}`}
+            onClick={() => spotFocus.rememberFrom(window.location.pathname + window.location.search)}
             className="truncate text-[17px] font-semibold tracking-tight text-text hover:text-accent"
           >
             <HighlightedText text={spot.name} query={query} />

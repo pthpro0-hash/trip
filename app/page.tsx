@@ -23,6 +23,8 @@ import { KakaoMap } from "@/components/map/KakaoMap";
 import { ViewToggle } from "@/components/layout/ViewToggle";
 import { RegionStrip } from "@/components/region/RegionStrip";
 import { HomeIntro } from "@/components/home/HomeIntro";
+import { restoreToCard, spotFocus } from "@/lib/scrollMemory";
+import { useHydrated } from "@/lib/useHydrated";
 
 const SPOTS = spotsData as Spot[];
 
@@ -37,6 +39,17 @@ export default function HomePage() {
   const [criteria, setCriteria] = useState<FilterCriteria>({});
   const [selectedId, setSelectedId] = useState<string>();
   const [mobileView, setMobileView] = useState<"list" | "map">("map");
+  /*
+    상세를 보고 돌아온 사람. 어느 카드 앞에 세울지.
+
+    붙기 전에는 모르는 척한다. 저장소는 브라우저에만 있어 서버가 그린
+    화면에는 이 사실이 없고, 처음부터 다르게 그리면 React 가 서버가 그린
+    것을 그대로 두어 아무 일도 일어나지 않는다. useHydrated 에 그 사연을
+    적어 두었다.
+  */
+  const hydrated = useHydrated();
+  const [mark] = useState(() => spotFocus.peek());
+  const focus = hydrated ? mark : null;
   const [savedOnly, setSavedOnly] = useState(false);
   // Searching is a "find this place" action, so results belong in the list —
   // but only until the reader says otherwise, after which their choice sticks.
@@ -71,6 +84,27 @@ export default function HomePage() {
   useEffect(() => {
     if (query && results.length === 0) reportEmptySearch(query);
   }, [query, results.length]);
+
+  /*
+    돌아온 사람을 그 여행지 카드 앞에 세운다.
+
+    한 번에 되지 않는다. 사진이 뒤늦게 들어오고 안내 띠가 끼어들며
+    높이가 바뀌므로, 카드가 제자리에 앉을 때까지 되짚는다. 손을 대면
+    그 즉시 그만둔다.
+  */
+  useEffect(() => {
+    if (!focus) return;
+    return restoreToCard(spotFocus.cardId(focus), spotFocus.forget);
+  }, [focus]);
+
+  /*
+    돌아온 사람에게는 목록을 편다.
+
+    좁은 화면의 기본은 지도인데, 목록에서 카드를 눌러 들어갔던 사람을
+    지도로 돌려보내면 보던 자리가 아예 화면에서 사라진다. 사람이 직접
+    고른 적이 있으면 그 뜻을 따른다 — 검색이 하는 것과 같은 규칙이다.
+  */
+  const view = focus && !viewChosenByUser ? "list" : mobileView;
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-5 px-5 pb-16 pt-10">
@@ -126,7 +160,7 @@ export default function HomePage() {
       </div>
 
       <ViewToggle
-        value={mobileView}
+        value={view}
         onChange={(next) => {
           setViewChosenByUser(true);
           setMobileView(next);
@@ -170,7 +204,7 @@ export default function HomePage() {
       )}
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-[1fr_1fr] md:items-start">
-        <div className={`${mobileView === "map" ? "hidden md:flex" : "flex"} flex-col gap-4`}>
+        <div className={`${view === "map" ? "hidden md:flex" : "flex"} flex-col gap-4`}>
           {results.map((spot) => (
             <SpotCard
               key={spot.id}
@@ -179,12 +213,13 @@ export default function HomePage() {
               onSelect={setSelectedId}
               query={query}
               distanceKm={origin ? distanceKm(origin, spot) : undefined}
+              focused={focus === spot.id}
             />
           ))}
         </div>
         {/* Sticky on desktop so the map stays put while the list scrolls past it. */}
         <div
-          className={`h-[70vh] overflow-hidden rounded-2xl ring-1 ring-line md:sticky md:top-6 ${mobileView === "list" ? "hidden md:block" : ""}`}
+          className={`h-[70vh] overflow-hidden rounded-2xl ring-1 ring-line md:sticky md:top-6 ${view === "list" ? "hidden md:block" : ""}`}
         >
           <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
         </div>
