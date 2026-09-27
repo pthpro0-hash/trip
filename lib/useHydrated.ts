@@ -18,11 +18,24 @@ import { useSyncExternalStore } from "react";
   고리라, React 가 붙은 뒤에 다시 그려 준다.
 */
 
-/** 지켜볼 것이 없다. 한 번 붙으면 그만이다. */
-const NEVER = () => () => undefined;
+/*
+  붙자마자 한 번 알린다.
+
+  "달라졌으니 알아서 다시 그려 주겠지" 에 기대면 안 된다. 기대어 봤더니
+  어떤 자리에서는 서버 몫의 답에 그대로 머물렀다 — 화면에는 아무 일도
+  일어나지 않고, 왜 안 되는지도 보이지 않는다.
+
+  그래서 지켜보는 척이 아니라 실제로 한 번 알린다. 이러면 다시 그리는
+  일이 우연이 아니라 약속이 된다.
+*/
+const TELL_ONCE = (notify: () => void) => {
+  const id = setTimeout(notify, 0);
+  return () => clearTimeout(id);
+};
+
 const ON_SCREEN = () => true;
 const ON_SERVER = () => false;
 
 export function useHydrated(): boolean {
-  return useSyncExternalStore(NEVER, ON_SCREEN, ON_SERVER);
+  return useSyncExternalStore(TELL_ONCE, ON_SCREEN, ON_SERVER);
 }

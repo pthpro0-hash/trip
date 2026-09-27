@@ -23,14 +23,25 @@ export function FilterBar({ criteria, onChange }: FilterBarProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <button
-        type="button"
-        className="flex items-center gap-1 self-start rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text md:hidden"
-        aria-expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
-      >
-        {activeCount > 0 ? `필터 ${activeCount}` : "필터"} {expanded ? "▲" : "▾"}
-      </button>
+      {/*
+        조건을 고를 수 있다는 것을 모르면 목록을 끝까지 내리며 눈으로
+        찾는다. 무엇을 누르면 무엇이 되는지 한 줄로 알려 준다.
+      */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text md:hidden"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {activeCount > 0 ? `필터 ${activeCount}` : "필터"} {expanded ? "▲" : "▾"}
+        </button>
+        <p className="text-[13px] text-text-faint">
+          {activeCount > 0
+            ? "조건을 다시 누르면 풀려요. 여러 개를 함께 걸 수 있어요."
+            : "권역·계절·테마를 눌러 좁혀 보세요. 여러 개를 함께 걸 수 있어요."}
+        </p>
+      </div>
       <div className={`${expanded ? "flex" : "hidden"} flex-col gap-2.5 md:flex`}>
         <FilterGroup
           label="권역"

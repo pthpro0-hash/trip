@@ -25,7 +25,6 @@ function toggle<T>(list: T[], value: T): T[] {
 export function RegionExplorer({ region, spots }: RegionExplorerProps) {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [seasons, setSeasons] = useState<Season[]>([]);
-  const [selectedId, setSelectedId] = useState<string>();
   /*
     상세를 보고 돌아온 사람. 어느 카드 앞에 세울지.
 
@@ -166,9 +165,8 @@ export function RegionExplorer({ region, spots }: RegionExplorerProps) {
                 <SpotCard
                   key={spot.id}
                   spot={spot}
-                  selected={spot.id === selectedId}
-                  onSelect={setSelectedId}
-                  focused={focus === spot.id}
+                  selected={false}
+                      focused={focus === spot.id}
                 />
               ))}
             </div>

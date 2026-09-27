@@ -63,7 +63,28 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto shrink-0">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {/*
+            좁은 화면에서는 물음표만 남긴다. 375px 에서는 갈래 둘과 계정
+            칩만으로도 폭이 빠듯해, 글자를 두면 계정 칩이 밀려 나간다.
+          */}
+          <Link
+            href="/help"
+            aria-label="도움말"
+            aria-current={pathname.startsWith("/help") ? "page" : undefined}
+            className={`grid h-8 shrink-0 place-items-center rounded-full px-2.5 text-[14px] font-medium transition sm:px-3.5 ${
+              pathname.startsWith("/help")
+                ? "bg-accent-soft text-accent"
+                : "text-text-muted hover:bg-bg-subtle hover:text-text"
+            }`}
+          >
+            <span aria-hidden="true" className="sm:hidden">
+              ?
+            </span>
+            <span aria-hidden="true" className="hidden whitespace-nowrap sm:inline">
+              도움말
+            </span>
+          </Link>
           <AccountChip />
         </div>
       </div>

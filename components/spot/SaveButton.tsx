@@ -59,7 +59,7 @@ export function SaveButton({ spotId, spotName, variant = "overlay" }: SaveButton
         사진 위에 올라가는 버튼이라 밝은 사진에서도 보이도록 어두운 반투명
         원 위에 흰 하트를 둔다. 테마 토큰을 쓰면 밝은 사진에서 사라진다.
       */
-      className={`absolute right-2.5 top-2.5 z-10 grid h-9 w-9 place-items-center rounded-full bg-black/45 backdrop-blur-sm transition hover:bg-black/60 ${
+      className={`absolute right-2.5 top-2.5 z-20 grid h-9 w-9 place-items-center rounded-full bg-black/45 backdrop-blur-sm transition hover:bg-black/60 ${
         saved ? "text-[#ff5a5f]" : "text-white"
       }`}
     >

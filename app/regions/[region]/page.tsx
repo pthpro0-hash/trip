@@ -6,6 +6,7 @@ import type { Region, Spot } from "@/lib/types";
 import { REGIONS, adjacentRegions } from "@/lib/regions";
 import { REGION_THEME } from "@/lib/regionTheme";
 import { RegionExplorer } from "@/components/region/RegionExplorer";
+import { ScrollTop } from "@/components/layout/ScrollTop";
 
 const SPOTS = spotsData as Spot[];
 
@@ -88,6 +89,8 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
           </span>
         </Link>
       </nav>
+      {/* 권역 목록도 길다. 둘러보기와 같은 자리에 둔다. */}
+      <ScrollTop />
     </main>
   );
 }

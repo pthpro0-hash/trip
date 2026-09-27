@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SpotCard } from "./SpotCard";
 import { spotFocus } from "@/lib/scrollMemory";
@@ -12,21 +12,33 @@ const SPOT: Spot = {
 
 describe("SpotCard", () => {
   it("이름과 대표 음식을 표시한다", () => {
-    render(<SpotCard spot={SPOT} selected={false} onSelect={() => {}} />);
+    render(<SpotCard spot={SPOT} selected={false} />);
     expect(screen.getByText("경복궁")).toBeTruthy();
     expect(screen.getByText("설렁탕")).toBeTruthy();
   });
 
-  it("클릭하면 onSelect가 spot id와 함께 호출된다", () => {
-    const onSelect = vi.fn();
-    render(<SpotCard spot={SPOT} selected={false} onSelect={onSelect} />);
-    fireEvent.click(screen.getByRole("button", { name: /지도에서 보기/ }));
-    expect(onSelect).toHaveBeenCalledWith("gyeongbokgung");
+  /*
+    제목이나 "자세히 보기"를 정확히 겨눠야 하면 손가락으로는 번번이
+    빗나간다. 카드 어디를 눌러도 상세로 가야 한다.
+  */
+  it("카드 어디를 눌러도 상세로 가는 길이 덮여 있다", () => {
+    render(<SpotCard spot={SPOT} selected={false} />);
+    const cover = screen.getByRole("link", { name: "경복궁 자세히 보기" });
+    expect(cover).toHaveAttribute("href", "/spots/gyeongbokgung");
+  });
+
+  it("덮개가 있어도 가고 싶은 곳 단추는 눌린다", () => {
+    render(<SpotCard spot={SPOT} selected={false} />);
+    // 단추가 덮개보다 위에 있어야 눌린다.
+    const save = screen.getByRole("button", { name: "경복궁 가고 싶은 곳에 담기" });
+    const cover = screen.getByRole("link", { name: "경복궁 자세히 보기" });
+    expect(save.className).toContain("z-20");
+    expect(cover.className).toContain("z-10");
   });
 
   it("가고 싶은 곳 버튼을 누르면 눌린 상태로 바뀐다", () => {
     window.localStorage.clear();
-    render(<SpotCard spot={SPOT} selected={false} onSelect={() => {}} />);
+    render(<SpotCard spot={SPOT} selected={false} />);
     const save = screen.getByRole("button", { name: "경복궁 가고 싶은 곳에 담기" });
     expect(save).toHaveAttribute("aria-pressed", "false");
 
@@ -41,18 +53,18 @@ describe("SpotCard", () => {
     여행지 상세는 둘러보기에서도 권역별에서도 열린다. 돌아갈 곳이 둘이라
     상세 혼자서는 알 수 없고, 떠나올 때 카드가 적어 두어야 한다.
   */
-  it("이름을 눌러 떠날 때 어디서 떠났는지 적어 둔다", () => {
+  it("떠날 때 어디서 떠났는지 적어 둔다", () => {
     window.sessionStorage.clear();
-    render(<SpotCard spot={SPOT} selected={false} onSelect={() => {}} />);
+    render(<SpotCard spot={SPOT} selected={false} />);
 
-    fireEvent.click(screen.getByText("경복궁"));
+    fireEvent.click(screen.getByRole("link", { name: "경복궁 자세히 보기" }));
 
     expect(spotFocus.from()).toBe(window.location.pathname + window.location.search);
   });
 
   it("돌아와 선 카드에는 찾을 이름표와 테가 있다", () => {
     const { container } = render(
-      <SpotCard spot={SPOT} selected={false} onSelect={() => {}} focused />,
+      <SpotCard spot={SPOT} selected={false} focused />,
     );
     const card = container.querySelector("#spot-gyeongbokgung");
     expect(card).toBeTruthy();
@@ -61,13 +73,13 @@ describe("SpotCard", () => {
 
   it("내 주변이 켜져 있으면 거리를 함께 보여준다", () => {
     render(
-      <SpotCard spot={SPOT} selected={false} onSelect={() => {}} distanceKm={3.42} />,
+      <SpotCard spot={SPOT} selected={false} distanceKm={3.42} />,
     );
     expect(screen.getByText("수도권 · 3.4km")).toBeTruthy();
   });
 
   it("상세 페이지로 이동하는 링크를 포함한다", () => {
-    render(<SpotCard spot={SPOT} selected={false} onSelect={() => {}} />);
+    render(<SpotCard spot={SPOT} selected={false} />);
     const link = screen.getByRole("link", { name: /자세히 보기/ });
     expect(link).toHaveAttribute("href", "/spots/gyeongbokgung");
   });

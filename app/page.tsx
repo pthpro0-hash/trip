@@ -23,6 +23,7 @@ import { KakaoMap } from "@/components/map/KakaoMap";
 import { ViewToggle } from "@/components/layout/ViewToggle";
 import { RegionStrip } from "@/components/region/RegionStrip";
 import { HomeIntro } from "@/components/home/HomeIntro";
+import { ScrollTop } from "@/components/layout/ScrollTop";
 import { restoreToCard, spotFocus } from "@/lib/scrollMemory";
 import { useHydrated } from "@/lib/useHydrated";
 
@@ -210,7 +211,6 @@ export default function HomePage() {
               key={spot.id}
               spot={spot}
               selected={spot.id === selectedId}
-              onSelect={setSelectedId}
               query={query}
               distanceKm={origin ? distanceKm(origin, spot) : undefined}
               focused={focus === spot.id}
@@ -229,6 +229,9 @@ export default function HomePage() {
         어디까지 내려가 있든 사진을 넣을 수 있게 떠 있는다. 목록이 길어
         아래에서 다시 위로 올라가야 하는 일이 없도록.
       */}
+      {/* 목록이 121곳이라 화면이 길다. 늘 같은 자리에 둔다. */}
+      <ScrollTop raised />
+
       <Link
         href="/trips/new"
         className="fixed bottom-5 right-5 z-20 flex items-center gap-1.5 rounded-full bg-accent px-4 py-3 text-[14px] font-medium text-on-accent shadow-lg transition hover:bg-accent-hover"
