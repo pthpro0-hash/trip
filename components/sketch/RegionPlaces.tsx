@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { tripFocus } from "@/lib/scrollMemory";
 import { CourseMap } from "@/components/course/CourseMap";
 import type { SketchDot } from "@/lib/sketch";
 import type { Region } from "@/lib/types";
@@ -57,6 +58,7 @@ export function RegionPlaces({ region, dots }: RegionPlacesProps) {
           <li key={`${place.lat},${place.lng}`}>
             <Link
               href={`/trips/${place.tripId}`}
+              onClick={() => tripFocus.rememberFrom("/sketch")}
               className="flex items-baseline gap-2 rounded-lg px-1 py-1 transition hover:bg-bg-subtle"
             >
               {/* 지도 위 번호와 그대로 이어 읽히게 한다. */}

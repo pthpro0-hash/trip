@@ -12,11 +12,12 @@ describe("BackToBrowse", () => {
     window.sessionStorage.clear();
   });
 
-  it("적어 둔 곳이 없으면 둘러보기로 보낸다", () => {
+  it("적어 둔 곳이 없으면 여행 100선으로 보낸다", () => {
     render(<BackToBrowse spotId="경복궁" />);
     const back = screen.getByRole("link");
-    expect(back).toHaveAttribute("href", "/");
-    expect(back.textContent).toContain("둘러보기");
+    // 맨 "/" 는 지난번에 고른 갈래를 연다. 내 지도가 뜨지 않게 갈래를 적는다.
+    expect(back).toHaveAttribute("href", "/?v=spots");
+    expect(back.textContent).toContain("여행 100선");
   });
 
   it("권역별에서 왔으면 그 권역 이름을 달고 그리로 돌려보낸다", () => {
@@ -28,10 +29,11 @@ describe("BackToBrowse", () => {
     expect(back.textContent).toContain("강원권");
   });
 
-  it("둘러보기에서 왔으면 거르던 조건까지 그대로 돌려보낸다", () => {
-    spotFocus.rememberFrom("/?q=바다");
+  it("첫 화면에서 왔으면 여행 100선 쪽으로 돌려보낸다", () => {
+    // 여행지 카드는 100선에만 있다. 맨 "/" 로 보내면 내 지도가 뜰 수 있다.
+    spotFocus.rememberFrom("/");
     render(<BackToBrowse spotId="경복궁" />);
-    expect(screen.getByRole("link")).toHaveAttribute("href", "/?q=바다");
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/?v=spots");
   });
 
   /*
@@ -41,7 +43,7 @@ describe("BackToBrowse", () => {
   it("바깥 주소가 적혀 있으면 따라가지 않는다", () => {
     spotFocus.rememberFrom("https://남의곳/훔치기");
     render(<BackToBrowse spotId="경복궁" />);
-    expect(screen.getByRole("link")).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/?v=spots");
   });
 
   it("누르면 이 여행지 앞에 세워 달라고 적어 둔다", () => {

@@ -21,7 +21,8 @@ describe("CoursePlanner", () => {
   it("담은 곳이 없으면 무엇을 해야 하는지 알려준다", async () => {
     await renderWith([]);
     expect(screen.getByText("이번 여행에 담은 곳이 없어요")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /여행지 둘러보기/ })).toHaveAttribute("href", "/");
+    // 맨 "/" 는 지난번에 고른 갈래를 연다. 여행지를 고르러 가는 길이니 100선을 적는다.
+    expect(screen.getByRole("link", { name: /여행지 둘러보기/ })).toHaveAttribute("href", "/?v=spots");
   });
 
   it("담은 순서대로 번호를 매겨 보여준다", async () => {

@@ -6,12 +6,15 @@ import {
   PHOTO_LIMIT,
   UPLOAD_LANES,
   legacyThumbPath,
+  markerPath,
+  markerUrls,
+  missingThumbs,
   thumbPath,
   thumbUrls,
   uploadPhotos,
   type UploadTarget,
 } from "./photos";
-import { THUMB_EDGE } from "@/lib/photo/resize";
+import { MARKER_EDGE, THUMB_EDGE } from "@/lib/photo/resize";
 import { UnsupportedImageError } from "@/lib/photo/resize";
 
 /*
@@ -20,12 +23,13 @@ import { UnsupportedImageError } from "@/lib/photo/resize";
   돌리는 코드는 눈으로 읽어서는 맞는지 알 수 없다. 여기서 못 박는다.
 */
 
-const shrink = vi.fn<(file: File) => Promise<{ full: Blob; thumb: Blob }>>();
+const shrink = vi.fn<(file: File) => Promise<{ full: Blob; thumb: Blob; marker: Blob }>>();
 vi.mock("@/lib/photo/resize", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/photo/resize")>()),
   shrinkToWebp: (file: File) => shrink(file),
   // node 에는 createImageBitmap 이 없다. 줄이는 일 자체는 여기서 볼 것이 아니다.
   thumbFromBlob: async () => new Blob(["t"]),
+  markerFromBlob: async () => new Blob(["m"]),
 }));
 
 function target(name: string): UploadTarget {
@@ -132,6 +136,7 @@ describe("uploadPhotos", () => {
     shrink.mockImplementation(async (file) => ({
       full: new Blob([file.name]),
       thumb: new Blob([`t:${file.name}`]),
+      marker: new Blob([`t:m:${file.name}`]),
     }));
   });
 
@@ -163,7 +168,11 @@ describe("uploadPhotos", () => {
       shrinkPeak = Math.max(shrinkPeak, shrinking);
       await new Promise((resolve) => setTimeout(resolve, 0));
       shrinking -= 1;
-      return { full: new Blob([file.name]), thumb: new Blob([`t:${file.name}`]) };
+      return {
+        full: new Blob([file.name]),
+        thumb: new Blob([`t:${file.name}`]),
+        marker: new Blob([`t:m:${file.name}`]),
+      };
     });
 
     const run = uploadPhotos(supabase, "나", Array.from({ length: 12 }, (_, i) => target(`${i}.jpg`)));
@@ -179,7 +188,11 @@ describe("uploadPhotos", () => {
       if (file.name === "b.jpg" || file.name === "d.jpg") {
         throw new UnsupportedImageError(file.name);
       }
-      return { full: new Blob([file.name]), thumb: new Blob([`t:${file.name}`]) };
+      return {
+        full: new Blob([file.name]),
+        thumb: new Blob([`t:${file.name}`]),
+        marker: new Blob([`t:m:${file.name}`]),
+      };
     });
 
     const run = uploadPhotos(
@@ -202,9 +215,10 @@ describe("uploadPhotos", () => {
 
     expect(outcome.uploaded).toBe(2);
     expect(outcome.failed).toBe(1);
-    // 아무도 가리키지 않는 파일이 보관함에 남지 않는다. 작은 판까지.
-    expect(state.removed).toHaveLength(2);
+    // 아무도 가리키지 않는 파일이 보관함에 남지 않는다. 작은 판들까지.
+    expect(state.removed).toHaveLength(3);
     expect(state.removed[1]).toBe(thumbPath(state.removed[0]));
+    expect(state.removed[2]).toBe(markerPath(state.removed[0]));
   });
 
   it("한 장이 망에서 실패해도 나머지는 그대로 올라간다", async () => {
@@ -338,14 +352,19 @@ describe("thumbUrls", () => {
   다시 만든 뒤 치우되, 순서가 중요하다 — 먼저 치우고 만들다 끊기면
   아무 판도 없는 사진이 생긴다.
 */
-describe("backfillThumbs · 낡은 판 치우기", () => {
-  function fake(옵션: { uploadFails?: boolean } = {}) {
-    const state = { uploaded: [] as string[], removed: [] as string[] };
+describe("backfillThumbs · 빠진 판 챙기기", () => {
+  /** 보관함에 이 경로들만 있는 셈 친다. */
+  function fake(있는것: string[], 옵션: { uploadFails?: boolean } = {}) {
+    const state = { uploaded: [] as string[], removed: [] as string[], fetched: [] as string[] };
     const supabase = {
       storage: {
         from: () => ({
           createSignedUrls: async (paths: string[]) => ({
-            data: paths.map((path) => ({ path, signedUrl: `https://예시/${path}` })),
+            data: paths.map((path) =>
+              있는것.includes(path)
+                ? { path, signedUrl: `https://예시/${path}` }
+                : { path: null, signedUrl: null },
+            ),
             error: null,
           }),
           upload: async (path: string) => {
@@ -359,29 +378,119 @@ describe("backfillThumbs · 낡은 판 치우기", () => {
           },
         }),
       },
-    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    } as unknown as SupabaseClient;
+
+    vi.stubGlobal("fetch", async (url: string) => {
+      state.fetched.push(url);
+      return { ok: true, blob: async () => new Blob(["x"]) };
+    });
     return { supabase, state };
   }
 
-  beforeEach(() => {
-    vi.stubGlobal("fetch", async () => ({ ok: true, blob: async () => new Blob(["x"]) }));
-  });
+  const 원본 = "나/v1/a.webp";
 
-  it("새 판을 만들고 예전 판을 치운다", async () => {
-    const { supabase, state } = fake();
-    const outcome = await backfillThumbs(supabase, ["나/v1/a.webp"]);
+  it("목록 판이 없으면 원본에서 둘 다 만들고 예전 판을 치운다", async () => {
+    const { supabase, state } = fake([원본]);
+    const outcome = await backfillThumbs(supabase, [원본]);
 
     expect(outcome).toEqual({ made: 1, failed: 0 });
-    expect(state.uploaded).toEqual([`나/v1/a.t${THUMB_EDGE}.webp`]);
+    expect(state.uploaded).toEqual([`나/v1/a.t${THUMB_EDGE}.webp`, `나/v1/a.t${MARKER_EDGE}.webp`]);
     expect(state.removed).toEqual(["나/v1/a.thumb.webp"]);
   });
 
+  /*
+    원본은 400KB, 목록 판은 87KB 다. 핀 판(160px)을 만드는 데는 목록
+    판으로 차고 넘친다. 507장이면 200MB 와 44MB 의 차이다.
+  */
+  it("목록 판이 있으면 그것으로 핀 판만 만든다 — 원본은 받지 않는다", async () => {
+    const { supabase, state } = fake([원본, thumbPath(원본)]);
+    const outcome = await backfillThumbs(supabase, [원본]);
+
+    expect(outcome).toEqual({ made: 1, failed: 0 });
+    expect(state.uploaded).toEqual([markerPath(원본)]);
+    expect(state.fetched).toEqual([`https://예시/${thumbPath(원본)}`]);
+    expect(state.removed).toEqual([]);
+  });
+
   it("만들지 못하면 예전 판을 치우지 않는다", async () => {
-    const { supabase, state } = fake({ uploadFails: true });
-    const outcome = await backfillThumbs(supabase, ["나/v1/a.webp"]);
+    const { supabase, state } = fake([원본], { uploadFails: true });
+    const outcome = await backfillThumbs(supabase, [원본]);
 
     expect(outcome).toEqual({ made: 0, failed: 1 });
     // 치웠다면 아무 판도 없는 사진이 됐을 것이다.
     expect(state.removed).toEqual([]);
+  });
+});
+
+describe("markerPath", () => {
+  it("핀 판도 이름에 크기를 박는다", () => {
+    expect(markerPath("나/v1/abc.webp")).toBe(`나/v1/abc.t${MARKER_EDGE}.webp`);
+  });
+
+  it("목록 판과 이름이 겹치지 않는다", () => {
+    expect(markerPath("나/v1/abc.webp")).not.toBe(thumbPath("나/v1/abc.webp"));
+  });
+});
+
+describe("markerUrls", () => {
+  function fakeStorage(있는것: string[]) {
+    return {
+      storage: {
+        from: () => ({
+          createSignedUrls: async (paths: string[]) => ({
+            data: paths.map((path) =>
+              있는것.includes(path)
+                ? { path, signedUrl: `https://예시/${path}` }
+                : { path: null, signedUrl: null },
+            ),
+            error: null,
+          }),
+        }),
+      },
+    } as unknown as SupabaseClient;
+  }
+
+  const a = "나/v1/a.webp";
+  const b = "나/v1/b.webp";
+  const c = "나/v1/c.webp";
+
+  it("핀 판 → 목록 판 → 원본 순으로 물러난다", async () => {
+    const urls = await markerUrls(fakeStorage([markerPath(a), thumbPath(b), c]), [a, b, c]);
+
+    expect(urls.get(a)).toBe(`https://예시/${markerPath(a)}`);
+    expect(urls.get(b)).toBe(`https://예시/${thumbPath(b)}`);
+    expect(urls.get(c)).toBe(`https://예시/${c}`);
+  });
+});
+
+describe("missingThumbs", () => {
+  function fakeRows(경로: string[], 있는것: string[]) {
+    return {
+      from: () => ({
+        select: () => ({
+          eq: async () => ({ data: 경로.map((storage_path) => ({ storage_path })), error: null }),
+        }),
+      }),
+      storage: {
+        from: () => ({
+          createSignedUrls: async (paths: string[]) => ({
+            data: paths.map((path) =>
+              있는것.includes(path)
+                ? { path, signedUrl: `https://예시/${path}` }
+                : { path: null, signedUrl: null },
+            ),
+            error: null,
+          }),
+        }),
+      },
+    } as unknown as SupabaseClient;
+  }
+
+  it("핀 판만 빠져도 챙길 대상이다", async () => {
+    const a = "나/v1/a.webp";
+    const b = "나/v1/b.webp";
+    const supabase = fakeRows([a, b], [thumbPath(a), markerPath(a), thumbPath(b)]);
+
+    expect(await missingThumbs(supabase, "나")).toEqual([b]);
   });
 });

@@ -6,7 +6,7 @@ import { ScrollTop } from "@/components/layout/ScrollTop";
 export const metadata: Metadata = {
   title: "도움말",
   description:
-    "사진으로 여행 기록 만들기, 한 장으로 보기, 이번 여행 코스 짜기, 둘러보기 사용법을 안내합니다.",
+    "사진으로 여행 기록 만들기, 내 여행 지도, 이번 여행 코스 짜기, 여행 100선 사용법을 안내합니다.",
   alternates: { canonical: "/help" },
 };
 

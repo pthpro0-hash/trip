@@ -16,7 +16,7 @@ export function LegalDocument({
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 px-5 pb-20 pt-8">
       <Link href="/" className="text-[15px] font-medium text-accent hover:text-accent-hover">
-        ← 목록으로
+        ← 처음으로
       </Link>
       <div>
         <h1 className="text-[28px] font-bold tracking-tight text-text md:text-[32px]">{title}</h1>

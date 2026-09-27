@@ -18,7 +18,12 @@ import type { Region } from "@/lib/types";
   사람은 처음부터 보려는 것이라 아무 표시도 남기지 않는다.
 */
 
-const HOME = { href: "/", label: "← 둘러보기" };
+/*
+  여행 100선은 주소에 갈래를 적어 둔다. 맨 "/" 는 지난번에 고른 쪽을
+  열기 때문에, 내 스케치에서 시작하는 사람이 "← 여행 100선"을 눌렀는데
+  내 지도가 뜨는 일이 생긴다.
+*/
+const HOME = { href: "/?v=spots", label: "← 여행 100선" };
 
 /** 적어 둔 주소에서 돌아갈 곳의 이름을 읽는다. */
 function placeOf(from: string | null): { href: string; label: string } {
@@ -27,6 +32,8 @@ function placeOf(from: string | null): { href: string; label: string } {
   const region = REGIONS.find((name: Region) => from.startsWith(`/regions/${encodeURIComponent(name)}`));
   if (region) return { href: from, label: `← ${region}` };
   if (from.startsWith("/regions")) return { href: from, label: "← 권역별" };
+  // 첫 화면에서 왔으면 어느 쪽이었는지는 뻔하다 — 여행지 카드는 100선에만 있다.
+  if (from === "/" || from.startsWith("/?")) return HOME;
   if (from.startsWith("/")) return { href: from, label: HOME.label };
   return HOME;
 }

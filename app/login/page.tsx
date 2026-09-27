@@ -41,7 +41,7 @@ export default async function LoginPage({
           로그인하면 담아두신 곳이 계정에 저장되어, 폰에서 담고 컴퓨터에서 이어 볼 수 있어요.
           <br />
           <span className="text-text-faint">
-            둘러보기와 검색은 로그인 없이도 그대로 쓰실 수 있어요.
+            여행 100선과 검색은 로그인 없이도 그대로 쓰실 수 있어요.
           </span>
         </p>
       </div>

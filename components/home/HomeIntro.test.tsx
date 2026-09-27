@@ -80,7 +80,8 @@ describe("HomeIntro", () => {
 
     expect(await screen.findByText("민수랑 첫 휴가")).toBeTruthy();
     expect(screen.getByText(/여행 2건을 남기셨어요/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: /내 스케치/ })).toHaveAttribute("href", "/trips");
+    // 내 스케치의 문은 이제 지도다.
+    expect(screen.getByRole("link", { name: /내 스케치/ })).toHaveAttribute("href", "/?v=sketch");
     // 소개 문구는 더 이상 필요 없다.
     expect(screen.queryByText("사진 속에 답이 있어요")).toBeNull();
   });

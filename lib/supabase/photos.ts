@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  MARKER_EDGE,
+  markerFromBlob,
   shrinkToWebp,
   THUMB_EDGE,
   thumbFromBlob,
@@ -79,10 +81,20 @@ const SIZED = /\.t\d+\.webp$/i;
 /** 크기를 이름에 넣기 전에 쓰던 이름. 다시 만든 뒤 지운다. */
 const LEGACY = ".thumb.webp";
 
-export function thumbPath(storagePath: string): string {
-  // 두 번 걸어도 겹치지 않게 한다.
+/** 보관 경로 옆에 크기를 박은 판의 경로. 두 번 걸어도 겹치지 않는다. */
+function sizedPath(storagePath: string, edge: number): string {
   if (SIZED.test(storagePath)) return storagePath;
-  return storagePath.replace(/\.webp$/i, `.t${THUMB_EDGE}.webp`);
+  return storagePath.replace(/\.webp$/i, `.t${edge}.webp`);
+}
+
+/** 목록에 쓸 판. */
+export function thumbPath(storagePath: string): string {
+  return sizedPath(storagePath, THUMB_EDGE);
+}
+
+/** 지도 핀에 쓸 판. */
+export function markerPath(storagePath: string): string {
+  return sizedPath(storagePath, MARKER_EDGE);
 }
 
 /** 예전 이름. 낡은 판을 치우는 데만 쓴다. */
@@ -126,6 +138,9 @@ async function putOne(
   await supabase.storage
     .from(BUCKET)
     .upload(thumbPath(path), shrunk.thumb, { contentType: "image/webp", upsert: false });
+  await supabase.storage
+    .from(BUCKET)
+    .upload(markerPath(path), shrunk.marker, { contentType: "image/webp", upsert: false });
 
   const { error: rowError } = await supabase.from("trip_photos").insert({
     visit_id: target.visitId,
@@ -138,8 +153,8 @@ async function putOne(
   });
 
   if (rowError) {
-    // 아무도 가리키지 않는 파일을 남기지 않는다. 작은 판도 함께.
-    await supabase.storage.from(BUCKET).remove([path, thumbPath(path)]);
+    // 아무도 가리키지 않는 파일을 남기지 않는다. 작은 판들도 함께.
+    await supabase.storage.from(BUCKET).remove([path, thumbPath(path), markerPath(path)]);
     return { kind: "failed" };
   }
 
@@ -320,6 +335,72 @@ export async function thumbUrls(
   return urls;
 }
 
+/**
+ * 지도 핀에 쓸 판의 주소.
+ *
+ * 핀 판이 아직 없으면 목록 판으로, 그것도 없으면 원본으로 물러난다.
+ * 열쇠는 thumbUrls 와 같이 언제나 원본 경로다.
+ */
+export async function markerUrls(
+  supabase: SupabaseClient,
+  paths: string[],
+  seconds = 3600,
+): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map();
+
+  const tiny = await signedUrls(supabase, paths.map(markerPath), seconds);
+
+  const urls = new Map<string, string>();
+  const missing: string[] = [];
+  for (const path of paths) {
+    const hit = tiny.get(markerPath(path));
+    if (hit) urls.set(path, hit);
+    else missing.push(path);
+  }
+
+  if (missing.length > 0) {
+    for (const [path, url] of await thumbUrls(supabase, missing, seconds)) urls.set(path, url);
+  }
+  return urls;
+}
+
+/** 한 곳에서 찍은 사진 한 장. */
+export interface PlacePhoto {
+  id: string;
+  visitId: string;
+  storagePath: string;
+  /** "2026-09-14 06:11:00" 꼴의 벽시계 시각. */
+  takenAt: string;
+}
+
+/**
+ * 지도에서 고른 곳의 사진들. 찍은 순서대로.
+ *
+ * 핀을 누를 때마다 그곳 것만 받는다. 전부를 미리 받아 두면 지도를 여는
+ * 것만으로 수백 장의 주소를 만들어야 한다.
+ */
+export async function fetchPlacePhotos(
+  supabase: SupabaseClient,
+  userId: string,
+  visitIds: string[],
+): Promise<PlacePhoto[]> {
+  if (visitIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("trip_photos")
+    .select("id,visit_id,storage_path,taken_at")
+    .eq("user_id", userId)
+    .in("visit_id", visitIds)
+    .order("taken_at", { ascending: true });
+
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id),
+    visitId: String(row.visit_id),
+    storagePath: String(row.storage_path),
+    takenAt: String(row.taken_at),
+  }));
+}
+
 /*
   뒤늦게 작은 판 챙기기.
 
@@ -342,8 +423,12 @@ export async function missingThumbs(
   const paths = data.map((row) => String(row.storage_path));
   if (paths.length === 0) return [];
 
-  const small = await signedUrls(supabase, paths.map(thumbPath), 60);
-  return paths.filter((path) => !small.has(thumbPath(path)));
+  /*
+    판이 하나라도 빠졌으면 챙길 대상이다. 목록 판과 핀 판을 한 번에
+    물어본다 — 이름이 규칙으로 정해져 있어 따로 적어 둔 표가 필요 없다.
+  */
+  const small = await signedUrls(supabase, [...paths.map(thumbPath), ...paths.map(markerPath)], 60);
+  return paths.filter((path) => !small.has(thumbPath(path)) || !small.has(markerPath(path)));
 }
 
 export interface BackfillOutcome {
@@ -352,7 +437,12 @@ export interface BackfillOutcome {
 }
 
 /**
- * 원본을 받아 작은 판을 만들어 올린다.
+ * 빠진 작은 판을 만들어 올린다.
+ *
+ * 목록 판이 있으면 그것을 받아 핀 판만 만든다. 목록 판(87KB)에서 만들면
+ * 원본(400KB)을 다시 받지 않아도 된다 — 507장이면 200MB 와 44MB 의
+ * 차이고, 내려받는 양은 곧 청구서다. 목록 판이 없을 때만 원본을 받아
+ * 둘 다 만든다.
  *
  * 한 장씩 차례로 한다. 펼친 그림이 한 번에 하나만 살아 있게 하는 것도
  * 있지만, 무엇보다 한 번 하고 마는 일이라 빠를 이유가 없다.
@@ -365,27 +455,38 @@ export async function backfillThumbs(
   const outcome: BackfillOutcome = { made: 0, failed: 0 };
   onProgress?.(0, paths.length);
 
+  const put = async (path: string, blob: Blob) => {
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, blob, { contentType: "image/webp", upsert: true });
+    if (error) throw new Error("upload failed");
+  };
+
   for (const [index, path] of paths.entries()) {
     try {
-      const urls = await signedUrls(supabase, [path], 120);
-      const url = urls.get(path);
-      if (!url) throw new Error("no url");
+      const urls = await signedUrls(supabase, [thumbPath(path), path], 120);
+      const thumbUrl = urls.get(thumbPath(path));
 
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("fetch failed");
+      if (thumbUrl) {
+        const response = await fetch(thumbUrl);
+        if (!response.ok) throw new Error("fetch failed");
+        await put(markerPath(path), await markerFromBlob(await response.blob(), path));
+      } else {
+        const url = urls.get(path);
+        if (!url) throw new Error("no url");
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("fetch failed");
+        const original = await response.blob();
 
-      const thumb = await thumbFromBlob(await response.blob(), path);
-      const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(thumbPath(path), thumb, { contentType: "image/webp", upsert: true });
+        await put(thumbPath(path), await thumbFromBlob(original, path));
+        await put(markerPath(path), await markerFromBlob(original, path));
 
-      if (error) throw new Error("upload failed");
-
-      /*
-        새 판이 올라간 뒤에야 낡은 판을 치운다. 순서가 바뀌면 중간에
-        끊겼을 때 아무 판도 없는 사진이 생긴다.
-      */
-      await supabase.storage.from(BUCKET).remove([legacyThumbPath(path)]);
+        /*
+          새 판이 올라간 뒤에야 낡은 판을 치운다. 순서가 바뀌면 중간에
+          끊겼을 때 아무 판도 없는 사진이 생긴다.
+        */
+        await supabase.storage.from(BUCKET).remove([legacyThumbPath(path)]);
+      }
       outcome.made += 1;
     } catch {
       // 한 장 실패했다고 나머지를 포기하지 않는다. 다음에 다시 하면 된다.
@@ -422,7 +523,12 @@ export async function deletePhoto(
   await supabase.storage
     .from(BUCKET)
     // 낡은 이름도 함께 치운다. 아직 다시 만들지 않은 사진일 수 있다.
-    .remove([photo.storagePath, thumbPath(photo.storagePath), legacyThumbPath(photo.storagePath)]);
+    .remove([
+      photo.storagePath,
+      thumbPath(photo.storagePath),
+      markerPath(photo.storagePath),
+      legacyThumbPath(photo.storagePath),
+    ]);
   await syncPhotoCount(supabase, userId, photo.visitId);
   return true;
 }

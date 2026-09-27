@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import HomePage from "./page";
+import { SpotsHome as HomePage } from "./SpotsHome";
 
 // The search field debounces before it tells the page, so these go through
 // waitFor rather than reading the DOM straight after the keystroke.

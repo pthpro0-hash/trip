@@ -165,6 +165,9 @@ export function TripList() {
     });
   }, [trips, searchable, query, person, year]);
 
+  /** 상세에서 "← 내 스케치"를 누르면 이 목록으로 돌아오게 적어 둔다. */
+  const leaveForDetail = () => tripFocus.rememberFrom("/trips");
+
   const remove = async (tripId: string) => {
     const supabase = getBrowserClient();
     if (!supabase || !userId) return;
@@ -387,12 +390,14 @@ export function TripList() {
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   <Link
                     href={`/trips/${trip.id}`}
+                    onClick={leaveForDetail}
                     className="text-[17px] font-semibold tracking-tight text-text hover:text-accent"
                   >
                     {trip.title || formatSpan(trip.startedOn, trip.endedOn)}
                   </Link>
                   <Link
                     href={`/trips/${trip.id}`}
+                    onClick={leaveForDetail}
                     tabIndex={-1}
                     aria-hidden="true"
                     className="shrink-0 rounded-full bg-bg-subtle px-2.5 py-1 text-[12px] font-medium text-text-muted transition hover:bg-accent-soft hover:text-accent"
@@ -440,6 +445,7 @@ export function TripList() {
             {trip.coverPath && (
               <Link
                 href={`/trips/${trip.id}`}
+                    onClick={leaveForDetail}
                 aria-label={`${trip.title || formatSpan(trip.startedOn, trip.endedOn)} 상세보기`}
                 className="group block aspect-[16/10] w-full overflow-hidden rounded-xl bg-bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountChip } from "@/components/auth/AccountChip";
+import { rememberStart, startHref, type Start } from "@/lib/start";
 
 /*
   이 서비스는 두 몸이다 — 어디를 갈지 고르는 쪽과, 다녀온 길을 남기는 쪽.
@@ -15,23 +16,32 @@ import { AccountChip } from "@/components/auth/AccountChip";
   그 사람의 형편을 보고 정한다(HomeIntro 참고).
 */
 
-const TABS = [
-  { href: "/", label: "둘러보기" },
-  { href: "/trips", label: "내 스케치" },
-] as const;
+const TABS: { start: Start; label: string }[] = [
+  { start: "sketch", label: "내 스케치" },
+  { start: "spots", label: "여행 100선" },
+];
 
 export function SiteHeader() {
   const pathname = usePathname();
 
   /** 하위 경로에 있어도 그 갈래가 켜져 보이게 한다. */
-  const isOn = (href: string) => {
-    if (href === "/") return pathname === "/" || pathname.startsWith("/spots") || pathname.startsWith("/regions");
-    return pathname.startsWith(href) || pathname.startsWith("/sketch");
+  const isOn = (start: Start) => {
+    if (start === "spots") {
+      return ["/spots", "/regions", "/course"].some((prefix) => pathname.startsWith(prefix));
+    }
+    return pathname.startsWith("/trips") || pathname.startsWith("/sketch");
   };
+
+  /*
+    첫 화면에는 큰 갈래가 화면 한가운데 따로 있다. 위 띠에도 두면 같은
+    단추가 두 벌이라, 첫 화면에서는 위 띠의 갈래를 접는다.
+  */
+  const home = pathname === "/";
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 sm:gap-3 sm:px-5">
+      {/* 높이를 못 박는다. 지도 첫 화면이 "화면 − 이 띠" 만큼을 채운다. */}
+      <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-5">
         <Link
           href="/"
           className="flex min-w-0 shrink items-center gap-1.5 truncate whitespace-nowrap text-[15px] font-semibold tracking-tight text-text transition hover:text-accent"
@@ -46,22 +56,25 @@ export function SiteHeader() {
           <span className="sr-only sm:hidden">나만의 여행 스케치</span>
         </Link>
 
-        <nav aria-label="주요 메뉴" className="flex items-center gap-1">
-          {TABS.map((tab) => (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              aria-current={isOn(tab.href) ? "page" : undefined}
-              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[14px] font-medium transition ${
-                isOn(tab.href)
-                  ? "bg-accent-soft text-accent"
-                  : "text-text-muted hover:bg-bg-subtle hover:text-text"
-              }`}
-            >
-              {tab.label}
-            </Link>
-          ))}
-        </nav>
+        {!home && (
+          <nav aria-label="주요 메뉴" className="flex items-center gap-1">
+            {TABS.map((tab) => (
+              <Link
+                key={tab.start}
+                href={startHref(tab.start)}
+                onClick={() => rememberStart(tab.start)}
+                aria-current={isOn(tab.start) ? "page" : undefined}
+                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[14px] font-medium transition ${
+                  isOn(tab.start)
+                    ? "bg-accent-soft text-accent"
+                    : "text-text-muted hover:bg-bg-subtle hover:text-text"
+                }`}
+              >
+                {tab.label}
+              </Link>
+            ))}
+          </nav>
+        )}
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {/*

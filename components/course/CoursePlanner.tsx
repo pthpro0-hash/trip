@@ -85,7 +85,7 @@ export function CoursePlanner() {
           </p>
           {notYetAdded.length === 0 && (
             <Link
-              href="/"
+              href="/?v=spots"
               className="mt-5 inline-block rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
             >
               여행지 둘러보기

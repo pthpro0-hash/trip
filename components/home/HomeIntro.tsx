@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { rememberStart, startHref } from "@/lib/start";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
@@ -136,7 +137,8 @@ export function HomeIntro() {
       )}
 
       <Link
-        href="/trips"
+        href={startHref("sketch")}
+        onClick={() => rememberStart("sketch")}
         className="shrink-0 rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
       >
         내 스케치 →

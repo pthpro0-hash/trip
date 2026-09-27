@@ -29,11 +29,23 @@ export const WEBP_QUALITY = 0.82;
 export const THUMB_EDGE = 960;
 export const THUMB_QUALITY = 0.8;
 
+/*
+  지도 핀에 쓸 판.
+
+  핀은 화면에서 48pt 남짓이다. 3배 화면에서 144px 이면 넉넉하다. 여기에
+  960px 판을 쓰면 핀 쉰 개에 4MB 넘게 내려받는다 — 지도를 한 번 열 때마다.
+  160px 면 한 장에 5KB 안팎이라 쉰 개가 0.3MB 다.
+*/
+export const MARKER_EDGE = 160;
+export const MARKER_QUALITY = 0.72;
+
 export interface Shrunk {
   /** 보관할 판. 긴 변 2048px. */
   full: Blob;
-  /** 목록에 쓸 판. 긴 변 480px. */
+  /** 목록에 쓸 판. 긴 변 960px. */
   thumb: Blob;
+  /** 지도 핀에 쓸 판. 긴 변 160px. */
+  marker: Blob;
 }
 
 /** 브라우저가 그림으로 풀어내지 못하는 형식. 아이폰 기본 포맷이 여기 걸린다. */
@@ -85,6 +97,26 @@ async function bake(
  * 이미 2048px 로 줄여 둔 것이라 다시 줄여도 잃을 것이 없다.
  */
 export async function thumbFromBlob(blob: Blob, name = "photo"): Promise<Blob> {
+  return bakeFromBlob(blob, THUMB_EDGE, THUMB_QUALITY, name);
+}
+
+/**
+ * 이미 보관된 그림에서 지도 핀 판을 만든다.
+ *
+ * 목록 판(960px)에서 만들면 된다. 원본(2048px, 400KB)을 다시 받을 까닭이
+ * 없다 — 160px 로 줄이는 데는 960px 로도 차고 넘치고, 내려받는 양이
+ * 다섯 배 적다.
+ */
+export async function markerFromBlob(blob: Blob, name = "photo"): Promise<Blob> {
+  return bakeFromBlob(blob, MARKER_EDGE, MARKER_QUALITY, name);
+}
+
+async function bakeFromBlob(
+  blob: Blob,
+  maxEdge: number,
+  quality: number,
+  name: string,
+): Promise<Blob> {
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(blob);
@@ -92,7 +124,7 @@ export async function thumbFromBlob(blob: Blob, name = "photo"): Promise<Blob> {
     throw new UnsupportedImageError(name);
   }
   try {
-    return await bake(bitmap, THUMB_EDGE, THUMB_QUALITY, name);
+    return await bake(bitmap, maxEdge, quality, name);
   } finally {
     bitmap.close();
   }
@@ -119,12 +151,13 @@ export async function shrinkToWebp(file: File): Promise<Shrunk> {
   try {
     const full = await bake(bitmap, MAX_EDGE, WEBP_QUALITY, file.name);
     const thumb = await bake(bitmap, THUMB_EDGE, THUMB_QUALITY, file.name);
+    const marker = await bake(bitmap, MARKER_EDGE, MARKER_QUALITY, file.name);
     /*
       캔버스를 거치면 EXIF 가 모두 사라진다. 촬영 시각과 위치는 이미 읽어
       기록에 넣었으니 잃는 것이 없고, 오히려 사진 파일 자체에서 위치가
       빠져 나중에 공유할 때 안전하다.
     */
-    return { full, thumb };
+    return { full, thumb, marker };
   } finally {
     bitmap.close();
   }

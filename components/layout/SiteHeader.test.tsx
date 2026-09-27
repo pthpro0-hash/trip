@@ -21,16 +21,28 @@ const 켜진곳 = () =>
     .map((link) => link.textContent);
 
 describe("SiteHeader", () => {
-  it("두 갈래를 늘 보여준다", async () => {
+  it("두 갈래를 보여주고, 갈래는 주소에 적힌다", async () => {
+    await 머리띠("/trips");
+    expect(screen.getByRole("link", { name: "내 스케치" })).toHaveAttribute("href", "/?v=sketch");
+    expect(screen.getByRole("link", { name: "여행 100선" })).toHaveAttribute("href", "/?v=spots");
+  });
+
+  /*
+    첫 화면에는 큰 갈래가 화면 한가운데 따로 있다. 위 띠에도 두면 같은
+    단추가 두 벌이 된다.
+  */
+  it("첫 화면에서는 위 띠의 갈래를 접는다", async () => {
     await 머리띠("/");
-    expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "내 스케치" })).toHaveAttribute("href", "/trips");
+    expect(screen.queryByRole("link", { name: "내 스케치" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "여행 100선" })).toBeNull();
+    // 도움말과 처음으로 가는 길은 남는다.
+    expect(screen.getByRole("link", { name: "도움말" })).toBeTruthy();
   });
 
   it.each([
-    ["/", "둘러보기"],
-    ["/spots/경복궁", "둘러보기"],
-    ["/regions/강원권", "둘러보기"],
+    ["/spots/경복궁", "여행 100선"],
+    ["/regions/강원권", "여행 100선"],
+    ["/course", "여행 100선"],
     ["/trips", "내 스케치"],
     ["/trips/new", "내 스케치"],
     ["/sketch", "내 스케치"],
