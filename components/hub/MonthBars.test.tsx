@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { MonthBars } from "./MonthBars";
+import { MonthBars, monthShown } from "./MonthBars";
 
 /*
   막대 위를 쓸면 기간이 골라진다. 손가락 처리는 눈으로 읽어서는 맞는지
@@ -89,5 +89,32 @@ describe("MonthBars", () => {
       <MonthBars months={months} totals={totals} range={null} onRange={() => {}} />,
     );
     expect(container.querySelector("[data-no-drag]")).toBeTruthy();
+  });
+});
+
+describe("monthShown", () => {
+  it("막대가 스무 개 남짓까지는 달마다 다 적는다", () => {
+    for (let month = 1; month <= 12; month += 1) expect(monthShown(month, 18)).toBe(true);
+  });
+
+  it("더 많으면 1·4·7·10월만", () => {
+    expect([1, 2, 3, 4, 7, 10, 12].map((m) => monthShown(m, 30))).toEqual([true, false, false, true, true, true, false]);
+  });
+
+  it("아주 많으면 1월만", () => {
+    expect(monthShown(1, 60)).toBe(true);
+    expect(monthShown(4, 60)).toBe(false);
+  });
+});
+
+describe("MonthBars · 달 숫자", () => {
+  it("막대 아래에 달 숫자가 붙고, 고른 달은 강조된다", () => {
+    const { container } = render(
+      <MonthBars months={months} totals={totals} range={["2026-01", "2026-02"]} onRange={() => {}} />,
+    );
+    const labels = [...container.querySelectorAll('[aria-hidden="true"] > span')];
+    expect(labels.map((label) => label.textContent)).toEqual(["11", "12", "1", "2", "3"]);
+    expect(labels[2].className).toContain("text-accent");
+    expect(labels[0].className).not.toContain("text-accent");
   });
 });

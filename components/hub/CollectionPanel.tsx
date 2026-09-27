@@ -27,7 +27,6 @@ interface CollectionPanelProps {
   curatedVisited: number;
   curatedTotal: number;
   onSido: (name: string, visited: boolean) => void;
-  onBack: () => void;
 }
 
 export function CollectionPanel({
@@ -36,13 +35,13 @@ export function CollectionPanel({
   curatedVisited,
   curatedTotal,
   onSido,
-  onBack,
 }: CollectionPanelProps) {
   const visited = SIDO_ORDER.filter((name) => tally.has(name)).length;
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
+      {/* 오른쪽 위는 창의 닫기 단추 자리다. */}
+      <div className="pr-10">
         <div>
           <h2 className="text-[20px] font-bold tracking-tight text-text">
             17개 시도 중 {visited}곳
@@ -51,13 +50,6 @@ export function CollectionPanel({
             {rangeText ? `${rangeText}에 밟은 곳 · ` : ""}한국관광 100선 {curatedTotal}곳 중 {curatedVisited}곳
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 rounded-full bg-bg-subtle px-3 py-1.5 text-[13px] font-medium text-text-muted transition hover:bg-line"
-        >
-          ← 목록
-        </button>
       </div>
 
       <ul className="grid grid-cols-4 gap-2">

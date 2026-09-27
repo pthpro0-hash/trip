@@ -16,8 +16,8 @@ import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 
 export type Snap = "peek" | "half" | "full";
 
-/** 살짝 올린 높이. 요약 한 줄, 달 막대, 갈림길 단추가 들어간다. */
-export const PEEK = 196;
+/** 살짝 올린 높이. 요약 한 줄, 달 막대와 달 숫자, 갈림길 단추가 들어간다. */
+export const PEEK = 212;
 /**
  * 아직 얹을 것이 없을 때의 살짝 높이. 로그인·사진 고르기 안내가 두 줄에
  * 단추까지 들어가야 한다 — 132px 로는 단추가 잘려 정작 누를 것이 안 보였다.

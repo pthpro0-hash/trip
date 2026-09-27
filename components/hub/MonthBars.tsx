@@ -72,6 +72,10 @@ export function MonthBars({ months, totals, range, onRange }: MonthBarsProps) {
 
   return (
     <div data-no-drag className="select-none">
+      {/*
+        막대와 그 아래 달 숫자가 한 덩어리다. 숫자를 눌러도 그 달이
+        골라진다 — 막대는 가늘어 손가락으로 겨누기 어렵고, 숫자가 더 크다.
+      */}
       <div
         ref={rowRef}
         role="group"
@@ -83,21 +87,38 @@ export function MonthBars({ months, totals, range, onRange }: MonthBarsProps) {
           anchor.current = null;
           setDraft(null);
         }}
-        className="flex h-9 cursor-pointer touch-none items-end gap-[2px]"
+        className="cursor-pointer touch-none"
       >
-        {months.map((month, index) => {
-          const photos = totals.get(month) ?? 0;
-          return (
-            <span
-              key={month}
-              title={`${month.replace("-", ".")} · 사진 ${photos}장`}
-              className={`min-w-[2px] flex-1 rounded-t-[2px] transition-colors ${
-                lit(index) ? "bg-accent" : photos > 0 ? "bg-line-strong" : "bg-line"
-              }`}
-              style={{ height: photos > 0 ? `${Math.max(14, (photos / most) * 100)}%` : "3px" }}
-            />
-          );
-        })}
+        <div className="flex h-9 items-end gap-[2px]">
+          {months.map((month, index) => {
+            const photos = totals.get(month) ?? 0;
+            return (
+              <span
+                key={month}
+                title={`${month.replace("-", ".")} · 사진 ${photos}장`}
+                className={`min-w-[2px] flex-1 rounded-t-[2px] transition-colors ${
+                  lit(index) ? "bg-accent" : photos > 0 ? "bg-line-strong" : "bg-line"
+                }`}
+                style={{ height: photos > 0 ? `${Math.max(14, (photos / most) * 100)}%` : "3px" }}
+              />
+            );
+          })}
+        </div>
+        <div aria-hidden="true" className="mt-0.5 flex gap-[2px]">
+          {months.map((month, index) => {
+            const number = Number(month.slice(5));
+            return (
+              <span
+                key={month}
+                className={`min-w-[2px] flex-1 text-center text-[10px] leading-3 tabular-nums ${
+                  lit(index) ? "font-semibold text-accent" : "text-text-faint"
+                }`}
+              >
+                {monthShown(number, months.length) ? number : ""}
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       <div className="relative mt-1 flex h-5 items-center">
@@ -131,4 +152,17 @@ export function MonthBars({ months, totals, range, onRange }: MonthBarsProps) {
       </div>
     </div>
   );
+}
+
+/*
+  달 숫자를 다 적을지.
+
+  막대가 스무 개 남짓까지는 한 칸에 두 자리 숫자가 들어간다. 그보다
+  많으면 1·4·7·10월만, 아주 많으면 1월만 적는다. 숫자끼리 붙어 읽히지
+  않으면 없느니만 못하다.
+*/
+export function monthShown(month: number, count: number): boolean {
+  if (count <= 20) return true;
+  if (count <= 40) return (month - 1) % 3 === 0;
+  return month === 1;
 }

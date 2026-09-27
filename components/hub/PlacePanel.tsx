@@ -21,13 +21,12 @@ import { PhotoViewer } from "@/components/trip/PhotoViewer";
 interface PlacePanelProps {
   userId: string;
   places: HubPlace[];
-  onBack: () => void;
 }
 
 /** "2026-09-14 06:11:00" → "2026.09.14" */
 const day = (stamp: string) => stamp.slice(0, 10).replaceAll("-", ".");
 
-export function PlacePanel({ userId, places, onBack }: PlacePanelProps) {
+export function PlacePanel({ userId, places }: PlacePanelProps) {
   const [photos, setPhotos] = useState<PlacePhoto[] | null>(null);
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
   const [big, setBig] = useState<Map<string, string>>(new Map());
@@ -88,7 +87,8 @@ export function PlacePanel({ userId, places, onBack }: PlacePanelProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3">
+      {/* 오른쪽 위는 창의 닫기 단추 자리다. */}
+      <div className="pr-10">
         <div className="min-w-0">
           <h2 className="truncate text-[20px] font-bold tracking-tight text-text">{title}</h2>
           <p className="mt-0.5 text-[13px] text-text-muted">
@@ -96,13 +96,6 @@ export function PlacePanel({ userId, places, onBack }: PlacePanelProps) {
             {" · "}사진 {places.reduce((sum, place) => sum + place.photoCount, 0)}장
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="shrink-0 rounded-full bg-bg-subtle px-3 py-1.5 text-[13px] font-medium text-text-muted transition hover:bg-line"
-        >
-          ← 목록
-        </button>
       </div>
 
       {photos === null && <p className="text-[14px] text-text-faint">사진을 불러오고 있어요…</p>}

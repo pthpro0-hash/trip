@@ -21,7 +21,6 @@ describe("CollectionPanel", () => {
         curatedVisited={1}
         curatedTotal={121}
         onSido={() => {}}
-        onBack={() => {}}
       />,
     );
     expect(SIDO_ORDER).toHaveLength(17);
@@ -34,7 +33,7 @@ describe("CollectionPanel", () => {
   it("밟은 곳과 안 밟은 곳을 누르면 무엇을 눌렀는지 알린다", () => {
     const onSido = vi.fn();
     render(
-      <CollectionPanel tally={tally} rangeText={null} curatedVisited={0} curatedTotal={121} onSido={onSido} onBack={() => {}} />,
+      <CollectionPanel tally={tally} rangeText={null} curatedVisited={0} curatedTotal={121} onSido={onSido} />,
     );
     fireEvent.click(screen.getByRole("button", { name: "강원 5곳 다녀옴" }));
     expect(onSido).toHaveBeenLastCalledWith("강원", true);
@@ -50,7 +49,6 @@ describe("CollectionPanel", () => {
         curatedVisited={0}
         curatedTotal={121}
         onSido={() => {}}
-        onBack={() => {}}
       />,
     );
     expect(screen.getByText(/2026.01 ~ 2026.06에 밟은 곳/)).toBeTruthy();
@@ -88,7 +86,7 @@ describe("SpotPeek", () => {
 
   it("자세히 보러 가면 이 지도로 돌아오게 적어 둔다", () => {
     window.sessionStorage.clear();
-    render(<SpotPeek spot={spot} thumbnail={undefined} onBack={() => {}} />);
+    render(<SpotPeek spot={spot} thumbnail={undefined} />);
     const link = screen.getByRole("link", { name: /자세히 보기/ });
     expect(link).toHaveAttribute("href", "/spots/gyeongbokgung");
     fireEvent.click(link);
@@ -97,7 +95,7 @@ describe("SpotPeek", () => {
 
   it("지도를 떠나지 않고 담을 수 있다", () => {
     window.localStorage.clear();
-    render(<SpotPeek spot={spot} thumbnail={undefined} onBack={() => {}} />);
+    render(<SpotPeek spot={spot} thumbnail={undefined} />);
     expect(screen.getByRole("button", { name: /경복궁 가고 싶은 곳에 담기/ })).toBeTruthy();
   });
 });

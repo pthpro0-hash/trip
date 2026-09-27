@@ -14,6 +14,7 @@ import { HubMap, type CuratedPin, type FlyTarget, type HubMapHandle, type Painte
 import { CollectionPanel } from "./CollectionPanel";
 import { EchoCard } from "./EchoCard";
 import { SpotPeek } from "./SpotPeek";
+import { HubDialog } from "./HubDialog";
 import { thumbUrls } from "@/lib/supabase/photos";
 import { useWishlist } from "@/lib/collections";
 import { MonthBars } from "./MonthBars";
@@ -362,7 +363,6 @@ export function HubView({
     setPicked(null);
     setPickedSpot(null);
     setPanel("collection");
-    if (snap === "peek") setSnap("half");
   };
 
   const toggleCurated = () => {
@@ -377,6 +377,7 @@ export function HubView({
   */
   const flyToSido = (name: string, visited: boolean) => {
     if (!sido) return;
+    backToList();
     if (visited) {
       fly(shown.filter((place) => sido.sidoOf(place) === name));
     } else {
@@ -390,14 +391,12 @@ export function HubView({
   const pickSpot = (id: string) => {
     setPicked(null);
     setPickedSpot(id);
-    if (snap === "peek") setSnap("half");
   };
 
   const pick = (targets: HubPlace[]) => {
     setPickedSpot(null);
     setPicked(targets);
     // 사진을 보려고 누른 것이다. 사진이 보일 만큼 올린다.
-    if (snap === "peek") setSnap("half");
   };
 
   const focusTrip = (trip: TripInView) => {
@@ -435,21 +434,34 @@ export function HubView({
     />
   );
 
+  /*
+    누른 것은 창으로 띄운다. 시트 속에 펼치면 반쯤 올라온 시트 아래로
+    사진이 잘려, 보려면 시트 안을 굴려야 했다. 시트는 목록만 맡는다.
+  */
+  const detail: { label: string; content: ReactNode } | null =
+    status !== "ready" || replay
+      ? null
+      : spot
+        ? { label: spot.name, content: <SpotPeek spot={spot} thumbnail={curated?.thumbnailOf(spot.id)} /> }
+        : picked && userId
+          ? { label: picked[0].placeName, content: <PlacePanel userId={userId} places={picked} /> }
+          : panel === "collection"
+            ? {
+                label: "칠한 곳",
+                content: (
+                  <CollectionPanel
+                    tally={tally}
+                    rangeText={range ? rangeLabel(range) : null}
+                    curatedVisited={curatedSeen.size}
+                    curatedTotal={121}
+                    onSido={flyToSido}
+                  />
+                ),
+              }
+            : null;
+
   const body =
-    status !== "ready" || places.length === 0 ? null : spot ? (
-      <SpotPeek spot={spot} thumbnail={curated?.thumbnailOf(spot.id)} onBack={backToList} />
-    ) : picked && userId ? (
-      <PlacePanel userId={userId} places={picked} onBack={backToList} />
-    ) : panel === "collection" ? (
-      <CollectionPanel
-        tally={tally}
-        rangeText={range ? rangeLabel(range) : null}
-        curatedVisited={curatedSeen.size}
-        curatedTotal={121}
-        onSido={flyToSido}
-        onBack={backToList}
-      />
-    ) : (
+    status !== "ready" || places.length === 0 ? null : (
       <>
         {echo && !range && !focused && (
           <EchoCard
@@ -569,6 +581,11 @@ export function HubView({
           </HubSheet>
           )}
         </>
+      )}
+      {detail && (
+        <HubDialog label={detail.label} onClose={backToList}>
+          {detail.content}
+        </HubDialog>
       )}
     </div>
   );
