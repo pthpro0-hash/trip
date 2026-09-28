@@ -23,6 +23,15 @@ function backTo(from: string | null): string {
   return from && from.startsWith("/") && !from.startsWith("//") ? from : LIST;
 }
 
+/** 돌아갈 곳의 이름. 같은 이름 모아 보기에서 왔으면 그 곳 이름. */
+export function backLabel(from: string | null): string {
+  if (from?.startsWith("/places?")) {
+    const name = new URLSearchParams(from.slice("/places?".length)).get("name");
+    if (name) return `← ${name}`;
+  }
+  return "← 내 스케치";
+}
+
 export function BackToSketches({ tripId }: { tripId: string }) {
   /*
     저장소는 브라우저에만 있다. 서버는 목록으로 그려 두고, 화면에 붙은
@@ -40,7 +49,7 @@ export function BackToSketches({ tripId }: { tripId: string }) {
       onClick={() => tripFocus.remember(tripId)}
       className="self-start text-[15px] font-medium text-accent hover:text-accent-hover"
     >
-      ← 내 스케치
+      {backLabel(from)}
     </Link>
   );
 }

@@ -18,9 +18,11 @@ import {
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { deletePhoto, setCoverPhoto, signedUrls, thumbUrls } from "@/lib/supabase/photos";
 import { deleteTrip } from "@/lib/supabase/trips";
+import { rememberPlaceName } from "@/lib/supabase/placeNames";
 import { PhotoViewer } from "./PhotoViewer";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionSuggestions } from "@/lib/companions";
+import { attachParticle } from "@/lib/korean";
 import { CompanionEditor } from "./CompanionEditor";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
@@ -37,6 +39,9 @@ function formatSpan(startedOn: string, endedOn: string) {
   if (startedOn === endedOn) return `${year}년 ${short(startedOn)}`;
   return `${year}년 ${short(startedOn)} ~ ${short(endedOn)}`;
 }
+
+/** 같은 이름으로 다녀온 때를 모아 보는 화면. */
+const placeHref = (name: string) => `/places?name=${encodeURIComponent(name)}`;
 
 function hourMinute(date: Date) {
   return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
@@ -60,6 +65,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [editingVisit, setEditingVisit] = useState<string | null>(null);
   const [visitName, setVisitName] = useState("");
   const [visitFailed, setVisitFailed] = useState(false);
+  /** 방금 고친 이름을 기억해 둔 방문. "다음부터 이 이름으로" 를 한 번 알린다. */
+  const [rememberedVisit, setRememberedVisit] = useState<string | null>(null);
   /*
     Escape 로 버리는 중인지 표시한다.
 
@@ -234,6 +241,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
     if (name.length === 0 || name === before) return;
 
     setVisitFailed(false);
+    setRememberedVisit(null);
     const ok = await saveVisitName(supabase, userId, visitId, name);
     if (!ok) {
       setVisitFailed(true);
@@ -248,6 +256,12 @@ export function TripDetail({ tripId }: { tripId: string }) {
     // 지도 서비스가 지어 준 이름을 사람이 얼마나 고치는지. 이름 짓기
     // 규칙이 맞는지 아는 유일한 신호다.
     logEvent(supabase, "trip_renamed", { place: true });
+
+    // 이 자리를 이 이름으로 기억한다. 다음에 같은 곳 사진을 가져오면 이 이름이 붙는다.
+    const visit = trip.visits.find((one) => one.id === visitId);
+    if (visit && (await rememberPlaceName(supabase, userId, visit.lat, visit.lng, name))) {
+      setRememberedVisit(visitId);
+    }
   };
 
   const submitNote = async () => {
@@ -533,21 +547,27 @@ export function TripDetail({ tripId }: { tripId: string }) {
                   />
                 ) : (
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                    {visit.spotId ? (
+                    {/*
+                      이름을 누르면 같은 이름으로 다녀온 때를 모두 모아 본다.
+                      100선이면 그 소개는 옆의 작은 링크로.
+                    */}
+                    <Link
+                      href={placeHref(visit.placeName)}
+                      className="text-[17px] font-semibold tracking-tight text-text underline decoration-line-strong underline-offset-4 hover:text-accent hover:decoration-accent"
+                    >
+                      {visit.placeName}
+                    </Link>
+                    {visit.spotId && (
                       <Link
                         href={`/spots/${visit.spotId}`}
-                        className="text-[17px] font-semibold tracking-tight text-accent hover:text-accent-hover"
+                        className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[12px] font-medium text-accent hover:text-accent-hover"
                       >
-                        {visit.placeName}
+                        100선
                       </Link>
-                    ) : (
-                      <span className="text-[17px] font-semibold tracking-tight text-text">
-                        {visit.placeName}
-                      </span>
                     )}
                     {/*
-                      100선으로 이어지는 곳은 이름 자체가 링크라, 눌러서
-                      고치게 하면 링크와 부딪힌다. 고치는 손잡이를 따로 둔다.
+                      이름 자체가 링크라, 눌러서 고치게 하면 링크와 부딪힌다.
+                      고치는 손잡이를 따로 둔다.
                     */}
                     <button
                       type="button"
@@ -564,6 +584,12 @@ export function TripDetail({ tripId }: { tripId: string }) {
                 )}
               </div>
 
+              {rememberedVisit === visit.id && (
+                <p className="pl-8 text-[13px] text-accent">
+                  다음부터 이 자리 사진은 &lsquo;{visit.placeName}&rsquo;
+                  {attachParticle(visit.placeName, "으로", "로", true).slice(visit.placeName.length)} 붙여 드려요.
+                </p>
+              )}
               <p className="pl-8 text-[13px] text-text-faint">
                 {hourMinute(visit.startedAt)}
                 {hourMinute(visit.endedAt) !== hourMinute(visit.startedAt) &&

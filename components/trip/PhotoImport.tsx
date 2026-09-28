@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { rememberedName, type PlaceMemory } from "@/lib/placeMemory";
+import { fetchPlaceNames } from "@/lib/supabase/placeNames";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
@@ -122,6 +124,8 @@ export function PhotoImport() {
     몇 초다. 그동안 화면이 그대로면 사람은 안 눌렸다고 생각하고 다시 누른다.
   */
   const [picking, setPicking] = useState(false);
+  /** 전에 고쳐 둔 곳 이름. 같은 자리면 지도 서비스의 이름보다 먼저 붙인다. */
+  const [memories, setMemories] = useState<PlaceMemory[]>([]);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -133,6 +137,8 @@ export function PhotoImport() {
       setUserId(data.user.id);
       // 같은 사진을 두 번 넣는 일이 잦다. 이미 저장한 날짜를 미리 알아 둔다.
       setSavedRanges(await fetchSavedRanges(supabase, data.user.id));
+      const remembered = await fetchPlaceNames(supabase, data.user.id);
+      if (active) setMemories(remembered);
     });
 
     return () => {
@@ -385,8 +391,17 @@ export function PhotoImport() {
     setSaving(false);
   };
 
-  const placeOf = (visit: { shots: { lat: number; lng: number }[] }) =>
-    placeCache.get(placeKey(visit.shots[0].lat, visit.shots[0].lng));
+  /*
+    이 방문의 곳. 전에 이 자리 이름을 고쳐 두었으면 그 이름이 먼저다 —
+    같은 곳을 매번 다시 고치게 하지 않는다(lib/placeMemory).
+  */
+  const placeOf = (visit: { shots: { lat: number; lng: number }[] }): PlaceAnswer | undefined => {
+    const { lat, lng } = visit.shots[0];
+    const place = placeCache.get(placeKey(lat, lng));
+    const memory = rememberedName(memories, lat, lng);
+    if (!memory) return place;
+    return { isCuratedSpot: false, spotId: null, dong: null, ...place, title: memory.name };
+  };
 
   /** 같은 이름이 연달아 나오는 방문을 합쳐, 보여주고 저장할 모양으로. */
   const shapeOf = (trip: Trip) => {
