@@ -52,8 +52,8 @@ export function SiteHeader() {
             잘린다. 잘린 이름보다 기호 하나가 낫다.
           */}
           <span aria-hidden="true">🧭</span>
-          <span className="hidden sm:inline">나만의 여행 스케치</span>
-          <span className="sr-only sm:hidden">나만의 여행 스케치</span>
+          <span className="hidden sm:inline">내 여행 스케치</span>
+          <span className="sr-only sm:hidden">내 여행 스케치</span>
         </Link>
 
         {!home && (

@@ -31,4 +31,4 @@ export type CardStats = Pick<
 >;
 
 /** 카드 맨 아래 서명. */
-export const SIGNATURE = "나만의 여행 스케치";
+export const SIGNATURE = "내 여행 스케치";
