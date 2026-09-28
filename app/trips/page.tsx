@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TripList } from "@/components/trip/TripList";
+import { StorageTidy } from "@/components/trip/StorageTidy";
 
 export const metadata: Metadata = {
   title: "내 스케치",
@@ -21,7 +22,7 @@ export default function TripsPage() {
             href="/sketch"
             className="rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
           >
-            한 장으로
+            한장 요약
           </Link>
           <Link
             href="/trips/new"
@@ -32,6 +33,7 @@ export default function TripsPage() {
         </div>
       </div>
       <TripList />
+      <StorageTidy />
     </main>
   );
 }

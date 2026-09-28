@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { forgetSignedUrls } from "@/lib/supabase/photos";
 import { writeCollections } from "@/lib/collections";
 
 interface Account {
@@ -74,6 +75,8 @@ export function AccountChip() {
     if (!supabase) return;
     setSigningOut(true);
     await supabase.auth.signOut();
+    // 받아 둔 내 사진 주소도 이 탭에서 지운다.
+    forgetSignedUrls();
 
     /*
       이 기기의 목록을 비우고 통째로 새로고침한다.

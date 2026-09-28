@@ -10,6 +10,11 @@ import {
 } from "@/lib/photo/resize";
 
 export const BUCKET = "trip-photos";
+/*
+  사진 파일은 이름이 무작위(uuid)라 한 번 올리면 바뀌지 않는다. 브라우저가
+  하루 동안 가지고 있어도 된다 — 서명 주소의 수명과 같다.
+*/
+const IMMUTABLE_CACHE = String(24 * 60 * 60);
 /**
  * 한꺼번에 망에 띄울 장 수.
  *
@@ -127,7 +132,7 @@ async function putOne(
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
-    .upload(path, shrunk.full, { contentType: "image/webp", upsert: false });
+    .upload(path, shrunk.full, { contentType: "image/webp", upsert: false, cacheControl: IMMUTABLE_CACHE });
 
   if (uploadError) return { kind: "failed" };
 
@@ -137,10 +142,10 @@ async function putOne(
   */
   await supabase.storage
     .from(BUCKET)
-    .upload(thumbPath(path), shrunk.thumb, { contentType: "image/webp", upsert: false });
+    .upload(thumbPath(path), shrunk.thumb, { contentType: "image/webp", upsert: false, cacheControl: IMMUTABLE_CACHE });
   await supabase.storage
     .from(BUCKET)
-    .upload(markerPath(path), shrunk.marker, { contentType: "image/webp", upsert: false });
+    .upload(markerPath(path), shrunk.marker, { contentType: "image/webp", upsert: false, cacheControl: IMMUTABLE_CACHE });
 
   const { error: rowError } = await supabase.from("trip_photos").insert({
     visit_id: target.visitId,
@@ -264,11 +269,60 @@ export async function uploadPhotos(
 */
 export const SIGNED_URL_SECONDS = 24 * 60 * 60;
 
+/*
+  받아 둔 서명 주소를 다시 쓴다.
+
+  서명 주소는 받을 때마다 글자가 달라진다. 브라우저는 주소가 다르면
+  같은 사진이어도 새로 내려받는다 — 목록에서 상세로 갔다 돌아오기만 해도
+  같은 사진 수십 장을 또 받았다. 내려받는 양(egress)이 무료 한도를 넘은
+  까닭이 이것이었다. 한 번 받은 주소를 이 탭이 살아 있는 동안 다시 쓰면,
+  주소가 같으니 브라우저가 가진 것을 그대로 보여 준다.
+
+  탭 저장소(sessionStorage)에 둔다. 탭을 닫으면 사라진다 — 같이 쓰는
+  기기에 내 사진 주소를 오래 남기지 않는다. 수명이 두 시간 넘게 남은
+  것만 다시 쓴다.
+*/
+const REUSE_MARGIN_MS = 2 * 60 * 60 * 1000;
+const SIGNED_STORE = "signed-urls:v1";
+let signedMemo: Map<string, { url: string; until: number }> | null = null;
+
+function memoOf(): Map<string, { url: string; until: number }> {
+  if (signedMemo) return signedMemo;
+  signedMemo = new Map();
+  try {
+    const raw = window.sessionStorage.getItem(SIGNED_STORE);
+    if (raw) for (const [path, entry] of Object.entries(JSON.parse(raw))) signedMemo.set(path, entry as { url: string; until: number });
+  } catch {
+    // 저장소를 못 쓰면 이번 화면 동안만 기억한다.
+  }
+  return signedMemo;
+}
+
+function keepMemo(memo: Map<string, { url: string; until: number }>, now: number) {
+  for (const [path, entry] of memo) if (entry.until - now <= REUSE_MARGIN_MS) memo.delete(path);
+  try {
+    window.sessionStorage.setItem(SIGNED_STORE, JSON.stringify(Object.fromEntries(memo)));
+  } catch {
+    // 가득 찼거나 막혔으면 이번 화면 동안만 기억한다.
+  }
+}
+
+/** 받아 둔 주소를 잊는다. 시험과 로그아웃에 쓴다. */
+export function forgetSignedUrls(): void {
+  signedMemo = new Map();
+  try {
+    window.sessionStorage.removeItem(SIGNED_STORE);
+  } catch {
+    // 막혔으면 할 일이 없다.
+  }
+}
+
 /**
  * 볼 수 있는 주소를 만든다.
  *
- * 버킷이 비공개라 고정 주소가 없다. 수명이 정해진 서명 주소를 그때그때
- * 받는다(SIGNED_URL_SECONDS).
+ * 버킷이 비공개라 고정 주소가 없다. 수명이 정해진 서명 주소를 받는다
+ * (SIGNED_URL_SECONDS). 기본 수명으로 받는 것은 받아 둔 것을 다시 쓴다 —
+ * 있는지 물어보려고 짧게 받는 것(missingThumbs 등)은 늘 새로 묻는다.
  */
 export async function signedUrls(
   supabase: SupabaseClient,
@@ -278,12 +332,26 @@ export async function signedUrls(
   const urls = new Map<string, string>();
   if (paths.length === 0) return urls;
 
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(paths, seconds);
+  const reuse = seconds === SIGNED_URL_SECONDS && typeof window !== "undefined";
+  const memo = reuse ? memoOf() : null;
+  const now = Date.now();
+  const wanted: string[] = [];
+  for (const path of paths) {
+    const kept = memo?.get(path);
+    if (kept && kept.until - now > REUSE_MARGIN_MS) urls.set(path, kept.url);
+    else wanted.push(path);
+  }
+  if (wanted.length === 0) return urls;
+
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(wanted, seconds);
   if (error || !data) return urls;
 
   for (const item of data) {
-    if (item.path && item.signedUrl) urls.set(item.path, item.signedUrl);
+    if (!item.path || !item.signedUrl) continue;
+    urls.set(item.path, item.signedUrl);
+    memo?.set(item.path, { url: item.signedUrl, until: now + seconds * 1000 });
   }
+  if (memo) keepMemo(memo, now);
   return urls;
 }
 

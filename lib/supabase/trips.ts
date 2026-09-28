@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { dayKey } from "@/lib/photo/grouping";
 import type { Trip } from "@/lib/photo/types";
+import { BUCKET, legacyThumbPath, markerPath, thumbPath } from "./photos";
 
 /** 저장할 때 방문마다 붙여 둔 장소 정보. */
 export interface VisitPlace {
@@ -157,13 +158,32 @@ export async function deleteTrip(
   userId: string,
   tripId: string,
 ): Promise<boolean> {
+  /*
+    사진 파일도 함께 지운다. 예전에는 기록만 지워져 파일이 보관함에
+    그대로 남았다 — 보이지 않는 채로 자리를 차지했다.
+
+    기록을 먼저 지우고 파일을 지운다(deletePhoto 와 같은 차례). 파일을
+    못 지우면 쓰지 않는 파일이 남을 뿐이고, 그것은 보관함 정리가 치운다.
+  */
+  const { data: shots } = await supabase
+    .from("trip_photos")
+    .select("storage_path,visits!inner(trip_id)")
+    .eq("user_id", userId)
+    .eq("visits.trip_id", tripId);
+
   const { error } = await supabase
     .from("trips")
     .delete()
     .eq("id", tripId)
     .eq("user_id", userId);
+  if (error) return false;
 
-  return !error;
+  const paths = (shots ?? []).map((row) => String(row.storage_path));
+  const files = paths.flatMap((path) => [path, thumbPath(path), markerPath(path), legacyThumbPath(path)]);
+  for (let start = 0; start < files.length; start += 100) {
+    await supabase.storage.from(BUCKET).remove(files.slice(start, start + 100));
+  }
+  return true;
 }
 
 /** 저장해 둔 여행을 최근 순으로. */
