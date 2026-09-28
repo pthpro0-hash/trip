@@ -3,7 +3,7 @@ import { Article, Bullets, Fill, LegalDocument } from "@/components/legal/LegalD
 
 export const metadata: Metadata = {
   title: "개인정보처리방침",
-  description: "나만의 여행 스케치이 어떤 정보를 어떻게 다루는지 알려드립니다.",
+  description: "내 여행 스케치가 어떤 정보를 어떻게 다루는지 알려드립니다.",
 };
 
 export default function PrivacyPage() {
@@ -11,8 +11,8 @@ export default function PrivacyPage() {
     <LegalDocument title="개인정보처리방침" effectiveDate="【시행일을 정해 적어주세요】">
       <Article heading="들어가며">
         <p>
-          <Fill>운영자명</Fill>(이하 &ldquo;회사&rdquo;)는 나만의 여행 스케치을 운영하면서 이용자의 개인정보를
-          소중히 다룹니다. 이 방침은 회사가 어떤 정보를 왜 모으고, 얼마나 보관하며, 이용자가 무엇을
+          박태희(이하 &ldquo;운영자&rdquo;)는 내 여행 스케치를 운영하면서 이용자의 개인정보를
+          소중히 다룹니다. 이 방침은 운영자가 어떤 정보를 왜 모으고, 얼마나 보관하며, 이용자가 무엇을
           요구할 수 있는지 알려드립니다.
         </p>
       </Article>
@@ -20,7 +20,7 @@ export default function PrivacyPage() {
       <Article heading="1. 모으는 정보">
         <p>
           <strong className="text-text">로그인하지 않고 둘러보실 때는 아무것도 모으지 않습니다.</strong>{" "}
-          담아두신 여행지는 회원가입 전까지 이용자의 브라우저에만 저장되며 회사 서버로 전송되지
+          담아두신 여행지는 회원가입 전까지 이용자의 브라우저에만 저장되며 운영자 서버로 전송되지
           않습니다.
         </p>
         <p>회원으로 가입하시면 다음을 모읍니다.</p>
@@ -34,14 +34,14 @@ export default function PrivacyPage() {
           ]}
         />
         <p>
-          비밀번호는 받지 않습니다. 로그인은 카카오·구글 등 외부 계정으로만 이루어지며, 회사는 해당
+          비밀번호는 받지 않습니다. 로그인은 카카오·구글 등 외부 계정으로만 이루어지며, 운영자는 해당
           계정의 비밀번호를 알 수 없습니다.
         </p>
       </Article>
 
       <Article heading="2. 위치정보에 관하여">
         <p>
-          회사는 다음 두 가지 경우에 위치정보를 다룹니다. 둘 다{" "}
+          운영자는 다음 두 가지 경우에 위치정보를 다룹니다. 둘 다{" "}
           <strong className="text-text">이용자가 먼저 요청하거나 직접 올릴 때만</strong> 이루어집니다.
         </p>
         <Bullets
@@ -53,12 +53,6 @@ export default function PrivacyPage() {
         <p>
           위치정보 수집에 동의하지 않으셔도 서비스의 대부분을 그대로 이용하실 수 있습니다. 브라우저
           설정에서 위치 권한을 끄시거나, 사진을 올리지 않으시면 됩니다.
-        </p>
-        <p className="rounded-xl bg-bg-subtle p-4 text-[14px]">
-          <Fill>
-            위치정보 취급에 관한 법적 절차(위치기반서비스사업 신고 등)가 필요한지 반드시 확인하고,
-            필요하다면 마친 뒤 이 문단을 정리해 주세요
-          </Fill>
         </p>
       </Article>
 
@@ -77,7 +71,7 @@ export default function PrivacyPage() {
           합니다. 고르지 않은 것(예: &ldquo;지도만&rdquo;일 때의 사진)은 베껴 두지 않으며, 함께한 사람의
           이름은 어느 범위에서도 싣지 않습니다. 검색 엔진에는 나오지 않게 합니다.
         </p>
-        <p>회사는 개인정보를 광고나 마케팅에 사용하지 않습니다.</p>
+        <p>운영자는 개인정보를 광고나 마케팅에 사용하지 않습니다.</p>
       </Article>
 
       <Article heading="4. 보관 기간">
@@ -102,7 +96,7 @@ export default function PrivacyPage() {
 
       <Article heading="5. 다른 곳에 제공하지 않습니다">
         <p>
-          회사는 이용자의 개인정보를 제3자에게 제공하지 않습니다. 다만 법령에 따라 수사기관이 적법한
+          운영자는 이용자의 개인정보를 제3자에게 제공하지 않습니다. 다만 법령에 따라 수사기관이 적법한
           절차로 요구하는 경우에는 예외입니다.
         </p>
       </Article>
@@ -119,8 +113,8 @@ export default function PrivacyPage() {
               <Fill>프로젝트 리전을 확인해 적어주세요</Fill>
             </>,
             <>
-              <strong className="text-text">Vercel</strong> — 서비스 운영과 접속 기록 · 보관 위치{" "}
-              <Fill>리전</Fill>
+              <strong className="text-text">Vercel</strong> — 서비스 운영과 접속 기록 · 처리 위치 미국
+              동부(워싱턴 D.C.)
             </>,
             <>
               <strong className="text-text">카카오 · 구글</strong> — 로그인 인증
@@ -174,10 +168,10 @@ export default function PrivacyPage() {
         <Bullets
           items={[
             <>
-              책임자 <Fill>이름</Fill>
+              책임자 박태희
             </>,
             <>
-              연락처 <Fill>이메일</Fill>
+              연락처 pthpro@naver.com
             </>,
           ]}
         />
