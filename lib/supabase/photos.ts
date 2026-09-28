@@ -15,6 +15,12 @@ export const BUCKET = "trip-photos";
   하루 동안 가지고 있어도 된다 — 서명 주소의 수명과 같다.
 */
 const IMMUTABLE_CACHE = String(24 * 60 * 60);
+/*
+  파일 이름은 늘 .webp 지만 속은 JPEG 일 수 있다 — WebP 를 굽지 못하는
+  브라우저(아이폰 사파리)에서 올린 것이다(lib/photo/resize.ts 의 encode).
+  이름은 판을 찾는 규칙에만 쓰이니 그대로 두고, 보내는 형식은 실제 것을 붙인다.
+*/
+const typeOf = (blob: Blob) => (blob.type.startsWith("image/") ? blob.type : "image/webp");
 /**
  * 한꺼번에 망에 띄울 장 수.
  *
@@ -132,7 +138,7 @@ async function putOne(
 
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
-    .upload(path, shrunk.full, { contentType: "image/webp", upsert: false, cacheControl: IMMUTABLE_CACHE });
+    .upload(path, shrunk.full, { contentType: typeOf(shrunk.full), upsert: false, cacheControl: IMMUTABLE_CACHE });
 
   if (uploadError) return { kind: "failed" };
 
@@ -142,10 +148,10 @@ async function putOne(
   */
   await supabase.storage
     .from(BUCKET)
-    .upload(thumbPath(path), shrunk.thumb, { contentType: "image/webp", upsert: false, cacheControl: IMMUTABLE_CACHE });
+    .upload(thumbPath(path), shrunk.thumb, { contentType: typeOf(shrunk.thumb), upsert: false, cacheControl: IMMUTABLE_CACHE });
   await supabase.storage
     .from(BUCKET)
-    .upload(markerPath(path), shrunk.marker, { contentType: "image/webp", upsert: false, cacheControl: IMMUTABLE_CACHE });
+    .upload(markerPath(path), shrunk.marker, { contentType: typeOf(shrunk.marker), upsert: false, cacheControl: IMMUTABLE_CACHE });
 
   const { error: rowError } = await supabase.from("trip_photos").insert({
     visit_id: target.visitId,
@@ -539,7 +545,7 @@ export async function backfillThumbs(
   const put = async (path: string, blob: Blob) => {
     const { error } = await supabase.storage
       .from(BUCKET)
-      .upload(path, blob, { contentType: "image/webp", upsert: true });
+      .upload(path, blob, { contentType: typeOf(blob), upsert: true });
     if (error) throw new Error("upload failed");
   };
 

@@ -83,11 +83,27 @@ async function bake(
   if (!context) throw new UnsupportedImageError(fileName);
   context.drawImage(bitmap, 0, 0, width, height);
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/webp", quality),
-  );
+  const blob = await encode(canvas, quality);
   if (!blob) throw new UnsupportedImageError(fileName);
   return blob;
+}
+
+const toBlob = (canvas: HTMLCanvasElement, type: string, quality: number) =>
+  new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+
+/*
+  WebP 로 굽고, 못 구우면 JPEG 로.
+
+  아이폰 사파리는 WebP 로 구워 달라는 말을 알아듣지 못하고 아무 말 없이
+  PNG 를 돌려준다. PNG 는 품질값을 모르는 무손실이라 2048px 사진 한 장이
+  4MB 를 넘는다 — WebP 의 열 배다. 사진 828장이 4GB 를 차지한 까닭이
+  이것이었다. 돌아온 것이 WebP 가 아니면 JPEG 로 다시 굽는다. JPEG 는
+  모든 브라우저가 품질값대로 굽고, WebP 보다 조금 클 뿐이다.
+*/
+export async function encode(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
+  const webp = await toBlob(canvas, "image/webp", quality);
+  if (!webp || webp.type === "image/webp") return webp;
+  return toBlob(canvas, "image/jpeg", quality);
 }
 
 /**

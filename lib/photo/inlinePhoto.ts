@@ -65,7 +65,9 @@ export async function inlinePhoto(url: string, options: InlineOptions = {}): Pro
         canvas.height,
       );
 
-      return canvas.toDataURL("image/webp", quality);
+      // 아이폰 사파리는 WebP 대신 무거운 PNG 를 준다 — 그때는 JPEG 로(lib/photo/resize.ts 의 encode).
+      const webp = canvas.toDataURL("image/webp", quality);
+      return webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/jpeg", quality);
     } finally {
       bitmap.close();
     }
