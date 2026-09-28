@@ -1,6 +1,7 @@
 import type { CardStyle } from "./cardStyle";
 import type { MonthCell, Season, Sketch, SketchDot, SketchShapes } from "./sketch";
 import type { YearStory } from "./sketchStory";
+import type { YearLayer, YearRow, YearsStory } from "./yearsStory";
 import { collagePicks } from "./collage";
 
 /*
@@ -22,8 +23,15 @@ import { collagePicks } from "./collage";
   좌표는 소수 둘째 자리(약 1km)로 뭉갠다. 전국이나 권역을 그리는 데는
   그걸로 넉넉하고, 집 앞 골목까지 알려 줄 이유는 없다.
 
+  "전체"(모든 해를 한 장에)도 같은 표에 해 번호 0 으로 적는다. 전체
+  카드에는 사진이 없어 사진까지는 고를 수 없고, 지도만이어도 곳 이름은
+  싣지 않는다 — 그 카드는 이름을 그리지 않는다.
+
   이 파일은 셈만 한다. 올리고 지우는 일은 lib/supabase/shares.ts 가 한다.
 */
+
+/** "전체" 링크의 해 번호. */
+export const ALL_YEARS = 0;
 
 export type ShareScope = "photos" | "map" | "sido";
 
@@ -33,8 +41,11 @@ export const SHARE_SCOPES: { id: ShareScope; label: string; hint: string }[] = [
   { id: "sido", label: "시도 이름만", hint: "어느 시도를 다녔는지와 숫자만. 정확한 곳과 사진은 보이지 않아요." },
 ];
 
-/** 링크에 그리는 카드. 시도 이름만일 때는 좌표가 없어 시도를 칠한 지도로 그린다. */
-export type ShareCard = CardStyle | "sido";
+/**
+ * 링크에 그리는 카드. 시도 이름만일 때는 좌표가 없어 시도를 칠한 지도로,
+ * 전체는 해마다 색을 달리한 지도(years)로 그린다.
+ */
+export type ShareCard = CardStyle | "sido" | "years";
 
 /** 사진을 가장 많이 얹는 카드(지도형)의 자리 수. SketchShowcase 와 맞춘다. */
 export const SHARE_PHOTO_LIMIT = 12;
@@ -58,11 +69,15 @@ export interface ShareDot {
   month: string;
   /** 링크 보관함 속 파일 이름. 사진을 싣지 않으면 null. */
   photo: string | null;
+  /** 전체 링크에서 이 점이 속한 해. 한 해 링크에는 없다. */
+  year?: number;
 }
 
 export interface SharePath {
   season: Season;
   points: { lat: number; lng: number }[];
+  /** 전체 링크에서 이 길이 속한 해. */
+  year?: number;
 }
 
 export interface ShareStory {
@@ -92,6 +107,8 @@ export interface ShareSnapshot {
   files: string[];
   /** 링크 미리보기 그림(og:image). 못 만들었으면 null. */
   cover: string | null;
+  /** 전체 링크의 해마다 한 줄. 숫자뿐이다. */
+  years?: YearRow[];
 }
 
 /** 약 1km. 전국·권역을 그리기에 넉넉하고, 골목까지는 알려 주지 않는다. */
@@ -248,6 +265,138 @@ export function storyOfShare(snapshot: ShareSnapshot): YearStory {
   };
 }
 
+/** 전체 링크의 스냅샷. 해마다의 숫자와, 지도만이면 해마다의 점과 길. */
+export function buildAllSnapshot(input: {
+  scope: ShareScope;
+  headline: string;
+  story: YearsStory;
+  cover: string | null;
+}): ShareSnapshot {
+  const { story } = input;
+  const withPlaces = input.scope !== "sido";
+  const { total } = story;
+  return {
+    v: 1,
+    year: ALL_YEARS,
+    scope: input.scope === "photos" ? "map" : input.scope,
+    card: input.scope === "sido" ? "sido" : "years",
+    headline: input.headline,
+    stats: {
+      tripCount: total.tripCount,
+      placeCount: total.placeCount,
+      photoCount: total.photoCount,
+      distanceKm: Math.round(total.distanceKm * 10) / 10,
+      spanDays: total.spanDays,
+      curatedCount: total.curatedCount,
+    },
+    months: [],
+    dots: withPlaces
+      ? story.layers.flatMap((layer) =>
+          layer.shapes.dots.map((dot) => ({
+            lat: blur(dot.lat),
+            lng: blur(dot.lng),
+            // 전체 카드는 곳 이름을 그리지 않는다. 쓰지 않는 것은 싣지 않는다.
+            placeName: "",
+            photoCount: dot.photoCount,
+            season: dot.season,
+            month: "",
+            photo: null,
+            year: layer.year,
+          })),
+        )
+      : [],
+    paths: withPlaces
+      ? story.layers.flatMap((layer) =>
+          layer.shapes.paths.map((path) => ({
+            season: path.season,
+            points: path.points.map((point) => ({ lat: blur(point.lat), lng: blur(point.lng) })),
+            year: layer.year,
+          })),
+        )
+      : [],
+    story: {
+      seasons: [],
+      seasonLine: null,
+      distanceWords: null,
+      sido: story.sido,
+      firstSido: null,
+      topPlace: null,
+      compare: null,
+      photos: [],
+    },
+    files: [],
+    cover: input.cover,
+    years: story.rows,
+  };
+}
+
+/** "2026년 여행 스케치" · "지금까지 여행 스케치" */
+export function shareKicker(snapshot: Pick<ShareSnapshot, "year">): string {
+  return snapshot.year === ALL_YEARS ? "지금까지 여행 스케치" : `${snapshot.year}년 여행 스케치`;
+}
+
+/** 전체 링크 스냅샷을 카드가 받는 해마다의 겹으로 되돌린다. 오래된 해부터. */
+export function layersOfShare(snapshot: ShareSnapshot): YearLayer[] {
+  const back = shapesOfShare(snapshot);
+  return (snapshot.years ?? []).map((row) => ({
+    year: row.year,
+    color: row.color,
+    shapes: {
+      dots: back.dots.filter((_, index) => snapshot.dots[index].year === row.year),
+      paths: back.paths.filter((_, index) => snapshot.paths[index].year === row.year),
+    },
+  }));
+}
+
+/*
+  링크 창이 받는 것. 한 해와 전체가 같은 창을 쓰도록, 무엇을 고를 수
+  있고 고르면 무엇이 베껴지는지를 여기서 한 모양으로 묶는다.
+*/
+export interface ShareSource {
+  /** 해 번호. 전체면 ALL_YEARS. */
+  year: number;
+  /** "2026년" · "지금까지" */
+  label: string;
+  /** "2026년 여행 스케치" — 미리보기 그림과 보내기 제목. */
+  kicker: string;
+  /** 사진까지일 때 올릴 원본 경로. */
+  photoPaths: string[];
+  /** 고를 수 없는 범위면 그 까닭. 고를 수 있으면 null. */
+  blocked: (scope: ShareScope) => string | null;
+  build: (scope: ShareScope, files: Map<string, string>, cover: string | null) => ShareSnapshot;
+}
+
+export function yearShareSource(input: Omit<SnapshotInput, "scope" | "files" | "cover">): ShareSource {
+  const photoPaths = sharePhotoPaths(input.shapes, input.story);
+  return {
+    year: input.year,
+    label: `${input.year}년`,
+    kicker: `${input.year}년 여행 스케치`,
+    photoPaths,
+    blocked: (scope) => {
+      if (scope === "photos" && photoPaths.length === 0) return "이 해에는 올린 사진이 없어요.";
+      if (scope === "sido" && input.story.sido.length === 0) return "시도를 아직 가리지 못했어요.";
+      return null;
+    },
+    build: (scope, files, cover) => buildSnapshot({ ...input, scope, files, cover }),
+  };
+}
+
+export function allShareSource(input: { headline: string; story: YearsStory }): ShareSource {
+  return {
+    year: ALL_YEARS,
+    label: "지금까지",
+    kicker: "지금까지 여행 스케치",
+    photoPaths: [],
+    blocked: (scope) => {
+      if (scope === "photos") return "전체 한 장에는 사진이 들어가지 않아요.";
+      if (scope === "sido" && input.story.sido.length === 0) return "시도를 아직 가리지 못했어요.";
+      return null;
+    },
+    build: (scope, _files, cover) => buildAllSnapshot({ scope, headline: input.headline, story: input.story, cover }),
+  };
+}
+
 /** 링크 id. 짐작해서 찾아올 수 없게 128비트를 URL 에 쓸 수 있는 글자로. */
 export function newShareId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -278,7 +427,8 @@ export function isSnapshot(value: unknown): value is ShareSnapshot {
     typeof snapshot.year === "number" &&
     typeof snapshot.headline === "string" &&
     ["photos", "map", "sido"].includes(String(snapshot.scope)) &&
-    ["map", "collage", "line", "sido"].includes(String(snapshot.card)) &&
+    ["map", "collage", "line", "sido", "years"].includes(String(snapshot.card)) &&
+    (snapshot.years === undefined || Array.isArray(snapshot.years)) &&
     Array.isArray(snapshot.dots) &&
     Array.isArray(snapshot.paths) &&
     Array.isArray(snapshot.months) &&

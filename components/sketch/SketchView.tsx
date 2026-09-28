@@ -194,7 +194,7 @@ export function SketchView() {
       )}
 
       {shown === "all" ? (
-        <AllYearsShowcase all={all} sidoOf={sidoOf} onPickYear={pick} />
+        <AllYearsShowcase all={all} sidoOf={sidoOf} onPickYear={pick} userId={userId} />
       ) : (
         <SketchShowcase
           key={shown}

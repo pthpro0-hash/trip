@@ -10,6 +10,7 @@ import { getBrowserClient } from "@/lib/supabase/client";
 import { markerUrls, thumbUrls } from "@/lib/supabase/photos";
 import { inlinePhoto, inlinePhotos } from "@/lib/photo/inlinePhoto";
 import { collagePicks } from "@/lib/collage";
+import { yearShareSource } from "@/lib/share";
 import {
   CARD_STYLES,
   keepCardStyle,
@@ -199,6 +200,10 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
   const [sharing, setSharing] = useState(false);
   // 창의 Esc 는 onClose 가 바뀔 때마다 다시 건다. 같은 함수를 넘긴다.
   const closeShare = useCallback(() => setSharing(false), []);
+  const shareSource = useMemo(
+    () => yearShareSource({ year, style, headline: sharedLine, sketch, shapes, months, story }),
+    [year, style, sharedLine, sketch, shapes, months, story],
+  );
   /** 링크 미리보기에 쓸, 이미 받아 둔 사진들. */
   const localPhotos = useMemo(() => new Map([...cardPhotos, ...collagePhotos]), [cardPhotos, collagePhotos]);
   /* 콜라주 사진을 얹는 중에 저장하면 빈 칸이 찍힌다. 다 얹을 때까지 기다린다. */
@@ -382,14 +387,9 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
       {sharing && userId && (
         <ShareDialog
           userId={userId}
-          year={year}
-          style={style}
+          source={shareSource}
           headline={sharedLine}
           ownLine={written !== undefined}
-          sketch={sketch}
-          shapes={shapes}
-          months={months}
-          story={story}
           localPhotos={localPhotos}
           onClose={closeShare}
         />

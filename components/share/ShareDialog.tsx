@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CardStyle } from "@/lib/cardStyle";
-import type { MonthCell, Sketch, SketchShapes } from "@/lib/sketch";
-import type { YearStory } from "@/lib/sketchStory";
-import { SHARE_SCOPES, buildSnapshot, sharePhotoPaths, type ShareScope } from "@/lib/share";
+import { SHARE_SCOPES, type ShareScope, type ShareSource } from "@/lib/share";
+import { attachParticle } from "@/lib/korean";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchOwnShare, publishShare, revokeShare, type OwnShare } from "@/lib/supabase/shares";
 import { markupToPngBlob } from "@/lib/svgToPng";
@@ -20,22 +18,21 @@ import { SharedCard } from "./SharedCard";
   고르는 것은 딱 하나 — 어디까지 보여 줄지. 고르면 아래 미리보기가 곧
   남이 볼 모습으로 바뀐다. 보고 나서 만든다.
 
-  한 해에 링크 하나다. 이미 만들어 두었으면 그 링크를 보여 주고, 고쳐
-  만들면 같은 링크의 내용만 바뀐다. 끊으면 그 링크는 되살아나지 않는다.
+  한 해에 링크 하나, "전체"에도 링크 하나다. 이미 만들어 두었으면 그
+  링크를 보여 주고, 고쳐 만들면 같은 링크의 내용만 바뀐다. 끊으면 그
+  링크는 되살아나지 않는다.
+
+  무엇을 고를 수 있고 고르면 무엇이 베껴지는지는 source 가 안다
+  (lib/share 의 yearShareSource · allShareSource). 창은 보여 주기만 한다.
 */
 
 interface ShareDialogProps {
   userId: string;
-  year: number;
-  style: CardStyle;
+  source: ShareSource;
   /** 싣는 한 줄. 화면이 지은 말이면 이미 이름을 뺀 것이다. */
   headline: string;
   /** 직접 적어 둔 한 줄인가. 그렇다면 그대로 실린다고 알린다. */
   ownLine?: boolean;
-  sketch: Sketch;
-  shapes: SketchShapes;
-  months: MonthCell[];
-  story: YearStory;
   /** 이미 받아 둔 사진 그림 글자(원본 경로 → data URI). 미리보기와 미리보기 그림에 쓴다. */
   localPhotos: Map<string, string>;
   onClose: () => void;
@@ -51,11 +48,12 @@ const dayOf = (iso: string) => {
 };
 
 export function ShareDialog(props: ShareDialogProps) {
-  const { userId, year, style, headline, ownLine = false, sketch, shapes, months, story, localPhotos, onClose } = props;
+  const { userId, source, headline, ownLine = false, localPhotos, onClose } = props;
+  const { year, label, kicker, photoPaths } = source;
   const [existing, setExisting] = useState<Loaded>("loading");
-  const photoPaths = useMemo(() => sharePhotoPaths(shapes, story), [shapes, story]);
-  const blocked = (scope: ShareScope) =>
-    (scope === "photos" && photoPaths.length === 0) || (scope === "sido" && story.sido.length === 0);
+  const blocked = (scope: ShareScope) => source.blocked(scope) !== null;
+  /** 고를 수 없는 범위가 있으면 그 까닭 하나. "이 해에는 올린 사진이 없어요." */
+  const blockedNote = SHARE_SCOPES.map((option) => source.blocked(option.id)).find(Boolean) ?? null;
   const [picked, setPicked] = useState<ShareScope | null>(null);
   const [working, setWorking] = useState<{ kind: "publish" | "revoke"; done: number; total: number } | null>(
     null,
@@ -78,25 +76,14 @@ export function ShareDialog(props: ShareDialogProps) {
   }, [userId, year]);
 
   const current = existing !== "loading" && existing !== "failed" ? existing : null;
-  /** 고르지 않았으면 만들어 둔 링크의 범위, 그것도 없으면 사진까지(못 고르면 지도만). */
-  const scope: ShareScope = picked ?? current?.scope ?? (blocked("photos") ? "map" : "photos");
+  /** 고르지 않았으면 만들어 둔 링크의 범위, 그것도 없으면 고를 수 있는 것 가운데 첫째. */
+  const scope: ShareScope =
+    picked ?? current?.scope ?? SHARE_SCOPES.find((option) => !blocked(option.id))?.id ?? "map";
 
   // 미리보기는 파일 이름 대신 원본 경로를 그대로 쓴다 — 그래야 받아 둔 그림 글자로 그린다.
   const draft = useMemo(
-    () =>
-      buildSnapshot({
-        year,
-        scope,
-        style,
-        headline,
-        sketch,
-        shapes,
-        months,
-        story,
-        files: new Map(photoPaths.map((path) => [path, path])),
-        cover: null,
-      }),
-    [year, scope, style, headline, sketch, shapes, months, story, photoPaths],
+    () => source.build(scope, new Map(photoPaths.map((path) => [path, path])), null),
+    [source, scope, photoPaths],
   );
 
   const publish = async () => {
@@ -112,7 +99,7 @@ export function ShareDialog(props: ShareDialogProps) {
     const cover = await markupToPngBlob(
       linkPreviewMarkup(svg, {
         background: draft.card === "line" ? "#e9e2d3" : "#eef0f3",
-        kicker: `${year}년 여행 스케치`,
+        kicker,
         headline,
       }),
       PREVIEW,
@@ -124,8 +111,7 @@ export function ShareDialog(props: ShareDialogProps) {
       existing: current,
       photoPaths: uploads,
       cover,
-      build: (files, coverName) =>
-        buildSnapshot({ year, scope, style, headline, sketch, shapes, months, story, files, cover: coverName }),
+      build: (files, coverName) => source.build(scope, files, coverName),
       onProgress: (done, total) => setWorking({ kind: "publish", done, total }),
     });
     if (!published) {
@@ -172,7 +158,7 @@ export function ShareDialog(props: ShareDialogProps) {
   const send = async () => {
     if (!current) return;
     try {
-      await navigator.share({ title: `${year}년 여행 스케치`, text: headline, url: linkOf(current.id) });
+      await navigator.share({ title: kicker, text: headline, url: linkOf(current.id) });
     } catch {
       // 공유 창을 닫은 것뿐이다.
     }
@@ -183,7 +169,7 @@ export function ShareDialog(props: ShareDialogProps) {
   const changed = current !== null && current.scope !== scope;
 
   return (
-    <HubDialog label={`${year}년 링크로 보여 주기`} onClose={onClose}>
+    <HubDialog label={`${label} 링크로 보여 주기`} onClose={onClose}>
       {working && (
         <WaitingOverlay
           title={working.kind === "revoke" ? "링크를 끊고 있어요" : "링크를 만들고 있어요"}
@@ -198,7 +184,7 @@ export function ShareDialog(props: ShareDialogProps) {
 
       <div className="flex flex-col gap-5 pr-8">
         <div>
-          <h2 className="text-[20px] font-bold tracking-tight text-text">{year}년을 링크로 보여 주기</h2>
+          <h2 className="text-[20px] font-bold tracking-tight text-text">{attachParticle(label, "을", "를")} 링크로 보여 주기</h2>
           <p className="mt-1 text-[14px] leading-relaxed text-text-muted">
             링크를 아는 사람만 볼 수 있어요. 검색에는 나오지 않고, 언제든 끊을 수 있어요.
           </p>
@@ -266,6 +252,7 @@ export function ShareDialog(props: ShareDialogProps) {
             ))}
           </div>
           <p className="text-[13px] leading-relaxed text-text-muted">
+            {blockedNote && `${blockedNote} `}
             {SHARE_SCOPES.find((option) => option.id === scope)?.hint} 함께한 사람과 날짜는 어느 쪽이든
             싣지 않아요.
           </p>

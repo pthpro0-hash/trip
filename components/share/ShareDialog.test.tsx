@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { buildSketch, monthStrip, sketchShapes, type SketchTrip } from "@/lib/sketch";
 import { yearStory } from "@/lib/sketchStory";
+import { yearsStory } from "@/lib/yearsStory";
+import { allShareSource, yearShareSource } from "@/lib/share";
 
 vi.mock("@/lib/supabase/client", () => ({ getBrowserClient: () => null }));
 const { ShareDialog } = await import("./ShareDialog");
@@ -24,13 +26,16 @@ const open = (sido = true, withPhotos = true) => {
   render(
     <ShareDialog
       userId="u1"
-      year={2026}
-      style="map"
+      source={yearShareSource({
+        year: 2026,
+        style: "map",
+        headline: "바다를 본 해",
+        sketch: buildSketch(all),
+        shapes: sketchShapes(all),
+        months: monthStrip(all),
+        story,
+      })}
       headline="바다를 본 해"
-      sketch={buildSketch(all)}
-      shapes={sketchShapes(all)}
-      months={monthStrip(all)}
-      story={story}
       localPhotos={new Map()}
       onClose={() => {}}
     />,
@@ -67,5 +72,43 @@ describe("ShareDialog", () => {
     open();
     expect(screen.getByText(/함께한 사람과 날짜는 어느 쪽이든/)).toBeTruthy();
     expect(document.body.textContent).not.toContain("민수");
+  });
+});
+
+/*
+  "전체"도 같은 창이다. 전체 카드에는 사진이 없으니 사진까지는 막히고,
+  지도로 시작한다. 제목은 "지금까지를".
+*/
+describe("ShareDialog · 전체", () => {
+  const several: SketchTrip[] = [
+    { ...trips[0], id: "a", startedOn: "2025-05-01", endedOn: "2025-05-01" },
+    { ...trips[0], id: "b", startedOn: "2026-08-13", endedOn: "2026-08-13" },
+  ];
+  const openAll = () => {
+    const story = yearsStory(several, (visit) => visit.dong?.split(" ")[0] ?? null);
+    render(
+      <ShareDialog
+        userId="u1"
+        source={allShareSource({ headline: "바다만 두 번", story })}
+        headline="바다만 두 번"
+        localPhotos={new Map()}
+        onClose={() => {}}
+      />,
+    );
+  };
+
+  it("지금까지를 링크로 — 사진까지는 막히고 지도로 시작한다", () => {
+    openAll();
+    expect(screen.getByRole("heading", { name: "지금까지를 링크로 보여 주기" })).toBeTruthy();
+    expect((screen.getByRole("radio", { name: "사진까지" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("radio", { name: "지도만" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText(/전체 한 장에는 사진이 들어가지 않아요/)).toBeTruthy();
+    expect(screen.getByRole("img", { name: /지금까지 바다만 두 번 — 2025년 1번, 2026년 1번/ })).toBeTruthy();
+  });
+
+  it("시도 이름만이면 모든 해의 시도를 칠한 카드", () => {
+    openAll();
+    fireEvent.click(screen.getByRole("radio", { name: "시도 이름만" }));
+    expect(screen.getByRole("img", { name: /밟은 시도 1곳: 강원/ })).toBeTruthy();
   });
 });

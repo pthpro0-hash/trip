@@ -124,18 +124,28 @@ export function yearsStory(all: SketchTrip[], sidoOf?: SidoOf): YearsStory {
   }
 
   const total = buildSketch(all);
-  const several = rows.length > 1;
   return {
     rows,
     layers,
     total,
     sido: [...seen],
-    spanLine:
-      rows.length === 0
-        ? ""
-        : several
-          ? `${rows.length}년 동안 ${times(total.tripCount)} 떠났어요`
-          : `${rows[0].year}년에 ${times(total.tripCount)} 떠났어요`,
+    spanLine: spanLineOf(rows, total.tripCount),
+    ...yearsHighlights(rows),
+  };
+}
+
+/** "3년 동안 열두 번 떠났어요" */
+export function spanLineOf(rows: YearRow[], tripCount: number): string {
+  if (rows.length === 0) return "";
+  return rows.length > 1
+    ? `${rows.length}년 동안 ${times(tripCount)} 떠났어요`
+    : `${rows[0].year}년에 ${times(tripCount)} 떠났어요`;
+}
+
+/** 해끼리 견준 셋. 해가 하나면 견줄 것이 없어 모두 null. 링크 페이지도 이것으로 다시 센다. */
+export function yearsHighlights(rows: YearRow[]): Pick<YearsStory, "busiest" | "mostPhotos" | "mostNew"> {
+  const several = rows.length > 1;
+  return {
     busiest: several ? topBy(rows, (row) => row.tripCount) : null,
     mostPhotos: several ? topBy(rows, (row) => row.photoCount) : null,
     mostNew: several ? topBy(rows, (row) => row.newSidoCount) : null,

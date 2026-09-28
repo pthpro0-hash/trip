@@ -5,7 +5,7 @@ import { connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchSharedSketch, publicFileUrl } from "@/lib/supabase/shares";
-import { isShareId } from "@/lib/share";
+import { isShareId, shareKicker } from "@/lib/share";
 import { SharedSketchView } from "@/components/share/SharedSketchView";
 
 /*
@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!shared) return { title: "없는 링크", robots };
 
   const { snapshot } = shared;
-  const title = `${snapshot.year}년 여행 스케치`;
+  const title = shareKicker(snapshot);
   const image = snapshot.cover ? publicFileUrl(id, snapshot.cover) : undefined;
   const description = `${snapshot.headline} — 여행 ${snapshot.stats.tripCount}번, ${snapshot.stats.placeCount}곳`;
   return {

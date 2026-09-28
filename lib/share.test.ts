@@ -2,7 +2,11 @@
 import { describe, it, expect } from "vitest";
 import { buildSketch, monthStrip, sketchShapes, type SketchTrip } from "./sketch";
 import { yearStory } from "./sketchStory";
+import { yearsStory } from "./yearsStory";
 import {
+  ALL_YEARS,
+  buildAllSnapshot,
+  layersOfShare,
   buildSnapshot,
   isShareId,
   isSnapshot,
@@ -171,5 +175,53 @@ describe("링크 id", () => {
     expect(isSnapshot({ ...valid, story: { ...valid.story, sido: "강원" } })).toBe(false);
     expect(isSnapshot({ ...valid, card: "poster" })).toBe(false);
     expect(isSnapshot({ ...valid, stats: {} })).toBe(false);
+  });
+});
+
+/*
+  "전체"도 같은 약속이다. 전체 카드는 곳 이름도 사진도 그리지 않으니
+  아예 싣지 않는다.
+*/
+describe("buildAllSnapshot", () => {
+  const several = [...trips, { ...trips[0], id: "trip-ccc", startedOn: "2025-10-01", endedOn: "2025-10-02" }];
+  const story = yearsStory(several, sidoOf);
+  const all = (scope: ShareScope) => buildAllSnapshot({ scope, headline: "바다만 세 번", story, cover: null });
+
+  for (const scope of ["map", "sido"] as const) {
+    it(`${scope}: 이름·날짜·여행 id·사진·곳 이름이 없다`, () => {
+      const text = JSON.stringify(all(scope));
+      for (const secret of ["민수", "지영", "trip-aaa", "trip-ccc", "2026-08-13", "u1/", "우도", "안목해변"]) {
+        expect(text).not.toContain(secret);
+      }
+      expect(all(scope).files).toEqual([]);
+      expect(all(scope).year).toBe(ALL_YEARS);
+    });
+  }
+
+  it("지도면 해마다의 점과 길, 해마다의 숫자", () => {
+    const shared = all("map");
+    expect(shared.card).toBe("years");
+    expect(shared.years?.map((row) => row.year)).toEqual([2025, 2026]);
+    const layers = layersOfShare(JSON.parse(JSON.stringify(shared)));
+    expect(layers.map((layer) => layer.year)).toEqual([2025, 2026]);
+    expect(layers[1].shapes.dots.length).toBe(story.layers[1].shapes.dots.length);
+    expect(layers[1].shapes.paths.length).toBe(story.layers[1].shapes.paths.length);
+  });
+
+  it("시도 이름만이면 좌표 없이 시도 카드", () => {
+    const shared = all("sido");
+    expect(shared.card).toBe("sido");
+    expect(shared.dots).toEqual([]);
+    expect(shared.paths).toEqual([]);
+    expect(shared.story.sido.sort()).toEqual(["강원", "제주"]);
+  });
+
+  it("사진까지를 달라고 해도 사진은 싣지 않는다", () => {
+    expect(all("photos").scope).toBe("map");
+    expect(all("photos").files).toEqual([]);
+  });
+
+  it("스냅샷 검사를 통과한다", () => {
+    expect(isSnapshot(JSON.parse(JSON.stringify(all("map"))))).toBe(true);
   });
 });

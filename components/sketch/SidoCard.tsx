@@ -93,13 +93,13 @@ export function SidoCard({ sketch, year, headline, sido, firstSido }: SidoCardPr
       width="100%"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label={`${year}년 ${headline} — 밟은 시도 ${names.length}곳: ${names.join(", ")}`}
+      aria-label={`${year === 0 ? "지금까지" : `${year}년`} ${headline} — 밟은 시도 ${names.length}곳: ${names.join(", ")}`}
       style={{ display: "block", borderRadius: 16 }}
     >
       <rect width={CARD_WIDTH} height={CARD_HEIGHT} fill="#ffffff" />
 
       <text x={CARD_MARGIN} y={78} fontFamily={FONT} fontSize={30} fontWeight={600} fill={MUTED}>
-        {year}년
+        {year === 0 ? "지금까지" : `${year}년`}
       </text>
       <text x={CARD_MARGIN} y={132} fontFamily={FONT} fontSize={40} fontWeight={700} fill={INK}>
         {fitText(headline, width, 40)}

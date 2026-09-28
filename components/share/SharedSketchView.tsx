@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { storyOfShare, type ShareSnapshot } from "@/lib/share";
+import { ALL_YEARS, shareKicker, storyOfShare, type ShareSnapshot } from "@/lib/share";
+import { spanLineOf, yearsHighlights } from "@/lib/yearsStory";
 import { publicFileUrl } from "@/lib/supabase/shares";
 import { StoryScenes } from "@/components/sketch/StoryScenes";
+import { YearsScenes } from "@/components/sketch/YearsScenes";
 import { SharedCard } from "./SharedCard";
 
 /*
@@ -18,21 +20,29 @@ interface SharedSketchViewProps {
 
 export function SharedSketchView({ id, snapshot }: SharedSketchViewProps) {
   const photos = new Map(snapshot.files.map((file) => [file, publicFileUrl(id, file)]));
+  const rows = snapshot.years ?? [];
+  const allYears = snapshot.year === ALL_YEARS;
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-5 px-5 pb-16 pt-8">
       <header className="flex flex-col gap-2">
-        <p className="text-[14px] font-semibold text-text-faint">{snapshot.year}년 여행 스케치</p>
+        <p className="text-[14px] font-semibold text-text-faint">{shareKicker(snapshot)}</p>
         <h1 className="text-[24px] font-bold leading-snug tracking-tight text-text md:text-[28px]">
           {snapshot.headline}
         </h1>
+        {allYears && <p className="text-[15px] text-text-muted">{spanLineOf(rows, snapshot.stats.tripCount)}</p>}
       </header>
 
       <div className="overflow-hidden rounded-2xl ring-1 ring-line">
         <SharedCard snapshot={snapshot} photos={photos} />
       </div>
 
-      <StoryScenes story={storyOfShare(snapshot)} photoUrls={photos} shared />
+      {/* 전체면 해끼리 견준 장면, 한 해면 그해 이야기. 받은 사람에게는 해를 넘겨 볼 곳이 없다. */}
+      {allYears ? (
+        <YearsScenes story={{ rows, sido: snapshot.story.sido, ...yearsHighlights(rows) }} />
+      ) : (
+        <StoryScenes story={storyOfShare(snapshot)} photoUrls={photos} shared />
+      )}
 
       {/*
         받은 사람이 "나도"라고 느끼는 자리. 이 한 장이 어떻게 만들어졌는지

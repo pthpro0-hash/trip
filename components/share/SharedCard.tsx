@@ -1,9 +1,10 @@
 import { collagePicks } from "@/lib/collage";
-import { shapesOfShare, type ShareSnapshot } from "@/lib/share";
+import { layersOfShare, shapesOfShare, type ShareSnapshot } from "@/lib/share";
 import { SketchCard } from "@/components/sketch/SketchCard";
 import { CollageCard } from "@/components/sketch/CollageCard";
 import { LineCard } from "@/components/sketch/LineCard";
 import { SidoCard } from "@/components/sketch/SidoCard";
+import { YearsCard } from "@/components/sketch/YearsCard";
 
 /*
   스냅샷 한 장을 카드로.
@@ -24,6 +25,12 @@ interface SharedCardProps {
 export function SharedCard({ snapshot, photos }: SharedCardProps) {
   const { stats, headline, year, months } = snapshot;
   const title = `${year}년`;
+
+  if (snapshot.card === "years") {
+    return (
+      <YearsCard stats={stats} headline={headline} layers={layersOfShare(snapshot)} rows={snapshot.years ?? []} />
+    );
+  }
 
   if (snapshot.card === "sido") {
     return (

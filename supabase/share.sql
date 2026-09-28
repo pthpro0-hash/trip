@@ -19,7 +19,8 @@ create table if not exists public.sketch_shares (
   -- 링크에 들어가는 무작위 글자. 짐작해서 찾아올 수 없을 만큼 길다.
   id         text        primary key check (id ~ '^[A-Za-z0-9_-]{16,64}$'),
   user_id    uuid        not null references auth.users (id) on delete cascade,
-  year       integer     not null check (year between 1900 and 2100),
+  -- 0 은 "전체"(모든 해를 한 장에).
+  year       integer     not null check (year = 0 or year between 1900 and 2100),
   scope      text        not null check (scope in ('photos', 'map', 'sido')),
   -- 한 해를 베낀 것이라 크지 않다. 터무니없이 큰 것은 받지 않는다.
   snapshot   jsonb       not null check (octet_length(snapshot::text) < 1000000),
@@ -31,7 +32,7 @@ create table if not exists public.sketch_shares (
 -- 표가 이미 있을 때도 아래 검사가 걸리게 다시 건다(create table if not
 -- exists 는 있는 표를 건드리지 않는다).
 alter table public.sketch_shares drop constraint if exists sketch_shares_year_check;
-alter table public.sketch_shares add constraint sketch_shares_year_check check (year between 1900 and 2100);
+alter table public.sketch_shares add constraint sketch_shares_year_check check (year = 0 or year between 1900 and 2100);
 alter table public.sketch_shares drop constraint if exists sketch_shares_snapshot_check;
 alter table public.sketch_shares add constraint sketch_shares_snapshot_check check (octet_length(snapshot::text) < 1000000);
 
