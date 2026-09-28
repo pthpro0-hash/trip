@@ -49,7 +49,7 @@ type Status = "loading" | "guest" | "ready" | "failed";
 interface SketchHubProps {
   /** 지도 위에 띄울 큰 갈래(내 스케치 · 여행 100선). */
   switcher: ReactNode;
-  /** 이 해를 골라 둔 채 연다. 한 장으로 보기에서 "다시 걷기"로 넘어올 때. */
+  /** 이 해를 골라 둔 채 연다. 한장 요약에서 "다시 걷기"로 넘어올 때. */
   initialYear?: string;
 }
 
@@ -188,7 +188,7 @@ export function HubView({
   const mapHandle = useRef<HubMapHandle>(null);
   /** 달 막대로 고른 기간. 지도와 목록이 이 기간만 남긴다. */
   /*
-    한 장으로 보기에서 "그해를 지도에서 다시 걷기"로 넘어오면 그해가
+    한장 요약에서 "그해를 지도에서 다시 걷기"로 넘어오면 그해가
     골라진 채로 연다. 막대에서 그해가 켜져 있고 ▶ 는 "이 기간 다시
     걷기"가 된다 — 누르기만 하면 된다.
   */
@@ -286,11 +286,15 @@ export function HubView({
 
   /*
     다시 걸을 것은 지금 고른 것이다. 여행을 골랐으면 그 여행, 기간을
-    골랐으면 그 기간, 아무것도 안 골랐으면 전부. 따로 묻지 않는다 —
-    무엇을 걷고 싶은지는 이미 화면에 골라 두었다.
+    골랐으면 그 기간. 따로 묻지 않는다 — 무엇을 걷고 싶은지는 이미
+    화면에 골라 두었다.
+
+    아무것도 안 골랐을 때 "전부 다시 걷기"가 있었지만 뺐다. 모든 여행을
+    처음부터 끝까지 걷는 것은 너무 길어 쓰이지 않았다. 고르지 않았으면
+    걷기 단추를 두지 않는다.
   */
-  const walkable = route ?? shown;
-  const walkLabel = route ? "이 여행 다시 걷기" : range ? "이 기간 다시 걷기" : "전부 다시 걷기";
+  const walkable = route ?? (range ? shown : []);
+  const walkLabel = route ? "이 여행 다시 걷기" : range ? "이 기간 다시 걷기" : null;
 
   const startWalk = () => {
     if (walkable.length === 0) return;
@@ -732,7 +736,7 @@ function SheetHeader({
           href="/sketch"
           className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
         >
-          올해의 한 장
+          한장 요약
         </Link>
       </div>
     </div>

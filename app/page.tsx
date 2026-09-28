@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { SpotsHome } from "@/components/home/SpotsHome";
 import { StartSwitch } from "@/components/home/StartSwitch";
 import { SketchHub } from "@/components/hub/SketchHub";
+import { SketchInvite } from "@/components/help/SketchInvite";
 import { START_COOKIE, startOf } from "@/lib/start";
 
 /*
@@ -24,12 +25,26 @@ export default async function HomePage({
   searchParams: Promise<{ v?: string | string[]; y?: string | string[] }>;
 }) {
   const { v, y } = await searchParams;
-  // 한 장으로 보기의 "그해를 지도에서 다시 걷기"가 해를 적어 보낸다.
+  // 한장 요약의 "그해를 지도에서 다시 걷기"가 해를 적어 보낸다.
   const year = typeof y === "string" && /^\d{4}$/.test(y) ? y : undefined;
   const start = startOf(typeof v === "string" ? v : undefined, (await cookies()).get(START_COOKIE)?.value);
 
+  /*
+    자료가 없는 사람을 내 스케치로 부르는 안내. 갈래마다 key 를 달리해,
+    100선에서 내 스케치로 넘어오면 새로 마운트되어 한 번 더 따진다.
+  */
   if (start === "sketch") {
-    return <SketchHub switcher={<StartSwitch current="sketch" floating />} initialYear={year} />;
+    return (
+      <>
+        <SketchHub switcher={<StartSwitch current="sketch" floating />} initialYear={year} />
+        <SketchInvite key="sketch" spot="sketch" />
+      </>
+    );
   }
-  return <SpotsHome switcher={<StartSwitch current="spots" />} />;
+  return (
+    <>
+      <SpotsHome switcher={<StartSwitch current="spots" />} />
+      <SketchInvite key="home" spot="home" />
+    </>
+  );
 }

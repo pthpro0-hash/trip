@@ -5,6 +5,8 @@ import { HelpDialog } from "./HelpDialog";
 import { hasSeen, markSeen } from "@/lib/seen";
 
 const KEY = "help";
+/** 사용법 창을 닫았다는 알림. 겹치지 않으려고 기다리던 창들이 듣는다. */
+export const HELP_CLOSED = "help:closed";
 
 /*
   처음 온 사람에게 한 번만 내민다.
@@ -35,6 +37,8 @@ export function FirstVisitHelp() {
       onClose={() => {
         markSeen(KEY);
         setOpen(false);
+        // 사용법을 닫기를 기다리던 안내(SketchInvite)가 이어서 뜬다.
+        window.dispatchEvent(new Event(HELP_CLOSED));
       }}
     />
   );

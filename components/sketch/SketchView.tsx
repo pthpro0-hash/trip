@@ -14,7 +14,7 @@ import { AllYearsShowcase } from "./AllYearsShowcase";
 import { Waiting } from "@/components/layout/Waiting";
 
 /*
-  한 장으로 보기 — 남에게 보여 주는 얼굴.
+  한장 요약 — 남에게 보여 주는 얼굴.
 
   예전에는 이 위에 검색·권역·해·함께 거르개가 쌓여 있었다. 찾고 거르는
   일은 이제 내 스케치 지도가 더 잘한다. 여기서는 한 해를 작품으로 보여

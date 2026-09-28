@@ -221,3 +221,16 @@ export async function fetchTrips(
       })),
   }));
 }
+
+/** 기록해 둔 여행 수. 묻지 못하면 null — 모르는 것을 0 으로 치지 않는다. */
+export async function countTrips(supabase: SupabaseClient, userId: string): Promise<number | null> {
+  try {
+    const { count, error } = await supabase
+      .from("trips")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId);
+    return error ? null : (count ?? 0);
+  } catch {
+    return null;
+  }
+}

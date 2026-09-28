@@ -182,7 +182,7 @@ export async function saveTripNote(
  * 누구와 갔는지 적는다. 비우면 지운다.
  *
  * 가져올 때는 사진 고르기에 바빠 대개 비워 둔다. 나중에 채울 수 있어야
- * 한 장으로 보기의 "누구와"가 쌓인다.
+ * 한장 요약의 "누구와"가 쌓인다.
  */
 export async function saveTripCompanions(
   supabase: SupabaseClient,

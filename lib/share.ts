@@ -5,7 +5,7 @@ import type { YearLayer, YearRow, YearsStory } from "./yearsStory";
 import { collagePicks } from "./collage";
 
 /*
-  한 장으로 보기를 링크로 보여 주기.
+  한장 요약를 링크로 보여 주기.
 
   링크를 만들 때 그 순간의 모습을 베껴 둔다(스냅샷). 남이 보는 페이지는
   이 베낀 것만 읽는다 — 여행 기록 표에는 닿지 않는다. 그래서 무엇을
