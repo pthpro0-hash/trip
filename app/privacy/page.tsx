@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Article, Bullets, Fill, LegalDocument } from "@/components/legal/LegalDocument";
+import { Article, Bullets, LegalDocument } from "@/components/legal/LegalDocument";
 
 export const metadata: Metadata = {
   title: "개인정보처리방침",
@@ -109,8 +109,8 @@ export default function PrivacyPage() {
         <Bullets
           items={[
             <>
-              <strong className="text-text">Supabase</strong> — 회원 정보와 여행 기록 보관 · 보관 위치{" "}
-              <Fill>프로젝트 리전을 확인해 적어주세요</Fill>
+              <strong className="text-text">Supabase</strong> — 회원 정보와 여행 기록·사진 보관 · 보관 위치
+              호주(시드니)
             </>,
             <>
               <strong className="text-text">Vercel</strong> — 서비스 운영과 접속 기록 · 처리 위치 미국
