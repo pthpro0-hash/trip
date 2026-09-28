@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  SIGNED_URL_SECONDS,
   backfillThumbs,
   PHOTO_LIMIT,
   UPLOAD_LANES,
@@ -492,5 +493,39 @@ describe("missingThumbs", () => {
     const supabase = fakeRows([a, b], [thumbPath(a), markerPath(a), thumbPath(b)]);
 
     expect(await missingThumbs(supabase, "나")).toEqual([b]);
+  });
+});
+
+/*
+  열어 둔 채 폰을 덮었다가 저녁에 다시 보면 사진이 다 깨져 있었다 —
+  한 시간짜리 주소가 그새 죽은 것이다. 지도·목록·한 장으로 보기가 모두
+  이 세 길로 주소를 받으므로, 셋 다 하루짜리를 받는지 못 박아 둔다.
+*/
+describe("서명 주소의 수명", () => {
+  function recording() {
+    const asked: number[] = [];
+    const client = {
+      storage: {
+        from: () => ({
+          createSignedUrls: async (paths: string[], seconds: number) => {
+            asked.push(seconds);
+            return { data: paths.map((path) => ({ path, signedUrl: `https://예시/${path}` })), error: null };
+          },
+        }),
+      },
+    } as unknown as SupabaseClient;
+    return { client, asked };
+  }
+
+  it("하루", () => {
+    expect(SIGNED_URL_SECONDS).toBe(86400);
+  });
+
+  it("목록 판·핀 판을 받을 때도 하루짜리를 받는다", async () => {
+    const { client, asked } = recording();
+    await thumbUrls(client, ["나/v1/a.webp"]);
+    await markerUrls(client, ["나/v1/a.webp"]);
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked.every((seconds) => seconds === SIGNED_URL_SECONDS)).toBe(true);
   });
 });

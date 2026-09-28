@@ -251,16 +251,29 @@ export async function uploadPhotos(
   return outcome;
 }
 
+/*
+  서명 주소의 수명. 하루.
+
+  처음엔 한 시간이었다. 그런데 지도나 한 장으로 보기를 열어 둔 채 폰을
+  덮었다가 한참 뒤 다시 보면 사진이 모두 깨져 있었다 — 주소가 그새
+  죽은 것이다. 새로 고치기 전에는 되살아나지 않는다.
+
+  하루면 "열어 두고 저녁에 다시 보기"가 된다. 대신 주소가 새어 나가면
+  하루 동안은 볼 수 있다. 주소는 긴 무작위 서명이라 짐작할 수 없고,
+  남에게 보여 줄 사진은 따로 옮겨 두는 링크 공유(shared-sketches)를 쓴다.
+*/
+export const SIGNED_URL_SECONDS = 24 * 60 * 60;
+
 /**
  * 볼 수 있는 주소를 만든다.
  *
- * 버킷이 비공개라 고정 주소가 없다. 짧게 사는 서명 주소를 그때그때 받는다 —
- * 주소가 새어 나가도 오래 쓰이지 않는다.
+ * 버킷이 비공개라 고정 주소가 없다. 수명이 정해진 서명 주소를 그때그때
+ * 받는다(SIGNED_URL_SECONDS).
  */
 export async function signedUrls(
   supabase: SupabaseClient,
   paths: string[],
-  seconds = 3600,
+  seconds = SIGNED_URL_SECONDS,
 ): Promise<Map<string, string>> {
   const urls = new Map<string, string>();
   if (paths.length === 0) return urls;
@@ -314,7 +327,7 @@ export async function visitCovers(
 export async function thumbUrls(
   supabase: SupabaseClient,
   paths: string[],
-  seconds = 3600,
+  seconds = SIGNED_URL_SECONDS,
 ): Promise<Map<string, string>> {
   if (paths.length === 0) return new Map();
 
@@ -344,7 +357,7 @@ export async function thumbUrls(
 export async function markerUrls(
   supabase: SupabaseClient,
   paths: string[],
-  seconds = 3600,
+  seconds = SIGNED_URL_SECONDS,
 ): Promise<Map<string, string>> {
   if (paths.length === 0) return new Map();
 
