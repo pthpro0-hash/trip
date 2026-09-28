@@ -67,8 +67,14 @@ interface HubMapProps {
   /** 지금 펼쳐 보고 있는 곳들. 핀에 테를 두른다. */
   pickedIds: Set<string>;
   flyTo: FlyTarget | null;
-  /** 아래에서 시트가 덮고 있는 높이. 그 밑은 화면이 아니다. */
+  /** 아래에서 시트가 덮고 있는 높이. 그 밑은 화면이 아니다. 곳들을 맞춰 넣을 때 쓴다. */
   bottomInset: number;
+  /**
+   * 목록이 셀 범위를 잴 때 뺄 아래 높이. 시트를 목록 읽으려고 올려도
+   * 목록이 비지 않게, 부르는 쪽이 시트의 가장 낮은 높이로 묶어 준다.
+   * 없으면 bottomInset.
+   */
+  viewInset?: number;
   onView: (bounds: Bounds) => void;
   onPick: (places: HubPlace[]) => void;
   /** 다녀온 시도. 멀리서 볼 때만 칠한다. */
@@ -108,6 +114,7 @@ export function HubMap({
   pickedIds,
   flyTo,
   bottomInset,
+  viewInset,
   onView,
   onPick,
   painted,
@@ -128,9 +135,10 @@ export function HubMap({
     지도의 행사(idle)는 한 번 걸어 두고 끝까지 쓴다. 그 안에서 읽는 값이
     처음 그대로 굳지 않도록, 늘 최신 값을 여기서 꺼내 쓴다.
   */
-  const latest = useRef({ places, photoUrls, pickedIds, bottomInset, onView, onPick, flyTo, curated, onPickSpot });
+  const viewBottom = viewInset ?? bottomInset;
+  const latest = useRef({ places, photoUrls, pickedIds, bottomInset, viewBottom, onView, onPick, flyTo, curated, onPickSpot });
   useEffect(() => {
-    latest.current = { places, photoUrls, pickedIds, bottomInset, onView, onPick, flyTo, curated, onPickSpot };
+    latest.current = { places, photoUrls, pickedIds, bottomInset, viewBottom, onView, onPick, flyTo, curated, onPickSpot };
   });
   const paintRef = useRef<Kakao[]>([]);
 
@@ -141,7 +149,7 @@ export function HubMap({
     if (!map || !box) return;
     const kakao: Kakao = (window as Kakao).kakao;
     const projection = map.getProjection();
-    const visibleHeight = Math.max(1, box.clientHeight - latest.current.bottomInset);
+    const visibleHeight = Math.max(1, box.clientHeight - latest.current.viewBottom);
     const sw = projection.coordsFromContainerPoint(new kakao.maps.Point(0, visibleHeight));
     const ne = projection.coordsFromContainerPoint(new kakao.maps.Point(box.clientWidth, 0));
     latest.current.onView({
@@ -358,11 +366,11 @@ export function HubMap({
      
   }, [flyTo]);
 
-  // 시트가 오르내리면 보이는 땅이 달라진다. 지도는 그대로 두고 범위만 다시 잰다.
+  // 가리는 높이가 바뀌면 보이는 땅이 달라진다. 지도는 그대로 두고 범위만 다시 잰다.
   useEffect(() => {
     reportView();
      
-  }, [bottomInset]);
+  }, [viewBottom]);
 
   /*
     다시 걷기의 자국. 고른 여행을 잇는 선(route)과 따로 둔다 — 걷는 동안

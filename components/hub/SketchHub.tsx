@@ -251,6 +251,13 @@ export function HubView({
     넓은 화면에서 시트는 옆에 서므로 0.
   */
   const inset = replay ? REPLAY_HEIGHT : wide ? 0 : (dragHeight ?? heights[snap]);
+  /*
+    목록이 셀 범위는 시트를 가장 낮게 내렸을 때 보이는 땅이다. 시트를
+    올리는 것은 목록을 읽으려는 것인데, 올린 만큼 범위를 줄이면 위쪽
+    얇은 띠만 남아 "이 화면에는 다녀온 곳이 없어요"가 떴다 — 지도에는
+    분명 핀이 보이는데. 올려도 목록은 그대로 둔다.
+  */
+  const viewInset = replay || wide ? inset : Math.min(inset, heights.peek);
 
   /*
     막대는 언제나 전체 기간을 보여 준다. 고른 기간만 남기면 막대가 줄어
@@ -517,6 +524,7 @@ export function HubView({
       pickedIds={pickedIds}
       flyTo={flyTo}
       bottomInset={inset}
+      viewInset={viewInset}
       onView={setView}
       onPick={pick}
       painted={painted}
