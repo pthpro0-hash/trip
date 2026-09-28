@@ -7,6 +7,8 @@ import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   fetchTripDetail,
+  fetchUsedCompanions,
+  saveTripCompanions,
   saveTripNote,
   saveTripSubtitle,
   saveTripTitle,
@@ -18,7 +20,8 @@ import { deletePhoto, setCoverPhoto, signedUrls, thumbUrls } from "@/lib/supabas
 import { deleteTrip } from "@/lib/supabase/trips";
 import { PhotoViewer } from "./PhotoViewer";
 import { logEvent } from "@/lib/supabase/serviceLog";
-import { companionLabel } from "@/lib/korean";
+import { companionSuggestions } from "@/lib/companions";
+import { CompanionEditor } from "./CompanionEditor";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
@@ -90,6 +93,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
     그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.
   */
   const [viewing, setViewing] = useState<number | null>(null);
+  /** 다른 여행들에 적어 둔 동행자. 나중에 채울 때 단추로 내민다. */
+  const [usedCompanions, setUsedCompanions] = useState<string[]>([]);
   const [bigUrls, setBigUrls] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
@@ -116,6 +121,10 @@ export function TripDetail({ tripId }: { tripId: string }) {
       setSubtitle(detail.subtitle ?? "");
       setNote(detail.note ?? "");
       setStatus("ready");
+
+      void fetchUsedCompanions(supabase, data.user.id).then((names) => {
+        if (active) setUsedCompanions(names);
+      });
 
       const paths = detail.visits.flatMap((visit) => visit.photos.map((p) => p.storagePath));
       if (paths.length > 0) {
@@ -199,6 +208,19 @@ export function TripDetail({ tripId }: { tripId: string }) {
     setTrip({ ...trip, subtitle: subtitle.trim() || null });
     setTitleSaved(true);
     logEvent(supabase, "trip_renamed", { subtitle: true });
+  };
+
+  const submitCompanions = async (next: string) => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId || !trip) return false;
+    const ok = await saveTripCompanions(supabase, userId, tripId, next);
+    if (!ok) return false;
+    const value = next.trim() || null;
+    setTrip({ ...trip, companions: value });
+    // 방금 적은 이름도 다음 추천에 들어가게.
+    if (value) setUsedCompanions((current) => [...current, value]);
+    logEvent(supabase, "trip_renamed", { companions: true });
+    return true;
   };
 
   const submitVisitName = async (visitId: string) => {
@@ -418,16 +440,22 @@ export function TripDetail({ tripId }: { tripId: string }) {
         />
         <p className="mt-0.5 px-0 text-[14px] text-text-faint">
           <span>{formatSpan(trip.startedOn, trip.endedOn)}</span>
-          {trip.companions && <span> · {companionLabel(trip.companions)}</span>}
           {titleSaved && <span> · 바꿨어요</span>}
         </p>
+        <div className="mt-0.5 text-[14px] text-text-faint">
+          <CompanionEditor
+            value={trip.companions}
+            suggestions={companionSuggestions(usedCompanions, trip.companions ?? "")}
+            onSave={submitCompanions}
+          />
+        </div>
         {titleFailed && (
           <p className="mt-1 text-[14px] text-text-muted">
             이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.
           </p>
         )}
         <p className="mt-1.5 text-[13px] text-text-faint">
-          제목·부제·장소 이름을 눌러 고칠 수 있어요. 비우면 원래대로 돌아가요.
+          제목·부제·동행·장소 이름을 눌러 고칠 수 있어요. 비우면 원래대로 돌아가요.
         </p>
       </div>
 

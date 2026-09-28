@@ -177,3 +177,41 @@ export async function saveTripNote(
 
   return !error;
 }
+
+/**
+ * 누구와 갔는지 적는다. 비우면 지운다.
+ *
+ * 가져올 때는 사진 고르기에 바빠 대개 비워 둔다. 나중에 채울 수 있어야
+ * 한 장으로 보기의 "누구와"가 쌓인다.
+ */
+export async function saveTripCompanions(
+  supabase: SupabaseClient,
+  userId: string,
+  tripId: string,
+  companions: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("trips")
+    .update({ companions: companions.trim() || null })
+    .eq("id", tripId)
+    .eq("user_id", userId);
+
+  return !error;
+}
+
+/** 다른 여행들에 적어 둔 동행자. 추천에 쓴다. 못 불러오면 빈 배열. */
+export async function fetchUsedCompanions(supabase: SupabaseClient, userId: string): Promise<string[]> {
+  // 추천은 곁다리다. 못 불러와도 적는 칸은 그대로 쓸 수 있어야 한다.
+  try {
+    const { data, error } = await supabase
+      .from("trips")
+      .select("companions")
+      .eq("user_id", userId)
+      .not("companions", "is", null);
+
+    if (error || !data) return [];
+    return data.map((row) => String(row.companions ?? "")).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
