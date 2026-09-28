@@ -10,6 +10,7 @@ import { visitCovers } from "@/lib/supabase/photos";
 import type { SketchTrip } from "@/lib/sketch";
 import { yearsOf, type SidoOf } from "@/lib/sketchStory";
 import { SketchShowcase } from "./SketchShowcase";
+import { AllYearsShowcase } from "./AllYearsShowcase";
 import { Waiting } from "@/components/layout/Waiting";
 
 /*
@@ -19,9 +20,9 @@ import { Waiting } from "@/components/layout/Waiting";
   일은 이제 내 스케치 지도가 더 잘한다. 여기서는 한 해를 작품으로 보여
   주는 데만 힘을 쓴다. 해를 고르는 탭 하나만 남긴다.
 
-  "지금까지 전부"는 아직 없다. 한 장에 모든 해를 담으면 해가 섞여
-  뭉개진다(lib/sketch 참고). 해마다 색을 달리해 뭉개지지 않게 만들 때
-  함께 넣는다.
+  해가 둘 이상이면 맨 앞에 "전체" 탭을 둔다. 모든 해를 한 장에 담되
+  해마다 색을 달리해 섞이지 않게 하고, 해끼리 견준다(AllYearsShowcase).
+  처음 열면 여전히 가장 최근 해다 — 보여 주고 싶은 것은 대개 올해다.
 */
 
 type Status = "loading" | "guest" | "failed" | "ready";
@@ -29,7 +30,8 @@ type Status = "loading" | "guest" | "failed" | "ready";
 export function SketchView() {
   const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
   const [trips, setTrips] = useState<SavedTrip[]>([]);
-  const [year, setYear] = useState<number | null>(null);
+  /** 고른 해. "all" 은 지금까지 전부. */
+  const [year, setYear] = useState<number | "all" | null>(null);
   /** 해마다 적어 둔 한 줄. 적지 않은 해는 없다. */
   const [written, setWritten] = useState<Map<number, string>>(new Map());
   const [userId, setUserId] = useState<string | null>(null);
@@ -106,7 +108,7 @@ export function SketchView() {
 
   const years = useMemo(() => yearsOf(all), [all]);
   /** 고르지 않았으면 가장 최근 해. 보여 주고 싶은 것은 대개 올해다. */
-  const shown = year ?? years[0] ?? null;
+  const shown = year === "all" && years.length < 2 ? years[0] ?? null : (year ?? years[0] ?? null);
 
   if (status === "loading") return <Waiting title="스케치를 그리고 있어요" />;
 
@@ -164,40 +166,46 @@ export function SketchView() {
     return true;
   };
 
+  const pick = (entry: number | "all") => {
+    setYear(entry);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <>
       {/* 해가 하나뿐이면 고를 것이 없다. 탭을 두지 않는다. */}
       {years.length > 1 && (
         <div role="tablist" aria-label="해 고르기" className="flex flex-wrap gap-1.5">
-          {years.map((entry) => (
+          {(["all", ...years] as const).map((entry) => (
             <button
               key={entry}
               type="button"
               role="tab"
               aria-selected={entry === shown}
-              onClick={() => {
-                setYear(entry);
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
+              onClick={() => pick(entry)}
               className={`rounded-full px-4 py-2 text-[15px] font-semibold tabular-nums transition ${
                 entry === shown ? "bg-text text-bg" : "bg-bg-subtle text-text-muted hover:bg-line hover:text-text"
               }`}
             >
-              {entry}
+              {entry === "all" ? "전체" : entry}
             </button>
           ))}
         </div>
       )}
 
-      <SketchShowcase
-        key={shown}
-        year={shown}
-        all={all}
-        written={written.get(shown)}
-        onWrite={write}
-        sidoOf={sidoOf}
-        userId={userId}
-      />
+      {shown === "all" ? (
+        <AllYearsShowcase all={all} sidoOf={sidoOf} onPickYear={pick} />
+      ) : (
+        <SketchShowcase
+          key={shown}
+          year={shown}
+          all={all}
+          written={written.get(shown)}
+          onWrite={write}
+          sidoOf={sidoOf}
+          userId={userId}
+        />
+      )}
     </>
   );
 }
