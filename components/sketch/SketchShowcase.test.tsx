@@ -146,7 +146,8 @@ describe("SketchShowcase · 링크의 한 줄", () => {
     );
     expect(screen.getAllByText(/민수와/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "2026년 링크로 보여 주기" }));
-    const dialog = await screen.findByRole("dialog", {}, { timeout: 3000 });
+    // 링크 창은 누를 때 받아 오는 조각이라, 시험을 한꺼번에 돌리면 몇 초 걸린다.
+    const dialog = await screen.findByRole("dialog", {}, { timeout: 15000 });
     expect(dialog.textContent).not.toContain("민수");
-  });
+  }, 20000);
 });
