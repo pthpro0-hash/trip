@@ -9,6 +9,7 @@ import { SpotGallery } from "@/components/spot/SpotGallery";
 import { VisitInfo } from "@/components/spot/VisitInfo";
 import { DirectionsLinks } from "@/components/spot/DirectionsLinks";
 import { SaveButton } from "@/components/spot/SaveButton";
+import { ShareSpotButton } from "@/components/spot/ShareSpotButton";
 import { BackToBrowse } from "@/components/spot/BackToBrowse";
 import { WeatherStrip } from "@/components/spot/WeatherStrip";
 import Link from "next/link";
@@ -101,6 +102,7 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
         <p className="text-[17px] leading-relaxed text-text-muted">{spot.summary}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <SaveButton spotId={spot.id} spotName={spot.name} variant="inline" />
+          <ShareSpotButton spotId={spot.id} spotName={spot.name} summary={spot.summary} />
           <Link
             href="/course"
             className="text-[13px] font-medium text-accent hover:text-accent-hover"
