@@ -692,6 +692,8 @@ export interface ReshrinkTarget {
 
 /** 나란히 다시 줄일 장 수. 한 장이 펼친 그림 16MB 를 잡는다. */
 const RESHRINK_LANES = 3;
+/** 실패한 것을 다시 해 보는 횟수까지 친 판 수. */
+const RESHRINK_ROUNDS = 3;
 
 /**
  * 무거운 사진을 받아 다시 줄여 같은 이름에 덮어쓴다.
@@ -707,6 +709,8 @@ export async function reshrinkPhotos(
   supabase: SupabaseClient,
   targets: ReshrinkTarget[],
   onProgress?: (done: number, total: number) => void,
+  /** 다시 하기 전에 숨 돌리는 시간. 끊긴 망이 돌아올 틈을 준다. */
+  retryDelayMs = 3000,
 ): Promise<ReshrinkOutcome> {
   const outcome: ReshrinkOutcome = { done: 0, failed: 0, skipped: 0, bytesBefore: 0, bytesAfter: 0 };
   onProgress?.(0, targets.length);
@@ -741,21 +745,33 @@ export async function reshrinkPhotos(
     outcome.bytesAfter += shrunk.full.size + shrunk.thumb.size + shrunk.marker.size;
   };
 
-  let next = 0;
-  let finished = 0;
-  const lane = async () => {
-    while (next < targets.length) {
-      const target = targets[next++];
-      try {
-        await one(target);
-      } catch {
-        // 한 장 실패했다고 나머지를 포기하지 않는다. 다음에 다시 하면 된다.
-        outcome.failed += 1;
+  /*
+    실패한 것은 모아 두었다가 다시 한다. 폰 화면이 잠깐 꺼지거나 망이
+    끊기면 그동안 뜬 것이 한꺼번에 실패한다 — 그대로 끝내면 사용자가
+    살펴보기와 다시 줄이기를 몇 번이고 되풀이해야 했다.
+  */
+  let pending = targets;
+  for (let round = 0; round < RESHRINK_ROUNDS && pending.length > 0; round += 1) {
+    if (round > 0) await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    const failed: ReshrinkTarget[] = [];
+    let next = 0;
+    const lane = async () => {
+      while (next < pending.length) {
+        const target = pending[next++];
+        try {
+          await one(target);
+          // 끝낸 것만 센다. 실패한 것은 다시 해서 끝낼 때 센다.
+          onProgress?.(outcome.done + outcome.skipped, targets.length);
+        } catch {
+          // 한 장 실패했다고 나머지를 멈추지 않는다. 이 판이 끝나면 다시 한다.
+          failed.push(target);
+        }
       }
-      onProgress?.(++finished, targets.length);
-    }
-  };
-  await Promise.all(Array.from({ length: RESHRINK_LANES }, lane));
+    };
+    await Promise.all(Array.from({ length: RESHRINK_LANES }, lane));
+    pending = failed;
+  }
+  outcome.failed = pending.length;
 
   return outcome;
 }

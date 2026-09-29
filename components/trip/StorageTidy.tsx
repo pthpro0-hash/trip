@@ -68,10 +68,20 @@ export function StorageTidy() {
     if (!supabase || !report) return;
     const title = "사진을 다시 줄이고 있어요";
     setPhase({ kind: "working", title, detail: "화면을 끄거나 닫지 마세요" });
-    const outcome = await reshrinkPhotos(supabase, report.heavy, (done, total) =>
-      setPhase({ kind: "working", title, detail: `${done} / ${total} · 화면을 끄거나 닫지 마세요` }),
-    );
-    setPhase({ kind: "reshrunk", outcome });
+    /*
+      폰은 한동안 손대지 않으면 화면이 꺼지고, 꺼지면 이 일도 멈춘다.
+      359장 가운데 101장만 하고 멈춘 적이 있다. 하는 동안 화면을 켜 둔다.
+      못 켜 두는 브라우저면 그냥 한다.
+    */
+    const awake = await navigator.wakeLock?.request("screen").catch(() => null);
+    try {
+      const outcome = await reshrinkPhotos(supabase, report.heavy, (done, total) =>
+        setPhase({ kind: "working", title, detail: `${done} / ${total} · 화면을 끄거나 닫지 마세요` }),
+      );
+      setPhase({ kind: "reshrunk", outcome });
+    } finally {
+      await awake?.release().catch(() => undefined);
+    }
     setReport(null);
   };
 

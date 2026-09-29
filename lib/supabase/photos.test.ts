@@ -536,7 +536,9 @@ describe("서명 주소의 수명", () => {
 describe("reshrinkPhotos · 무거운 사진 다시 줄이기", () => {
   const bytes = (n: number, type = "image/webp") => new Blob([new Uint8Array(n)], { type });
 
-  function fake(options: { failUploadOf?: string } = {}) {
+  /** failUploadOf 경로의 올리기가 failTimes 번 실패한다. 주지 않으면 늘 실패. */
+  function fake(options: { failUploadOf?: string; failTimes?: number } = {}) {
+    let failuresLeft = options.failTimes ?? Infinity;
     const state = { uploaded: [] as { path: string; type: string; upsert: boolean }[] };
     const supabase = {
       storage: {
@@ -546,7 +548,10 @@ describe("reshrinkPhotos · 무거운 사진 다시 줄이기", () => {
             error: null,
           }),
           upload: async (path: string, _blob: Blob, opts: { contentType: string; upsert: boolean }) => {
-            if (path === options.failUploadOf) return { error: { message: "nope" } };
+            if (path === options.failUploadOf && failuresLeft > 0) {
+              failuresLeft -= 1;
+              return { error: { message: "nope" } };
+            }
             state.uploaded.push({ path, type: opts.contentType, upsert: opts.upsert });
             return { error: null };
           },
@@ -584,10 +589,26 @@ describe("reshrinkPhotos · 무거운 사진 다시 줄이기", () => {
     expect(outcome.skipped).toBe(1);
   });
 
-  it("한 장이 실패해도 나머지는 한다", async () => {
+  /*
+    폰 화면이 잠깐 꺼지거나 망이 끊기면 그동안 뜬 것이 한꺼번에 실패한다.
+    그대로 끝내면 살펴보기와 다시 줄이기를 몇 번이고 되풀이해야 했다.
+  */
+  it("잠깐 실패한 것은 같은 판 안에서 다시 해 끝낸다", async () => {
+    const { supabase, state } = fake({ failUploadOf: "나/v1/b.webp", failTimes: 2 });
+    const paths = ["a", "b", "c"].map((name) => ({ path: `나/v1/${name}.webp`, bytes: 4600 }));
+    const progress: number[] = [];
+    const outcome = await reshrinkPhotos(supabase, paths, (done) => progress.push(done), 0);
+
+    expect(outcome.done).toBe(3);
+    expect(outcome.failed).toBe(0);
+    expect(state.uploaded.map((u) => u.path)).toContain("나/v1/b.webp");
+    expect(progress.at(-1)).toBe(3);
+  });
+
+  it("끝내 실패하는 것만 못 한 것으로 남기고 나머지는 한다", async () => {
     const { supabase, state } = fake({ failUploadOf: "나/v1/b.webp" });
     const paths = ["a", "b", "c", "d", "e"].map((name) => ({ path: `나/v1/${name}.webp`, bytes: 4600 }));
-    const outcome = await reshrinkPhotos(supabase, paths);
+    const outcome = await reshrinkPhotos(supabase, paths, undefined, 0);
 
     expect(outcome.done).toBe(4);
     expect(outcome.failed).toBe(1);
