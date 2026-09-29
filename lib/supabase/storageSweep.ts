@@ -31,7 +31,18 @@ export interface StorageReport {
   orphanBytes: number;
   /** 기록에 있는 사진 수. */
   photoCount: number;
+  /** 보관본이 무거운 사진. 경로는 보관본, 크기는 세 판을 더한 것. */
+  heavy: StoredFile[];
+  heavyBytes: number;
 }
+
+/*
+  보관본이 이보다 크면 무겁다.
+
+  제대로 줄인 보관본은 WebP 300~500KB, JPEG 로 구워도 1MB 안쪽이다.
+  아이폰 사파리가 PNG 로 굳힌 것은 4MB 안팎이라 한참 위에 있다.
+*/
+export const HEAVY_BYTES = 1.5 * 1024 * 1024;
 
 /** 보관함 파일을 기록과 맞춰 본다. 파일 목록만 보고 셈한다 — 시험하기 쉽게. */
 export function classifyFiles(files: StoredFile[], photoPaths: string[]): StorageReport {
@@ -46,21 +57,36 @@ export function classifyFiles(files: StoredFile[], photoPaths: string[]): Storag
     thumb: { count: 0, bytes: 0 },
     marker: { count: 0, bytes: 0 },
   };
+  const ownerOf = new Map<string, string>();
+  for (const path of photoPaths) {
+    ownerOf.set(thumbPath(path), path);
+    ownerOf.set(markerPath(path), path);
+  }
   const orphans: StoredFile[] = [];
+  const fullBytes = new Map<string, number>();
+  const photoBytes = new Map<string, number>();
   for (const file of files) {
     const kind = kindOf.get(file.path);
     if (kind) {
       used[kind].count += 1;
       used[kind].bytes += file.bytes;
+      const owner = kind === "full" ? file.path : ownerOf.get(file.path)!;
+      photoBytes.set(owner, (photoBytes.get(owner) ?? 0) + file.bytes);
+      if (kind === "full") fullBytes.set(file.path, file.bytes);
     } else {
       orphans.push(file);
     }
   }
+  const heavy = [...fullBytes]
+    .filter(([, bytes]) => bytes > HEAVY_BYTES)
+    .map(([path]) => ({ path, bytes: photoBytes.get(path) ?? 0 }));
   return {
     used,
     orphans,
     orphanBytes: orphans.reduce((sum, file) => sum + file.bytes, 0),
     photoCount: photoPaths.length,
+    heavy,
+    heavyBytes: heavy.reduce((sum, file) => sum + file.bytes, 0),
   };
 }
 

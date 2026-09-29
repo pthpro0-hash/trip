@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   MARKER_EDGE,
   markerFromBlob,
+  reshrink,
   shrinkToWebp,
   THUMB_EDGE,
   thumbFromBlob,
@@ -670,4 +671,91 @@ export async function setCoverPhoto(
     .eq("user_id", userId);
 
   return !error;
+}
+
+export interface ReshrinkOutcome {
+  done: number;
+  failed: number;
+  /** 다시 구워도 가벼워지지 않아 그대로 둔 수. */
+  skipped: number;
+  /** 다시 줄이기 전과 뒤, 보관본·목록 판·핀 판을 모두 더한 크기. 줄인 것만 센다. */
+  bytesBefore: number;
+  bytesAfter: number;
+}
+
+/** 다시 줄일 한 장. 지금 보관된 크기를 함께 받아 줄었는지 견준다. */
+export interface ReshrinkTarget {
+  path: string;
+  /** 보관본·목록 판·핀 판을 더한 지금 크기. */
+  bytes: number;
+}
+
+/** 나란히 다시 줄일 장 수. 한 장이 펼친 그림 16MB 를 잡는다. */
+const RESHRINK_LANES = 3;
+
+/**
+ * 무거운 사진을 받아 다시 줄여 같은 이름에 덮어쓴다.
+ *
+ * 이름이 그대로라 표를 고칠 것이 없다. 덮어쓰기는 파일 하나씩 통째로
+ * 바뀌므로, 중간에 끊겨도 보관본은 옛것이든 새것이든 온전하다. 다시
+ * 살펴보면 아직 무거운 것만 남으니 그대로 이어서 하면 된다.
+ *
+ * 다시 구운 보관본이 지금보다 크면 건드리지 않는다 — 가볍게 하려는
+ * 일이 무겁게 만들면 안 된다.
+ */
+export async function reshrinkPhotos(
+  supabase: SupabaseClient,
+  targets: ReshrinkTarget[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<ReshrinkOutcome> {
+  const outcome: ReshrinkOutcome = { done: 0, failed: 0, skipped: 0, bytesBefore: 0, bytesAfter: 0 };
+  onProgress?.(0, targets.length);
+
+  const put = async (path: string, blob: Blob) => {
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, blob, { contentType: typeOf(blob), upsert: true, cacheControl: IMMUTABLE_CACHE });
+    if (error) throw new Error("upload failed");
+  };
+
+  const one = async ({ path, bytes }: ReshrinkTarget) => {
+    const url = (await signedUrls(supabase, [path], 120)).get(path);
+    if (!url) throw new Error("no url");
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("fetch failed");
+    const original = await response.blob();
+
+    const shrunk = await reshrink(original, path);
+    if (shrunk.full.size >= original.size) {
+      outcome.skipped += 1;
+      return;
+    }
+
+    // 작은 판부터. 보관본이 마지막이라, 끊기면 다음에 다시 무거운 것으로 잡힌다.
+    await put(markerPath(path), shrunk.marker);
+    await put(thumbPath(path), shrunk.thumb);
+    await put(path, shrunk.full);
+
+    outcome.done += 1;
+    outcome.bytesBefore += bytes;
+    outcome.bytesAfter += shrunk.full.size + shrunk.thumb.size + shrunk.marker.size;
+  };
+
+  let next = 0;
+  let finished = 0;
+  const lane = async () => {
+    while (next < targets.length) {
+      const target = targets[next++];
+      try {
+        await one(target);
+      } catch {
+        // 한 장 실패했다고 나머지를 포기하지 않는다. 다음에 다시 하면 된다.
+        outcome.failed += 1;
+      }
+      onProgress?.(++finished, targets.length);
+    }
+  };
+  await Promise.all(Array.from({ length: RESHRINK_LANES }, lane));
+
+  return outcome;
 }

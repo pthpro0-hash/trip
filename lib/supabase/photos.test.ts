@@ -10,6 +10,7 @@ import {
   markerPath,
   markerUrls,
   missingThumbs,
+  reshrinkPhotos,
   thumbPath,
   thumbUrls,
   uploadPhotos,
@@ -31,7 +32,9 @@ vi.mock("@/lib/photo/resize", async (importOriginal) => ({
   // node 에는 createImageBitmap 이 없다. 줄이는 일 자체는 여기서 볼 것이 아니다.
   thumbFromBlob: async () => new Blob(["t"]),
   markerFromBlob: async () => new Blob(["m"]),
+  reshrink: (blob: Blob) => reshrinkMock(blob),
 }));
+const reshrinkMock = vi.fn<(blob: Blob) => Promise<{ full: Blob; thumb: Blob; marker: Blob }>>();
 
 function target(name: string): UploadTarget {
   return {
@@ -527,5 +530,69 @@ describe("서명 주소의 수명", () => {
     await markerUrls(client, ["나/v1/a.webp"]);
     expect(asked.length).toBeGreaterThan(0);
     expect(asked.every((seconds) => seconds === SIGNED_URL_SECONDS)).toBe(true);
+  });
+});
+
+describe("reshrinkPhotos · 무거운 사진 다시 줄이기", () => {
+  const bytes = (n: number, type = "image/webp") => new Blob([new Uint8Array(n)], { type });
+
+  function fake(options: { failUploadOf?: string } = {}) {
+    const state = { uploaded: [] as { path: string; type: string; upsert: boolean }[] };
+    const supabase = {
+      storage: {
+        from: () => ({
+          createSignedUrls: async (paths: string[]) => ({
+            data: paths.map((path) => ({ path, signedUrl: `https://예시/${path}` })),
+            error: null,
+          }),
+          upload: async (path: string, _blob: Blob, opts: { contentType: string; upsert: boolean }) => {
+            if (path === options.failUploadOf) return { error: { message: "nope" } };
+            state.uploaded.push({ path, type: opts.contentType, upsert: opts.upsert });
+            return { error: null };
+          },
+        }),
+      },
+    } as unknown as SupabaseClient;
+    vi.stubGlobal("fetch", async () => ({ ok: true, blob: async () => bytes(4000, "image/webp") }));
+    return { supabase, state };
+  }
+
+  beforeEach(() => {
+    reshrinkMock.mockReset();
+    reshrinkMock.mockResolvedValue({
+      full: bytes(400, "image/jpeg"),
+      thumb: bytes(80, "image/jpeg"),
+      marker: bytes(8, "image/jpeg"),
+    });
+  });
+
+  it("세 판을 같은 이름에 덮어쓰고, 보관본은 맨 끝에 — 끊기면 다음에 다시 잡히게", async () => {
+    const { supabase, state } = fake();
+    const outcome = await reshrinkPhotos(supabase, [{ path: "나/v1/a.webp", bytes: 4600 }]);
+
+    expect(state.uploaded.map((u) => u.path)).toEqual([markerPath("나/v1/a.webp"), thumbPath("나/v1/a.webp"), "나/v1/a.webp"]);
+    expect(state.uploaded.every((u) => u.upsert && u.type === "image/jpeg")).toBe(true);
+    expect(outcome).toEqual({ done: 1, failed: 0, skipped: 0, bytesBefore: 4600, bytesAfter: 488 });
+  });
+
+  it("다시 구운 것이 더 무거우면 건드리지 않는다", async () => {
+    reshrinkMock.mockResolvedValue({ full: bytes(5000), thumb: bytes(80), marker: bytes(8) });
+    const { supabase, state } = fake();
+    const outcome = await reshrinkPhotos(supabase, [{ path: "나/v1/a.webp", bytes: 4600 }]);
+
+    expect(state.uploaded).toEqual([]);
+    expect(outcome.skipped).toBe(1);
+  });
+
+  it("한 장이 실패해도 나머지는 한다", async () => {
+    const { supabase, state } = fake({ failUploadOf: "나/v1/b.webp" });
+    const paths = ["a", "b", "c", "d", "e"].map((name) => ({ path: `나/v1/${name}.webp`, bytes: 4600 }));
+    const outcome = await reshrinkPhotos(supabase, paths);
+
+    expect(outcome.done).toBe(4);
+    expect(outcome.failed).toBe(1);
+    expect(state.uploaded.filter((u) => !u.path.includes(".t")).map((u) => u.path).sort()).toEqual(
+      ["나/v1/a.webp", "나/v1/c.webp", "나/v1/d.webp", "나/v1/e.webp"],
+    );
   });
 });

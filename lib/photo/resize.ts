@@ -156,18 +156,33 @@ async function bakeFromBlob(
  * 사진이 눕지 않는다.
  */
 export async function shrinkToWebp(file: File): Promise<Shrunk> {
+  return shrink(file, file.name);
+}
+
+/**
+ * 이미 보관된 한 장을 세 판으로 다시 굽는다.
+ *
+ * 아이폰 사파리에서 올라가 PNG 로 굳은 사진을 가볍게 되돌리는 데 쓴다.
+ * 크기는 이미 2048px 이라 줄지 않고, 무손실 PNG 를 손실 압축으로 바꾸는
+ * 것뿐이라 눈에 띄는 차이가 없다.
+ */
+export async function reshrink(blob: Blob, name = "photo"): Promise<Shrunk> {
+  return shrink(blob, name);
+}
+
+async function shrink(source: Blob, name: string): Promise<Shrunk> {
   let bitmap: ImageBitmap;
   try {
-    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    bitmap = await createImageBitmap(source, { imageOrientation: "from-image" });
   } catch {
     // HEIC 처럼 브라우저가 풀지 못하는 형식이 여기로 온다.
-    throw new UnsupportedImageError(file.name);
+    throw new UnsupportedImageError(name);
   }
 
   try {
-    const full = await bake(bitmap, MAX_EDGE, WEBP_QUALITY, file.name);
-    const thumb = await bake(bitmap, THUMB_EDGE, THUMB_QUALITY, file.name);
-    const marker = await bake(bitmap, MARKER_EDGE, MARKER_QUALITY, file.name);
+    const full = await bake(bitmap, MAX_EDGE, WEBP_QUALITY, name);
+    const thumb = await bake(bitmap, THUMB_EDGE, THUMB_QUALITY, name);
+    const marker = await bake(bitmap, MARKER_EDGE, MARKER_QUALITY, name);
     /*
       캔버스를 거치면 EXIF 가 모두 사라진다. 촬영 시각과 위치는 이미 읽어
       기록에 넣었으니 잃는 것이 없고, 오히려 사진 파일 자체에서 위치가
