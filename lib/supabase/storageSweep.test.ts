@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { classifyFiles, HEAVY_BYTES, scanStorage, sweepOrphans } from "./storageSweep";
+import { classifyFiles, HEAVY_BYTES, scanStorage, sweepOrphans, worthReshrinking } from "./storageSweep";
 import { FULL_BUDGET } from "@/lib/photo/resize";
 
 /*
@@ -112,6 +112,31 @@ describe("classifyFiles · 무거운 사진", () => {
 
   it("기준은 보관본 상한보다 넉넉히 위 — 제대로 구운 것을 또 줄이지 않게", () => {
     expect(HEAVY_BYTES).toBeGreaterThan(FULL_BUDGET * 1.2);
+  });
+});
+
+/*
+  자잘한 사진은 가장 낮은 품질로도 800KB 를 넘어 늘 "무거운 사진"으로
+  남는다. 줄여 봐야 얼마 안 되면 권하지 않는다.
+*/
+describe("worthReshrinking", () => {
+  const MB = 1024 * 1024;
+  const heavy = (n: number, eachMb: number) => ({
+    heavy: Array.from({ length: n }, (_, i) => ({ path: `u/v1/${i}.webp`, bytes: eachMb * MB })),
+    heavyBytes: n * eachMb * MB,
+  });
+
+  it("더 줄지 않는 자잘한 사진 몇 장은 권하지 않는다", () => {
+    expect(worthReshrinking(heavy(23, 25 / 23))).toBe(false);
+  });
+
+  it("PNG 로 굳은 사진처럼 크게 줄 것은 권한다", () => {
+    expect(worthReshrinking(heavy(20, 6))).toBe(true);
+    expect(worthReshrinking(heavy(359, 517 / 359))).toBe(true);
+  });
+
+  it("무거운 사진이 없으면 권하지 않는다", () => {
+    expect(worthReshrinking(heavy(0, 0))).toBe(false);
   });
 });
 

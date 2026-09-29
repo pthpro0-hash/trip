@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/client";
-import { scanStorage, sweepOrphans, type StorageReport } from "@/lib/supabase/storageSweep";
+import {
+  RESHRUNK_BYTES,
+  scanStorage,
+  sweepOrphans,
+  worthReshrinking,
+  type StorageReport,
+} from "@/lib/supabase/storageSweep";
 import { reshrinkPhotos, type ReshrinkOutcome } from "@/lib/supabase/photos";
 import { WaitingOverlay } from "@/components/layout/Waiting";
 
@@ -24,8 +30,22 @@ type Phase =
   | { kind: "done"; removed: number }
   | { kind: "reshrunk"; outcome: ReshrinkOutcome };
 
-/** 다시 줄인 한 장(세 판)의 어림. WebP 로 굽는 브라우저 기준. */
-const RESHRUNK_BYTES = 0.5 * 1024 * 1024;
+const count = (value: number) => value.toLocaleString("ko-KR");
+
+/** 다시 줄이기를 마친 뒤 한 줄. 줄인 것, 줄일 수 없어 둔 것, 못 한 것을 차례로. */
+export function reshrunkMessage(outcome: ReshrinkOutcome): string {
+  const parts: string[] = [];
+  if (outcome.done > 0) {
+    parts.push(
+      `사진 ${count(outcome.done)}장을 다시 줄였어요(${mb(outcome.bytesBefore)} → ${mb(outcome.bytesAfter)}).`,
+    );
+  }
+  if (outcome.skipped > 0) parts.push(`${count(outcome.skipped)}장은 더 줄일 수 없어 그대로 뒀어요.`);
+  if (outcome.failed > 0) {
+    parts.push(`${count(outcome.failed)}장은 못 했어요 — 보관함 살펴보기를 다시 누르면 남은 것만 이어서 할 수 있어요.`);
+  }
+  return parts.length > 0 ? parts.join(" ") : "다시 줄인 사진이 없어요.";
+}
 
 export function StorageTidy() {
   const [report, setReport] = useState<StorageReport | null>(null);
@@ -115,13 +135,7 @@ export function StorageTidy() {
         </p>
       )}
       {phase.kind === "reshrunk" && (
-        <p className="text-[14px] font-medium text-accent">
-          {phase.outcome.done > 0
-            ? `사진 ${phase.outcome.done.toLocaleString("ko-KR")}장을 다시 줄였어요. ${mb(phase.outcome.bytesBefore)} → ${mb(phase.outcome.bytesAfter)}`
-            : "다시 줄인 사진이 없어요."}
-          {phase.outcome.failed > 0 &&
-            ` ${phase.outcome.failed.toLocaleString("ko-KR")}장은 못 했어요 — 보관함 살펴보기를 다시 누르면 남은 것만 이어서 할 수 있어요.`}
-        </p>
+        <p className="text-[14px] font-medium text-accent">{reshrunkMessage(phase.outcome)}</p>
       )}
       {failed && <p className="text-[14px] text-text-muted">{failed}</p>}
 
@@ -136,7 +150,7 @@ export function StorageTidy() {
               {mb(report.used.marker.bytes)}
             </li>
           </ul>
-          {report.heavy.length > 0 && (
+          {worthReshrinking(report) && (
             <div className="flex flex-col gap-2 rounded-xl bg-surface p-4 ring-1 ring-line">
               <p className="text-[14px] text-text">
                 무겁게 보관된 사진 <strong>{report.heavy.length.toLocaleString("ko-KR")}장</strong>(

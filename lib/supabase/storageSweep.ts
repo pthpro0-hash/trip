@@ -46,6 +46,28 @@ export interface StorageReport {
 */
 export const HEAVY_BYTES = 800 * 1024;
 
+/** 다시 줄인 한 장(세 판)의 어림. WebP 로 굽는 브라우저 기준. */
+export const RESHRUNK_BYTES = 0.5 * 1024 * 1024;
+
+/*
+  이만큼도 가벼워지지 않을 것이면 다시 줄이자고 권하지 않는다.
+
+  숲이나 나뭇잎처럼 자잘한 사진은 가장 낮은 품질로 구워도 보관본이
+  800KB 를 넘는다. 이런 사진 23장(25MB)이 남아, 살펴볼 때마다 "무겁게
+  보관된 사진"이 떴다. 눌러도 거의 줄지 않는 일을 권하지 않는다.
+*/
+export const WORTH_RESHRINKING_BYTES = 50 * 1024 * 1024;
+
+/** 무거운 사진을 다시 줄이면 가벼워질 어림. */
+export function reshrinkSavings(report: Pick<StorageReport, "heavy" | "heavyBytes">): number {
+  return Math.max(0, report.heavyBytes - report.heavy.length * RESHRUNK_BYTES);
+}
+
+/** 다시 줄이자고 권할 만한가. */
+export function worthReshrinking(report: Pick<StorageReport, "heavy" | "heavyBytes">): boolean {
+  return reshrinkSavings(report) >= WORTH_RESHRINKING_BYTES;
+}
+
 /** 보관함 파일을 기록과 맞춰 본다. 파일 목록만 보고 셈한다 — 시험하기 쉽게. */
 export function classifyFiles(files: StoredFile[], photoPaths: string[]): StorageReport {
   const kindOf = new Map<string, FileKind>();
