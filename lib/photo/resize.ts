@@ -12,6 +12,21 @@ export const MAX_EDGE = 2048;
 export const WEBP_QUALITY = 0.82;
 
 /*
+  한 판의 크기 상한.
+
+  품질값만으로는 크기가 정해지지 않는다. 크롬 WebP 는 0.82 에 보관본
+  410KB 남짓인데, 같은 사진을 다른 브라우저가 JPEG 로 구우면 두 배가
+  넘게 나왔다(사진 643장을 다시 줄였더니 한 장에 세 판 합쳐 1.3MB).
+  그래서 상한을 넘으면 품질을 한 단계씩 내려 다시 굽는다. 크롬에서는
+  거의 모두 첫 번에 들어온다.
+*/
+export const FULL_BUDGET = 600 * 1024;
+export const THUMB_BUDGET = 150 * 1024;
+/** 이보다 품질을 내리면 눈에 띈다. 여기서도 넘으면 그대로 쓴다. */
+const MIN_QUALITY = 0.5;
+const QUALITY_STEP = 0.08;
+
+/*
   목록에 쓸 판.
 
   2048px 짜리 400KB 를 48px 자리에 내려받는 것은 스무 배쯤 낭비다.
@@ -73,6 +88,7 @@ async function bake(
   maxEdge: number,
   quality: number,
   fileName: string,
+  budget = Infinity,
 ): Promise<Blob> {
   const { width, height } = targetSize(bitmap.width, bitmap.height, maxEdge);
   const canvas = document.createElement("canvas");
@@ -83,8 +99,21 @@ async function bake(
   if (!context) throw new UnsupportedImageError(fileName);
   context.drawImage(bitmap, 0, 0, width, height);
 
-  const blob = await encode(canvas, quality);
+  const blob = await encodeWithin(canvas, quality, budget);
   if (!blob) throw new UnsupportedImageError(fileName);
+  return blob;
+}
+
+/** 상한 안에 들 때까지 품질을 내려 가며 굽는다. */
+export async function encodeWithin(
+  canvas: HTMLCanvasElement,
+  quality: number,
+  budget: number,
+): Promise<Blob | null> {
+  let blob = await encode(canvas, quality);
+  for (let q = quality - QUALITY_STEP; blob && blob.size > budget && q >= MIN_QUALITY - 1e-9; q -= QUALITY_STEP) {
+    blob = await encode(canvas, q);
+  }
   return blob;
 }
 
@@ -113,7 +142,7 @@ export async function encode(canvas: HTMLCanvasElement, quality: number): Promis
  * 이미 2048px 로 줄여 둔 것이라 다시 줄여도 잃을 것이 없다.
  */
 export async function thumbFromBlob(blob: Blob, name = "photo"): Promise<Blob> {
-  return bakeFromBlob(blob, THUMB_EDGE, THUMB_QUALITY, name);
+  return bakeFromBlob(blob, THUMB_EDGE, THUMB_QUALITY, name, THUMB_BUDGET);
 }
 
 /**
@@ -132,6 +161,7 @@ async function bakeFromBlob(
   maxEdge: number,
   quality: number,
   name: string,
+  budget = Infinity,
 ): Promise<Blob> {
   let bitmap: ImageBitmap;
   try {
@@ -140,7 +170,7 @@ async function bakeFromBlob(
     throw new UnsupportedImageError(name);
   }
   try {
-    return await bake(bitmap, maxEdge, quality, name);
+    return await bake(bitmap, maxEdge, quality, name, budget);
   } finally {
     bitmap.close();
   }
@@ -180,8 +210,8 @@ async function shrink(source: Blob, name: string): Promise<Shrunk> {
   }
 
   try {
-    const full = await bake(bitmap, MAX_EDGE, WEBP_QUALITY, name);
-    const thumb = await bake(bitmap, THUMB_EDGE, THUMB_QUALITY, name);
+    const full = await bake(bitmap, MAX_EDGE, WEBP_QUALITY, name, FULL_BUDGET);
+    const thumb = await bake(bitmap, THUMB_EDGE, THUMB_QUALITY, name, THUMB_BUDGET);
     const marker = await bake(bitmap, MARKER_EDGE, MARKER_QUALITY, name);
     /*
       캔버스를 거치면 EXIF 가 모두 사라진다. 촬영 시각과 위치는 이미 읽어

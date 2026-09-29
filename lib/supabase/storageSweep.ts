@@ -39,10 +39,12 @@ export interface StorageReport {
 /*
   보관본이 이보다 크면 무겁다.
 
-  제대로 줄인 보관본은 WebP 300~500KB, JPEG 로 구워도 1MB 안쪽이다.
-  아이폰 사파리가 PNG 로 굳힌 것은 4MB 안팎이라 한참 위에 있다.
+  보관본은 이제 600KB 상한 안에 굽는다(lib/photo/resize.ts 의 FULL_BUDGET).
+  처음엔 아이폰 사파리가 PNG 로 굳힌 4MB 짜리만 잡으려고 1.5MB 로 두었는데,
+  그것을 다시 줄인 것도 다른 브라우저의 JPEG 라 1MB 안팎이었다. 상한보다
+  넉넉히 위를 기준으로 삼아, 상한 없이 구워진 것을 모두 잡는다.
 */
-export const HEAVY_BYTES = 1.5 * 1024 * 1024;
+export const HEAVY_BYTES = 800 * 1024;
 
 /** 보관함 파일을 기록과 맞춰 본다. 파일 목록만 보고 셈한다 — 시험하기 쉽게. */
 export function classifyFiles(files: StoredFile[], photoPaths: string[]): StorageReport {

@@ -130,7 +130,7 @@ export function StorageTidy() {
             <div className="flex flex-col gap-2 rounded-xl bg-surface p-4 ring-1 ring-line">
               <p className="text-[14px] text-text">
                 무겁게 보관된 사진 <strong>{report.heavy.length.toLocaleString("ko-KR")}장</strong>(
-                {mb(report.heavyBytes)})이 있어요. 아이폰에서 올릴 때 덜 줄여진 것이에요. 다시 줄이면 약{" "}
+                {mb(report.heavyBytes)})이 있어요. 덜 줄여진 채로 보관된 것이에요. 다시 줄이면 약{" "}
                 {mb(report.heavy.length * RESHRUNK_BYTES)}로 가벼워지고, 사진과 기록은 그대로예요.
               </p>
               <p className="text-[13px] leading-relaxed text-text-muted">

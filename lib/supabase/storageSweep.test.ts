@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyFiles, HEAVY_BYTES, scanStorage, sweepOrphans } from "./storageSweep";
+import { FULL_BUDGET } from "@/lib/photo/resize";
 
 /*
   표는 한 번에 1,000줄까지만 준다. 그대로 받으면 나머지 사진의 파일이
@@ -109,8 +110,8 @@ describe("classifyFiles · 무거운 사진", () => {
     expect(report.heavyBytes).toBe(4 * MB + MB / 2 + 1000);
   });
 
-  it("기준은 제대로 줄인 보관본보다 넉넉히 위", () => {
-    expect(HEAVY_BYTES).toBeGreaterThan(1024 * 1024);
+  it("기준은 보관본 상한보다 넉넉히 위 — 제대로 구운 것을 또 줄이지 않게", () => {
+    expect(HEAVY_BYTES).toBeGreaterThan(FULL_BUDGET * 1.2);
   });
 });
 
