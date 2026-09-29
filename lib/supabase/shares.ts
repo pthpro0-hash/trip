@@ -100,7 +100,7 @@ async function listFolder(supabase: SupabaseClient, id: string): Promise<string[
 }
 
 /** 폴더에서 keep 에 없는 것을 모두 지운다. 다 지웠으면 true. */
-async function sweepFolder(supabase: SupabaseClient, id: string, keep: Set<string>): Promise<boolean> {
+export async function sweepFolder(supabase: SupabaseClient, id: string, keep: Set<string>): Promise<boolean> {
   const names = await listFolder(supabase, id);
   if (names === null) return false;
   const stale = names.filter((name) => !keep.has(name));

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { dayKey } from "@/lib/photo/grouping";
 import type { Trip } from "@/lib/photo/types";
 import { BUCKET, legacyThumbPath, markerPath, thumbPath } from "./photos";
+import { fetchOwnTripShare, revokeTripShare } from "./tripShares";
 
 /** 저장할 때 방문마다 붙여 둔 장소 정보. */
 export interface VisitPlace {
@@ -165,6 +166,16 @@ export async function deleteTrip(
     기록을 먼저 지우고 파일을 지운다(deletePhoto 와 같은 차례). 파일을
     못 지우면 쓰지 않는 파일이 남을 뿐이고, 그것은 보관함 정리가 치운다.
   */
+  /*
+    링크로 보여 주던 여행이면 링크부터 끊는다. 링크의 사진은 공개 보관함에
+    있고, 여행을 지우면 링크 줄도 함께 사라져 주인임을 밝힐 길이 없어진다 —
+    그러면 그 사진이 주소를 아는 사람에게 영영 보인다. 링크를 못 끊었거나
+    있는지 확인하지 못했으면 여행도 지우지 않는다.
+  */
+  const share = await fetchOwnTripShare(supabase, userId, tripId);
+  if (share === "failed") return false;
+  if (share && !(await revokeTripShare(supabase, share))) return false;
+
   const { data: shots } = await supabase
     .from("trip_photos")
     .select("storage_path,visits!inner(trip_id)")

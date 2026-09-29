@@ -19,6 +19,7 @@ vi.mock("@/lib/supabase/client", () => ({
 }));
 
 vi.mock("@/components/course/CourseMap", () => ({ CourseMap: () => null }));
+vi.mock("@/components/share/TripShareDialog", () => ({ TripShareDialog: () => <p>링크 창이 열렸어요</p> }));
 
 vi.mock("@/lib/supabase/photos", () => ({
   thumbUrls: async (_c: unknown, paths: string[]) =>
@@ -402,5 +403,13 @@ describe("여행 통째로 지우기", () => {
 
     expect(await screen.findByText(/지우지 못했어요/)).toBeTruthy();
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("TripDetail 링크 공유", () => {
+  it("여행 상세에도 링크 공유가 있고, 누르면 링크 창이 열린다", async () => {
+    await 상세();
+    fireEvent.click(await screen.findByRole("button", { name: "링크 공유" }));
+    expect(await screen.findByText("링크 창이 열렸어요")).toBeTruthy();
   });
 });

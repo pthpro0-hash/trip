@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -27,6 +28,12 @@ import { CompanionEditor } from "./CompanionEditor";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
+
+/* 링크 창은 누를 때만 받는다. */
+const TripShareDialog = dynamic(
+  () => import("@/components/share/TripShareDialog").then((module) => module.TripShareDialog),
+  { ssr: false },
+);
 
 type Status = "loading" | "guest" | "missing" | "ready";
 
@@ -95,6 +102,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [confirmingTrip, setConfirmingTrip] = useState(false);
   const [removingTrip, setRemovingTrip] = useState(false);
   const [tripError, setTripError] = useState(false);
+  const [sharing, setSharing] = useState(false);
   /*
     크게 보고 있는 사진. 목록에는 작은 판을 쓰지만 여기서는 보관본을
     그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.
@@ -401,6 +409,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
         다른 데를 누르면 절반만 지워진 기록이 남는다.
       */}
       {removingTrip && <WaitingOverlay title="여행을 지우고 있어요" />}
+      {sharing && userId && <TripShareDialog userId={userId} trip={trip} onClose={() => setSharing(false)} />}
       {removingPhoto && <WaitingOverlay title="사진을 지우고 있어요" />}
 
       <div>
@@ -478,6 +487,15 @@ export function TripDetail({ tripId }: { tripId: string }) {
         끝에서 지우기를 만나면 손이 미끄러진다.
       */}
       <div className="flex flex-wrap items-center gap-3">
+        {userId && (
+          <button
+            type="button"
+            onClick={() => setSharing(true)}
+            className="self-start rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-accent transition hover:bg-line"
+          >
+            링크 공유
+          </button>
+        )}
         <button
           type="button"
           onClick={() => (confirmingTrip ? void removeTrip() : setConfirmingTrip(true))}
