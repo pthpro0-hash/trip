@@ -113,8 +113,8 @@ export default function PrivacyPage() {
               호주(시드니)
             </>,
             <>
-              <strong className="text-text">Vercel</strong> — 서비스 운영과 접속 기록 · 처리 위치 미국
-              동부(워싱턴 D.C.)
+              <strong className="text-text">Vercel</strong> — 서비스 운영과 접속 기록 · 처리 위치 호주
+              (시드니), 접속 기록 일부는 미국에 보관될 수 있음
             </>,
             <>
               <strong className="text-text">카카오 · 구글</strong> — 로그인 인증
