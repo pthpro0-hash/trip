@@ -188,9 +188,8 @@ export function HubView({
   const mapHandle = useRef<HubMapHandle>(null);
   /** 달 막대로 고른 기간. 지도와 목록이 이 기간만 남긴다. */
   /*
-    한장 요약에서 "그해를 지도에서 다시 걷기"로 넘어오면 그해가
-    골라진 채로 연다. 막대에서 그해가 켜져 있고 ▶ 는 "이 기간 다시
-    걷기"가 된다 — 누르기만 하면 된다.
+    한장 요약에서 "그해를 지도에서 보기"로 넘어오면 그해가 골라진 채로
+    연다. 막대에서 그해가 켜져 있다.
   */
   const [range, setRange] = useState<MonthRange | null>(() =>
     initialYear ? yearRange(monthSpan(places), initialYear) : null,
@@ -292,16 +291,15 @@ export function HubView({
   const shownPhotos = shown.reduce((sum, place) => sum + place.photoCount, 0);
 
   /*
-    다시 걸을 것은 지금 고른 것이다. 여행을 골랐으면 그 여행, 기간을
-    골랐으면 그 기간. 따로 묻지 않는다 — 무엇을 걷고 싶은지는 이미
-    화면에 골라 두었다.
+    다시 걸을 것은 지금 고른 여행이다. 따로 묻지 않는다 — 무엇을 걷고
+    싶은지는 이미 화면에 골라 두었다.
 
-    아무것도 안 골랐을 때 "전부 다시 걷기"가 있었지만 뺐다. 모든 여행을
-    처음부터 끝까지 걷는 것은 너무 길어 쓰이지 않았다. 고르지 않았으면
-    걷기 단추를 두지 않는다.
+    "전부 다시 걷기"와 "이 기간 다시 걷기"는 뺐다. 여러 여행을 이어
+    걷는 것은 너무 길어 쓰이지 않았다. 여행을 고르지 않았으면 걷기
+    단추를 두지 않는다.
   */
-  const walkable = route ?? (range ? shown : []);
-  const walkLabel = route ? "이 여행 다시 걷기" : range ? "이 기간 다시 걷기" : null;
+  const walkable = route ?? [];
+  const walkLabel = route ? "이 여행 다시 걷기" : null;
 
   const startWalk = () => {
     if (walkable.length === 0) return;

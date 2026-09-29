@@ -46,7 +46,7 @@ describe("StoryScenes", () => {
 
   it("장면을 차례로 그린다", () => {
     render(<StoryScenes story={full} photoUrls={new Map()} />);
-    for (const label of ["2026년의 나", "사진을 가장 많이 남긴 곳", "계절", "밟은 시도 2곳", "그해의 사진", "2025년과 견주면", "누구와", "다시 걷기"]) {
+    for (const label of ["2026년의 나", "사진을 가장 많이 남긴 곳", "계절", "밟은 시도 2곳", "그해의 사진", "2025년과 견주면", "누구와", "지도에서 보기"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
   });
@@ -59,9 +59,9 @@ describe("StoryScenes", () => {
     expect(screen.getByText("제주를 처음 밟았어요")).toBeTruthy();
   });
 
-  it("그해를 지도에서 다시 걷는 길을 낸다", () => {
+  it("그해를 지도에서 보는 길을 낸다", () => {
     render(<StoryScenes story={full} photoUrls={new Map()} />);
-    expect(screen.getByRole("link", { name: /2026년을 지도에서 다시 걷기/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /2026년을 지도에서 보기/ })).toHaveAttribute(
       "href",
       "/?v=sketch&y=2026",
     );
