@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { CollectionSync } from "@/components/auth/CollectionSync";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { BottomNav, BottomNavSpace } from "@/components/layout/BottomNav";
 import { FirstVisitHelp } from "@/components/help/FirstVisitHelp";
 import "./globals.css";
 
@@ -41,7 +42,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen bg-bg text-text antialiased">
         <SiteHeader />
-        {children}
+        {/* 폰에서는 아래에 탭이 있다. 내용이 그 밑에 가리지 않게 자리를 비워 둔다. */}
+        <BottomNavSpace>{children}</BottomNavSpace>
+        <BottomNav />
         {/* 처음 온 사람에게 한 번만, 이 서비스가 무엇을 해 주는지 말해 준다. */}
         <FirstVisitHelp />
         {/* 이 기기의 목록과 계정의 목록을 이어 준다. 그리는 것은 없다. */}

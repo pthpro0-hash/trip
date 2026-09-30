@@ -21,6 +21,7 @@ import {
 } from "@/lib/photo/grouping";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { rememberStartIfUnset } from "@/lib/start";
+import { MAP_HREF } from "@/lib/nav";
 import { remainingText } from "@/lib/photo/eta";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
@@ -664,7 +665,7 @@ export function PhotoImport() {
               보관할 수 있는 사진 수를 넘어 {outcome.overLimit}장은 올리지 못했어요.
             </p>
           )}
-          <Link href="/trips" className="self-start font-medium underline underline-offset-2">
+          <Link href={MAP_HREF} className="self-start font-medium underline underline-offset-2">
             내 여행 보기 →
           </Link>
         </div>

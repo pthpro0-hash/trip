@@ -1,29 +1,32 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { LIST_HREF } from "@/lib/nav";
 
-vi.mock("@/components/trip/TripList", () => ({ TripList: () => null }));
-vi.mock("@/components/trip/StorageTidy", () => ({ StorageTidy: () => null }));
-const { default: TripsPage, metadata } = await import("./page");
+const redirect = vi.hoisted(() =>
+  vi.fn<(to: string) => never>(() => {
+    // next/navigation 의 redirect 는 던져서 그리기를 멈춘다.
+    throw new Error("NEXT_REDIRECT");
+  }),
+);
+vi.mock("next/navigation", () => ({ redirect }));
+const { default: TripsPage } = await import("./page");
 
 /*
-  같은 이름을 서로 다른 화면에 붙이면 사람은 자기가 어디 있는지 모른다. 위 띠의
-  "내 여행"은 지도로 가는 갈래이고, 이 화면은 그 안의 목록이다 — 이름을 나눈다.
+  /trips 는 예전에 따로 선 목록 화면이었다. 지금 목록은 내 여행 화면의 한 모습이다
+  (/?v=sketch&view=list). 북마크나 옛 링크로 들어온 사람을 그리로 넘긴다 — 이 화면이
+  남아 있으면 "내 스케치"가 두 화면에 붙던 혼란이 되살아난다.
 */
-describe("/trips · 여행 목록", () => {
-  it("이 화면의 이름은 '여행 목록' — 위 띠의 '내 여행'(지도)과 겹치지 않는다", () => {
-    render(<TripsPage />);
-    expect(screen.getByRole("heading", { level: 1, name: "여행 목록" })).toBeTruthy();
-    expect(metadata.title).toBe("여행 목록");
+describe("/trips · 옛 주소", () => {
+  beforeEach(() => {
+    // 화살표로 그대로 돌려주면 vitest 가 그것을 뒷정리 함수로 불러 버린다.
+    redirect.mockClear();
   });
 
-  it("사진을 넣는 길은 어디서나 같은 말이다 — '+ 사진 고르기'", () => {
-    render(<TripsPage />);
-    expect(screen.getByRole("link", { name: "+ 사진 고르기" })).toHaveAttribute("href", "/trips/new");
-    expect(screen.queryByText(/사진등록/)).toBeNull();
+  it("내 여행 목록 모습으로 넘긴다", () => {
+    expect(() => TripsPage()).toThrow("NEXT_REDIRECT");
+    expect(redirect).toHaveBeenCalledWith(LIST_HREF);
   });
 
-  it("한장 요약으로 가는 길이 있다", () => {
-    render(<TripsPage />);
-    expect(screen.getByRole("link", { name: "한장 요약" })).toHaveAttribute("href", "/sketch");
+  it("넘기는 곳은 내 여행 한 화면의 view=list 다", () => {
+    expect(LIST_HREF).toBe("/?v=sketch&view=list");
   });
 });

@@ -101,3 +101,25 @@ describe("HomePage", { timeout: 20000 }, () => {
     }
   });
 });
+
+/*
+  폰에는 아래에 하단 탭(내 여행 · 한장 · 사진 고르기 · 여행 100선)이 있다. 첫 화면 한가운데의
+  큰 갈래 스위치와 아래 구석에 떠 있던 "사진 고르기" 단추는 폰에서 그것과 같은 일을 하므로
+  접는다. 넓은 화면에는 하단 탭이 없어 그대로다.
+*/
+describe("HomePage · 폰의 하단 탭과 겹치는 것", { timeout: 20000 }, () => {
+  it("큰 갈래 스위치는 폰에서 접는다", () => {
+    render(<HomePage switcher={<span>갈래 스위치</span>} />);
+    expect(screen.getByText("갈래 스위치").parentElement!.className).toContain("max-sm:hidden");
+  });
+
+  it("떠 있는 '사진 고르기' 단추는 폰에서 접고, 이름은 어디서나 같다", () => {
+    render(<HomePage />);
+    const floating = screen
+      .getAllByRole("link", { name: /사진 고르기/ })
+      .find((link) => link.className.includes("fixed"))!;
+    expect(floating).toHaveAttribute("href", "/trips/new");
+    expect(floating.className).toContain("max-sm:hidden");
+    expect(screen.queryByText(/여행 스케치 그리기/)).toBeNull();
+  });
+});

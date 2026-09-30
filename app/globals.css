@@ -27,6 +27,20 @@
 
 :root {
   color-scheme: light dark;
+
+  /*
+    폰 하단 탭(BottomNav)이 차지하는 높이. 탭이 있는 좁은 화면에서만 0 이 아니다.
+    화면 높이를 재는 것(지도 허브)과 아래 구석에 떠 있는 단추가 이 값을 빼거나 더한다.
+    탭을 숨기는 화면(한장 요약)은 BottomNavSpace 가 이 값을 0 으로 덮어쓴다.
+  */
+  --bottom-nav-h: 0px;
+}
+
+@media (max-width: 639px) {
+  :root {
+    /* 탭 56px + 위 테두리 1px + 아래 안전 영역(아이폰의 홈 막대). */
+    --bottom-nav-h: calc(57px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /*

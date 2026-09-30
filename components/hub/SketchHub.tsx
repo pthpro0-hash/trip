@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { markerUrls, visitCovers } from "@/lib/supabase/photos";
 import { hubPlaces, placesIn, tripsIn, type Bounds, type HubPlace, type TripInView } from "@/lib/hub";
 import { tripFocus } from "@/lib/scrollMemory";
+import { ADD_HREF, SKETCH_HREF, hubHref, viewOf, type MyView } from "@/lib/nav";
 import { useWide } from "@/lib/useWide";
 import { Waiting } from "@/components/layout/Waiting";
 import { HubMap, type CuratedPin, type FlyTarget, type HubMapHandle, type PaintedSido } from "./HubMap";
@@ -32,16 +34,23 @@ import {
 import { HubSheet, PEEK, PEEK_EMPTY, snapHeights, type Snap } from "./HubSheet";
 import { PlacePanel } from "./PlacePanel";
 import { TripsPanel } from "./TripsPanel";
+import { ViewSwitch } from "./ViewSwitch";
+import { TripArchive } from "@/components/trip/TripArchive";
 
 /*
   내 여행의 첫 화면. 지도 하나에 내 사진이 다 얹힌다.
 
   여기서 모든 것이 갈라진다 — 사진을 넣고, 여행을 열고, 사진을 크게 보고,
-  올해를 한 장으로 저장한다. 목록 화면(/trips)과 연도 카드(/sketch)는
-  그대로 두고, 이 화면에서 그리로 가는 길을 낸다.
+  올해를 한 장으로 저장한다.
 
-  좁은 화면은 지도 위로 시트가 올라오고, 넓은 화면은 지도 옆에 목록이
-  선다. 어느 쪽이든 목록에는 지금 지도에 보이는 것만 나온다.
+  내 여행은 한 화면의 두 모습이다 — 지도와 목록. 목록은 예전에 /trips 라는 따로
+  선 화면이었다. 같은 여행이 세 곳(지도 시트·목록·한장)에 나뉘어 있고 "내 스케치"라는
+  이름이 두 화면에 붙어, 어디에 있는지 알기 어려웠다. 지금은 스위치 하나로 오간다.
+  모습은 주소(?view=list)에 적혀, 새로 고치거나 링크를 건네도 같은 모습이 된다.
+
+  지도 모습에서 좁은 화면은 지도 위로 시트가 올라오고, 넓은 화면은 지도 옆에
+  목록이 선다. 어느 쪽이든 그 목록에는 지금 지도에 보이는 것만 나온다. 모든 여행을
+  검색하고 거르고 지우는 것은 목록 모습이 한다(TripArchive).
 */
 
 type Status = "loading" | "guest" | "ready" | "failed";
@@ -49,11 +58,67 @@ type Status = "loading" | "guest" | "ready" | "failed";
 interface SketchHubProps {
   /** 지도 위에 띄울 큰 갈래(내 여행 · 여행 100선). */
   switcher: ReactNode;
-  /** 이 해를 골라 둔 채 연다. 한장 요약에서 "다시 걷기"로 넘어올 때. */
+  /** 이 해를 골라 둔 채 연다. 한장 요약에서 "지도에서 보기"로 넘어올 때. */
   initialYear?: string;
+  /** 어느 모습으로 열까. 주소의 ?view= 가 정한다. */
+  initialView?: MyView;
 }
 
-export function SketchHub({ switcher, initialYear }: SketchHubProps) {
+/**
+ * 내 여행. 지도와 목록 중 하나를 보인다.
+ *
+ * 모습의 진실은 주소(?view=)다. 직접 누르면 화면이 먼저 바뀌고 주소를 따라 적는다.
+ * 그런데 주소가 밖에서 바뀔 수도 있다 — 목록을 보다가 위 띠의 "내 여행"(/?v=sketch)을
+ * 누르면 같은 화면이 다시 그려지지 않고 주소만 바뀐다. 그때 화면이 그것을 따르지
+ * 않으면 눌러도 아무 일이 없다.
+ *
+ * "주소가 지금 무엇인가"가 아니라 "주소가 바뀌었는가"를 본다. 직접 누른 뒤에는 화면이
+ * 먼저 바뀌고 주소는 조금 늦게 따라오는데, 현재 값끼리 견주면 그 사이의 어긋남을 밖에서
+ * 바뀐 것으로 읽어 도로 되돌린다.
+ */
+export function SketchHub({ switcher, initialYear, initialView = "map" }: SketchHubProps) {
+  const params = useSearchParams();
+  const urlView: MyView = params ? viewOf(params.get("view")) : initialView;
+  const [view, setView] = useState<MyView>(urlView);
+  const [seenUrlView, setSeenUrlView] = useState<MyView>(urlView);
+  if (seenUrlView !== urlView) {
+    setSeenUrlView(urlView);
+    setView(urlView);
+  }
+
+  const change = useCallback(
+    (next: MyView) => {
+      setView(next);
+      /*
+        모습을 주소에 적는다 — 새로 고치거나 링크를 건네도 같은 모습이 되게. 화면을
+        넘기는 것이 아니라 적어 두기만 한다. 보던 해(?y=)는 지도로 돌아올 때만 남긴다.
+        목록에는 해가 없다.
+      */
+      window.history.replaceState(null, "", hubHref(next, next === "map" ? initialYear : undefined));
+    },
+    [initialYear],
+  );
+
+  /*
+    목록 모습은 지도를 받아 오지 않는다. 지도는 위 화면이 불러오는 것이 많아(여행,
+    대표 사진, 시도 경계) 목록으로 열 사람에게는 낭비이고, 목록(TripArchive)은 제 것을
+    스스로 받아 온다. 지도로 돌아오면 그때 받아 온다 — 그 사이 지우거나 더한 여행이
+    있어도 지도가 늘 지금 것을 보인다.
+  */
+  return view === "list" ? (
+    <TripArchive onView={change} />
+  ) : (
+    <MapHub switcher={switcher} initialYear={initialYear} onList={() => change("list")} />
+  );
+}
+
+interface MapHubProps {
+  switcher: ReactNode;
+  initialYear?: string;
+  onList: () => void;
+}
+
+function MapHub({ switcher, initialYear, onList }: MapHubProps) {
   const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
   const [userId, setUserId] = useState<string | null>(null);
   const [trips, setTrips] = useState<SavedTrip[]>([]);
@@ -134,6 +199,7 @@ export function SketchHub({ switcher, initialYear }: SketchHubProps) {
       today={today}
       initialYear={initialYear}
       switcher={switcher}
+      onList={onList}
     />
   );
 }
@@ -151,6 +217,8 @@ export interface HubViewProps {
   /** 이 해를 골라 둔 채 연다. */
   initialYear?: string;
   switcher: ReactNode;
+  /** 목록 모습으로 넘어간다. 주지 않으면 스위치를 두지 않는다. */
+  onList?: () => void;
 }
 
 /**
@@ -169,6 +237,7 @@ export function HubView({
   today = "",
   initialYear,
   switcher,
+  onList,
 }: HubViewProps) {
   const wide = useWide();
   const [view, setView] = useState<Bounds | null>(null);
@@ -447,6 +516,7 @@ export function HubView({
       }
       walkLabel={walkable.length > 0 ? walkLabel : null}
       onWalk={startWalk}
+      onList={onList}
     />
   );
 
@@ -536,7 +606,7 @@ export function HubView({
     아직 얹을 것이 없으면 띄우지 않는다.
   */
   const controls = !empty && !replay && (
-    <div className="pointer-events-none absolute left-3 top-[68px] z-20 flex flex-col items-start gap-2">
+    <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col items-start gap-2 sm:top-[68px]">
       <button
         type="button"
         onClick={openCollection}
@@ -570,8 +640,11 @@ export function HubView({
   return (
     <div
       ref={frameRef}
-      /* 위 띠(57px)를 뺀 화면 전체. 지도는 가장자리까지 꽉 채운다. */
-      className="relative h-[calc(100dvh-57px)] min-h-[480px] w-full overflow-hidden"
+      /*
+        위 띠(57px)와 폰의 하단 탭을 뺀 화면 전체. 지도는 가장자리까지 꽉 채운다.
+        탭 높이(--bottom-nav-h)는 탭이 있는 좁은 화면에서만 0 이 아니다.
+      */
+      className="relative h-[calc(100dvh-57px-var(--bottom-nav-h,0px))] min-h-[480px] w-full overflow-hidden"
     >
       {wide ? (
         <div className="grid h-full grid-cols-[minmax(0,1fr)_400px]">
@@ -618,10 +691,14 @@ export function HubView({
   );
 }
 
-/** 지도 위 가운데 위쪽에 띄운다. 지도를 가리는 것은 이 한 줄뿐이다. */
+/**
+ * 지도 위 가운데 위쪽에 띄운다. 지도를 가리는 것은 이 한 줄뿐이다.
+ *
+ * 폰에서는 접는다. 큰 갈래(내 여행 · 여행 100선)는 아래 하단 탭이 이미 하고 있다.
+ */
 function Floating({ children }: { children: ReactNode }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center px-4">
+    <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center px-4 max-sm:hidden">
       <div className="pointer-events-auto">{children}</div>
     </div>
   );
@@ -641,6 +718,8 @@ interface SheetHeaderProps {
   /** 다시 걷기 단추의 이름. 걸을 것이 없으면 null. */
   walkLabel: string | null;
   onWalk: () => void;
+  /** 목록 모습으로 넘어간다. 주지 않으면 스위치를 두지 않는다. */
+  onList?: () => void;
 }
 
 /*
@@ -658,6 +737,7 @@ function SheetHeader({
   timeline,
   walkLabel,
   onWalk,
+  onList,
 }: SheetHeaderProps) {
   if (status === "guest") {
     return (
@@ -684,7 +764,7 @@ function SheetHeader({
         <p className="text-[15px] font-semibold text-text">사진을 고르면 여기에 점이 찍혀요</p>
         <p className="text-[13px] text-text-muted">찍은 시각과 위치를 읽어 다녀온 길을 지도에 그려 드려요.</p>
         <Link
-          href="/trips/new"
+          href={ADD_HREF}
           className="self-start rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
         >
           사진 고르기
@@ -712,7 +792,7 @@ function SheetHeader({
         )}
       </div>
       {timeline}
-      <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
         {/*
           다시 걷기가 맨 앞이다. 이 화면에서 다른 데서는 못 하는 일이
           이것이다.
@@ -726,21 +806,18 @@ function SheetHeader({
             ▶ {walkLabel}
           </button>
         )}
+        {/* 같은 여행을 목록으로도 본다. 검색하고 거르고 지우는 것은 그쪽이 한다. */}
+        {onList && <ViewSwitch view="map" onChange={onList} />}
+        {/* 폰에서는 접는다 — 하단 탭의 가운데 단추와 "한장"이 이 일을 한다. */}
         <Link
-          href="/trips/new"
-          className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
+          href={ADD_HREF}
+          className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line max-sm:hidden"
         >
           + 사진 고르기
         </Link>
         <Link
-          href="/trips"
-          className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
-        >
-          여행 목록
-        </Link>
-        <Link
-          href="/sketch"
-          className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
+          href={SKETCH_HREF}
+          className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line max-sm:hidden"
         >
           한장 요약
         </Link>

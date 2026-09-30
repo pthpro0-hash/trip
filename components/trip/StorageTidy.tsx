@@ -19,7 +19,7 @@ import { WaitingOverlay } from "@/components/layout/Waiting";
   (지운 여행의 사진, 낡은 판 등)이 있으면 지울 수 있게 한다. 지우는 것은
   되돌릴 수 없으니 살펴본 뒤 한 번 더 누르게 한다.
 
-  목록 맨 아래 조용히 둔다. 자주 쓸 일이 아니다.
+  도움말의 "내 데이터"에 둔다. 자주 쓸 일이 아니다. 예전에는 여행 목록 맨 아래였다.
 */
 
 const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)}MB`;
@@ -56,7 +56,11 @@ export function StorageTidy() {
     const supabase = getBrowserClient();
     if (!supabase) return;
     const { data } = await supabase.auth.getUser();
-    if (!data.user) return;
+    if (!data.user) {
+      // 도움말은 로그인하지 않은 사람도 연다. 눌러서 아무 일도 없으면 고장난 단추로 보인다.
+      setFailed("로그인해야 보관함을 살펴볼 수 있어요.");
+      return;
+    }
     setFailed(null);
     setPhase({ kind: "working", title: "보관함을 살펴보고 있어요" });
     const found = await scanStorage(supabase, data.user.id, (done, total) =>

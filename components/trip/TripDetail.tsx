@@ -19,6 +19,7 @@ import {
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { deletePhoto, setCoverPhoto, signedUrls, thumbUrls } from "@/lib/supabase/photos";
 import { deleteTrip } from "@/lib/supabase/trips";
+import { LIST_HREF } from "@/lib/nav";
 import { rememberPlaceName } from "@/lib/supabase/placeNames";
 import { PhotoViewer } from "./PhotoViewer";
 import { logEvent } from "@/lib/supabase/serviceLog";
@@ -189,7 +190,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
       지운 여행의 자리로 돌아갈 수는 없다. 목록을 처음부터 보여 준다 —
       askRestore 를 부르지 않으므로 저절로 맨 위다.
     */
-    router.push("/trips");
+    router.push(LIST_HREF);
   };
 
   const submitTitle = async () => {
@@ -361,7 +362,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
     return (
       <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6">
         <p className="text-[15px] text-text-muted">그 여행을 찾지 못했어요.</p>
-        <Link href="/trips" className="self-start text-[15px] font-medium text-accent">
+        <Link href={LIST_HREF} className="self-start text-[15px] font-medium text-accent">
           내 여행으로 →
         </Link>
       </div>

@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { tripFocus } from "@/lib/scrollMemory";
+import { LIST_HREF } from "@/lib/nav";
 
 /*
   내 여행으로 돌아가는 길.
@@ -16,7 +17,7 @@ import { tripFocus } from "@/lib/scrollMemory";
   여행을 적는 이유는 lib/scrollMemory 에 있다.
 */
 
-const LIST = "/trips";
+const LIST = LIST_HREF;
 
 /** 우리 주소만 따라간다. 적힌 것이 바깥 주소면 목록으로. */
 function backTo(from: string | null): string {

@@ -5,6 +5,7 @@ import { StartSwitch } from "@/components/home/StartSwitch";
 import { SketchHub } from "@/components/hub/SketchHub";
 import { SketchInvite } from "@/components/help/SketchInvite";
 import { START_COOKIE, startOf } from "@/lib/start";
+import { viewOf } from "@/lib/nav";
 
 /*
   첫 화면. 내 여행과 여행 100선, 두 갈래 중 하나를 연다.
@@ -22,9 +23,9 @@ export const metadata: Metadata = {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ v?: string | string[]; y?: string | string[] }>;
+  searchParams: Promise<{ v?: string | string[]; y?: string | string[]; view?: string | string[] }>;
 }) {
-  const { v, y } = await searchParams;
+  const { v, y, view } = await searchParams;
   // 한장 요약의 "그해를 지도에서 보기"가 해를 적어 보낸다.
   const year = typeof y === "string" && /^\d{4}$/.test(y) ? y : undefined;
   const start = startOf(typeof v === "string" ? v : undefined, (await cookies()).get(START_COOKIE)?.value);
@@ -36,7 +37,12 @@ export default async function HomePage({
   if (start === "sketch") {
     return (
       <>
-        <SketchHub switcher={<StartSwitch current="sketch" floating />} initialYear={year} />
+        <SketchHub
+          switcher={<StartSwitch current="sketch" floating />}
+          initialYear={year}
+          // 내 여행은 지도와 목록 두 모습이다. 어느 쪽으로 열지는 주소가 정한다.
+          initialView={viewOf(typeof view === "string" ? view : undefined)}
+        />
         <SketchInvite key="sketch" spot="sketch" />
       </>
     );

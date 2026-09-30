@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, fireEvent } from "@testing-library/react";
 import type { SavedTrip } from "@/lib/supabase/trips";
+import { LIST_HREF } from "@/lib/nav";
+import { tripFocus } from "@/lib/scrollMemory";
 
 /*
   목록에서 상세로 들어가는 길을 못 박는다.
@@ -17,7 +19,7 @@ vi.mock("@/lib/supabase/client", () => ({
   }),
 }));
 
-const rows: SavedTrip[] = [
+const 기본: SavedTrip[] = [
   {
     id: "t1",
     title: "민수랑 첫 휴가",
@@ -61,6 +63,7 @@ const rows: SavedTrip[] = [
     ],
   },
 ];
+let rows: SavedTrip[] = 기본;
 
 vi.mock("@/lib/supabase/trips", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/supabase/trips")>()),
@@ -254,5 +257,35 @@ describe("보던 여행으로 돌아오기", () => {
     await 목록();
     expect(document.getElementById("trip-t1")).toBeTruthy();
     expect(document.getElementById("trip-t2")).toBeTruthy();
+  });
+});
+
+/*
+  목록은 이제 내 여행 화면의 한 모습이다(/?v=sketch&view=list). 상세로 갔다가
+  "← 내 여행"을 누르면 이 목록 모습으로 돌아와야 하고, 옛 /trips 주소를 거치지
+  않아야 한다.
+*/
+describe("내 여행 목록의 길", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    rows = 기본;
+  });
+
+  it("상세로 갈 때 돌아올 곳을 목록 모습으로 적어 둔다", async () => {
+    await 목록();
+    const link = screen.getByText("민수랑 첫 휴가").closest("a")!;
+    // 실제로 이동하지는 않는다.
+    link.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(link);
+    expect(tripFocus.from()).toBe(LIST_HREF);
+  });
+
+  it("기록이 없으면 '사진 고르기'로 부른다 — 사진을 넣는 길은 어디서나 같은 말", async () => {
+    rows = [];
+    vi.resetModules();
+    const { TripList } = await import("./TripList");
+    render(<TripList />);
+    expect(await screen.findByRole("link", { name: "사진 고르기" })).toHaveAttribute("href", "/trips/new");
+    expect(screen.queryByText("사진에서 찾기")).toBeNull();
   });
 });

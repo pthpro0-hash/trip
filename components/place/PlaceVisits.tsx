@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchVisitsByName, type PlaceVisit } from "@/lib/supabase/placeVisits";
 import { fetchPlacePhotos, signedUrls, thumbUrls, type PlacePhoto } from "@/lib/supabase/photos";
 import { tripFocus } from "@/lib/scrollMemory";
+import { LIST_HREF } from "@/lib/nav";
 import { times } from "@/lib/sketchWords";
 import { PhotoViewer } from "@/components/trip/PhotoViewer";
 import { Waiting } from "@/components/layout/Waiting";
@@ -97,8 +98,8 @@ export function PlaceVisits({ name }: { name: string }) {
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-5 px-5 pb-16 pt-8">
-      <Link href="/trips" className="self-start text-[15px] font-medium text-accent hover:text-accent-hover">
-        ← 내 여행 목록
+      <Link href={LIST_HREF} className="self-start text-[15px] font-medium text-accent hover:text-accent-hover">
+        ← 내 여행
       </Link>
 
       <header className="flex flex-col gap-1.5">

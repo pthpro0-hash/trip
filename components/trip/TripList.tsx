@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
 import { restoreToCard, tripFocus } from "@/lib/scrollMemory";
+import { ADD_HREF, LIST_HREF } from "@/lib/nav";
 import { backfillThumbs, missingThumbs, thumbUrls } from "@/lib/supabase/photos";
 import {
   companionOptions,
@@ -166,7 +167,7 @@ export function TripList() {
   }, [trips, searchable, query, person, year]);
 
   /** 상세에서 "← 내 여행"을 누르면 이 목록으로 돌아오게 적어 둔다. */
-  const leaveForDetail = () => tripFocus.rememberFrom("/trips");
+  const leaveForDetail = () => tripFocus.rememberFrom(LIST_HREF);
 
   const remove = async (tripId: string) => {
     const supabase = getBrowserClient();
@@ -193,7 +194,7 @@ export function TripList() {
           여행 기록은 계정에 저장돼요. 로그인하시면 어느 기기에서나 이어 보실 수 있어요.
         </p>
         <Link
-          href="/login?next=%2Ftrips"
+          href={`/login?next=${encodeURIComponent(LIST_HREF)}`}
           className="self-start rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
         >
           로그인하기
@@ -218,10 +219,10 @@ export function TripList() {
           사진을 고르면 언제 어디를 다녀왔는지 찾아 드려요.
         </p>
         <Link
-          href="/trips/new"
+          href={ADD_HREF}
           className="self-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
         >
-          사진에서 찾기
+          사진 고르기
         </Link>
       </div>
     );

@@ -11,7 +11,10 @@
 */
 /**
  * @param raised 이미 떠 있는 단추가 아래 구석에 있을 때 한 칸 올려 둔다.
- *   둘러보기에는 "여행 스케치 그리기"가 같은 자리에 있어 겹친다.
+ *   둘러보기에는 "사진 고르기"가 같은 자리에 있어 겹친다(폰에는 그 단추가 없다).
+ *
+ * 폰에서는 하단 탭이 아래를 덮으므로 그 높이(--bottom-nav-h)만큼 올린다. 넓은
+ * 화면에서는 그 값이 0 이라 예전 자리(아래 20px)와 같다.
  */
 export function ScrollTop({ raised = false }: { raised?: boolean }) {
   return (
@@ -20,7 +23,9 @@ export function ScrollTop({ raised = false }: { raised?: boolean }) {
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label="맨 위로"
       className={`fixed right-5 z-20 grid h-11 w-11 place-items-center rounded-full bg-surface text-[18px] text-text-muted shadow-lg ring-1 ring-line transition hover:bg-bg-subtle hover:text-text ${
-        raised ? "bottom-[76px]" : "bottom-5"
+        raised
+          ? "bottom-[calc(1.25rem+var(--bottom-nav-h,0px))] sm:bottom-[76px]"
+          : "bottom-[calc(1.25rem+var(--bottom-nav-h,0px))]"
       }`}
     >
       <span aria-hidden="true">↑</span>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CHAPTERS } from "@/lib/help";
 import { ScrollTop } from "@/components/layout/ScrollTop";
+import { StorageTidy } from "@/components/trip/StorageTidy";
 
 export const metadata: Metadata = {
   title: "도움말",
@@ -38,6 +39,12 @@ export default function HelpPage() {
             <span aria-hidden="true">{chapter.icon}</span> {chapter.title}
           </a>
         ))}
+        <a
+          href="#data"
+          className="rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
+        >
+          <span aria-hidden="true">🗂️</span> 내 데이터
+        </a>
       </nav>
 
       {CHAPTERS.map((chapter) => (
@@ -78,6 +85,20 @@ export default function HelpPage() {
           </Link>
         </section>
       ))}
+
+      {/*
+        사진 보관함 정리. 예전에는 여행 목록 맨 아래에 있었다. 목록이 내 여행 화면의 한
+        모습이 되면서 자리를 잃었고, 자주 쓸 일이 아니라 여기에 둔다.
+      */}
+      <section id="data" className="scroll-mt-20">
+        <h2 className="text-[22px] font-bold tracking-tight text-text">
+          <span aria-hidden="true">🗂️</span> 내 데이터
+        </h2>
+        <p className="mt-1 text-[15px] leading-relaxed text-text-muted">
+          계정에 쌓인 사진이 얼마나 자리를 쓰는지 보고, 쓰지 않는 파일을 정리해요.
+        </p>
+        <StorageTidy />
+      </section>
 
       <p className="text-[14px] leading-relaxed text-text-faint">
         찾으시는 것이 없으면{" "}

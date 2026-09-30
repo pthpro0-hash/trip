@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountChip } from "@/components/auth/AccountChip";
-import { rememberStart, startHref, type Start } from "@/lib/start";
+import { rememberStart, type Start } from "@/lib/start";
+import { ADD_HREF, MAP_HREF, SKETCH_HREF, SPOTS_HREF, activeNav, showsBottomNav, type NavId } from "@/lib/nav";
 
 /*
   이 서비스는 두 몸이다 — 어디를 갈지 고르는 쪽과, 다녀온 길을 남기는 쪽.
@@ -14,23 +15,27 @@ import { rememberStart, startHref, type Start } from "@/lib/start";
 
   그래서 나누는 일은 여기서 한다. 어느 쪽이 커 보일지는 첫 화면이
   그 사람의 형편을 보고 정한다(HomeIntro 참고).
+
+  갈래는 셋이다 — 내 여행(지도·목록), 한장(해마다 한 장), 여행 100선. 한장 요약이
+  자리를 얻은 것은 이 서비스가 보여 주려는 결과이기 때문이다.
+
+  폰에서는 위 띠가 좁아 갈래를 아래 하단 탭(BottomNav)에 넘기고 여기서는 접는다.
+  넓은 화면에서는 여기가 유일한 길이다.
 */
 
-const TABS: { start: Start; label: string }[] = [
-  { start: "sketch", label: "내 여행" },
-  { start: "spots", label: "여행 100선" },
+const TABS: { id: NavId; label: string; href: string; start?: Start }[] = [
+  { id: "trips", label: "내 여행", href: MAP_HREF, start: "sketch" },
+  { id: "sketch", label: "한장", href: SKETCH_HREF },
+  { id: "spots", label: "여행 100선", href: SPOTS_HREF, start: "spots" },
 ];
 
 export function SiteHeader() {
   const pathname = usePathname();
 
-  /** 하위 경로에 있어도 그 갈래가 켜져 보이게 한다. */
-  const isOn = (start: Start) => {
-    if (start === "spots") {
-      return ["/spots", "/regions", "/course"].some((prefix) => pathname.startsWith(prefix));
-    }
-    return pathname.startsWith("/trips") || pathname.startsWith("/sketch");
-  };
+  /** 하위 경로에 있어도 그 갈래가 켜져 보이게 한다. 첫 화면은 갈래를 접으므로 따질 것이 없다. */
+  const active = activeNav(pathname, null);
+  /** 폰 하단 탭이 이 화면에 있는가. 있으면 위 띠의 갈래는 폰에서 접는다. */
+  const bottomNav = showsBottomNav(pathname);
 
   /*
     첫 화면에는 큰 갈래가 화면 한가운데 따로 있다. 위 띠에도 두면 같은
@@ -57,18 +62,20 @@ export function SiteHeader() {
         </Link>
 
         {!home && (
-          <nav aria-label="주요 메뉴" className="flex items-center gap-1">
+          <nav aria-label="주요 메뉴" className={`flex items-center gap-1 ${bottomNav ? "max-sm:hidden" : ""}`}>
             {TABS.map((tab) => (
               <Link
-                key={tab.start}
-                href={startHref(tab.start)}
-                onClick={() => rememberStart(tab.start)}
-                aria-current={isOn(tab.start) ? "page" : undefined}
+                key={tab.id}
+                href={tab.href}
+                onClick={tab.start ? () => rememberStart(tab.start!) : undefined}
+                aria-current={active === tab.id ? "page" : undefined}
+                /*
+                  한장은 폰의 위 띠에서 늘 접는다. 하단 탭이 없는 화면(한장 요약)에서도
+                  375px 에는 갈래 셋과 계정 칩이 함께 들어가지 않고, 그 화면이 곧 한장이다.
+                */
                 className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[14px] font-medium transition ${
-                  isOn(tab.start)
-                    ? "bg-accent-soft text-accent"
-                    : "text-text-muted hover:bg-bg-subtle hover:text-text"
-                }`}
+                  tab.id === "sketch" ? "max-sm:hidden" : ""
+                } ${active === tab.id ? "bg-accent-soft text-accent" : "text-text-muted hover:bg-bg-subtle hover:text-text"}`}
               >
                 {tab.label}
               </Link>
@@ -77,6 +84,16 @@ export function SiteHeader() {
         )}
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {/*
+            사진을 넣는 것은 이 서비스의 가장 큰 일이라 어느 화면에서든 같은 자리에 있다.
+            폰에서는 하단 탭의 가운데 단추가 그 일을 한다.
+          */}
+          <Link
+            href={ADD_HREF}
+            className="hidden shrink-0 items-center rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-on-accent transition hover:bg-accent-hover sm:inline-flex"
+          >
+            + 사진 고르기
+          </Link>
           {/*
             좁은 화면에서는 물음표만 남긴다. 375px 에서는 갈래 둘과 계정
             칩만으로도 폭이 빠듯해, 글자를 두면 계정 칩이 밀려 나간다.

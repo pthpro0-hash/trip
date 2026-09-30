@@ -114,7 +114,8 @@ export function SpotsHome({ switcher }: SpotsHomeProps = {}) {
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-5 px-5 pb-16 pt-6">
-      {switcher && <div className="flex justify-center">{switcher}</div>}
+      {/* 폰에서는 접는다 — 큰 갈래는 아래 하단 탭이 이미 하고 있다. */}
+      {switcher && <div className="flex justify-center max-sm:hidden">{switcher}</div>}
       {/*
         머리글은 서비스 이름이 아니라 이 면이 무엇인지를 말한다. 이름은
         위 띠가 이미 들고 있고, 사람들이 찾는 말은 "한국관광 100선"이다.
@@ -238,12 +239,16 @@ export function SpotsHome({ switcher }: SpotsHomeProps = {}) {
       {/* 목록이 121곳이라 화면이 길다. 늘 같은 자리에 둔다. */}
       <ScrollTop raised />
 
+      {/*
+        폰에서는 접는다 — 하단 탭의 가운데 단추가 같은 일을 한다. 이름은 어디서나
+        "사진 고르기"다(예전에는 여기만 "여행 스케치 그리기"였다).
+      */}
       <Link
         href="/trips/new"
-        className="fixed bottom-5 right-5 z-20 flex items-center gap-1.5 rounded-full bg-accent px-4 py-3 text-[14px] font-medium text-on-accent shadow-lg transition hover:bg-accent-hover"
+        className="fixed bottom-5 right-5 z-20 flex items-center gap-1.5 rounded-full bg-accent px-4 py-3 text-[14px] font-medium text-on-accent shadow-lg transition hover:bg-accent-hover max-sm:hidden"
       >
-        <span aria-hidden="true">✏️</span>
-        여행 스케치 그리기
+        <span aria-hidden="true">📷</span>
+        사진 고르기
       </Link>
     </main>
   );

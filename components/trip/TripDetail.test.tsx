@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { TripDetail as Detail } from "@/lib/supabase/tripDetail";
+import { LIST_HREF } from "@/lib/nav";
 
 /*
   이름은 한참 뒤에 다시 짓게 된다. "화진포해변 외 2곳"으로 남겨 뒀다가
@@ -382,7 +383,7 @@ describe("여행 통째로 지우기", () => {
     fireEvent.click(await screen.findByRole("button", { name: "이 여행 지우기" }));
     fireEvent.click(await screen.findByRole("button", { name: /정말 지울까요/ }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/trips"));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(LIST_HREF));
   });
 
   it("손을 떼면 묻던 것을 거둔다 — 잘못 눌러도 지워지지 않게", async () => {
