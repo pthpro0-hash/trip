@@ -40,16 +40,11 @@ describe("SiteHeader", () => {
     expect(add.className).toContain("sm:inline-flex");
   });
 
-  /*
-    첫 화면에는 큰 갈래가 화면 한가운데 따로 있다. 위 띠에도 두면 같은
-    단추가 두 벌이 된다.
-  */
-  it("첫 화면에서는 위 띠의 갈래를 접는다", async () => {
+  // 갈래는 어느 화면에서든 위 띠에 보인다 — 첫 화면에서도. 길을 잃으면 맨 위를 본다.
+  it("첫 화면에서도 위 띠에 갈래가 보인다", async () => {
     await 머리띠("/");
-    expect(screen.queryByRole("link", { name: "내 여행" })).toBeNull();
-    expect(screen.queryByRole("link", { name: "한장" })).toBeNull();
-    expect(screen.queryByRole("link", { name: "여행 100선" })).toBeNull();
-    // 도움말과 처음으로 가는 길은 남는다.
+    expect(screen.getByRole("link", { name: "내 여행" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "여행 100선" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "도움말" })).toBeTruthy();
   });
 
@@ -66,27 +61,17 @@ describe("SiteHeader", () => {
     expect(켜진곳()).toEqual([expected]);
   });
 
-  /*
-    폰에는 아래에 하단 탭이 있어 위 띠의 갈래는 접는다 — 375px 에서 갈래 셋과 계정 칩이
-    함께 들어가지 않는다. 하단 탭을 숨기는 화면(한장 요약)에서는 위 띠가 그 일을 한다.
-  */
   describe("폰에서", () => {
-    it("하단 탭이 있는 화면에서는 위 띠의 갈래를 접는다", async () => {
-      await 머리띠("/trips/abc");
-      expect(screen.getByRole("navigation", { name: "주요 메뉴" }).className).toContain("max-sm:hidden");
-    });
-
-    it("하단 탭이 없는 화면(한장 요약)에서는 위 띠의 갈래가 남는다", async () => {
-      await 머리띠("/sketch");
+    it.each(["/", "/trips/abc", "/sketch", "/s/abc"])("%s 에서도 위 띠의 갈래를 접지 않는다", async (at) => {
+      await 머리띠(at);
       expect(screen.getByRole("navigation", { name: "주요 메뉴" }).className).not.toContain("max-sm:hidden");
-    });
-
-    it("그때도 '한장'은 폰의 위 띠에서 접는다 — 지금 그 화면이라 자리만 차지한다", async () => {
-      await 머리띠("/sketch");
-      expect(screen.getByRole("link", { name: "한장" }).className).toContain("max-sm:hidden");
-      // 갈래 둘은 남는다.
       expect(screen.getByRole("link", { name: "내 여행" }).className).not.toContain("max-sm:hidden");
       expect(screen.getByRole("link", { name: "여행 100선" }).className).not.toContain("max-sm:hidden");
+    });
+
+    it("'한장'만 폰의 위 띠에서 접는다 — 375px 에 셋이 들어가지 않는다", async () => {
+      await 머리띠("/trips/abc");
+      expect(screen.getByRole("link", { name: "한장" }).className).toContain("max-sm:hidden");
     });
   });
 

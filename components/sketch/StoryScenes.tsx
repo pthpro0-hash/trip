@@ -5,11 +5,8 @@ import Link from "next/link";
 import { times } from "@/lib/sketchWords";
 import { attachParticle } from "@/lib/korean";
 import { PLACE_SHOWN, type StoryPlace, type YearStory } from "@/lib/sketchStory";
-import { getBrowserClient } from "@/lib/supabase/client";
-import { signedUrls } from "@/lib/supabase/photos";
 import { tripFocus } from "@/lib/scrollMemory";
 import { SIDO_ORDER } from "@/lib/sidoOrder";
-import { PhotoViewer } from "@/components/trip/PhotoViewer";
 
 /*
   그해를 장면마다 풀어 말한다.
@@ -54,19 +51,7 @@ function placeDate(day: string): string {
 }
 
 export function StoryScenes({ story, photoUrls, placeUrls, backHref, shared = false }: StoryScenesProps) {
-  const [viewing, setViewing] = useState<number | null>(null);
-  const [big, setBig] = useState<Map<string, string>>(new Map());
   const [allPlaces, setAllPlaces] = useState(false);
-
-  const open = async (index: number) => {
-    setViewing(index);
-    const path = story.photoPaths[index];
-    if (shared || !path || big.has(path)) return;
-    const supabase = getBrowserClient();
-    if (!supabase) return;
-    const url = (await signedUrls(supabase, [path])).get(path);
-    if (url) setBig((current) => new Map(current).set(path, url));
-  };
 
   const mostSeason = Math.max(1, ...story.seasons.map((bar) => bar.trips));
   const sido = SIDO_ORDER.filter((name) => story.sido.includes(name));
@@ -173,27 +158,6 @@ export function StoryScenes({ story, photoUrls, placeUrls, backHref, shared = fa
         </Scene>
       )}
 
-      {story.photoPaths.length > 0 && (
-        <Scene label="그해의 사진">
-          <div className="grid grid-cols-3 gap-1.5">
-            {story.photoPaths.map((path, index) => (
-              <button
-                key={path}
-                type="button"
-                onClick={() => void open(index)}
-                aria-label={`그해의 사진 ${index + 1} 크게 보기`}
-                className="aspect-square overflow-hidden rounded-xl bg-bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                {photoUrls.get(path) && (
-                  // eslint-disable-next-line @next/next/no-img-element -- 서명 주소는 그때그때 바뀐다
-                  <img src={photoUrls.get(path)} alt="" loading="lazy" className="h-full w-full object-cover" />
-                )}
-              </button>
-            ))}
-          </div>
-        </Scene>
-      )}
-
       {story.compare && (
         <Scene label={`${story.compare.previousYear}년과 견주면`}>
           <p className="text-[18px] font-semibold text-text">{story.compare.tripsLine}</p>
@@ -229,17 +193,6 @@ export function StoryScenes({ story, photoUrls, placeUrls, backHref, shared = fa
             {story.year}년을 지도에서 보기
           </Link>
         </Scene>
-      )}
-
-      {viewing !== null && story.photoPaths[viewing] && (
-        <PhotoViewer
-          url={big.get(story.photoPaths[viewing]) ?? photoUrls.get(story.photoPaths[viewing]) ?? null}
-          index={viewing}
-          total={story.photoPaths.length}
-          onClose={() => setViewing(null)}
-          onPrev={() => void open((viewing - 1 + story.photoPaths.length) % story.photoPaths.length)}
-          onNext={() => void open((viewing + 1) % story.photoPaths.length)}
-        />
       )}
     </div>
   );

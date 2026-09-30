@@ -53,6 +53,9 @@ const ShareDialog = dynamic(() => import("@/components/share/ShareDialog").then(
 */
 const PHOTOS_ON_MAP = 10;
 
+/* 장면에는 따로 큰 사진을 두지 않는다. 곳 줄의 작은 사진은 placeUrls 가 맡는다. */
+const NO_PHOTOS = new Map<string, string>();
+
 /*
   콜라주 칸에 심을 사진의 긴 변. 큰 칸은 카드 폭을 거의 다 차지해서
   목록 판(960px)을 그대로, 작은 칸은 그보다 작게 — 아홉 장을 다 크게
@@ -178,21 +181,6 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
     // 받아 둔 사진이 늘 때마다 다시 돌 이유는 없다. 모양이나 고를 곳이 바뀔 때만.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [style, picks]);
-
-  /* 장면 속 사진은 크게 보이므로 목록 판(960px)을 받는다. */
-  const scenePaths = story.photoPaths;
-  const [sceneUrls, setSceneUrls] = useState<Map<string, string>>(new Map());
-  useEffect(() => {
-    const supabase = getBrowserClient();
-    if (!supabase || scenePaths.length === 0) return;
-    let active = true;
-    void thumbUrls(supabase, scenePaths).then((urls) => {
-      if (active) setSceneUrls(urls);
-    });
-    return () => {
-      active = false;
-    };
-  }, [scenePaths]);
 
   /*
     "그해의 곳들"의 사진. 줄마다 손톱만 하게 보이므로 핀용 작은 판(160px)이면
@@ -391,7 +379,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
       />
 
       {/* 곳을 눌러 상세로 갔다가 돌아오면 보던 해의 한장 요약으로 선다. */}
-      <StoryScenes story={story} photoUrls={sceneUrls} placeUrls={placeUrls} backHref={`/sketch?y=${year}`} />
+      <StoryScenes story={story} photoUrls={NO_PHOTOS} placeUrls={placeUrls} backHref={`/sketch?y=${year}`} />
 
       {/*
         저장은 늘 손 닿는 데. 어디까지 읽어 내려가든 그 자리에서 저장한다.

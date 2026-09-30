@@ -50,7 +50,7 @@ describe("StoryScenes", () => {
 
   it("장면을 차례로 그린다", () => {
     render(<StoryScenes story={full} photoUrls={new Map()} />);
-    for (const label of ["그해의 곳들", "2026년의 나", "계절", "밟은 시도 2곳", "그해의 사진", "2025년과 견주면", "누구와", "지도에서 보기"]) {
+    for (const label of ["그해의 곳들", "2026년의 나", "계절", "밟은 시도 2곳", "2025년과 견주면", "누구와", "지도에서 보기"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
   });
@@ -101,7 +101,7 @@ describe("StoryScenes", () => {
         photoUrls={new Map()}
       />,
     );
-    for (const label of ["그해의 곳들", "그해의 사진", "2025년과 견주면", "누구와"]) {
+    for (const label of ["그해의 곳들", "2025년과 견주면", "누구와"]) {
       expect(screen.queryByText(label)).toBeNull();
     }
     expect(screen.queryByText(/밟은 시도/)).toBeNull();

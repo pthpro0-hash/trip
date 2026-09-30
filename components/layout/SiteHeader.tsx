@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountChip } from "@/components/auth/AccountChip";
 import { rememberStart, type Start } from "@/lib/start";
-import { ADD_HREF, MAP_HREF, SKETCH_HREF, SPOTS_HREF, activeNav, showsBottomNav, type NavId } from "@/lib/nav";
+import { ADD_HREF, MAP_HREF, SKETCH_HREF, SPOTS_HREF, activeNav, type NavId } from "@/lib/nav";
 
 /*
   이 서비스는 두 몸이다 — 어디를 갈지 고르는 쪽과, 다녀온 길을 남기는 쪽.
@@ -19,8 +19,8 @@ import { ADD_HREF, MAP_HREF, SKETCH_HREF, SPOTS_HREF, activeNav, showsBottomNav,
   갈래는 셋이다 — 내 여행(지도·목록), 한장(해마다 한 장), 여행 100선. 한장 요약이
   자리를 얻은 것은 이 서비스가 보여 주려는 결과이기 때문이다.
 
-  폰에서는 위 띠가 좁아 갈래를 아래 하단 탭(BottomNav)에 넘기고 여기서는 접는다.
-  넓은 화면에서는 여기가 유일한 길이다.
+  위 띠의 갈래는 어느 화면에서든, 폰에서도 늘 보인다(첫 화면 포함). 길을 잃으면
+  맨 위를 보면 된다. 폰의 하단 탭(BottomNav)은 엄지가 닿는 두 번째 길이다.
 */
 
 const TABS: { id: NavId; label: string; href: string; start?: Start }[] = [
@@ -32,16 +32,8 @@ const TABS: { id: NavId; label: string; href: string; start?: Start }[] = [
 export function SiteHeader() {
   const pathname = usePathname();
 
-  /** 하위 경로에 있어도 그 갈래가 켜져 보이게 한다. 첫 화면은 갈래를 접으므로 따질 것이 없다. */
+  /** 하위 경로에 있어도 그 갈래가 켜져 보이게 한다. 첫 화면은 어느 갈래인지 주소만으로 몰라 켜지 않는다. */
   const active = activeNav(pathname, null);
-  /** 폰 하단 탭이 이 화면에 있는가. 있으면 위 띠의 갈래는 폰에서 접는다. */
-  const bottomNav = showsBottomNav(pathname);
-
-  /*
-    첫 화면에는 큰 갈래가 화면 한가운데 따로 있다. 위 띠에도 두면 같은
-    단추가 두 벌이라, 첫 화면에서는 위 띠의 갈래를 접는다.
-  */
-  const home = pathname === "/";
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">
@@ -61,8 +53,7 @@ export function SiteHeader() {
           <span className="sr-only sm:hidden">내 여행 스케치</span>
         </Link>
 
-        {!home && (
-          <nav aria-label="주요 메뉴" className={`flex items-center gap-1 ${bottomNav ? "max-sm:hidden" : ""}`}>
+        <nav aria-label="주요 메뉴" className="flex items-center gap-1">
             {TABS.map((tab) => (
               <Link
                 key={tab.id}
@@ -81,7 +72,6 @@ export function SiteHeader() {
               </Link>
             ))}
           </nav>
-        )}
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {/*
