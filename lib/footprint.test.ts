@@ -140,25 +140,8 @@ describe("tripsPerMonth · 월별 여행 수", () => {
 });
 
 describe("stepDelayMs · 재생 속도", () => {
-  it("곳이 적으면 곳당 1.2초", () => {
-    expect(stepDelayMs(1)).toBe(1200);
-    expect(stepDelayMs(9)).toBe(1200);
-  });
-
-  it("곳이 많으면 통틀어 30초를 넘지 않게 줄인다", () => {
-    expect(stepDelayMs(30)).toBe(1000);
-    expect(stepDelayMs(60)).toBe(500);
-    for (const count of [25, 26, 40, 77, 120, 300]) {
-      expect(stepDelayMs(count) * count).toBeLessThanOrEqual(30000);
-    }
-  });
-
-  it("아무리 많아도 0 이 되지는 않는다", () => {
-    expect(stepDelayMs(100000)).toBeGreaterThanOrEqual(1);
-  });
-
-  it("곳이 없어도 셈이 깨지지 않는다", () => {
-    expect(stepDelayMs(0)).toBe(1200);
+  it("곳이 몇이든 곳당 1초다 — 전체 시간 제한은 없다", () => {
+    expect(stepDelayMs()).toBe(1000);
   });
 });
 

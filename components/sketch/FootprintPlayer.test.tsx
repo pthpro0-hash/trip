@@ -35,11 +35,12 @@ describe("FootprintPlayer", () => {
     render(<FootprintPlayer steps={steps} monthCounts={counts} totals={totals} />);
     expect(screen.getByText("재생을 눌러 보세요")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "재생" }));
-    expect(screen.getByText("3월 2일 · 경복궁")).toBeTruthy();
-    act(() => void vi.advanceTimersByTime(1200));
-    expect(screen.getByText("8월 13일 · 안목해변")).toBeTruthy();
-    act(() => void vi.advanceTimersByTime(1200));
-    act(() => void vi.advanceTimersByTime(1200));
+    // 띠와 지도 위 이름표, 두 곳에 나온다.
+    expect(screen.getAllByText("3월 2일 · 경복궁").length).toBe(2);
+    act(() => void vi.advanceTimersByTime(1000));
+    expect(screen.getAllByText("8월 13일 · 안목해변").length).toBeGreaterThan(0);
+    act(() => void vi.advanceTimersByTime(1000));
+    act(() => void vi.advanceTimersByTime(1000));
     expect(screen.getByText("다녀온 곳 3곳")).toBeTruthy();
   });
 

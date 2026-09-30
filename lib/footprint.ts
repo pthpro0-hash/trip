@@ -95,12 +95,9 @@ export function seasonOfMonth(month: number): Season {
   return seasonOf(`2000-${String(month).padStart(2, "0")}-01`);
 }
 
-/**
- * 곳 하나를 찍는 데 걸리는 시간. 곳이 적으면 천천히(1.2초), 많으면 통틀어 30초를
- * 넘지 않게 줄인다. 서른 곳이 넘는 해도 끝까지 보는 데 한참 걸리지 않게 하려는 것이다.
- */
-export function stepDelayMs(count: number, totalMs = 30000, eachMs = 1200): number {
-  return Math.max(1, Math.min(eachMs, Math.floor(totalMs / Math.max(1, count))));
+/** 곳 하나를 찍는 데 걸리는 시간. 곳이 몇이든 1초 — 전체 시간에는 제한을 두지 않는다. */
+export function stepDelayMs(): number {
+  return 1000;
 }
 
 /*

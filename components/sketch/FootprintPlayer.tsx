@@ -23,7 +23,7 @@ import {
 
   카드는 그해를 한눈에 보여 주고, 여기서는 그 순서를 되살린다. 곳을 하나씩 찍으며
   지금 곳은 크게, 지나온 곳은 작게 남긴다(선은 잇지 않는다). 아래 달 막대를 누르면
-  그 달에 다녀온 곳만 남는다. 처음부터 끝까지 30초를 넘기지 않는다.
+  그 달에 다녀온 곳만 남는다. 곳마다 1초씩 머문다.
 
   내 화면에서는 점을 눌러 그 여행으로 갈 수 있다. 링크로 받은 화면(shared)에는
   갈 곳이 없어 점을 눌러도 이름만 보인다.
@@ -48,11 +48,41 @@ interface FootprintPlayerProps {
   backHref?: string;
 }
 
+/** 점 위의 이름표. 가장자리에서는 안쪽으로 밀어 잘리지 않게 한다. */
+function MapTag({
+  text,
+  x,
+  y,
+  k,
+  view,
+}: {
+  text: string;
+  x: number;
+  y: number;
+  k: number;
+  view: { x: number; y: number; width: number; height: number };
+}) {
+  const size = 13 * k;
+  const half = (text.length * size * 0.62 + 16 * k) / 2;
+  const cx = Math.min(Math.max(x, view.x + half + 4 * k), view.x + view.width - half - 4 * k);
+  // 위쪽이 모자라면 점 아래에 둔다.
+  const above = y - view.y > 40 * k;
+  const cy = above ? y - 24 * k : y + 34 * k;
+  return (
+    <g pointerEvents="none" data-tag>
+      <rect x={cx - half} y={cy - size} width={half * 2} height={size * 1.7} rx={size * 0.5} fill="#fff" fillOpacity={0.94} stroke={COAST} strokeWidth={k} />
+      <text x={cx} y={cy + size * 0.2} textAnchor="middle" fontSize={size} fontWeight={700} fill="#222">
+        {text}
+      </text>
+    </g>
+  );
+}
+
 export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared = false, backHref }: FootprintPlayerProps) {
   const [state, dispatch] = useReducer(playReducer, initialPlay);
   const [picked, setPicked] = useState<number | null>(null);
   const count = steps.length;
-  const delay = stepDelayMs(count);
+  const delay = stepDelayMs();
 
   // 재생 중에는 한 곳씩 넘긴다.
   useEffect(() => {
@@ -75,6 +105,7 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
   const shown = picked !== null ? steps[picked] : null;
   const shownPhoto = shown?.photoPath ? photoUrls?.get(shown.photoPath) : undefined;
   const canPlay = !state.playing;
+  const tagIndex = picked ?? (state.sel === null && state.cur >= 0 && !state.done ? state.cur : null);
 
   return (
     <section aria-label="발자취" className="flex flex-col gap-3">
@@ -122,6 +153,10 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
               </g>
             );
           })}
+          {/* 지금 찍는 곳(재생 중)이나 눌러 본 곳의 날짜·이름을 그 점 위에 적는다. */}
+          {tagIndex !== null && Number.isFinite(points[tagIndex]?.x) && (
+            <MapTag text={stepTitle(steps[tagIndex])} x={points[tagIndex].x} y={points[tagIndex].y} k={k} view={view} />
+          )}
         </svg>
 
         <div className="flex items-center gap-3 bg-bg px-4 py-3">
@@ -132,7 +167,11 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
           <div className="flex shrink-0 gap-1.5">
             <button
               type="button"
-              onClick={() => (canPlay ? dispatch({ type: "play", count }) : dispatch({ type: "pause" }))}
+              onClick={() => {
+                if (!canPlay) return dispatch({ type: "pause" });
+                setPicked(null);
+                dispatch({ type: "play", count });
+              }}
               className="rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
             >
               {state.playing ? "멈춤" : state.done || state.sel !== null ? "다시 재생" : state.cur >= 0 ? "이어서" : "재생"}
