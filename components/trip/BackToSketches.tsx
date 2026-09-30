@@ -29,6 +29,8 @@ export function backLabel(from: string | null): string {
     const name = new URLSearchParams(from.slice("/places?".length)).get("name");
     if (name) return `← ${name}`;
   }
+  // 한장 요약의 "그해의 곳들"에서 왔으면 그 해의 한장 요약으로.
+  if (from === "/sketch" || from?.startsWith("/sketch?")) return "← 한장 요약";
   return "← 내 스케치";
 }
 

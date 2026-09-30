@@ -27,13 +27,13 @@ export function SharedTripGallery({ visits }: { visits: GalleryVisit[] }) {
     setViewing((viewing + step + reel.length) % reel.length);
   };
 
-  let offset = 0;
+  // 곳마다 사진 한 줄(reel)에서 몇 번째부터인지. 크게 볼 때 그 자리에서 열려야 한다.
+  const starts = visits.map((_, index) => visits.slice(0, index).reduce((sum, visit) => sum + visit.urls.length, 0));
   return (
     <>
       <ol className="flex flex-col gap-6">
         {visits.map((visit, index) => {
-          const start = offset;
-          offset += visit.urls.length;
+          const start = starts[index];
           return (
             <li key={index} className="flex flex-col gap-2">
               <div>

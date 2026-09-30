@@ -23,6 +23,12 @@ describe("BackToSketches", () => {
     expect(screen.getByRole("link", { name: "← 내 스케치" })).toHaveAttribute("href", "/?v=sketch");
   });
 
+  it("한장 요약의 '그해의 곳들'에서 왔으면 보던 해의 한장 요약으로", () => {
+    tripFocus.rememberFrom("/sketch?y=2025");
+    render(<BackToSketches tripId="t1" />);
+    expect(screen.getByRole("link", { name: "← 한장 요약" })).toHaveAttribute("href", "/sketch?y=2025");
+  });
+
   it("바깥 주소는 따라가지 않는다", () => {
     tripFocus.rememberFrom("//남의곳");
     render(<BackToSketches tripId="t1" />);
@@ -39,6 +45,13 @@ describe("BackToSketches", () => {
 describe("backLabel", () => {
   it("같은 이름 모아 보기에서 왔으면 그 곳 이름으로 돌아간다", () => {
     expect(backLabel(`/places?name=${encodeURIComponent("안목해변")}`)).toBe("← 안목해변");
+  });
+
+  it("한장 요약에서 왔으면 한장 요약", () => {
+    expect(backLabel("/sketch")).toBe("← 한장 요약");
+    expect(backLabel("/sketch?y=2026")).toBe("← 한장 요약");
+    // 앞부분만 닮은 다른 주소는 아니다.
+    expect(backLabel("/sketchbook")).toBe("← 내 스케치");
   });
 
   it("그 밖에는 내 스케치", () => {

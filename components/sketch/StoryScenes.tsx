@@ -4,9 +4,10 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { times } from "@/lib/sketchWords";
 import { attachParticle } from "@/lib/korean";
-import type { YearStory } from "@/lib/sketchStory";
+import { PLACE_SHOWN, type StoryPlace, type YearStory } from "@/lib/sketchStory";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { signedUrls } from "@/lib/supabase/photos";
+import { tripFocus } from "@/lib/scrollMemory";
 import { SIDO_ORDER } from "@/lib/sidoOrder";
 import { PhotoViewer } from "@/components/trip/PhotoViewer";
 
@@ -24,8 +25,20 @@ interface StoryScenesProps {
   /** 원본 경로 → 목록 판(960px) 주소. */
   photoUrls: Map<string, string>;
   /**
+   * "그해의 곳들"의 작은 사진(핀 판, 160px) 주소. 주면 목록은 이것만 쓴다 — 줄마다
+   * 큰 판을 받으면 열 장에 1MB 가까이 내려받는다. 주지 않으면 photoUrls 를 쓴다
+   * (링크로 받은 화면에는 작은 판이 없다).
+   */
+  placeUrls?: Map<string, string>;
+  /**
+   * 곳을 눌러 여행 상세로 갔다가 돌아올 곳("/sketch?y=2026"). 누를 때 적어 둔다.
+   * 상세의 되돌아가기가 이것을 따라, 보던 해의 한장 요약으로 돌아온다.
+   */
+  backHref?: string;
+  /**
    * 링크로 남에게 보여 주는 중. 원본을 받으러 가지 않고(남에게는 열리지
-   * 않는다), 날짜를 적지 않고, 내 지도로 넘어가는 "지도에서 보기"를 두지 않는다.
+   * 않는다), 날짜를 달까지만 적고, 곳을 눌러도 갈 곳이 없고, 내 지도로 넘어가는
+   * "지도에서 보기"를 두지 않는다.
    */
   shared?: boolean;
 }
@@ -33,9 +46,17 @@ interface StoryScenesProps {
 /** "2026-08-13" → "8월 13일" */
 const monthDay = (day: string) => `${Number(day.slice(5, 7))}월 ${Number(day.slice(8, 10))}일`;
 
-export function StoryScenes({ story, photoUrls, shared = false }: StoryScenesProps) {
+/** 곳 줄의 날짜. "2026-08-13" → "8월 13일", 달까지만 있으면("2026-08") "8월". 모르면 "". */
+function placeDate(day: string): string {
+  const month = Number(day.slice(5, 7));
+  if (!(month >= 1 && month <= 12)) return "";
+  return day.length >= 10 ? monthDay(day) : `${month}월`;
+}
+
+export function StoryScenes({ story, photoUrls, placeUrls, backHref, shared = false }: StoryScenesProps) {
   const [viewing, setViewing] = useState<number | null>(null);
   const [big, setBig] = useState<Map<string, string>>(new Map());
+  const [allPlaces, setAllPlaces] = useState(false);
 
   const open = async (index: number) => {
     setViewing(index);
@@ -51,8 +72,50 @@ export function StoryScenes({ story, photoUrls, shared = false }: StoryScenesPro
   const sido = SIDO_ORDER.filter((name) => story.sido.includes(name));
   const firsts = new Set(story.firstSido ?? []);
 
+  /*
+    그해의 곳들. 카드의 점에 이름을 붙여 날짜순으로 늘어놓는다 — 카드가 포스터라면
+    이 목록은 차례다. 처음에는 사진 가장 많은 열 곳만 보이고(rank 가 그 순서다),
+    나머지는 "더 보기"로 편다. 예전에 따로 있던 "사진을 가장 많이 남긴 곳"은
+    이 목록의 첫째 줄에 표시로 남았다.
+
+    사진이 하나도 없으면(사진 없이 가져왔거나 링크가 "지도만") 사진 자리를 아예
+    두지 않는다. 자리만 비워 두면 다 빠진 것처럼 보인다.
+  */
+  const shownPlaces = allPlaces ? story.places : story.places.filter((place) => place.rank < PLACE_SHOWN);
+  const morePlaces = story.places.length - PLACE_SHOWN;
+  const anyPhoto = story.places.some((place) => place.photoPath);
+  const thumbs = placeUrls ?? photoUrls;
+
   return (
     <div className="flex flex-col">
+      {story.places.length > 0 && (
+        <Scene label="그해의 곳들">
+          <ul className="-my-1 flex flex-col">
+            {shownPlaces.map((place, index) => (
+              <PlaceRow
+                key={`${index}-${place.placeName}`}
+                place={place}
+                crown={story.places.length > 1 && place.rank === 0}
+                withTile={anyPhoto}
+                thumb={place.photoPath ? thumbs.get(place.photoPath) : undefined}
+                linked={!shared && place.tripId !== ""}
+                onOpen={() => backHref && tripFocus.rememberFrom(backHref)}
+              />
+            ))}
+          </ul>
+          {morePlaces > 0 && (
+            <button
+              type="button"
+              aria-expanded={allPlaces}
+              onClick={() => setAllPlaces((open) => !open)}
+              className="mt-3 rounded-full bg-bg-subtle px-4 py-2 text-[14px] font-medium text-text transition hover:bg-line"
+            >
+              {allPlaces ? "접기" : `${morePlaces}곳 더 보기`}
+            </button>
+          )}
+        </Scene>
+      )}
+
       <Scene label={`${story.year}년의 나`}>
         <div className="grid grid-cols-2 gap-x-4 gap-y-4">
           <Stat big={times(story.tripCount)} small="떠났어요" />
@@ -66,32 +129,6 @@ export function StoryScenes({ story, photoUrls, shared = false }: StoryScenesPro
           )}
         </div>
       </Scene>
-
-      {story.topPlace && (
-        <Scene label="사진을 가장 많이 남긴 곳">
-          <div className="flex items-center gap-4">
-            <span className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-bg-subtle">
-              {story.topPlace.photoPath && photoUrls.get(story.topPlace.photoPath) && (
-                // eslint-disable-next-line @next/next/no-img-element -- 서명 주소는 그때그때 바뀐다
-                <img
-                  src={photoUrls.get(story.topPlace.photoPath)}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              )}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate text-[20px] font-bold tracking-tight text-text">
-                {story.topPlace.placeName}
-              </p>
-              <p className="text-[14px] text-text-muted">
-                사진 {story.topPlace.photoCount}장
-                {story.topPlace.lastVisitedOn && ` · 마지막으로 ${monthDay(story.topPlace.lastVisitedOn)}`}
-              </p>
-            </div>
-          </div>
-        </Scene>
-      )}
 
       {story.seasonLine && (
         <Scene label="계절">
@@ -205,6 +242,82 @@ export function StoryScenes({ story, photoUrls, shared = false }: StoryScenesPro
         />
       )}
     </div>
+  );
+}
+
+/** 그해의 곳 한 줄. 내 화면에서는 그 여행의 상세로 가는 문이고, 링크로 받은 화면에서는 읽기만 한다. */
+function PlaceRow({
+  place,
+  crown,
+  withTile,
+  thumb,
+  linked,
+  onOpen,
+}: {
+  place: StoryPlace;
+  /** 사진을 가장 많이 남긴 곳. */
+  crown: boolean;
+  /** 사진 자리를 둘지. 어느 줄에도 사진이 없으면 두지 않는다. */
+  withTile: boolean;
+  thumb: string | undefined;
+  linked: boolean;
+  onOpen: () => void;
+}) {
+  const date = placeDate(place.lastVisitedOn);
+  const revisit = place.visits > 1;
+  // 여러 번 갔으면 날짜는 마지막으로 간 날이고, 누르면 그 여행으로 간다.
+  const meta = [date && (revisit ? `마지막 ${date}` : date), `사진 ${place.photoCount.toLocaleString("ko-KR")}장`]
+    .filter(Boolean)
+    .join(" · ");
+
+  const body = (
+    <>
+      {withTile && (
+        <span className="flex h-[60px] w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-bg-subtle">
+          {thumb ? (
+            // eslint-disable-next-line @next/next/no-img-element -- 서명 주소는 그때그때 바뀐다
+            <img src={thumb} alt="" loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            <span aria-hidden="true" className="text-[20px] opacity-60">
+              📍
+            </span>
+          )}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[16px] font-semibold text-text">{place.placeName}</span>
+        <span className="block text-[13px] text-text-muted">{meta}</span>
+        {(crown || revisit) && (
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+            {crown && (
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 font-semibold text-accent">가장 많이 찍은 곳</span>
+            )}
+            {revisit && <span className="text-text-faint">{times(place.visits)} 다녀왔어요</span>}
+          </span>
+        )}
+      </span>
+      {linked && (
+        <span aria-hidden="true" className="shrink-0 text-[22px] leading-none text-text-faint">
+          ›
+        </span>
+      )}
+    </>
+  );
+
+  return (
+    <li>
+      {linked ? (
+        <Link
+          href={`/trips/${place.tripId}`}
+          onClick={onOpen}
+          className="-mx-2 flex items-center gap-3 rounded-2xl px-2 py-2 transition hover:bg-bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        >
+          {body}
+        </Link>
+      ) : (
+        <div className="flex items-center gap-3 py-2">{body}</div>
+      )}
+    </li>
   );
 }
 

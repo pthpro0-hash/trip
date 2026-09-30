@@ -18,6 +18,11 @@ export interface SketchVisit {
   dong?: string | null;
   /** 그 자리에서 찍은 대표 사진의 보관 경로. 지도에 점 대신 얹는다. */
   photoPath?: string | null;
+  /**
+   * 그곳에 간 날("2026-09-13"). 여행 시작일과 다를 수 있다 — 사흘째에 간 곳은
+   * 사흘째 날짜다. 모르면 비워 두고, 그때는 여행 시작일로 갈음한다.
+   */
+  visitedOn?: string | null;
 }
 
 export interface SketchTrip {
@@ -224,7 +229,10 @@ export interface SketchDot {
   lng: number;
   /** 그 자리에서 사진을 가장 많이 찍은 때의 이름. 여러 번 갔으면 그중 하나. */
   placeName: string;
-  /** 마지막으로 간 날. 목록을 최근 순으로 세우는 데 쓴다. */
+  /**
+   * 마지막으로 간 날. 목록을 세우고 "그해의 곳들"에 적는 데 쓴다. 내 기록에서는
+   * 그곳에 간 날("2026-09-13"), 링크로 받은 것은 달까지("2026-09")다.
+   */
   lastVisitedOn: string;
   /** 사진을 가장 많이 찍은 방문의 대표 사진. 없으면 null. */
   photoPath: string | null;
@@ -234,6 +242,8 @@ export interface SketchDot {
   season: Season;
   /** 눌렀을 때 갈 여행. 여러 번 갔으면 가장 최근 것. */
   tripId: string;
+  /** 이 자리를 다녀온 여행의 수. 링크로 받은 것은 모른다(비어 있다). */
+  visitCount?: number;
 }
 
 /** 한 여행 안에서 옮겨 다닌 길. */
@@ -266,6 +276,8 @@ export function sketchShapes(trips: SketchTrip[]): SketchShapes {
   const dots: (SketchDot & {
     bySeason: Map<Season, number>;
     byName: Map<string, number>;
+    /** 이 자리를 다녀온 여행들. 한 여행에서 두 번 찍혀도 한 번으로 센다. */
+    tripIds: Set<string>;
   })[] = [];
   /** 점마다 "지금까지 본 가장 많은 사진 수". 대표 사진을 고르는 잣대다. */
   const best = new Map<object, number>();
@@ -278,6 +290,8 @@ export function sketchShapes(trips: SketchTrip[]): SketchShapes {
     const season = seasonOf(trip.startedOn);
     for (const visit of trip.visits) {
       if (!drawable(visit)) continue;
+      /** 그곳에 간 날. 모르면 여행 시작일로 갈음한다. */
+      const visitedOn = visit.visitedOn || trip.startedOn;
 
       const hit = dots.find((dot) => distanceKm(dot, visit) < SAME_SPOT_KM);
       const target =
@@ -286,13 +300,14 @@ export function sketchShapes(trips: SketchTrip[]): SketchShapes {
           lat: visit.lat,
           lng: visit.lng,
           placeName: visit.placeName,
-          lastVisitedOn: trip.startedOn,
+          lastVisitedOn: visitedOn,
           photoPath: null,
           photoCount: 0,
           season,
           tripId: trip.id,
           bySeason: new Map(),
           byName: new Map(),
+          tripIds: new Set(),
         }),
         dots.at(-1)!);
 
@@ -310,9 +325,17 @@ export function sketchShapes(trips: SketchTrip[]): SketchShapes {
       if (visit.placeName) {
         target.byName.set(visit.placeName, (target.byName.get(visit.placeName) ?? 0) + visit.photoCount);
       }
-      // 마지막에 들른 여행으로 이어 준다.
-      target.tripId = trip.id;
-      target.lastVisitedOn = trip.startedOn;
+      target.tripIds.add(trip.id);
+      /*
+        가장 늦게 간 날과 그날의 여행을 함께 적는다. 여행은 시작일 순으로
+        훑으므로, 긴 여행의 끝자락에 간 곳이 그 뒤에 시작한 짧은 여행보다
+        늦을 수 있다 — 날짜와 여행이 어긋나지 않게 늘 같이 바꾼다.
+        같은 날이면 나중에 훑은 것이 이긴다.
+      */
+      if (visitedOn >= target.lastVisitedOn) {
+        target.lastVisitedOn = visitedOn;
+        target.tripId = trip.id;
+      }
     }
   }
 
@@ -333,6 +356,7 @@ export function sketchShapes(trips: SketchTrip[]): SketchShapes {
       lastVisitedOn: dot.lastVisitedOn,
       photoPath: dot.photoPath,
       photoCount: dot.photoCount,
+      visitCount: dot.tripIds.size,
       // 사진을 가장 많이 찍은 때의 색. 같으면 먼저 간 때를 쓴다.
       season: [...dot.bySeason.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? dot.season,
       tripId: dot.tripId,

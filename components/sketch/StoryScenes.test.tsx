@@ -34,6 +34,10 @@ const full: YearStory = {
   firstSido: ["제주"],
   compare: { previousYear: 2025, tripsLine: "2025년보다 두 번 더 떠났어요", photosLine: "사진은 76장 더 남겼어요" },
   companions: [{ label: "민수", count: 1 }],
+  places: [
+    { placeName: "우도", photoCount: 12, photoPath: "c.webp", lastVisitedOn: "2026-04-10", visits: 1, tripId: "t2", rank: 1 },
+    { placeName: "안목해변", photoCount: 62, photoPath: "a.webp", lastVisitedOn: "2026-08-30", visits: 2, tripId: "t4", rank: 0 },
+  ],
 };
 
 describe("StoryScenes", () => {
@@ -46,9 +50,19 @@ describe("StoryScenes", () => {
 
   it("장면을 차례로 그린다", () => {
     render(<StoryScenes story={full} photoUrls={new Map()} />);
-    for (const label of ["2026년의 나", "사진을 가장 많이 남긴 곳", "계절", "밟은 시도 2곳", "그해의 사진", "2025년과 견주면", "누구와", "지도에서 보기"]) {
+    for (const label of ["그해의 곳들", "2026년의 나", "계절", "밟은 시도 2곳", "그해의 사진", "2025년과 견주면", "누구와", "지도에서 보기"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
+  });
+
+  it("'그해의 곳들'이 맨 앞이다 — 카드 바로 아래", () => {
+    const { container } = render(<StoryScenes story={full} photoUrls={new Map()} />);
+    expect(container.querySelector("h2")?.textContent).toBe("그해의 곳들");
+  });
+
+  it("따로 있던 '사진을 가장 많이 남긴 곳' 장면은 목록이 흡수했다", () => {
+    render(<StoryScenes story={full} photoUrls={new Map()} />);
+    expect(screen.queryByText("사진을 가장 많이 남긴 곳")).toBeNull();
   });
 
   it("시도는 지도 차례로 늘어놓고, 처음 밟은 곳을 표시하고, 조사를 받침에 맞춘다", () => {
@@ -77,6 +91,7 @@ describe("StoryScenes", () => {
           ...full,
           distanceKm: 0,
           topPlace: null,
+          places: [],
           photoPaths: [],
           sido: [],
           firstSido: null,
@@ -86,7 +101,7 @@ describe("StoryScenes", () => {
         photoUrls={new Map()}
       />,
     );
-    for (const label of ["사진을 가장 많이 남긴 곳", "그해의 사진", "2025년과 견주면", "누구와"]) {
+    for (const label of ["그해의 곳들", "그해의 사진", "2025년과 견주면", "누구와"]) {
       expect(screen.queryByText(label)).toBeNull();
     }
     expect(screen.queryByText(/밟은 시도/)).toBeNull();

@@ -178,10 +178,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
   }, [style, picks]);
 
   /* 장면 속 사진은 크게 보이므로 목록 판(960px)을 받는다. */
-  const scenePaths = useMemo(
-    () => [...new Set([story.topPlace?.photoPath, ...story.photoPaths].filter((p): p is string => !!p))],
-    [story],
-  );
+  const scenePaths = story.photoPaths;
   const [sceneUrls, setSceneUrls] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -194,6 +191,33 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
       active = false;
     };
   }, [scenePaths]);
+
+  /*
+    "그해의 곳들"의 사진. 줄마다 손톱만 하게 보이므로 핀용 작은 판(160px)이면
+    된다 — 카드가 이미 받은 것과 같은 판이라 주소도 같고, 브라우저가 가진 것을
+    그대로 쓴다. 큰 판을 열 장씩 받으면 한장 요약을 열 때마다 1MB 가까이 든다.
+    "더 보기"에 숨은 곳까지 주소만 미리 받아 둔다(사진은 펼칠 때 받는다).
+  */
+  const placePaths = useMemo(
+    () => [...new Set(story.places.map((place) => place.photoPath).filter((path): path is string => !!path))],
+    [story],
+  );
+  const [placeUrls, setPlaceUrls] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    const supabase = getBrowserClient();
+    if (!supabase || placePaths.length === 0) return;
+    let active = true;
+    void markerUrls(supabase, placePaths)
+      .then((urls) => {
+        if (active) setPlaceUrls(urls);
+      })
+      .catch(() => {
+        // 사진을 못 받아도 곳 이름과 날짜는 보인다. 자리표시가 남을 뿐이다.
+      });
+    return () => {
+      active = false;
+    };
+  }, [placePaths]);
 
   const title = `${year}년`;
 
@@ -343,7 +367,8 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
         )}
       </div>
 
-      <StoryScenes story={story} photoUrls={sceneUrls} />
+      {/* 곳을 눌러 상세로 갔다가 돌아오면 보던 해의 한장 요약으로 선다. */}
+      <StoryScenes story={story} photoUrls={sceneUrls} placeUrls={placeUrls} backHref={`/sketch?y=${year}`} />
 
       {/*
         저장은 늘 손 닿는 데. 어디까지 읽어 내려가든 그 자리에서 저장한다.

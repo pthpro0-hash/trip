@@ -149,6 +149,47 @@ describe("sketchShapes · 점", () => {
   });
 });
 
+/*
+  한장 요약의 "그해의 곳들"이 곳마다 날짜와 다녀온 횟수를 보여 준다. 날짜는
+  여행 시작일이 아니라 그곳에 간 날이어야 한다 — 사흘째에 간 곳이 첫날로
+  적히면 목록이 거짓말을 한다.
+*/
+describe("sketchShapes · 그곳에 간 날과 다녀온 횟수", () => {
+  it("방문한 날이 있으면 마지막으로 간 날은 그날이다 — 여행 시작일이 아니라", () => {
+    const [dot] = sketchShapes([
+      trip({ id: "a", startedOn: "2026-09-13", endedOn: "2026-09-15", visits: [{ ...남산, visitedOn: "2026-09-15" }] }),
+    ]).dots;
+    expect(dot.lastVisitedOn).toBe("2026-09-15");
+  });
+
+  it("방문한 날을 모르면 여행 시작일로 물러난다", () => {
+    const [dot] = sketchShapes([trip({ id: "a", startedOn: "2026-09-13", visits: [남산] })]).dots;
+    expect(dot.lastVisitedOn).toBe("2026-09-13");
+  });
+
+  it("여러 번 갔으면 가장 늦게 간 날, 그리고 그날의 여행으로 이어 준다", () => {
+    const [dot] = sketchShapes([
+      // 긴 여행(1일~10일)의 9일에 들르고, 그 사이 5일에 시작한 짧은 여행에서 또 들렀다.
+      trip({ id: "긴", startedOn: "2026-05-01", endedOn: "2026-05-10", visits: [{ ...남산, visitedOn: "2026-05-09" }] }),
+      trip({ id: "짧은", startedOn: "2026-05-05", endedOn: "2026-05-05", visits: [{ ...남산, visitedOn: "2026-05-05" }] }),
+    ]).dots;
+    expect(dot.lastVisitedOn).toBe("2026-05-09");
+    expect(dot.tripId).toBe("긴");
+  });
+
+  it("다녀온 횟수는 여행 수로 센다 — 한 여행에서 두 번 찍혀도 한 번", () => {
+    const [dot] = sketchShapes([
+      trip({ id: "a", startedOn: "2026-04-01", endedOn: "2026-04-01", visits: [남산, { ...남산, lat: 남산.lat + 0.001 }] }),
+      trip({ id: "b", startedOn: "2026-06-01", endedOn: "2026-06-01", visits: [남산] }),
+    ]).dots;
+    expect(dot.visitCount).toBe(2);
+  });
+
+  it("한 번 간 곳은 1", () => {
+    expect(sketchShapes([trip({ id: "a", visits: [남산] })]).dots[0].visitCount).toBe(1);
+  });
+});
+
 describe("sketchShapes · 길", () => {
   it("한 여행 안에서 옮겨 다닌 순서대로 잇는다", () => {
     const [path] = sketchShapes([

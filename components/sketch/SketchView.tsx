@@ -8,7 +8,8 @@ import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { fetchHeadlines, saveHeadline } from "@/lib/supabase/sketchYears";
 import { visitCovers } from "@/lib/supabase/photos";
 import type { SketchTrip } from "@/lib/sketch";
-import { yearsOf, type SidoOf } from "@/lib/sketchStory";
+import { yearFromSearch, yearsOf, type SidoOf } from "@/lib/sketchStory";
+import { tripFocus } from "@/lib/scrollMemory";
 import { SketchShowcase } from "./SketchShowcase";
 import { AllYearsShowcase } from "./AllYearsShowcase";
 import { Waiting } from "@/components/layout/Waiting";
@@ -30,8 +31,16 @@ type Status = "loading" | "guest" | "failed" | "ready";
 export function SketchView() {
   const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
   const [trips, setTrips] = useState<SavedTrip[]>([]);
-  /** 고른 해. "all" 은 지금까지 전부. */
-  const [year, setYear] = useState<number | "all" | null>(null);
+  /*
+    고른 해. "all" 은 지금까지 전부.
+
+    주소의 ?y= 로 열 수 있다. "그해의 곳들"에서 여행 상세로 갔다가 돌아오면 보던
+    해로 서야 한다 — 그렇지 않으면 2024년을 보다 나온 사람이 늘 최근 해로 돌아온다.
+    서버에서는 주소를 모르지만, 첫 화면(불러오는 중)은 해와 무관해 어긋나지 않는다.
+  */
+  const [year, setYear] = useState<number | "all" | null>(() =>
+    typeof window === "undefined" ? null : yearFromSearch(window.location.search),
+  );
   /** 해마다 적어 둔 한 줄. 적지 않은 해는 없다. */
   const [written, setWritten] = useState<Map<number, string>>(new Map());
   const [userId, setUserId] = useState<string | null>(null);
@@ -41,6 +50,13 @@ export function SketchView() {
   const [sidoOf, setSidoOf] = useState<SidoOf | undefined>(undefined);
 
   useEffect(() => {
+    /*
+      상세에서 돌아온 것이다. 상세가 "이 여행 앞에 세워 달라"고 적어 둔 것은 목록의
+      장부인데 여기서는 아무도 읽지 않는다 — 지우지 않으면 나중에 목록을 열 때 엉뚱한
+      카드 앞에 선다.
+    */
+    tripFocus.forget();
+
     const supabase = getBrowserClient();
     if (!supabase) return;
     let active = true;
@@ -101,14 +117,23 @@ export function SketchView() {
           photoCount: visit.photoCount,
           dong: visit.dong,
           photoPath: covers.get(visit.id) ?? null,
+          // "2026-09-13T09:21:23" → 그곳에 간 날. 여행 시작일이 아니라 그날이다.
+          visitedOn: visit.startedAt.slice(0, 10),
         })),
       })),
     [trips, covers],
   );
 
   const years = useMemo(() => yearsOf(all), [all]);
-  /** 고르지 않았으면 가장 최근 해. 보여 주고 싶은 것은 대개 올해다. */
-  const shown = year === "all" && years.length < 2 ? years[0] ?? null : (year ?? years[0] ?? null);
+  /**
+   * 고르지 않았으면 가장 최근 해. 보여 주고 싶은 것은 대개 올해다.
+   * 주소에서 온 해는 기록에 있는 해일 때만 따른다 — 없는 해를 열면 빈 그림이 뜬다.
+   */
+  const shown = (() => {
+    if (year === "all") return years.length < 2 ? (years[0] ?? null) : "all";
+    if (year !== null && years.includes(year)) return year;
+    return years[0] ?? null;
+  })();
 
   if (status === "loading") return <Waiting title="스케치를 그리고 있어요" />;
 

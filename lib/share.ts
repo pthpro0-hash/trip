@@ -1,6 +1,6 @@
 import type { CardStyle } from "./cardStyle";
 import type { MonthCell, Season, Sketch, SketchDot, SketchShapes } from "./sketch";
-import type { YearStory } from "./sketchStory";
+import { PLACE_SHOWN, notablePlaces, type YearStory } from "./sketchStory";
 import type { YearLayer, YearRow, YearsStory } from "./yearsStory";
 import { collagePicks } from "./collage";
 
@@ -47,7 +47,10 @@ export const SHARE_SCOPES: { id: ShareScope; label: string; hint: string }[] = [
  */
 export type ShareCard = CardStyle | "sido" | "years";
 
-/** 사진을 가장 많이 얹는 카드(지도형)의 자리 수. SketchShowcase 와 맞춘다. */
+/**
+ * 링크로 올리는 사진의 상한. 카드(지도형)에 가장 많이 얹는 자리 수다.
+ * "그해의 곳들"의 사진(열 장까지)은 대부분 카드의 사진과 겹쳐 이 안에 든다.
+ */
 export const SHARE_PHOTO_LIMIT = 12;
 
 export interface ShareStats {
@@ -114,13 +117,24 @@ export interface ShareSnapshot {
 /** 약 1km. 전국·권역을 그리기에 넉넉하고, 골목까지는 알려 주지 않는다. */
 const blur = (n: number) => Math.round(n * 100) / 100;
 
-/** 사진까지일 때 올릴 사진들. 카드와 장면에 쓰이는 것을 모아, 겹치지 않게. */
+/**
+ * 사진까지일 때 올릴 사진들. 카드와 장면에 쓰이는 것을 모아, 겹치지 않게.
+ *
+ * "그해의 곳들"에 먼저 보이는 곳(열 곳까지)의 대표 사진이 맨 앞이다. 받는
+ * 사람도 그 목록을 보므로, 사진이 빠지면 그 줄만 빈 칸으로 남는다. 카드와
+ * 이야기에 쓰는 사진은 그 뒤에 자리가 남는 만큼 채운다.
+ */
 export function sharePhotoPaths(shapes: SketchShapes, story: YearStory, max = SHARE_PHOTO_LIMIT): string[] {
   const byCount = shapes.dots
     .filter((dot) => dot.photoPath)
     .sort((a, b) => b.photoCount - a.photoCount)
     .map((dot) => dot.photoPath!);
+  const listed = story.places
+    .filter((place) => place.rank < PLACE_SHOWN)
+    .sort((a, b) => a.rank - b.rank)
+    .map((place) => place.photoPath);
   const wanted = [
+    ...listed,
     story.topPlace?.photoPath ?? null,
     ...story.photoPaths,
     ...collagePicks(shapes.dots).map((dot) => dot.photoPath),
@@ -255,6 +269,12 @@ export function storyOfShare(snapshot: ShareSnapshot): YearStory {
           tripId: "",
         }
       : null,
+    /*
+      곳 목록은 따로 싣지 않고 점에서 되짚는다. 점은 이미 범위를 따른다 —
+      시도 이름만이면 점이 없어 목록도 없고, 지도만이면 사진이 없어 이름뿐이다.
+      "더 보기"는 내 화면에서만 연다. 링크로는 열 곳까지, 그 사진만 올라가 있다.
+    */
+    places: notablePlaces(shapesOfShare(snapshot).dots).filter((place) => place.rank < PLACE_SHOWN),
     seasons: story.seasons,
     seasonLine: story.seasonLine,
     photoPaths: story.photos,

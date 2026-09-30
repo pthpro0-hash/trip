@@ -1,10 +1,11 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { buildSketch, monthStrip, sketchShapes, type SketchTrip } from "./sketch";
-import { yearStory } from "./sketchStory";
+import { PLACE_SHOWN, yearStory } from "./sketchStory";
 import { yearsStory } from "./yearsStory";
 import {
   ALL_YEARS,
+  SHARE_PHOTO_LIMIT,
   buildAllSnapshot,
   layersOfShare,
   buildSnapshot,
@@ -132,6 +133,102 @@ describe("sharePhotoPaths", () => {
     expect(paths[0]).toBe("u1/v2/b.webp");
     expect(new Set(paths).size).toBe(paths.length);
     expect(sharePhotoPaths(shapes, story, 2)).toHaveLength(2);
+  });
+});
+
+/*
+  "그해의 곳들"은 링크로 받은 사람도 본다. 따로 싣지 않는다 — 스냅샷의 점(곳 이름·
+  사진 수·달·사진 파일)에서 되짚는다. 그래서 범위가 곧 목록의 범위다: 사진까지면
+  사진이 있고, 지도만이면 이름뿐이고, 시도 이름만이면 목록이 없다. 날짜는 달까지,
+  여행 id 는 없으니 눌러도 갈 곳이 없다.
+*/
+describe("sharePhotoPaths · 그해의 곳들의 사진", () => {
+  // 사진을 10장 이상 남긴 곳이 열넷 — 콜라주 후보와 자리를 다툰다.
+  const many: SketchTrip[] = [
+    {
+      id: "trip-many",
+      startedOn: "2026-05-01",
+      endedOn: "2026-05-02",
+      companions: null,
+      visits: Array.from({ length: 14 }, (_, i) =>
+        v(`곳${String(i).padStart(2, "0")}`, 34 + i * 0.3, 126 + i * 0.3, 60 - i, `u1/m/${i}.webp`, "강원 강릉시"),
+      ),
+    },
+  ];
+  const manyShapes = sketchShapes(many);
+  const manyStory = yearStory(many, 2026, sidoOf);
+  const uploaded = sharePhotoPaths(manyShapes, manyStory);
+
+  it("먼저 보이는 열 곳의 대표 사진은 자리가 모자라도 언제나 올린다", () => {
+    const shown = manyStory.places.filter((place) => place.rank < PLACE_SHOWN);
+    expect(shown).toHaveLength(10);
+    for (const place of shown) expect(uploaded).toContain(place.photoPath);
+  });
+
+  it("총 상한은 넘지 않는다", () => {
+    expect(uploaded.length).toBeLessThanOrEqual(SHARE_PHOTO_LIMIT);
+  });
+});
+
+describe("스냅샷 → 그해의 곳들", () => {
+  it("사진까지: 곳 이름·사진·달까지 — 여행 id 도 날짜도 없다", () => {
+    const { places } = storyOfShare(snap("photos"));
+    expect(places.map((place) => place.placeName).sort()).toEqual(["속초해변", "안목해변", "우도"]);
+    for (const place of places) {
+      expect(place.tripId).toBe("");
+      expect(place.lastVisitedOn).toMatch(/^\d{4}-\d{2}$/);
+    }
+    expect(places.find((place) => place.placeName === "안목해변")?.photoPath).toBe(files.get("u1/v2/b.webp"));
+  });
+
+  it("지도만: 이름은 있고 사진은 없다", () => {
+    const { places } = storyOfShare(snap("map"));
+    expect(places.length).toBeGreaterThan(0);
+    expect(places.every((place) => place.photoPath === null)).toBe(true);
+  });
+
+  it("시도 이름만: 곳 목록이 없다", () => {
+    expect(storyOfShare(snap("sido")).places).toEqual([]);
+  });
+
+  it("열 곳까지만 — '더 보기'는 내 화면에서만 열린다", () => {
+    const many: SketchTrip[] = [
+      {
+        id: "trip-many",
+        startedOn: "2026-05-01",
+        endedOn: "2026-05-02",
+        companions: null,
+        visits: Array.from({ length: 14 }, (_, i) =>
+          v(`곳${String(i).padStart(2, "0")}`, 34 + i * 0.3, 126 + i * 0.3, 60 - i, `u1/m/${i}.webp`, "강원 강릉시"),
+        ),
+      },
+    ];
+    const manyShapes = sketchShapes(many);
+    const manyStory = yearStory(many, 2026, sidoOf);
+    const manyFiles = new Map(sharePhotoPaths(manyShapes, manyStory).map((path, index) => [path, `k2-${index}.webp`]));
+    const snapshot = buildSnapshot({
+      year: 2026,
+      scope: "photos",
+      style: "map",
+      headline: "",
+      sketch: buildSketch(many),
+      shapes: manyShapes,
+      months: monthStrip(many),
+      story: manyStory,
+      files: manyFiles,
+      cover: null,
+    });
+    const { places } = storyOfShare(snapshot);
+    expect(places).toHaveLength(10);
+    // 올린 사진이 곧 보이는 사진이다 — 빈 칸이 없다.
+    expect(places.every((place) => place.photoPath !== null)).toBe(true);
+  });
+
+  it("어느 범위에서도 스냅샷에 정확한 날짜와 여행 id 는 없다 (달까지만)", () => {
+    for (const scope of ["photos", "map", "sido"] as const) {
+      const text = JSON.stringify(snap(scope));
+      expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    }
   });
 });
 

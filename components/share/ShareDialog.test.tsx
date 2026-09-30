@@ -70,7 +70,7 @@ describe("ShareDialog", () => {
 
   it("함께한 사람은 어느 범위에서도 싣지 않는다고 알린다", () => {
     open();
-    expect(screen.getByText(/함께한 사람과 날짜는 어느 쪽이든/)).toBeTruthy();
+    expect(screen.getByText(/함께한 사람은 어느 쪽이든 싣지 않고, 날짜는 몇 월보다 자세히 싣지 않아요/)).toBeTruthy();
     expect(document.body.textContent).not.toContain("민수");
   });
 });

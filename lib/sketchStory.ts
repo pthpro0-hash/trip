@@ -40,6 +40,76 @@ export interface SeasonBar {
   trips: number;
 }
 
+/*
+  "그해의 곳들" — 한 해를 곳으로 정리한다.
+
+  카드의 점에 이름을 붙여 날짜순으로 늘어놓는다. 사진을 10장 이상 남긴 곳이
+  그해의 곳이다. 기준을 고정하면 해마다 들쭉날쭉하다 — 어떤 해는 0곳,
+  어떤 해는 서른 곳. 그래서:
+
+    적으면  사진 많은 순으로 3곳까지 채운다.
+    많으면  사진 가장 많은 열 곳이 먼저 보이고, 나머지는 "더 보기"로 편다.
+            (그래서 rank 를 붙인다 — 날짜순으로 세워도 무엇이 위인지 남는다.)
+*/
+
+/** 이만큼 남긴 곳을 그해의 곳으로 친다. */
+export const PLACE_MIN_PHOTOS = 10;
+/** 그해의 곳이 이보다 적으면 사진 많은 순으로 여기까지 채운다. */
+export const PLACE_FLOOR = 3;
+/** 처음에 보이는 곳의 수. 나머지는 "더 보기". */
+export const PLACE_SHOWN = 10;
+
+export interface StoryPlace {
+  placeName: string;
+  photoCount: number;
+  /** 대표 사진의 보관 경로(링크로 받은 것은 링크 보관함 파일 이름). 없으면 null. */
+  photoPath: string | null;
+  /** 마지막으로 간 날. 내 기록은 "2026-09-13", 링크로 받은 것은 달까지 "2026-09". */
+  lastVisitedOn: string;
+  /** 이 자리를 다녀온 여행의 수. 링크로 받은 것은 모른다(1). */
+  visits: number;
+  /** 눌러서 갈 여행. 링크로 받은 것은 갈 곳이 없다(""). */
+  tripId: string;
+  /** 사진 많은 순 0부터. 이름이 같은 수면 이름 순. */
+  rank: number;
+}
+
+const byCountThenName = (a: SketchDot, b: SketchDot) =>
+  b.photoCount - a.photoCount || a.placeName.localeCompare(b.placeName, "ko");
+
+/** 그해의 곳들. 날짜순(같은 날이면 사진 많은 쪽이 먼저). */
+export function notablePlaces(dots: SketchDot[]): StoryPlace[] {
+  const ranked = dots.filter((dot) => dot.photoCount > 0).sort(byCountThenName);
+  const qualified = ranked.filter((dot) => dot.photoCount >= PLACE_MIN_PHOTOS);
+  const chosen = qualified.length >= PLACE_FLOOR ? qualified : ranked.slice(0, PLACE_FLOOR);
+
+  return chosen
+    .map((dot, rank) => ({
+      placeName: dot.placeName,
+      photoCount: dot.photoCount,
+      photoPath: dot.photoPath,
+      lastVisitedOn: dot.lastVisitedOn,
+      visits: dot.visitCount ?? 1,
+      tripId: dot.tripId,
+      rank,
+    }))
+    .sort((a, b) => a.lastVisitedOn.localeCompare(b.lastVisitedOn) || a.rank - b.rank);
+}
+
+/**
+ * 주소의 ?y= 에서 고른 해를 읽는다. 상세에서 한장 요약으로 돌아올 때 보던 해로
+ * 서게 한다. 없거나 이상하면 null — 화면이 가장 최근 해를 고른다.
+ */
+export function yearFromSearch(search: string): number | "all" | null {
+  const value = new URLSearchParams(search).get("y");
+  if (value === "all") return "all";
+  if (value && /^\d{4}$/.test(value)) {
+    const year = Number(value);
+    if (year >= 1900 && year <= 2100) return year;
+  }
+  return null;
+}
+
 export interface YearCompare {
   previousYear: number;
   /** "2025년보다 네 번 더 떠났어요" */
@@ -58,6 +128,8 @@ export interface YearStory {
   distanceWords: string | null;
   /** 사진을 가장 많이 남긴 곳. 사진을 하나도 안 올렸으면 null. */
   topPlace: SketchDot | null;
+  /** 그해의 곳들. 날짜순. 보여 줄 곳이 없으면 빈 배열. */
+  places: StoryPlace[];
   /** 봄·여름·가을·겨울 순서 그대로. */
   seasons: SeasonBar[];
   /** "여름에 가장 많이 떠났어요". 여행이 없으면 null. */
@@ -162,6 +234,7 @@ export function yearStory(all: SketchTrip[], year: number, sidoOf?: SidoOf): Yea
     distanceKm: Math.round(sketch.distanceKm),
     distanceWords: distanceInWords(sketch.distanceKm),
     topPlace: withPhotos[0] ?? null,
+    places: notablePlaces(shapes.dots),
     seasons,
     seasonLine: seasonLineOf(seasons),
     photoPaths: withPhotos.slice(0, 6).map((dot) => dot.photoPath!),

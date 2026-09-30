@@ -253,8 +253,8 @@ export function ShareDialog(props: ShareDialogProps) {
           </div>
           <p className="text-[13px] leading-relaxed text-text-muted">
             {blockedNote && `${blockedNote} `}
-            {SHARE_SCOPES.find((option) => option.id === scope)?.hint} 함께한 사람과 날짜는 어느 쪽이든
-            싣지 않아요.
+            {SHARE_SCOPES.find((option) => option.id === scope)?.hint} 함께한 사람은 어느 쪽이든 싣지 않고,
+            날짜는 몇 월보다 자세히 싣지 않아요.
           </p>
         </section>
 
