@@ -5,7 +5,7 @@ import Link from "next/link";
 import { tripFocus } from "@/lib/scrollMemory";
 
 /*
-  내 스케치로 돌아가는 길.
+  내 여행으로 돌아가는 길.
 
   여행 상세는 지도에서도, 목록에서도, 연도 카드에서도 열린다. 돌아갈
   곳은 떠나올 때 적어 둔 것을 따른다 — 지도에서 왔으면 지도로, 목록에서
@@ -31,7 +31,7 @@ export function backLabel(from: string | null): string {
   }
   // 한장 요약의 "그해의 곳들"에서 왔으면 그 해의 한장 요약으로.
   if (from === "/sketch" || from?.startsWith("/sketch?")) return "← 한장 요약";
-  return "← 내 스케치";
+  return "← 내 여행";
 }
 
 export function BackToSketches({ tripId }: { tripId: string }) {

@@ -10,14 +10,14 @@ import { rememberStart, startHref, type Start } from "@/lib/start";
 
   둘을 한 화면에 섞어 놓으면 둘 다 흐려진다. 그렇다고 첫 화면을 두 개짜리
   관문으로 만들 수도 없다: 검색엔진이 보는 것이 100선 목록이고, 처음 온
-  사람에게 "내 스케치"는 문이 아니라 빈 벽이기 때문이다.
+  사람에게 "내 여행"은 문이 아니라 빈 벽이기 때문이다.
 
   그래서 나누는 일은 여기서 한다. 어느 쪽이 커 보일지는 첫 화면이
   그 사람의 형편을 보고 정한다(HomeIntro 참고).
 */
 
 const TABS: { start: Start; label: string }[] = [
-  { start: "sketch", label: "내 스케치" },
+  { start: "sketch", label: "내 여행" },
   { start: "spots", label: "여행 100선" },
 ];
 

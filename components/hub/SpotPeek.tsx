@@ -38,7 +38,7 @@ export function SpotPeek({ spot, thumbnail }: SpotPeekProps) {
 
       <div className="flex flex-wrap items-center gap-2">
         <SaveButton spotId={spot.id} spotName={spot.name} variant="inline" />
-        {/* 상세에서 "← 내 스케치"로 이 지도에 돌아오게 적어 둔다. */}
+        {/* 상세에서 "← 내 여행"으로 이 지도에 돌아오게 적어 둔다. */}
         <Link
           href={`/spots/${spot.id}`}
           onClick={() => spotFocus.rememberFrom("/?v=sketch")}

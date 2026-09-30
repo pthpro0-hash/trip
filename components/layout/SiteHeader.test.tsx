@@ -23,7 +23,7 @@ const 켜진곳 = () =>
 describe("SiteHeader", () => {
   it("두 갈래를 보여주고, 갈래는 주소에 적힌다", async () => {
     await 머리띠("/trips");
-    expect(screen.getByRole("link", { name: "내 스케치" })).toHaveAttribute("href", "/?v=sketch");
+    expect(screen.getByRole("link", { name: "내 여행" })).toHaveAttribute("href", "/?v=sketch");
     expect(screen.getByRole("link", { name: "여행 100선" })).toHaveAttribute("href", "/?v=spots");
   });
 
@@ -33,7 +33,7 @@ describe("SiteHeader", () => {
   */
   it("첫 화면에서는 위 띠의 갈래를 접는다", async () => {
     await 머리띠("/");
-    expect(screen.queryByRole("link", { name: "내 스케치" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "내 여행" })).toBeNull();
     expect(screen.queryByRole("link", { name: "여행 100선" })).toBeNull();
     // 도움말과 처음으로 가는 길은 남는다.
     expect(screen.getByRole("link", { name: "도움말" })).toBeTruthy();
@@ -43,9 +43,9 @@ describe("SiteHeader", () => {
     ["/spots/경복궁", "여행 100선"],
     ["/regions/강원권", "여행 100선"],
     ["/course", "여행 100선"],
-    ["/trips", "내 스케치"],
-    ["/trips/new", "내 스케치"],
-    ["/sketch", "내 스케치"],
+    ["/trips", "내 여행"],
+    ["/trips/new", "내 여행"],
+    ["/sketch", "내 여행"],
   ])("%s 에서는 '%s' 가 켜진다", async (at, expected) => {
     await 머리띠(at);
     expect(켜진곳()).toEqual([expected]);

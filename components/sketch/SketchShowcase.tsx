@@ -315,10 +315,32 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
       </header>
 
       {/*
-        카드 모양. 같은 한 해라도 보여 줄 곳에 따라 어울리는 모양이 다르다.
-        고른 모양 그대로 저장된다.
+        카드가 먼저다. 열자마자 보여야 하는 것은 결과이고, 모양을 바꾸는 것은 그다음
+        일이다 — 고르는 줄이 카드 위에 있으면 첫 화면이 설정으로 시작한다.
       */}
-      <div className="flex flex-col gap-2">
+      <div ref={holder} className="overflow-hidden rounded-2xl ring-1 ring-line">
+        {style === "collage" ? (
+          <CollageCard sketch={sketch} title={title} headline={line} picks={picks} photos={collagePhotos} />
+        ) : style === "line" ? (
+          <LineCard sketch={sketch} shapes={shapes} year={year} headline={line} months={months} />
+        ) : (
+          <SketchCard
+            sketch={sketch}
+            shapes={shapes}
+            title={title}
+            headline={line}
+            months={months}
+            region={null}
+            photos={cardPhotos}
+          />
+        )}
+      </div>
+
+      {/*
+        카드 모양. 같은 한 해라도 보여 줄 곳에 따라 어울리는 모양이 다르다.
+        고른 모양 그대로 저장된다. 바로 위 카드의 것이라 카드에 붙여 둔다.
+      */}
+      <div className="-mt-2 flex flex-col gap-2">
         <div role="radiogroup" aria-label="카드 모양" className="flex gap-1.5">
           {CARD_STYLES.map((option) => {
             const blocked = option.id === "collage" && picks.length === 0;
@@ -347,24 +369,6 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
             : CARD_STYLES.find((option) => option.id === style)?.hint}
           {style === "collage" && collageBusy && " · 사진을 얹고 있어요…"}
         </p>
-      </div>
-
-      <div ref={holder} className="overflow-hidden rounded-2xl ring-1 ring-line">
-        {style === "collage" ? (
-          <CollageCard sketch={sketch} title={title} headline={line} picks={picks} photos={collagePhotos} />
-        ) : style === "line" ? (
-          <LineCard sketch={sketch} shapes={shapes} year={year} headline={line} months={months} />
-        ) : (
-          <SketchCard
-            sketch={sketch}
-            shapes={shapes}
-            title={title}
-            headline={line}
-            months={months}
-            region={null}
-            photos={cardPhotos}
-          />
-        )}
       </div>
 
       {/* 곳을 눌러 상세로 갔다가 돌아오면 보던 해의 한장 요약으로 선다. */}

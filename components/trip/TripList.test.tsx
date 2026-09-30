@@ -241,7 +241,7 @@ describe("보던 여행으로 돌아오기", () => {
   });
 
   it("그냥 들어온 사람은 맨 위에서 시작한다", async () => {
-    // 위 띠의 "내 스케치"를 눌러 온 경우 — 적어 둔 여행이 없다.
+    // 위 띠의 "내 여행"을 눌러 온 경우 — 적어 둔 여행이 없다.
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
 
     await 목록();

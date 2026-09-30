@@ -34,7 +34,7 @@ import { PlacePanel } from "./PlacePanel";
 import { TripsPanel } from "./TripsPanel";
 
 /*
-  내 스케치의 첫 화면. 지도 하나에 내 사진이 다 얹힌다.
+  내 여행의 첫 화면. 지도 하나에 내 사진이 다 얹힌다.
 
   여기서 모든 것이 갈라진다 — 사진을 넣고, 여행을 열고, 사진을 크게 보고,
   올해를 한 장으로 저장한다. 목록 화면(/trips)과 연도 카드(/sketch)는
@@ -47,7 +47,7 @@ import { TripsPanel } from "./TripsPanel";
 type Status = "loading" | "guest" | "ready" | "failed";
 
 interface SketchHubProps {
-  /** 지도 위에 띄울 큰 갈래(내 스케치 · 여행 100선). */
+  /** 지도 위에 띄울 큰 갈래(내 여행 · 여행 100선). */
   switcher: ReactNode;
   /** 이 해를 골라 둔 채 연다. 한장 요약에서 "다시 걷기"로 넘어올 때. */
   initialYear?: string;
@@ -88,7 +88,7 @@ export function SketchHub({ switcher, initialYear }: SketchHubProps) {
       const laid = hubPlaces(rows, covers);
 
       /*
-        상세를 보고 "← 내 스케치"로 돌아왔으면 그 여행을 지도에 이어 두고
+        상세를 보고 "← 내 여행"으로 돌아왔으면 그 여행을 지도에 이어 두고
         그리로 날아간다. 보던 것을 다시 찾아 헤매지 않게.
       */
       const back = tripFocus.peek();
@@ -730,13 +730,13 @@ function SheetHeader({
           href="/trips/new"
           className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
         >
-          + 사진등록
+          + 사진 고르기
         </Link>
         <Link
           href="/trips"
           className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line"
         >
-          목록으로
+          여행 목록
         </Link>
         <Link
           href="/sketch"

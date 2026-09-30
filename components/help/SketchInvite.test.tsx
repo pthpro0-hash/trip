@@ -22,18 +22,18 @@ describe("SketchInvite", () => {
   it("로그인 전이면 — 사진만 올리면 무엇이 되는지와, 로그인하고 시작하기", async () => {
     client.auth.getUser.mockResolvedValue({ data: { user: null } });
     render(<SketchInvite spot="home" />);
-    expect(await screen.findByRole("dialog", { name: "내 스케치 안내" })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "내 여행 안내" })).toBeTruthy();
     expect(screen.getByText("여행 사진 수백 장, 올리기만 하세요")).toBeTruthy();
     expect(screen.getByText(/한장 요약/)).toBeTruthy();
     expect(screen.getByText("로그인하고 사진만 올리면 끝!")).toBeTruthy();
     expect(screen.getByRole("link", { name: "로그인하고 시작하기" }).getAttribute("href")).toBe("/login?next=%2Ftrips%2Fnew");
   });
 
-  it("로그인했지만 여행이 없으면 — 사진 올리러 가기", async () => {
+  it("로그인했지만 여행이 없으면 — 사진 고르기", async () => {
     client.auth.getUser.mockResolvedValue({ data: { user: { id: "u1" } } });
     count.mockResolvedValue(0);
     render(<SketchInvite spot="home" />);
-    expect(await screen.findByRole("link", { name: "사진 올리러 가기" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "사진 고르기" })).toBeTruthy();
   });
 
   it("이미 쓰고 있는 사람에게는 내밀지 않는다 — 셀 수 없을 때도", async () => {
@@ -50,7 +50,7 @@ describe("SketchInvite", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("오늘 그만 보기를 누르면 닫히고, 내 스케치에 들어와도 오늘은 다시 뜨지 않는다", async () => {
+  it("오늘 그만 보기를 누르면 닫히고, 내 여행에 들어와도 오늘은 다시 뜨지 않는다", async () => {
     client.auth.getUser.mockResolvedValue({ data: { user: null } });
     const first = render(<SketchInvite spot="home" />);
     fireEvent.click(await screen.findByRole("button", { name: "오늘 그만 보기" }));
@@ -70,6 +70,6 @@ describe("SketchInvite", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     window.localStorage.setItem("seen:help", "1");
     window.dispatchEvent(new Event("help:closed"));
-    expect(await screen.findByRole("dialog", { name: "내 스케치 안내" })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "내 여행 안내" })).toBeTruthy();
   });
 });

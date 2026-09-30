@@ -9,8 +9,8 @@ beforeEach(() => {
 const now = new Date(2026, 8, 28, 10);
 const invite = (spot: "home" | "sketch", helpSeen = true, at = now) => shouldInvite(inviteState(spot, helpSeen, at));
 
-describe("내 스케치 안내를 언제 내미나", () => {
-  it("첫 화면에서 한 번, 내 스케치에 들어오면 한 번 더, 그다음은 없다", () => {
+describe("내 여행 안내를 언제 내미나", () => {
+  it("첫 화면에서 한 번, 내 여행에 들어오면 한 번 더, 그다음은 없다", () => {
     expect(invite("home")).toBe(true);
     markInvited("home");
     expect(invite("home")).toBe(false);
@@ -19,7 +19,7 @@ describe("내 스케치 안내를 언제 내미나", () => {
     expect(invite("sketch")).toBe(false);
   });
 
-  it("내 스케치로 바로 들어와도 그것이 첫 화면 — 나중에 내 스케치를 누르면 한 번 더", () => {
+  it("내 여행으로 바로 들어와도 그것이 첫 화면 — 나중에 내 여행을 누르면 한 번 더", () => {
     expect(invite("sketch")).toBe(true);
     markInvited("sketch");
     expect(invite("home")).toBe(false);

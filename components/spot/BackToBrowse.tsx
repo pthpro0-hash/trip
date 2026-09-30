@@ -20,7 +20,7 @@ import type { Region } from "@/lib/types";
 
 /*
   여행 100선은 주소에 갈래를 적어 둔다. 맨 "/" 는 지난번에 고른 쪽을
-  열기 때문에, 내 스케치에서 시작하는 사람이 "← 여행 100선"을 눌렀는데
+  열기 때문에, 내 여행에서 시작하는 사람이 "← 여행 100선"을 눌렀는데
   내 지도가 뜨는 일이 생긴다.
 */
 const HOME = { href: "/?v=spots", label: "← 여행 100선" };
@@ -32,8 +32,8 @@ function placeOf(from: string | null): { href: string; label: string } {
   const region = REGIONS.find((name: Region) => from.startsWith(`/regions/${encodeURIComponent(name)}`));
   if (region) return { href: from, label: `← ${region}` };
   if (from.startsWith("/regions")) return { href: from, label: "← 권역별" };
-  // 내 스케치 지도에서 100선을 겹쳐 보다가 들어온 사람은 지도로 돌려보낸다.
-  if (from.startsWith("/?v=sketch")) return { href: "/?v=sketch", label: "← 내 스케치" };
+  // 내 여행 지도에서 100선을 겹쳐 보다가 들어온 사람은 지도로 돌려보낸다.
+  if (from.startsWith("/?v=sketch")) return { href: "/?v=sketch", label: "← 내 여행" };
   // 그 밖의 첫 화면은 100선 쪽이다 — 여행지 카드는 100선에만 있다.
   if (from === "/" || from.startsWith("/?")) return HOME;
   if (from.startsWith("/")) return { href: from, label: HOME.label };

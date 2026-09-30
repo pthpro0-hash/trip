@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { rememberStart, startHref } from "@/lib/start";
+import { rememberStart, rememberStartIfUnset, startHref } from "@/lib/start";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
@@ -11,7 +11,7 @@ import { thumbUrls } from "@/lib/supabase/photos";
 /*
   첫 화면에서 "정보"와 "개인" 중 무엇을 볼지 사람에게 고르게 하지 않는다.
 
-  처음 온 사람에게 "내 스케치"는 문이 아니라 빈 벽이다 — 눌러 봐야 아무것도
+  처음 온 사람에게 "내 여행"은 문이 아니라 빈 벽이다 — 눌러 봐야 아무것도
   없고 로그인부터 하라는 말을 듣는다. 첫 화면의 절반을 "당신에겐 아직
   아무것도 없습니다"에 쓸 이유가 없다.
 
@@ -51,6 +51,13 @@ export function HomeIntro() {
       const rows = await fetchTrips(supabase, data.user.id);
       if (!active) return;
       setTrips(rows ?? []);
+      /*
+        여행을 남긴 사람에게 이 화면의 여행 100선은 문 앞에서 한 번 돌아가는 일이다.
+        갈래를 눌러 본 적이 없어도(새 폰, 지워진 쿠키) 다음부터는 내 여행으로 열리게
+        기억해 둔다. 이번 화면은 그대로 두니 번쩍이지 않는다. 눌러서 고른 사람의
+        선택은 뒤집지 않는다.
+      */
+      if ((rows ?? []).length > 0) rememberStartIfUnset("sketch");
       setReady(true);
 
       const paths = (rows ?? [])
@@ -101,7 +108,7 @@ export function HomeIntro() {
           href="/trips/new"
           className="shrink-0 rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
         >
-          사진에서 찾아보기 →
+          사진 고르기 →
         </Link>
       </section>
     );
@@ -141,7 +148,7 @@ export function HomeIntro() {
         onClick={() => rememberStart("sketch")}
         className="shrink-0 rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
       >
-        내 스케치 →
+        내 여행 →
       </Link>
     </section>
   );

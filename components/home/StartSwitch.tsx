@@ -4,7 +4,7 @@ import Link from "next/link";
 import { rememberStart, startHref, type Start } from "@/lib/start";
 
 /*
-  가장 큰 갈래. 내 스케치냐, 여행 100선이냐.
+  가장 큰 갈래. 내 여행이냐, 여행 100선이냐.
 
   이 서비스는 두 몸이다 — 다녀온 길을 남기는 쪽과, 어디를 갈지 고르는
   쪽. 첫 화면에서 그 둘을 한 번에 고를 수 있게 크게 둔다.
@@ -13,7 +13,7 @@ import { rememberStart, startHref, type Start } from "@/lib/start";
 */
 
 const OPTIONS: { value: Start; label: string }[] = [
-  { value: "sketch", label: "내 스케치" },
+  { value: "sketch", label: "내 여행" },
   { value: "spots", label: "여행 100선" },
 ];
 

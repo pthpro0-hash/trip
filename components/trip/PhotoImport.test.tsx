@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { ReadResult } from "@/lib/photo/readShots";
+import { readStart } from "@/lib/start";
 
 /*
   사진을 고른 뒤의 화면을 본다.
@@ -122,6 +123,45 @@ describe("PhotoImport", () => {
 
     await waitFor(() => expect(saveTrip).toHaveBeenCalled());
     expect(saveTrip.mock.calls[0].at(-1)).toBe("민수랑 첫 휴가");
+  });
+
+  /*
+    첫 여행을 기록한 사람은 다음부터 "내 여행"으로 열려야 한다. 그 사람에게 첫
+    화면의 여행 100선은 문 앞에서 한 번 돌아가는 일이다. 다만 갈래를 눌러서
+    100선을 고른 사람의 선택은 뒤집지 않는다.
+  */
+  describe("기록하고 나면 다음에 열 갈래", () => {
+    const clear = () => {
+      document.cookie = "start=; path=/; max-age=0";
+    };
+    const 기록하기 = async () => {
+      await 사진넣기();
+      await waitFor(() => expect(제목칸()[0].value).not.toBe(""));
+      fireEvent.click(screen.getByRole("button", { name: /여행 1건 기록하기/ }));
+      await waitFor(() => expect(saveTrip).toHaveBeenCalled());
+    };
+
+    beforeEach(clear);
+
+    it("아직 고른 적이 없으면 내 여행으로 기억한다", async () => {
+      await 기록하기();
+      await waitFor(() => expect(readStart()).toBe("sketch"));
+    });
+
+    it("이미 100선을 고른 사람의 선택은 뒤집지 않는다", async () => {
+      document.cookie = "start=spots; path=/";
+      await 기록하기();
+      // 기록이 끝난 뒤(화면이 바뀐 뒤)에도 그대로다.
+      await screen.findByText("여행 1건을 기록했어요.");
+      expect(readStart()).toBe("spots");
+    });
+
+    it("하나도 기록하지 못했으면 기억하지 않는다", async () => {
+      saveTrip.mockResolvedValue({ ok: false });
+      await 기록하기();
+      await waitFor(() => expect(saveTrip).toHaveBeenCalledTimes(1));
+      expect(readStart()).toBeNull();
+    });
   });
 
   it("멀리 떨어진 날 경계에서만 나누기를 묻는다", async () => {

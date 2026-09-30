@@ -37,7 +37,7 @@ const RELAX_LABEL: Record<RelaxationSuggestion["relaxed"], string> = {
 };
 
 interface SpotsHomeProps {
-  /** 맨 위에 둘 큰 갈래(내 스케치 · 여행 100선). */
+  /** 맨 위에 둘 큰 갈래(내 여행 · 여행 100선). */
   switcher?: ReactNode;
 }
 

@@ -165,7 +165,7 @@ export function TripList() {
     });
   }, [trips, searchable, query, person, year]);
 
-  /** 상세에서 "← 내 스케치"를 누르면 이 목록으로 돌아오게 적어 둔다. */
+  /** 상세에서 "← 내 여행"을 누르면 이 목록으로 돌아오게 적어 둔다. */
   const leaveForDetail = () => tripFocus.rememberFrom("/trips");
 
   const remove = async (tripId: string) => {

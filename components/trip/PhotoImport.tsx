@@ -20,6 +20,7 @@ import {
   tripDays,
 } from "@/lib/photo/grouping";
 import { logEvent } from "@/lib/supabase/serviceLog";
+import { rememberStartIfUnset } from "@/lib/start";
 import { remainingText } from "@/lib/photo/eta";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
@@ -385,6 +386,13 @@ export function PhotoImport() {
       failed: result.failed,
       withPhotos,
     });
+
+    /*
+      여행을 기록한 사람은 다음부터 내 여행으로 열려야 한다 — 이 사람에게 첫 화면의
+      여행 100선은 문 앞에서 한 번 돌아가는 일이다. 갈래를 눌러서 고른 사람의
+      선택은 뒤집지 않는다. 하나도 못 기록했으면 기억할 것도 없다.
+    */
+    if (result.saved > 0) rememberStartIfUnset("sketch");
 
     setSavedRanges([...savedRanges]);
     setOutcome(result);

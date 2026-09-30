@@ -9,7 +9,7 @@ import { inviteState, markInvited, shouldInvite, snoozeInviteToday, type InviteS
 import { HELP_CLOSED } from "./FirstVisitHelp";
 
 /*
-  내 스케치로 부르는 한 장.
+  내 여행으로 부르는 한 장.
 
   자료가 하나도 없는 사람에게만 내민다 — 로그인 전이거나, 로그인했지만
   여행을 하나도 기록하지 않은 사람. 이미 쓰고 있는 사람에게 "써 보세요"는
@@ -87,14 +87,14 @@ export function SketchInvite({ spot }: { spot: InviteSpot }) {
   const start =
     who === "guest"
       ? { href: "/login?next=%2Ftrips%2Fnew", label: "로그인하고 시작하기" }
-      : { href: "/trips/new", label: "사진 올리러 가기" };
+      : { href: "/trips/new", label: "사진 고르기" };
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/45 p-4 backdrop-blur-sm" onClick={close}>
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="내 스케치 안내"
+        aria-label="내 여행 안내"
         onClick={(event) => event.stopPropagation()}
         className="relative w-full max-w-md overflow-hidden rounded-2xl bg-surface shadow-xl ring-1 ring-line"
       >
@@ -109,7 +109,7 @@ export function SketchInvite({ spot }: { spot: InviteSpot }) {
 
         <div className="flex flex-col gap-4 px-6 pb-5 pt-6">
           <div className="pr-8">
-            <p className="text-[13px] font-semibold text-accent">내 스케치</p>
+            <p className="text-[13px] font-semibold text-accent">내 여행</p>
             <h2 className="mt-1 text-[22px] font-bold leading-snug tracking-tight text-text">
               여행 사진 수백 장, 올리기만 하세요
             </h2>

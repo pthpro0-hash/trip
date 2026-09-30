@@ -151,3 +151,31 @@ describe("SketchShowcase · 링크의 한 줄", () => {
     expect(dialog.textContent).not.toContain("민수");
   }, 20000);
 });
+
+/*
+  열자마자 보여야 하는 것은 결과다. 카드 모양을 고르는 줄이 카드보다 위에 있으면
+  첫 화면이 설정으로 시작한다.
+*/
+describe("SketchShowcase · 순서", () => {
+  const open = () =>
+    render(<SketchShowcase year={2026} all={all} written={undefined} onWrite={async () => true} sidoOf={undefined} />);
+  const after = (first: Element, second: Element) =>
+    Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it("카드가 먼저고, 카드 모양 고르기는 카드 아래에 있다", () => {
+    const { container } = open();
+    const card = container.querySelector("svg")!;
+    expect(after(card, screen.getByRole("radiogroup", { name: "카드 모양" }))).toBe(true);
+  });
+
+  it("그해의 한 줄은 카드 위에 남는다", () => {
+    const { container } = open();
+    const card = container.querySelector("svg")!;
+    expect(after(screen.getByRole("button", { name: /한 줄 고쳐 쓰기/ }), card)).toBe(true);
+  });
+
+  it("카드 모양 고르기는 그해의 이야기보다 위다 — 카드를 바꾸고 바로 이어 읽는다", () => {
+    open();
+    expect(after(screen.getByRole("radiogroup", { name: "카드 모양" }), screen.getByText("2026년의 나"))).toBe(true);
+  });
+});
