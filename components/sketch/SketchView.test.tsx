@@ -54,6 +54,7 @@ vi.mock("@/lib/supabase/photos", () => ({
 }));
 vi.mock("@/lib/photo/inlinePhoto", () => ({ inlinePhoto: async () => null, inlinePhotos: async () => new Map() }));
 vi.mock("@/lib/sido", () => ({ sidoOf: () => null }));
+vi.mock("@/lib/sidoShapes", () => ({ sidoShapes: () => ({ list: [], points: [] }) }));
 const { SketchView } = await import("./SketchView");
 
 const selectedYear = async () => {

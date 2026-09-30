@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useReducer, useState } from "react";
 import Link from "next/link";
-import { KOREA_LAND_PATHS, project } from "@/lib/koreaMap";
+import { project } from "@/lib/koreaMap";
+import { sidoShapes } from "@/lib/sidoShapes";
 import { dotsViewBox } from "@/lib/photo/regionView";
 import { SEASON_COLOR } from "@/lib/sketch";
 import { tripFocus } from "@/lib/scrollMemory";
@@ -123,9 +124,12 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
           style={{ aspectRatio: `${FRAME.width} / ${FRAME.height}` }}
         >
           <rect x={view.x} y={view.y} width={view.width} height={view.height} fill={SEA} />
-          {KOREA_LAND_PATHS.map((path) => (
-            <path key={path.slice(0, 24)} d={path} fill={LAND} stroke={COAST} strokeWidth={1.4 * k} />
-          ))}
+          {/* 도 경계가 보이는 간략한 실제 지도. 흐리게 깔아 점과 이름표가 먼저 읽히게 한다. */}
+          <g opacity={0.5} data-basemap>
+            {sidoShapes().list.map((sido) => (
+              <path key={sido.name} d={sido.d} fillRule="evenodd" fill={LAND} stroke={COAST} strokeWidth={0.9 * k} strokeLinejoin="round" />
+            ))}
+          </g>
           {steps.map((step, index) => {
             const look = dotLook(index, step, state);
             const point = points[index];
