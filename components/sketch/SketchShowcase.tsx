@@ -24,6 +24,8 @@ import { CollageCard } from "./CollageCard";
 import { LineCard } from "./LineCard";
 import { PAPER } from "./cardInk";
 import { StoryScenes } from "./StoryScenes";
+import { FootprintPlayer } from "./FootprintPlayer";
+import { footprintSteps, tripsPerMonth } from "@/lib/footprint";
 import { WaitingOverlay } from "@/components/layout/Waiting";
 
 /*
@@ -198,9 +200,18 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
     그대로 쓴다. 큰 판을 열 장씩 받으면 한장 요약을 열 때마다 1MB 가까이 든다.
     "더 보기"에 숨은 곳까지 주소만 미리 받아 둔다(사진은 펼칠 때 받는다).
   */
+  const steps = useMemo(() => footprintSteps(trips), [trips]);
+  const stepMonths = useMemo(() => tripsPerMonth(steps), [steps]);
+  // 발자취의 점을 눌렀을 때 보이는 사진도 같은 작은 판이다.
   const placePaths = useMemo(
-    () => [...new Set(story.places.map((place) => place.photoPath).filter((path): path is string => !!path))],
-    [story],
+    () => [
+      ...new Set(
+        [...story.places.map((place) => place.photoPath), ...steps.map((step) => step.photoPath)].filter(
+          (path): path is string => !!path,
+        ),
+      ),
+    ],
+    [story, steps],
   );
   const [placeUrls, setPlaceUrls] = useState<Map<string, string>>(new Map());
   useEffect(() => {
@@ -370,6 +381,14 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
           {style === "collage" && collageBusy && " · 사진을 얹고 있어요…"}
         </p>
       </div>
+
+      <FootprintPlayer
+        steps={steps}
+        monthCounts={stepMonths}
+        totals={{ trips: story.tripCount, places: story.placeCount, photos: story.photoCount }}
+        photoUrls={placeUrls}
+        backHref={`/sketch?y=${year}`}
+      />
 
       {/* 곳을 눌러 상세로 갔다가 돌아오면 보던 해의 한장 요약으로 선다. */}
       <StoryScenes story={story} photoUrls={sceneUrls} placeUrls={placeUrls} backHref={`/sketch?y=${year}`} />

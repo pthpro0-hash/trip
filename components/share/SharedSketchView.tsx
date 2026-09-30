@@ -5,6 +5,8 @@ import { publicFileUrl } from "@/lib/supabase/shares";
 import { StoryScenes } from "@/components/sketch/StoryScenes";
 import { YearsScenes } from "@/components/sketch/YearsScenes";
 import { SharedCard } from "./SharedCard";
+import { FootprintPlayer } from "@/components/sketch/FootprintPlayer";
+import { footprintStepsOfShare, monthCountsOfShare } from "@/lib/footprint";
 
 /*
   링크로 받은 한 장의 본문. 서버에서 그린다 — 카드가 통째로 SVG 라
@@ -22,6 +24,7 @@ export function SharedSketchView({ id, snapshot }: SharedSketchViewProps) {
   const photos = new Map(snapshot.files.map((file) => [file, publicFileUrl(id, file)]));
   const rows = snapshot.years ?? [];
   const allYears = snapshot.year === ALL_YEARS;
+  const steps = allYears ? [] : footprintStepsOfShare(snapshot);
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-5 px-5 pb-16 pt-8">
@@ -36,6 +39,16 @@ export function SharedSketchView({ id, snapshot }: SharedSketchViewProps) {
       <div className="overflow-hidden rounded-2xl ring-1 ring-line">
         <SharedCard snapshot={snapshot} photos={photos} />
       </div>
+
+      {steps.length > 0 && (
+        <FootprintPlayer
+          shared
+          steps={steps}
+          monthCounts={monthCountsOfShare(snapshot)}
+          totals={{ trips: snapshot.stats.tripCount, places: snapshot.stats.placeCount, photos: snapshot.stats.photoCount }}
+          photoUrls={photos}
+        />
+      )}
 
       {/* 전체면 해끼리 견준 장면, 한 해면 그해 이야기. 받은 사람에게는 해를 넘겨 볼 곳이 없다. */}
       {allYears ? (
