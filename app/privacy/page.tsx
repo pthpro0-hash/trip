@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalDocument title="개인정보처리방침" effectiveDate="【시행일을 정해 적어주세요】">
+    <LegalDocument title="개인정보처리방침" effectiveDate="2026년 10월 1일">
       <Article heading="들어가며">
         <p>
           박태희(이하 &ldquo;운영자&rdquo;)는 내 여행 스케치를 운영하면서 이용자의 개인정보를

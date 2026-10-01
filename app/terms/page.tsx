@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <LegalDocument title="이용약관" effectiveDate="【시행일을 정해 적어주세요】">
+    <LegalDocument title="이용약관" effectiveDate="2026년 10월 1일">
       <Article heading="제1조 (목적)">
         <p>
           이 약관은 박태희(이하 &ldquo;운영자&rdquo;)가 제공하는 내 여행 스케치(이하

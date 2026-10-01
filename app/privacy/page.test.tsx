@@ -29,6 +29,16 @@ describe("개인정보처리방침 · 가족 공유", () => {
   });
 });
 
+describe("시행일", () => {
+  it("방침과 약관 모두 시행일이 적혀 있고, 빈칸 안내가 남아 있지 않다", () => {
+    for (const Page of [PrivacyPage, TermsPage]) {
+      const t = render(<Page />).container.textContent ?? "";
+      expect(t).toContain("시행일 2026년 10월 1일");
+      expect(t).not.toContain("정해 적어주세요");
+    }
+  });
+});
+
 describe("이용약관 · 가족 공유", () => {
   it("권한을 주는 것은 초대한 회원이 정하고, 그 범위의 일은 운영자가 책임지지 않는다", () => {
     const t = render(<TermsPage />).container.textContent ?? "";
