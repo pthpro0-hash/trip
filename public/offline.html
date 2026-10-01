@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>인터넷에 연결되지 않았어요</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    background: #fff; color: #1d1d1f; text-align: center; }
+  @media (prefers-color-scheme: dark) { body { background: #000; color: #f5f5f7; } p { color: #a1a1a6 !important; } }
+  .logo { width: 64px; height: 64px; margin: 0 auto 20px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p { font-size: 15px; line-height: 1.6; color: #6e6e73; margin: 0 0 20px; }
+  button { font: inherit; font-size: 15px; font-weight: 500; border: 0; border-radius: 999px; padding: 10px 22px;
+    background: #0071e3; color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+  <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+    <rect x="2" y="2" width="60" height="60" rx="15" fill="#0071e3"/>
+    <circle cx="44" cy="30" r="13" fill="#fff" opacity="0.22"/>
+    <circle cx="18" cy="42" r="4.2" fill="#fff" opacity="0.55"/>
+    <circle cx="28" cy="21" r="5.6" fill="#fff" opacity="0.75"/>
+    <circle cx="36" cy="49" r="4.6" fill="#fff" opacity="0.65"/>
+    <circle cx="44" cy="30" r="8" fill="#fff"/>
+  </svg>
+  <h1>인터넷에 연결되지 않았어요</h1>
+  <p>여행 기록과 사진은 안전하게 계정에 있어요.<br>연결되면 다시 열어 주세요.</p>
+  <button type="button" onclick="location.reload()">다시 시도</button>
+</main>
+</body>
+</html>

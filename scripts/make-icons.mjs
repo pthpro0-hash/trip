@@ -17,6 +17,13 @@ const bleed = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect
 writeFileSync("app/icon.svg", tile);
 await sharp(Buffer.from(bleed), { density: 600 }).resize(180, 180).png().toFile("app/apple-icon.png");
 
+// 앱(PWA) 아이콘 — 홈 화면용. 둥글게 깎이는 자리를 위해 가장자리까지 채운 판과, 안드로이드가
+// 모양을 마음대로 오려도 점이 잘리지 않게 점들을 가운데로 85% 줄인 판(maskable)을 만든다.
+const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0071e3"/><g transform="translate(32 32) scale(0.85) translate(-32 -32)">${dots}</g></svg>`;
+await sharp(Buffer.from(bleed), { density: 600 }).resize(192, 192).png().toFile("public/icon-192.png");
+await sharp(Buffer.from(bleed), { density: 600 }).resize(512, 512).png().toFile("public/icon-512.png");
+await sharp(Buffer.from(maskable), { density: 600 }).resize(512, 512).png().toFile("public/icon-maskable-512.png");
+
 // favicon.ico — PNG 를 담은 ico 한 장(48px).
 const png = await sharp(Buffer.from(tile), { density: 600 }).resize(48, 48).png().toBuffer();
 const head = Buffer.alloc(22);

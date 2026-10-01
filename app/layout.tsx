@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { CollectionSync } from "@/components/auth/CollectionSync";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { RegisterServiceWorker } from "@/components/layout/RegisterServiceWorker";
 import { FamilyBanner } from "@/components/family/FamilyBanner";
 import { BottomNav, BottomNavSpace } from "@/components/layout/BottomNav";
 import { FirstVisitHelp } from "@/components/help/FirstVisitHelp";
@@ -24,6 +25,16 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
   },
   twitter: { card: "summary_large_image" },
+  // 아이폰에서 홈 화면에 추가했을 때 앱처럼 전체 화면으로 열린다.
+  appleWebApp: { capable: true, title: "여행 스케치", statusBarStyle: "default" },
+};
+
+// 폰의 위 상태 줄 색을 화면 바탕과 맞춘다(켜질 때 어색한 띠가 생기지 않게).
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -53,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* 이 기기의 목록과 계정의 목록을 이어 준다. 그리는 것은 없다. */}
         <CollectionSync />
         <Analytics />
+        <RegisterServiceWorker />
       </body>
     </html>
   );
