@@ -93,6 +93,18 @@ describe("FamilyPanel", () => {
     await waitFor(() => expect(api.removeLink).toHaveBeenCalledWith(expect.anything(), "o1", "me"));
   });
 
+  it("나에게 열어 준 사람의 [여행 보기]는 그 주인의 여행을 보는 상태로 바꾼다", async () => {
+    window.sessionStorage.clear();
+    state.circle = { owned: [], shared: [member("o1", "dad@example.com", "edit")] };
+    render(<FamilyPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "여행 보기" }));
+    expect(JSON.parse(window.sessionStorage.getItem("family-view")!)).toEqual({
+      ownerId: "o1",
+      label: "dad@example.com",
+      role: "edit",
+    });
+  });
+
   it("수락 전 초대는 취소할 수 있다", async () => {
     state.invites = [{ token: state.token, role: "view", expiresAt: "2099-01-01T00:00:00Z" }];
     render(<FamilyPanel />);

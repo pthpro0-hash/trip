@@ -19,12 +19,13 @@ import {
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { deletePhoto, setCoverPhoto, signedUrls, thumbUrls } from "@/lib/supabase/photos";
 import { deleteTrip } from "@/lib/supabase/trips";
+import { canIn, ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
 import { LIST_HREF } from "@/lib/nav";
 import { rememberPlaceName } from "@/lib/supabase/placeNames";
 import { PhotoViewer } from "./PhotoViewer";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionSuggestions } from "@/lib/companions";
-import { attachParticle } from "@/lib/korean";
+import { attachParticle, companionLabel } from "@/lib/korean";
 import { CompanionEditor } from "./CompanionEditor";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
@@ -61,6 +62,14 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [trip, setTrip] = useState<Detail | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [userId, setUserId] = useState<string | null>(null);
+  /*
+    가족의 여행을 보는 중이면 그 사람의 자료를 읽고, 권한 밖의 단추는 내지 않는다.
+    userId 는 "자료의 주인"이다 — 내 여행이면 나, 가족 여행이면 그 주인.
+  */
+  const family = useFamilyView();
+  const canEdit = canIn(family, "edit");
+  const canRemove = canIn(family, "remove");
+  const ownTrip = family === null;
   /*
     제목은 적어 두기 단추 없이 손을 떼면 저장한다. 한 줄짜리라 단추까지
     두면 무겁고, 무엇보다 이름은 고치다 만 채로 두는 법이 없다.
@@ -124,9 +133,10 @@ export function TripDetail({ tripId }: { tripId: string }) {
         setStatus("guest");
         return;
       }
-      setUserId(data.user.id);
+      const owner = ownerOf(readFamilyView(), data.user.id);
+      setUserId(owner);
 
-      const detail = await fetchTripDetail(supabase, data.user.id, tripId);
+      const detail = await fetchTripDetail(supabase, owner, tripId);
       if (!active) return;
       if (!detail) {
         setStatus("missing");
@@ -138,7 +148,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
       setNote(detail.note ?? "");
       setStatus("ready");
 
-      void fetchUsedCompanions(supabase, data.user.id).then((names) => {
+      void fetchUsedCompanions(supabase, owner).then((names) => {
         if (active) setUsedCompanions(names);
       });
 
@@ -422,6 +432,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
           type="text"
           value={title}
           aria-label="여행 제목"
+          readOnly={!canEdit}
           onChange={(event) => {
             setTitle(event.target.value);
             setTitleSaved(false);
@@ -446,6 +457,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
           type="text"
           value={subtitle}
           aria-label="부제"
+          readOnly={!canEdit}
           onChange={(event) => {
             setSubtitle(event.target.value);
             setTitleSaved(false);
@@ -467,20 +479,26 @@ export function TripDetail({ tripId }: { tripId: string }) {
           {titleSaved && <span> · 바꿨어요</span>}
         </p>
         <div className="mt-0.5 text-[14px] text-text-faint">
-          <CompanionEditor
-            value={trip.companions}
-            suggestions={companionSuggestions(usedCompanions, trip.companions ?? "")}
-            onSave={submitCompanions}
-          />
+          {canEdit ? (
+            <CompanionEditor
+              value={trip.companions}
+              suggestions={companionSuggestions(usedCompanions, trip.companions ?? "")}
+              onSave={submitCompanions}
+            />
+          ) : (
+            trip.companions && <span className="px-1">{companionLabel(trip.companions)}</span>
+          )}
         </div>
         {titleFailed && (
           <p className="mt-1 text-[14px] text-text-muted">
             이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.
           </p>
         )}
-        <p className="mt-1.5 text-[13px] text-text-faint">
-          제목·부제·동행·장소 이름을 눌러 고칠 수 있어요. 비우면 원래대로 돌아가요.
-        </p>
+        {canEdit && (
+          <p className="mt-1.5 text-[13px] text-text-faint">
+            제목·부제·동행·장소 이름을 눌러 고칠 수 있어요. 비우면 원래대로 돌아가요.
+          </p>
+        )}
       </div>
 
       {/*
@@ -488,7 +506,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
         끝에서 지우기를 만나면 손이 미끄러진다.
       */}
       <div className="flex flex-wrap items-center gap-3">
-        {userId && (
+        {userId && ownTrip && (
           <button
             type="button"
             onClick={() => setSharing(true)}
@@ -497,23 +515,25 @@ export function TripDetail({ tripId }: { tripId: string }) {
             링크 공유
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => (confirmingTrip ? void removeTrip() : setConfirmingTrip(true))}
-          onBlur={() => setConfirmingTrip(false)}
-          disabled={removingTrip}
-          className={`self-start rounded-full px-3.5 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
-            confirmingTrip
-              ? "bg-[#d70015] text-white"
-              : "bg-bg-subtle text-text-muted hover:bg-line"
-          }`}
-        >
-          {removingTrip
-            ? "지우는 중…"
-            : confirmingTrip
-              ? "정말 지울까요? 사진도 함께 사라져요"
-              : "이 여행 지우기"}
-        </button>
+        {canRemove && (
+          <button
+            type="button"
+            onClick={() => (confirmingTrip ? void removeTrip() : setConfirmingTrip(true))}
+            onBlur={() => setConfirmingTrip(false)}
+            disabled={removingTrip}
+            className={`self-start rounded-full px-3.5 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
+              confirmingTrip
+                ? "bg-[#d70015] text-white"
+                : "bg-bg-subtle text-text-muted hover:bg-line"
+            }`}
+          >
+            {removingTrip
+              ? "지우는 중…"
+              : confirmingTrip
+                ? "정말 지울까요? 사진도 함께 사라져요"
+                : "이 여행 지우기"}
+          </button>
+        )}
         {tripError && (
           <span className="text-[13px] text-text-muted">지우지 못했어요. 잠시 후 다시 시도해 주세요.</span>
         )}
@@ -588,17 +608,19 @@ export function TripDetail({ tripId }: { tripId: string }) {
                       이름 자체가 링크라, 눌러서 고치게 하면 링크와 부딪힌다.
                       고치는 손잡이를 따로 둔다.
                     */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setVisitName(visit.placeName);
-                        setEditingVisit(visit.id);
-                      }}
-                      aria-label={`${visit.placeName} 이름 고치기`}
-                      className="shrink-0 rounded-full px-1.5 py-0.5 text-[12px] font-medium text-text-faint transition hover:bg-bg-subtle hover:text-text"
-                    >
-                      고치기
-                    </button>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVisitName(visit.placeName);
+                          setEditingVisit(visit.id);
+                        }}
+                        aria-label={`${visit.placeName} 이름 고치기`}
+                        className="shrink-0 rounded-full px-1.5 py-0.5 text-[12px] font-medium text-text-faint transition hover:bg-bg-subtle hover:text-text"
+                      >
+                        고치기
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -640,28 +662,30 @@ export function TripDetail({ tripId }: { tripId: string }) {
                             <img src={url} alt="" className="h-full w-full object-cover" />
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() =>
-                            confirming
-                              ? removePhoto(visit.id, photo.id, photo.storagePath)
-                              : setConfirmingPhoto(photo.id)
-                          }
-                          onBlur={() =>
-                            setConfirmingPhoto((current) =>
-                              current === photo.id ? null : current,
-                            )
-                          }
-                          disabled={removingPhoto === photo.id}
-                          aria-label={confirming ? "이 사진 정말 지우기" : "이 사진 지우기"}
-                          className={`absolute right-1.5 top-1.5 rounded-full px-2 py-1 text-[12px] font-medium backdrop-blur-sm transition disabled:opacity-60 ${
-                            confirming
-                              ? "bg-[#d70015] text-white"
-                              : "bg-black/45 text-white hover:bg-black/65"
-                          }`}
-                        >
-                          {removingPhoto === photo.id ? "…" : confirming ? "정말?" : "✕"}
-                        </button>
+                        {canRemove && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              confirming
+                                ? removePhoto(visit.id, photo.id, photo.storagePath)
+                                : setConfirmingPhoto(photo.id)
+                            }
+                            onBlur={() =>
+                              setConfirmingPhoto((current) =>
+                                current === photo.id ? null : current,
+                              )
+                            }
+                            disabled={removingPhoto === photo.id}
+                            aria-label={confirming ? "이 사진 정말 지우기" : "이 사진 지우기"}
+                            className={`absolute right-1.5 top-1.5 rounded-full px-2 py-1 text-[12px] font-medium backdrop-blur-sm transition disabled:opacity-60 ${
+                              confirming
+                                ? "bg-[#d70015] text-white"
+                                : "bg-black/45 text-white hover:bg-black/65"
+                            }`}
+                          >
+                            {removingPhoto === photo.id ? "…" : confirming ? "정말?" : "✕"}
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -704,23 +728,26 @@ export function TripDetail({ tripId }: { tripId: string }) {
               setNoteSaved(false);
             }}
             rows={3}
-            placeholder="예: 비가 와서 우산 사러 편의점에 들렀다"
+            readOnly={!canEdit}
+            placeholder={canEdit ? "예: 비가 와서 우산 사러 편의점에 들렀다" : "적어 둔 기억이 없어요"}
             className="resize-y rounded-xl bg-surface px-3.5 py-2.5 text-[15px] leading-relaxed text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
           />
         </label>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={submitNote}
-            disabled={savingNote}
-            className="rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
-          >
-            {savingNote ? "적는 중…" : "적어두기"}
-          </button>
-          {noteSaved && <span className="text-[13px] text-text-muted">적어뒀어요.</span>}
-          <span className="text-[13px] text-text-faint">나중에 쓰셔도 돼요.</span>
-        </div>
+        {canEdit && (
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={submitNote}
+              disabled={savingNote}
+              className="rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
+            >
+              {savingNote ? "적는 중…" : "적어두기"}
+            </button>
+            {noteSaved && <span className="text-[13px] text-text-muted">적어뒀어요.</span>}
+            <span className="text-[13px] text-text-faint">나중에 쓰셔도 돼요.</span>
+          </div>
+        )}
       </section>
     </>
   );

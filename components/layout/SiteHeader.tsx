@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountChip } from "@/components/auth/AccountChip";
 import { rememberStart, type Start } from "@/lib/start";
+import { canIn, useFamilyView } from "@/lib/familyView";
 import { ADD_HREF, MAP_HREF, SKETCH_HREF, SPOTS_HREF, activeNav, type NavId } from "@/lib/nav";
 
 /*
@@ -34,6 +35,8 @@ export function SiteHeader() {
 
   /** 하위 경로에 있어도 그 갈래가 켜져 보이게 한다. 첫 화면은 어느 갈래인지 주소만으로 몰라 켜지 않는다. */
   const active = activeNav(pathname, null);
+  // 가족의 여행을 보는 동안에는 내 사진을 더하는 단추를 내지 않는다(남의 여행에 올리는 것으로 헷갈린다).
+  const canAdd = canIn(useFamilyView(), "add");
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">
@@ -78,12 +81,14 @@ export function SiteHeader() {
             사진을 넣는 것은 이 서비스의 가장 큰 일이라 어느 화면에서든 같은 자리에 있다.
             폰에서는 하단 탭의 가운데 단추가 그 일을 한다.
           */}
-          <Link
-            href={ADD_HREF}
-            className="hidden shrink-0 items-center rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-on-accent transition hover:bg-accent-hover sm:inline-flex"
-          >
-            + 사진 고르기
-          </Link>
+          {canAdd && (
+            <Link
+              href={ADD_HREF}
+              className="hidden shrink-0 items-center rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-on-accent transition hover:bg-accent-hover sm:inline-flex"
+            >
+              + 사진 고르기
+            </Link>
+          )}
           {/*
             좁은 화면에서는 물음표만 남긴다. 375px 에서는 갈래 둘과 계정
             칩만으로도 폭이 빠듯해, 글자를 두면 계정 칩이 밀려 나간다.

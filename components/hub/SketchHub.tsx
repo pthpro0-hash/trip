@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
+import { ownerOf, readFamilyView } from "@/lib/familyView";
 import { markerUrls, visitCovers } from "@/lib/supabase/photos";
 import { hubPlaces, placesIn, tripsIn, type Bounds, type HubPlace, type TripInView } from "@/lib/hub";
 import { tripFocus } from "@/lib/scrollMemory";
@@ -139,11 +140,10 @@ function MapHub({ switcher, initialYear, onList }: MapHubProps) {
         setStatus("guest");
         return;
       }
-      setUserId(data.user.id);
-      const [rows, covers] = await Promise.all([
-        fetchTrips(supabase, data.user.id),
-        visitCovers(supabase, data.user.id),
-      ]);
+      // 가족의 여행을 보는 중이면 그 주인의 자료를 읽는다(권한은 DB 가 지킨다).
+      const owner = ownerOf(readFamilyView(), data.user.id);
+      setUserId(owner);
+      const [rows, covers] = await Promise.all([fetchTrips(supabase, owner), visitCovers(supabase, owner)]);
       if (!active) return;
       if (!rows) {
         setStatus("failed");

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
+import { canIn, ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionLabel } from "@/lib/korean";
@@ -48,6 +49,9 @@ export function TripList() {
     한 번 훑어 두면 그 뒤로는 안 그러므로, 있을 때만 조용히 권한다.
   */
   const [stale, setStale] = useState<string[]>([]);
+  const family = useFamilyView();
+  const canRemove = canIn(family, "remove");
+  const canAdd = canIn(family, "add");
   const [tidying, setTidying] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [person, setPerson] = useState<string | null>(null);
@@ -64,8 +68,11 @@ export function TripList() {
         setStatus("guest");
         return;
       }
-      setUserId(data.user.id);
-      const rows = await fetchTrips(supabase, data.user.id);
+      // 가족의 여행을 보는 중이면 그 주인의 자료를 읽는다(권한은 DB 가 지킨다).
+      const viewed = readFamilyView();
+      const owner = ownerOf(viewed, data.user.id);
+      setUserId(owner);
+      const rows = await fetchTrips(supabase, owner);
       if (!active) return;
       if (!rows) {
         setStatus("failed");
@@ -77,6 +84,8 @@ export function TripList() {
         권하지 못할 뿐이다.
       */
       try {
+        // 남의 자료를 고쳐 굽는 정리는 권하지 않는다.
+        if (viewed) throw new Error("family");
         void Promise.resolve(missingThumbs(supabase, data.user.id)).then(
           (paths) => {
             if (active) setStale(paths);
@@ -218,12 +227,14 @@ export function TripList() {
         <p className="text-[15px] leading-relaxed text-text-muted">
           사진을 고르면 언제 어디를 다녀왔는지 찾아 드려요.
         </p>
-        <Link
-          href={ADD_HREF}
-          className="self-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
-        >
-          사진 고르기
-        </Link>
+        {canAdd && (
+          <Link
+            href={ADD_HREF}
+            className="self-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+          >
+            사진 고르기
+          </Link>
+        )}
       </div>
     );
   }
@@ -412,28 +423,30 @@ export function TripList() {
                   {trip.companions && <span>{companionLabel(trip.companions)}</span>}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => (confirming === trip.id ? remove(trip.id) : setConfirming(trip.id))}
-                onBlur={() => setConfirming((current) => (current === trip.id ? null : current))}
-                disabled={removing === trip.id}
-                aria-label={
-                  confirming === trip.id
-                    ? `${trip.title || formatSpan(trip.startedOn, trip.endedOn)} 기록 정말 지우기`
-                    : `${trip.title || formatSpan(trip.startedOn, trip.endedOn)} 기록 지우기`
-                }
-                className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
-                  confirming === trip.id
-                    ? "bg-[#d70015] text-white"
-                    : "bg-bg-subtle text-text-muted hover:bg-line"
-                }`}
-              >
-                {removing === trip.id
-                  ? "지우는 중…"
-                  : confirming === trip.id
-                    ? "정말 지울까요?"
-                    : "지우기"}
-              </button>
+              {canRemove && (
+                <button
+                  type="button"
+                  onClick={() => (confirming === trip.id ? remove(trip.id) : setConfirming(trip.id))}
+                  onBlur={() => setConfirming((current) => (current === trip.id ? null : current))}
+                  disabled={removing === trip.id}
+                  aria-label={
+                    confirming === trip.id
+                      ? `${trip.title || formatSpan(trip.startedOn, trip.endedOn)} 기록 정말 지우기`
+                      : `${trip.title || formatSpan(trip.startedOn, trip.endedOn)} 기록 지우기`
+                  }
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
+                    confirming === trip.id
+                      ? "bg-[#d70015] text-white"
+                      : "bg-bg-subtle text-text-muted hover:bg-line"
+                  }`}
+                >
+                  {removing === trip.id
+                    ? "지우는 중…"
+                    : confirming === trip.id
+                      ? "정말 지울까요?"
+                      : "지우기"}
+                </button>
+              )}
             </div>
 
             {/*

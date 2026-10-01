@@ -19,6 +19,7 @@ import {
   subscribeCardStyle,
   type CardStyle,
 } from "@/lib/cardStyle";
+import { canIn, useFamilyView } from "@/lib/familyView";
 import { SketchCard } from "./SketchCard";
 import { CollageCard } from "./CollageCard";
 import { LineCard } from "./LineCard";
@@ -79,6 +80,8 @@ interface SketchShowcaseProps {
 
 export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = null }: SketchShowcaseProps) {
   const holder = useRef<HTMLDivElement>(null);
+  // 가족의 여행에서는 한 줄을 고칠 수 있는 권한이 있어야 쓴다.
+  const canEdit = canIn(useFamilyView(), "edit");
   const [saving, setSaving] = useState<"card" | "story" | null>(null);
   const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -299,7 +302,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
           <p className="text-[24px] font-bold leading-snug tracking-tight text-text md:text-[28px]">{line}</p>
         )}
         <div className="flex items-center gap-3 text-[13px]">
-          {!editing && (
+          {!editing && canEdit && (
             <button
               type="button"
               onClick={() => setEditing(true)}

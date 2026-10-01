@@ -14,6 +14,7 @@ import {
   type NavId,
 } from "@/lib/nav";
 import { readStart, rememberStart, type Start } from "@/lib/start";
+import { canIn, useFamilyView } from "@/lib/familyView";
 
 /*
   폰 하단 탭 — 내 여행 · 한장 · 사진 고르기 · 여행 100선.
@@ -82,6 +83,8 @@ const ITEMS: Item[] = [
 ];
 
 function Bar({ active }: { active: NavId | null }) {
+  // 가족의 여행을 보는 동안에는 "사진 고르기"를 뺀다 — 남의 여행에 올리는 것으로 헷갈린다.
+  const items = canIn(useFamilyView(), "add") ? ITEMS : ITEMS.filter((item) => item.id !== "add");
   return (
     <nav
       aria-label="하단 메뉴"
@@ -91,8 +94,8 @@ function Bar({ active }: { active: NavId | null }) {
       */
       className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/95 backdrop-blur-md sm:hidden [padding-bottom:env(safe-area-inset-bottom,0px)]"
     >
-      <ul className="mx-auto grid h-14 max-w-md grid-cols-4">
-        {ITEMS.map((item) => {
+      <ul className={`mx-auto grid h-14 max-w-md ${items.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+        {items.map((item) => {
           const on = item.id !== "add" && item.id === active;
           return (
             <li key={item.id} className="min-w-0">

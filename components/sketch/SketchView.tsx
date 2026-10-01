@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
+import { ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
 import { fetchHeadlines, saveHeadline } from "@/lib/supabase/sketchYears";
 import { visitCovers } from "@/lib/supabase/photos";
 import type { SketchTrip } from "@/lib/sketch";
@@ -44,6 +45,8 @@ export function SketchView() {
   /** 해마다 적어 둔 한 줄. 적지 않은 해는 없다. */
   const [written, setWritten] = useState<Map<number, string>>(new Map());
   const [userId, setUserId] = useState<string | null>(null);
+  /** 가족의 여행을 볼 때는 링크 공유를 내지 않는다 — 남의 여행을 내 이름으로 보여 줄 수는 없다. */
+  const shareId = useFamilyView() ? null : userId;
   /** 방문마다 대표 사진 한 장. 지도에 점 대신 얹는다. */
   const [covers, setCovers] = useState<Map<string, string>>(new Map());
   /** 시도 경계(60KB)는 따로 불러온다. 없으면 시도 장면만 비어 있다. */
@@ -67,25 +70,27 @@ export function SketchView() {
         setStatus("guest");
         return;
       }
-      const rows = await fetchTrips(supabase, data.user.id);
+      // 가족의 여행을 보는 중이면 그 주인의 자료를 읽는다(권한은 DB 가 지킨다).
+      const owner = ownerOf(readFamilyView(), data.user.id);
+      const rows = await fetchTrips(supabase, owner);
       if (!active) return;
       if (!rows) {
         setStatus("failed");
         return;
       }
       setTrips(rows);
-      setUserId(data.user.id);
+      setUserId(owner);
       setStatus("ready");
 
       // 둘 다 곁다리다. 못 불러와도 스케치는 그려져야 한다.
       try {
-        const lines = await fetchHeadlines(supabase, data.user.id);
+        const lines = await fetchHeadlines(supabase, owner);
         if (active) setWritten(lines);
       } catch {
         // 적어 둔 말을 못 불러온 것뿐이다.
       }
       try {
-        const shots = await visitCovers(supabase, data.user.id);
+        const shots = await visitCovers(supabase, owner);
         if (active) setCovers(shots);
       } catch {
         // 사진을 못 얹으면 점으로 그려진다.
@@ -219,7 +224,7 @@ export function SketchView() {
       )}
 
       {shown === "all" ? (
-        <AllYearsShowcase all={all} sidoOf={sidoOf} onPickYear={pick} userId={userId} />
+        <AllYearsShowcase all={all} sidoOf={sidoOf} onPickYear={pick} userId={shareId} />
       ) : (
         <SketchShowcase
           key={shown}
@@ -228,7 +233,7 @@ export function SketchView() {
           written={written.get(shown)}
           onWrite={write}
           sidoOf={sidoOf}
-          userId={userId}
+          userId={shareId}
         />
       )}
     </>

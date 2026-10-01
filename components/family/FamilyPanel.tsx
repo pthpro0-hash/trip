@@ -14,6 +14,7 @@ import {
   type Circle,
   type PendingInvite,
 } from "@/lib/supabase/family";
+import { startFamilyView } from "@/lib/familyView";
 import { FAMILY_LIMIT, FAMILY_ROLES, INVITE_DAYS, roleHint, roleLabel, type FamilyRole } from "@/lib/family";
 
 /*
@@ -310,6 +311,19 @@ export function FamilyPanel() {
                   <span className="block truncate text-[15px] font-semibold text-text">{member.email ?? "알 수 없는 계정"}</span>
                   <span className="text-[13px] text-text-muted">{roleLabel(member.role)}</span>
                 </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    startFamilyView({ ownerId: member.id, label: member.email ?? "가족", role: member.role });
+                    // 앞 화면의 자료가 남지 않게 새로 불러온다.
+                    // 라우터가 아니라 통째로 새로 불러온다 — 앞 화면의 자료가 남지 않게.
+                    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+                    window.location.href = "/?v=sketch";
+                  }}
+                  className="rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-on-accent transition hover:bg-accent-hover"
+                >
+                  여행 보기
+                </button>
                 {asking === `leave-${member.id}` ? (
                   <>
                     <button
