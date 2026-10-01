@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Logo } from "./Logo";
 import { AccountChip } from "@/components/auth/AccountChip";
 import { rememberStart, type Start } from "@/lib/start";
 import { canIn, useFamilyView } from "@/lib/familyView";
@@ -47,11 +48,11 @@ export function SiteHeader() {
           className="flex min-w-0 shrink items-center gap-1.5 truncate whitespace-nowrap text-[15px] font-semibold tracking-tight text-text transition hover:text-accent"
         >
           {/*
-            좁은 화면에서는 이름을 접고 나침반만 남긴다. 375px 에서는
+            좁은 화면에서는 이름을 접고 로고만 남긴다. 375px 에서는
             갈래 둘과 계정 칩만으로 폭이 꽉 차, 이름을 두면 "여행." 으로
             잘린다. 잘린 이름보다 기호 하나가 낫다.
           */}
-          <span aria-hidden="true">🧭</span>
+          <Logo className="h-6 w-6 shrink-0" />
           <span className="hidden sm:inline">내 여행 스케치</span>
           <span className="sr-only sm:hidden">내 여행 스케치</span>
         </Link>
