@@ -22,6 +22,7 @@ import {
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { rememberStartIfUnset } from "@/lib/start";
 import { MAP_HREF } from "@/lib/nav";
+import { canIn, ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
 import { remainingText } from "@/lib/photo/eta";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
@@ -111,6 +112,12 @@ export function PhotoImport() {
   const [dailyShots, setDailyShots] = useState<Shot[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string | null>(null);
+  /*
+    가족의 여행을 보는 중이면 사진은 그 사람의 여행에 더해진다(userId 는 자료의 주인).
+    더할 권한이 없으면 저장할 수 없다 — 올리는 곳이 남의 여행이라 안내만 한다.
+  */
+  const family = useFamilyView();
+  const noAdd = family !== null && !canIn(family, "add");
   const [companions, setCompanions] = useState<Record<string, string>>({});
   // 제목을 손댄 여행만 기억한다. 손대지 않은 것은 장소에서 새로 짓는다.
   const [titles, setTitles] = useState<Record<string, string>>({});
@@ -136,10 +143,14 @@ export function PhotoImport() {
 
     supabase.auth.getUser().then(async ({ data }) => {
       if (!active || !data.user) return;
-      setUserId(data.user.id);
+      const viewed = readFamilyView();
+      // 더할 권한이 없으면 저장할 곳이 없다. 사용자 id 를 비워 두어 저장 길이 열리지 않게 한다.
+      if (viewed && !canIn(viewed, "add")) return;
+      const owner = ownerOf(viewed, data.user.id);
+      setUserId(owner);
       // 같은 사진을 두 번 넣는 일이 잦다. 이미 저장한 날짜를 미리 알아 둔다.
-      setSavedRanges(await fetchSavedRanges(supabase, data.user.id));
-      const remembered = await fetchPlaceNames(supabase, data.user.id);
+      setSavedRanges(await fetchSavedRanges(supabase, owner));
+      const remembered = await fetchPlaceNames(supabase, owner);
       if (active) setMemories(remembered);
     });
 
@@ -671,7 +682,20 @@ export function PhotoImport() {
         </div>
       )}
 
-      {visible.length > 0 && !userId && (
+      {visible.length > 0 && noAdd && (
+        <p className="rounded-xl bg-bg-subtle px-4 py-3.5 text-[14px] text-text-muted">
+          {family?.label} 님의 여행에는 사진을 더할 수 없어요(권한이 &lsquo;추가도 가능&rsquo;이 아니에요). 내
+          여행으로 돌아가 올려 주세요.
+        </p>
+      )}
+
+      {visible.length > 0 && family !== null && userId && (
+        <p className="rounded-xl bg-accent-soft px-4 py-3 text-[14px] text-text">
+          이 사진은 <span className="font-semibold">{family.label}</span> 님의 여행에 더해져요.
+        </p>
+      )}
+
+      {visible.length > 0 && !userId && !noAdd && (
         <div className="flex flex-col gap-2 rounded-xl bg-bg-subtle px-4 py-3.5 text-[14px] text-text-muted">
           <p>기록으로 남기려면 로그인이 필요해요. 찾은 결과는 로그인한 뒤 다시 골라 주세요.</p>
           <Link

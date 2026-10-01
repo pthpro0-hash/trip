@@ -86,16 +86,12 @@ export function useFamilyView(): FamilyView | null {
 export const ownerOf = (view: FamilyView | null, myId: string): string => view?.ownerId ?? myId;
 
 /*
-  가족 여행에서 무엇을 할 수 있나.
+  가족 여행에서 무엇을 할 수 있나 — 그 주인이 나에게 준 권한대로.
 
-  이번 단계는 보기만이다 — 어느 권한이든 읽기만 열어 둔다. DB 는 이미 권한대로 막지만
-  (supabase/family.sql), 화면이 수정·추가·삭제 단추를 권한대로 내는 것은 다음 단계다.
-  단계가 올라갈 때 이 한 곳만 canDo(view.role, action) 으로 바꾸면 된다.
+  화면은 이것으로 단추를 내거나 숨긴다. 막는 것은 DB 다(supabase/family.sql). 권한이
+  바뀌어도 화면이 한동안 옛 값을 들고 있을 수 있는데, 그때 누른 것은 DB 가 거절하고
+  화면은 "하지 못했어요"로 알린다(FamilyBanner 가 불러올 때마다 권한을 새로 맞춘다).
 */
-const WRITES_OPEN = false;
-
 export function canIn(view: FamilyView | null, action: FamilyAction): boolean {
-  if (view === null) return true;
-  if (action === "read") return true;
-  return WRITES_OPEN && canDo(view.role, action);
+  return view === null ? true : canDo(view.role, action);
 }

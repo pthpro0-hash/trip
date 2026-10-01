@@ -335,6 +335,27 @@ create policy "place_names_delete_family" on public.place_names
   for delete using (public.family_can(user_id, 'edit'));
 
 -- ═══════════════════════════════════════════════
+-- 링크로 보여 주는 여행은 가족이 지우지 못한다.
+--
+-- 여행을 지울 때 화면은 먼저 그 여행의 링크(trip_shares)가 있는지 보고, 있으면 끊은 뒤에
+-- 지운다(링크 사진은 공개 보관함에 있어서, 줄이 먼저 사라지면 영영 남는다). 가족이 그
+-- 줄을 못 읽으면 "링크 없음"으로 보고 지워 버려, 주인의 링크 사진이 공개로 남는다.
+--
+-- 그래서 추가도 가능(full) 가족에게는 그 줄을 읽게만 한다. 읽으면 가족의 화면이 링크가
+-- 있음을 알지만 끊을 수는 없어(끊는 것은 주인만) 여행 지우기가 멈춘다 — 주인이 링크를
+-- 끊은 뒤에 지울 수 있다. tripShare.sql 을 실행하지 않았으면 이 부분은 건너뛴다.
+-- ═══════════════════════════════════════════════
+
+do $$
+begin
+  if to_regclass('public.trip_shares') is not null then
+    drop policy if exists "trip_shares_select_family" on public.trip_shares;
+    create policy "trip_shares_select_family" on public.trip_shares
+      for select using (public.family_can(user_id, 'full'));
+  end if;
+end $$;
+
+-- ═══════════════════════════════════════════════
 -- 주인 칸(user_id)은 바꿀 수 없다.
 --
 -- 수정 권한이 있는 가족이 고치기(update)로 user_id 를 자기 것으로 바꾸면, with check

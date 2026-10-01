@@ -82,17 +82,42 @@ describe("TripDetail · 가족의 여행", () => {
     expect(fetched.mock.calls[0][1]).toBe("엄마");
   });
 
-  it("가족의 여행이면 — 권한이 가장 높아도 이번 단계는 — 읽기만 된다", async () => {
-    window.sessionStorage.setItem("family-view", JSON.stringify({ ownerId: "엄마", label: "mom@example.com", role: "full" }));
+  const withRole = (role: "view" | "edit" | "full") =>
+    window.sessionStorage.setItem("family-view", JSON.stringify({ ownerId: "엄마", label: "mom@example.com", role }));
+  const BUTTONS = {
+    share: "링크 공유",
+    deleteTrip: /이 여행 지우기/,
+    rename: "성산일출봉 이름 고치기",
+    deletePhoto: "이 사진 지우기",
+    note: "적어두기",
+  } as const;
+  const shown = () =>
+    Object.entries(BUTTONS)
+      .filter(([, name]) => screen.queryByRole("button", { name }) !== null)
+      .map(([key]) => key);
+
+  it("보기만이면 읽기만 된다 — 고치기·지우기·공유 단추가 없다", async () => {
+    withRole("view");
     const title = await open();
     expect(title.value).toBe("엄마의 제주");
     expect(title.readOnly).toBe(true);
     expect(screen.getByLabelText("부제")).toHaveProperty("readOnly", true);
-    for (const name of ["링크 공유", /이 여행 지우기/, "성산일출봉 이름 고치기", "이 사진 지우기", "적어두기"]) {
-      expect(screen.queryByRole("button", { name })).toBeNull();
-    }
+    expect(shown()).toEqual([]);
     // 읽는 것은 그대로 보인다.
     expect(screen.getByText("성산일출봉")).toBeTruthy();
     expect(screen.getByDisplayValue("비가 왔다")).toBeTruthy();
+  });
+
+  it("수정만이면 고칠 수 있지만 지우지는 못한다", async () => {
+    withRole("edit");
+    const title = await open();
+    expect(title.readOnly).toBe(false);
+    expect(shown()).toEqual(["rename", "note"]);
+  });
+
+  it("추가도 가능이면 지울 수도 있다 — 그래도 내 이름으로 링크를 만들 수는 없다", async () => {
+    withRole("full");
+    await open();
+    expect(shown()).toEqual(["deleteTrip", "rename", "deletePhoto", "note"]);
   });
 });

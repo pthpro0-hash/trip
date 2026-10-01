@@ -49,13 +49,24 @@ describe("자료의 주인", () => {
   });
 });
 
-describe("무엇을 할 수 있나 — 이번 단계는 보기만", () => {
-  it("내 여행이면 모두 할 수 있다", () => {
-    for (const action of ["read", "edit", "add", "remove"] as const) expect(canIn(null, action)).toBe(true);
+describe("무엇을 할 수 있나 — 그 주인이 준 권한대로", () => {
+  const as = (role: "view" | "edit" | "full") => ({ ...view, role });
+  const can = (v: ReturnType<typeof as> | null) =>
+    (["read", "edit", "add", "remove"] as const).filter((action) => canIn(v, action));
+
+  it("내 여행이면 모두", () => {
+    expect(can(null)).toEqual(["read", "edit", "add", "remove"]);
   });
 
-  it("가족 여행에서는 읽기만 된다 — 고치기·더하기·지우기 단추는 숨긴다", () => {
-    expect(canIn(view, "read")).toBe(true);
-    for (const action of ["edit", "add", "remove"] as const) expect(canIn(view, action)).toBe(false);
+  it("보기만: 읽기", () => {
+    expect(can(as("view"))).toEqual(["read"]);
+  });
+
+  it("수정만: 읽고 고친다 — 더하거나 지우지 못한다", () => {
+    expect(can(as("edit"))).toEqual(["read", "edit"]);
+  });
+
+  it("추가도 가능: 모두", () => {
+    expect(can(as("full"))).toEqual(["read", "edit", "add", "remove"]);
   });
 });

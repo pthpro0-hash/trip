@@ -95,6 +95,17 @@ describe("family.sql · 여행 자료의 권한", () => {
   });
 });
 
+describe("family.sql · 링크로 보여 주는 여행", () => {
+  it("추가도 가능 가족은 여행의 링크 줄을 읽을 수 있다 — 그래야 링크가 걸린 여행의 삭제가 멈춘다", () => {
+    expect(sql).toContain('policy "trip_shares_select_family" on public.trip_shares');
+    expect(sql).toMatch(/trip_shares_select_family[\s\S]*?family_can\(user_id, 'full'\)/);
+  });
+
+  it("끊기(지우기)는 가족에게 열지 않는다 — 주인만", () => {
+    expect(sql).not.toMatch(/trip_shares_(insert|update|delete)_family/);
+  });
+});
+
 describe("family.sql · 주인 칸", () => {
   it("다섯 표 모두 고치기로 user_id 를 바꾸지 못한다 — 수정 권한으로 자료를 자기 계정에 옮기는 길을 막는다", () => {
     expect(sql).toContain("new.user_id is distinct from old.user_id");
