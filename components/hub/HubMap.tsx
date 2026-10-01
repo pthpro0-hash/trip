@@ -1,5 +1,6 @@
 "use client";
 
+import { fitBottomPadding } from "./fitPadding";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { loadKakaoMaps } from "@/lib/kakaoLoader";
 import { groupPins, inseparable, type Bounds, type HubPlace } from "@/lib/hub";
@@ -173,7 +174,10 @@ export function HubMap({
     }
     const bounds = new kakao.maps.LatLngBounds();
     for (const place of targets) bounds.extend(new kakao.maps.LatLng(place.lat, place.lng));
-    map.setBounds(bounds, EDGE, EDGE, EDGE + latest.current.bottomInset, EDGE);
+    // 시트를 끝까지 올렸을 때 여백이 지도 높이를 넘지 않게 한다(넘으면 지도가 엉뚱한 곳으로 간다).
+    const box = containerRef.current;
+    const bottom = box ? fitBottomPadding(box.clientHeight, latest.current.bottomInset, EDGE) : latest.current.bottomInset;
+    map.setBounds(bounds, EDGE, EDGE, EDGE + bottom, EDGE);
   };
 
   /** 핀을 다시 묶어 다시 얹는다. */
