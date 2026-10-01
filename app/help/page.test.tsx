@@ -25,3 +25,15 @@ describe("HelpPage · 내 데이터", () => {
     expect(document.getElementById("data")).toBeTruthy();
   });
 });
+
+describe("HelpPage · 가족 공유", () => {
+  it("계정과 보관 갈래에 가족 공유를 풀어 적었다 — 권한 셋과 한도까지", () => {
+    render(<HelpPage />);
+    expect(screen.getByText("가족과 내 여행 함께 보기")).toBeTruthy();
+    expect(screen.getByText("가족의 여행 보기")).toBeTruthy();
+    const section = document.getElementById("account")!;
+    for (const word of ["보기만", "수정만", "추가도 가능", "8명", "7일", "해제"]) {
+      expect(section.textContent).toContain(word);
+    }
+  });
+});
