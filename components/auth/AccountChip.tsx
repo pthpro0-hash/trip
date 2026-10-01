@@ -94,24 +94,31 @@ export function AccountChip() {
 
   return (
     <div className="flex shrink-0 items-center gap-2">
-      {account.avatar && (
-        // 다른 서비스의 프로필 사진이라 도메인을 미리 알 수 없다.
-        // next/image 를 쓰려면 도메인을 등록해야 해서 그냥 img 로 둔다.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={account.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
-      )}
       {/*
         좁은 화면에서는 이름을 접는다. 위 띠에 서비스 이름과 갈래 둘이
         함께 서 있어 375px 에서 이 칩이 화면 밖으로 밀려났다. 사진이
         있으면 그것으로 누구인지 알 수 있으니 이름은 접어도 된다.
       */}
-      <span
-        className={`max-w-[10ch] truncate text-[13px] font-medium text-text ${
-          account.avatar ? "hidden sm:inline" : ""
-        }`}
+      <Link
+        href="/family"
+        aria-label="가족 공유"
+        title="가족 공유"
+        className="flex items-center gap-2 rounded-full transition hover:opacity-80"
       >
-        {account.name}
-      </span>
+        {account.avatar && (
+          // 다른 서비스의 프로필 사진이라 도메인을 미리 알 수 없다.
+          // next/image 를 쓰려면 도메인을 등록해야 해서 그냥 img 로 둔다.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={account.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
+        )}
+        <span
+          className={`max-w-[10ch] truncate text-[13px] font-medium text-text ${
+            account.avatar ? "hidden sm:inline" : ""
+          }`}
+        >
+          {account.name}
+        </span>
+      </Link>
       <button
         type="button"
         onClick={signOut}
