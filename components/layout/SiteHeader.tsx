@@ -6,6 +6,7 @@ import { Logo } from "./Logo";
 import { AccountChip } from "@/components/auth/AccountChip";
 import { rememberStart, type Start } from "@/lib/start";
 import { canIn, useFamilyView } from "@/lib/familyView";
+import { isReceiverPath } from "@/lib/nav";
 import { ADD_HREF, MAP_HREF, SKETCH_HREF, SPOTS_HREF, activeNav, type NavId } from "@/lib/nav";
 
 /*
@@ -38,6 +39,9 @@ export function SiteHeader() {
   const active = activeNav(pathname, null);
   // 가족의 여행을 보는 동안에는 내 사진을 더하는 단추를 내지 않는다(남의 여행에 올리는 것으로 헷갈린다).
   const canAdd = canIn(useFamilyView(), "add");
+
+  // 가족 우편함의 받는 쪽(부모님)에는 위 띠가 없다 — 엽서와 답장 단추뿐이다.
+  if (isReceiverPath(pathname)) return null;
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">

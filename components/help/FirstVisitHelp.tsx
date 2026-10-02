@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { isReceiverPath } from "@/lib/nav";
 import { HelpDialog } from "./HelpDialog";
 import { hasSeen, markSeen } from "@/lib/seen";
 
@@ -24,13 +26,15 @@ export const HELP_CLOSED = "help:closed";
 */
 export function FirstVisitHelp() {
   const [open, setOpen] = useState(false);
+  // 가족 우편함의 받는 쪽(부모님)에는 사용법 창을 내밀지 않는다 — 처음 온 사람이 아니라 엽서를 받은 사람이다.
+  const receiver = isReceiverPath(usePathname() ?? "");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 저장소는 화면에 붙은 뒤에야 읽을 수 있다.
-    if (!hasSeen(KEY)) setOpen(true);
-  }, []);
+    if (!receiver && !hasSeen(KEY)) setOpen(true);
+  }, [receiver]);
 
-  if (!open) return null;
+  if (!open || receiver) return null;
 
   return (
     <HelpDialog

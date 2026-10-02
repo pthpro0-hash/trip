@@ -18,11 +18,15 @@ import {
   newPostcardId,
   normalizeMembers,
   pickPostcardPhotos,
+  postcardSpan,
+  postcardSteps,
+  postcardTitle,
   postcardUrl,
   suggestionsFor,
   type PostcardPhotoCandidate,
 } from "./mailbox";
 import type { TripDetail } from "./supabase/tripDetail";
+import type { PostcardSnapshot as PostcardSnapshotLike } from "./mailbox";
 
 describe("한도", () => {
   it("우편함은 3개, 보내는 사람은 8명, 엽서 사진은 3장", () => {
@@ -269,5 +273,46 @@ describe("엽서 스냅샷 · 보낸 순간의 모습", () => {
     expect(isPostcardSnapshot({ ...snap, files: ["../x"] })).toBe(false);
     expect(isPostcardSnapshot({ ...snap, visits: [{ placeName: 1 }] })).toBe(false);
     expect(isPostcardSnapshot(null)).toBe(false);
+  });
+});
+
+describe("엽서 화면에 쓰는 말 · 점", () => {
+  const snap = (over: Partial<PostcardSnapshotLike> = {}): PostcardSnapshotLike => ({
+    v: 1,
+    title: "강릉 바다",
+    startedOn: "2026-09-13",
+    endedOn: "2026-09-14",
+    visits: [
+      { placeName: "안목해변", lat: 37.77, lng: 128.95, day: "2026-09-13", photos: ["a.webp", "b.webp"] },
+      { placeName: "경포대", lat: 37.79, lng: 128.9, day: "2026-09-14", photos: [] },
+      { placeName: "주문진", lat: 37.89, lng: 128.83, day: "2026-09-14", photos: ["c.webp"] },
+    ],
+    files: ["a.webp", "b.webp", "c.webp"],
+    ...over,
+  });
+
+  it("제목이 있으면 그것, 없으면 곳 이름으로 짓는다", () => {
+    expect(postcardTitle(snap())).toBe("강릉 바다");
+    expect(postcardTitle(snap({ title: null }))).toBe("안목해변 외 2곳");
+    expect(postcardTitle(snap({ title: "  ", visits: [snap().visits[0]] }))).toBe("안목해변");
+    expect(postcardTitle(snap({ title: null, visits: [] }))).toBe("여행 엽서");
+  });
+
+  it("기간은 말로 — 같은 날, 같은 달, 달이 넘어갈 때", () => {
+    expect(postcardSpan(snap({ startedOn: "2026-09-13", endedOn: "2026-09-13" }))).toBe("9월 13일");
+    expect(postcardSpan(snap())).toBe("9월 13일 ~ 14일");
+    expect(postcardSpan(snap({ startedOn: "2026-08-31", endedOn: "2026-09-01" }))).toBe("8월 31일 ~ 9월 1일");
+  });
+
+  it("발자취 재생에 쓸 점들 — 들른 차례, 흐린 좌표, 사진 수와 첫 사진", () => {
+    const steps = postcardSteps(snap());
+    expect(steps.map((s) => s.placeName)).toEqual(["안목해변", "경포대", "주문진"]);
+    expect(steps[0]).toMatchObject({ month: 9, day: 13, lat: 37.77, lng: 128.95, photoCount: 2, photoPath: "a.webp", tripId: "" });
+    expect(steps[1]).toMatchObject({ photoCount: 0, photoPath: null });
+  });
+
+  it("날을 못 읽는 곳은 건너뛴다", () => {
+    const bad = snap({ visits: [{ placeName: "x", lat: 1, lng: 1, day: "깨짐", photos: [] }, snap().visits[0]] });
+    expect(postcardSteps(bad)).toHaveLength(1);
   });
 });

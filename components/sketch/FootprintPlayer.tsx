@@ -47,6 +47,11 @@ interface FootprintPlayerProps {
   shared?: boolean;
   /** 상세에서 돌아올 자리. */
   backHref?: string;
+  /** 위 제목. 한 해가 아니라 여행 하나를 보일 때(엽서)는 "다녀온 길"처럼 바꾼다. */
+  heading?: string;
+  hint?: string;
+  /** 아래 달 막대를 둘지. 여행 하나(엽서)에는 달을 고를 일이 없다. */
+  showMonths?: boolean;
 }
 
 /** 점 위의 이름표. 가장자리에서는 안쪽으로 밀어 잘리지 않게 한다. */
@@ -79,7 +84,7 @@ function MapTag({
   );
 }
 
-export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared = false, backHref }: FootprintPlayerProps) {
+export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared = false, backHref, heading = "그해의 발자취", hint = "날짜순으로 찍어 봐요", showMonths = true }: FootprintPlayerProps) {
   const [state, dispatch] = useReducer(playReducer, initialPlay);
   const [picked, setPicked] = useState<number | null>(null);
   const count = steps.length;
@@ -111,8 +116,8 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
   return (
     <section aria-label="발자취" className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-[18px] font-bold tracking-tight text-text">그해의 발자취</h2>
-        <span className="text-[13px] text-text-faint">날짜순으로 찍어 봐요</span>
+        <h2 className="text-[18px] font-bold tracking-tight text-text">{heading}</h2>
+        <span className="text-[13px] text-text-faint">{hint}</span>
       </div>
 
       <div className="overflow-hidden rounded-2xl ring-1 ring-line" style={{ background: SEA }}>
@@ -215,6 +220,7 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
       )}
 
       {/* 달마다 여행이 몇 번이었는지. 누르면 그 달에 간 곳만 지도에 남는다. */}
+      {showMonths && (
       <div role="group" aria-label="달별 여행 수" className="flex items-end gap-1">
         {perMonth.map((n, index) => {
           const month = index + 1;
@@ -247,6 +253,7 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
           );
         })}
       </div>
+      )}
     </section>
   );
 }

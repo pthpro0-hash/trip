@@ -8,6 +8,7 @@ import {
   activeNav,
   homeStart,
   hubHref,
+  isReceiverPath,
   showsBottomNav,
   viewOf,
 } from "./nav";
@@ -85,6 +86,25 @@ describe("activeNav · 켜질 갈래", () => {
     expect(activeNav("/sketchbook", null)).toBeNull();
     expect(activeNav("/tripsy", null)).toBeNull();
     expect(activeNav("/spotsfoo", null)).toBeNull();
+  });
+});
+
+describe("isReceiverPath · 가족 우편함 받는 쪽", () => {
+  /*
+    부모님은 링크 하나로 들어온다. 위 띠(내 여행·여행 100선·로그인)와 하단 탭, 처음 온 사람 안내창이
+    보이면 어디를 눌러야 할지 헷갈린다 — 받는 쪽에는 엽서와 답장 단추뿐이다.
+  */
+  it("/m 과 그 아래는 받는 쪽이다", () => {
+    for (const path of ["/m/abc", "/m/abc/p/def", "/m"]) expect(isReceiverPath(path)).toBe(true);
+  });
+
+  it("앞부분만 닮은 주소는 아니다 — 보내는 쪽 /mailboxes 는 평소 화면이다", () => {
+    for (const path of ["/mailboxes", "/mailboxes/join/abc", "/map", "/", "/trips/new"]) expect(isReceiverPath(path)).toBe(false);
+  });
+
+  it("받는 쪽에는 하단 탭도 없다", () => {
+    expect(showsBottomNav("/m/abc")).toBe(false);
+    expect(showsBottomNav("/mailboxes")).toBe(true);
   });
 });
 

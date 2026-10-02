@@ -1,0 +1,172 @@
+// @vitest-environment node
+import { describe, it, expect } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  fetchMailboxPostcard,
+  fetchMailboxView,
+  markPostcardOpened,
+  postcardFileUrl,
+  replyToPostcard,
+} from "./mailboxPublic";
+
+/*
+  받는 쪽(로그인 없음)이 읽는 것. 내려받은 것은 보낸 사람의 브라우저가 적은 것이라 모양을 확인하고,
+  모르는 모양은 그리지 않는다. 링크가 틀렸거나 우편함이 닫혔으면 null — 화면은 "열리지 않는 링크"를 보인다.
+*/
+
+const TOKEN = "T".repeat(43);
+const CARD = "P".repeat(43);
+
+const snapshot = {
+  v: 1,
+  title: "강릉 바다",
+  startedOn: "2026-09-13",
+  endedOn: "2026-09-14",
+  visits: [{ placeName: "안목해변", lat: 37.77, lng: 128.95, day: "2026-09-13", photos: ["a.webp"] }],
+  files: ["a.webp"],
+};
+
+function fake(rpc: Record<string, { data?: unknown; error?: { message: string } | null }>) {
+  const calls: { name: string; args: unknown }[] = [];
+  const client = {
+    rpc: async (name: string, args?: unknown) => {
+      calls.push({ name, args });
+      return rpc[name] ?? { data: null, error: null };
+    },
+  };
+  return { client: client as unknown as SupabaseClient, calls };
+}
+
+describe("postcardFileUrl", () => {
+  it("공개 보관함의 주소 — 파일 이름은 한 칸으로 묶는다", () => {
+    const url = postcardFileUrl("pid", "a.webp");
+    expect(url).toMatch(/\/storage\/v1\/object\/public\/postcards\/pid\/a\.webp$/);
+    expect(postcardFileUrl("pid", "../x")).toContain("pid/..%2Fx");
+  });
+});
+
+describe("fetchMailboxView", () => {
+  const view = {
+    name: "우리 엄마 아빠",
+    tone: "casual",
+    members: ["엄마", "아빠"],
+    postcards: [
+      {
+        id: CARD,
+        senderName: "지민",
+        title: "강릉 바다",
+        startedOn: "2026-09-13",
+        cover: "a.webp",
+        greeting: "엄마 아빠, 바다 보고 왔어요",
+        sentAt: "2026-10-02T00:00:00Z",
+        openedAt: null,
+        replies: [{ who: "엄마", reaction: "좋구나", at: "2026-10-03T00:00:00Z" }],
+      },
+    ],
+  };
+
+  it("우편함과 받은 엽서 목록을 읽을 수 있는 모양으로", async () => {
+    const { client, calls } = fake({ mailbox_view: { data: view } });
+    const result = await fetchMailboxView(client, TOKEN);
+    expect(calls[0]).toEqual({ name: "mailbox_view", args: { box_token: TOKEN } });
+    expect(result?.members).toEqual(["엄마", "아빠"]);
+    expect(result?.postcards[0]).toMatchObject({ id: CARD, senderName: "지민", title: "강릉 바다", cover: "a.webp", opened: false });
+    expect(result?.postcards[0].replies).toEqual([{ who: "엄마", reaction: "좋구나" }]);
+  });
+
+  it("열어 본 시각이 있으면 opened", async () => {
+    const { client } = fake({ mailbox_view: { data: { ...view, postcards: [{ ...view.postcards[0], openedAt: "2026-10-02T01:00:00Z" }] } } });
+    expect((await fetchMailboxView(client, TOKEN))?.postcards[0].opened).toBe(true);
+  });
+
+  it("모르는 링크·닫힌 우편함(null)은 null", async () => {
+    expect(await fetchMailboxView(fake({ mailbox_view: { data: null } }).client, TOKEN)).toBeNull();
+  });
+
+  it("모양이 틀린 링크 글자는 묻지도 않는다", async () => {
+    const { client, calls } = fake({});
+    expect(await fetchMailboxView(client, "짧음")).toBeNull();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("오류가 나도 null — 열리지 않는 링크로 보인다", async () => {
+    expect(await fetchMailboxView(fake({ mailbox_view: { error: { message: "x" } } }).client, TOKEN)).toBeNull();
+  });
+
+  it("엉뚱한 모양(받는 분이 문자열 아님 등)은 거른 채 읽는다", async () => {
+    const { client } = fake({ mailbox_view: { data: { ...view, members: ["엄마", 3, null], postcards: [{ nope: 1 }, view.postcards[0]] } } });
+    const result = await fetchMailboxView(client, TOKEN);
+    expect(result?.members).toEqual(["엄마"]);
+    expect(result?.postcards).toHaveLength(1);
+  });
+});
+
+describe("fetchMailboxPostcard", () => {
+  const data = {
+    id: CARD,
+    senderName: "지민",
+    snapshot,
+    greeting: "엄마 아빠, 바다 보고 왔어요",
+    sentAt: "2026-10-02T00:00:00Z",
+    mailbox: { name: "우리 엄마 아빠", tone: "casual", members: ["엄마", "아빠"] },
+    replies: [],
+  };
+
+  it("엽서 한 장을 읽는다", async () => {
+    const { client, calls } = fake({ mailbox_postcard: { data } });
+    const result = await fetchMailboxPostcard(client, TOKEN, CARD);
+    expect(calls[0]).toEqual({ name: "mailbox_postcard", args: { box_token: TOKEN, card_id: CARD } });
+    expect(result).toMatchObject({ id: CARD, senderName: "지민", greeting: "엄마 아빠, 바다 보고 왔어요", members: ["엄마", "아빠"], tone: "casual" });
+    expect(result?.snapshot.title).toBe("강릉 바다");
+  });
+
+  it("스냅샷 모양이 틀리면 null — 그리지 않는다", async () => {
+    const bad = fake({ mailbox_postcard: { data: { ...data, snapshot: { v: 9 } } } });
+    expect(await fetchMailboxPostcard(bad.client, TOKEN, CARD)).toBeNull();
+    const evil = fake({ mailbox_postcard: { data: { ...data, snapshot: { ...snapshot, files: ["../../x"] } } } });
+    expect(await fetchMailboxPostcard(evil.client, TOKEN, CARD)).toBeNull();
+  });
+
+  it("엽서 주소·링크 글자가 틀리면 묻지도 않는다", async () => {
+    const { client, calls } = fake({});
+    expect(await fetchMailboxPostcard(client, "짧음", CARD)).toBeNull();
+    expect(await fetchMailboxPostcard(client, TOKEN, "짧음")).toBeNull();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("그 우편함에 없는 엽서(null)는 null", async () => {
+    expect(await fetchMailboxPostcard(fake({ mailbox_postcard: { data: null } }).client, TOKEN, CARD)).toBeNull();
+  });
+});
+
+describe("markPostcardOpened · replyToPostcard", () => {
+  it("열어 봤다고 적는다 — 실패해도 조용히(보는 데 지장 없다)", async () => {
+    const { client, calls } = fake({ mailbox_open: { data: true } });
+    await markPostcardOpened(client, TOKEN, CARD);
+    expect(calls[0]).toEqual({ name: "mailbox_open", args: { box_token: TOKEN, card_id: CARD } });
+    await expect(markPostcardOpened(fake({ mailbox_open: { error: { message: "x" } } }).client, TOKEN, CARD)).resolves.toBeUndefined();
+  });
+
+  it("답장을 보낸다", async () => {
+    const { client, calls } = fake({ mailbox_reply: { data: true } });
+    expect(await replyToPostcard(client, TOKEN, CARD, "엄마", "좋구나")).toEqual({ ok: true });
+    expect(calls[0]).toEqual({
+      name: "mailbox_reply",
+      args: { box_token: TOKEN, card_id: CARD, reply_who: "엄마", reply_reaction: "좋구나" },
+    });
+  });
+
+  it("너무 잦은 답장은 too-often, 그 밖은 failed, 링크가 닫혔으면 closed", async () => {
+    expect(await replyToPostcard(fake({ mailbox_reply: { error: { message: "mailbox: 답장이 너무 잦다" } } }).client, TOKEN, CARD, "엄마", "좋구나")).toEqual({ ok: false, reason: "often" });
+    expect(await replyToPostcard(fake({ mailbox_reply: { error: { message: "boom" } } }).client, TOKEN, CARD, "엄마", "좋구나")).toEqual({ ok: false, reason: "failed" });
+    expect(await replyToPostcard(fake({ mailbox_reply: { data: false } }).client, TOKEN, CARD, "엄마", "좋구나")).toEqual({ ok: false, reason: "closed" });
+  });
+
+  it("이름·답장 글자 수가 틀리면 묻지도 않는다", async () => {
+    const { client, calls } = fake({});
+    expect(await replyToPostcard(client, TOKEN, CARD, "", "좋구나")).toEqual({ ok: false, reason: "invalid" });
+    expect(await replyToPostcard(client, TOKEN, CARD, "가".repeat(11), "좋구나")).toEqual({ ok: false, reason: "invalid" });
+    expect(await replyToPostcard(client, TOKEN, CARD, "엄마", "가".repeat(31))).toEqual({ ok: false, reason: "invalid" });
+    expect(calls).toHaveLength(0);
+  });
+});

@@ -144,7 +144,7 @@ describe("mailbox.sql · 보내는 사람의 권한", () => {
 });
 
 describe("mailbox.sql · 받는 쪽(로그인 없음)", () => {
-  const RPCS = ["mailbox_view", "mailbox_postcard", "mailbox_reply"];
+  const RPCS = ["mailbox_view", "mailbox_postcard", "mailbox_open", "mailbox_reply"];
 
   it.each(RPCS)("%s 는 security definer 이고 로그인 없는 사람에게 열려 있다", (name) => {
     expect(fn(name)).toContain("security definer");
@@ -165,8 +165,12 @@ describe("mailbox.sql · 받는 쪽(로그인 없음)", () => {
     expect(fn("mailbox_postcard")).toContain("postcard_deliveries");
   });
 
-  it("엽서를 처음 열면 열어 본 시각을 적는다(보낸 사람이 '읽으셨어요'를 본다)", () => {
-    expect(fn("mailbox_postcard")).toContain("opened_at");
+  it("엽서를 읽는 함수는 읽기만 한다 — 열어 본 시각은 따로(mailbox_open) 적는다", () => {
+    // 카카오톡 미리보기 같은 기계가 링크를 읽어 가도 "읽으셨어요"가 찍히지 않게.
+    expect(fn("mailbox_postcard")).not.toContain("opened_at");
+    expect(fn("mailbox_postcard")).not.toMatch(/update/);
+    expect(fn("mailbox_open")).toContain("opened_at");
+    expect(fn("mailbox_open")).toContain("coalesce");
   });
 
   it("답장은 짧게, 너무 자주는 안 된다", () => {

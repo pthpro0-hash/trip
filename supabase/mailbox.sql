@@ -549,10 +549,12 @@ as $$
   where m.token = box_token and m.closed_at is null;
 $$;
 
--- 엽서 한 장. 처음 열면 열어 본 시각을 적는다(보낸 사람이 "읽으셨어요"를 본다).
+-- 엽서 한 장. 읽기만 한다 — 열어 본 시각은 따로(mailbox_open) 적는다. 카카오톡 미리보기 같은 기계가
+-- 링크를 읽어 가도 "읽으셨어요"가 찍히지 않게, 사람이 화면을 연 뒤에 화면이 따로 부른다.
 create or replace function public.mailbox_postcard(box_token text, card_id text)
 returns jsonb
 language plpgsql
+stable
 security definer
 set search_path = public
 as $$
@@ -564,10 +566,6 @@ begin
   if not found then
     return null;
   end if;
-
-  update public.postcard_deliveries d
-    set opened_at = coalesce(d.opened_at, now())
-    where d.mailbox_id = box.id and d.postcard_id = card_id;
 
   select jsonb_build_object(
     'id', p.id,
@@ -590,6 +588,28 @@ begin
   where d.mailbox_id = box.id and d.postcard_id = card_id;
 
   return found_card;
+end;
+$$;
+
+-- 엽서를 열어 봤다고 적는다(처음 열 때 한 번). 보낸 사람이 "읽으셨어요"를 본다.
+create or replace function public.mailbox_open(box_token text, card_id text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  box_id uuid;
+begin
+  select id into box_id from public.mailboxes where token = box_token and closed_at is null;
+  if box_id is null then
+    return false;
+  end if;
+
+  update public.postcard_deliveries d
+    set opened_at = coalesce(d.opened_at, now())
+    where d.mailbox_id = box_id and d.postcard_id = card_id;
+  return found;
 end;
 $$;
 
@@ -634,9 +654,11 @@ $$;
 
 revoke all on function public.mailbox_view(text) from public;
 revoke all on function public.mailbox_postcard(text, text) from public;
+revoke all on function public.mailbox_open(text, text) from public;
 revoke all on function public.mailbox_reply(text, text, text, text) from public;
 grant execute on function public.mailbox_view(text) to anon, authenticated;
 grant execute on function public.mailbox_postcard(text, text) to anon, authenticated;
+grant execute on function public.mailbox_open(text, text) to anon, authenticated;
 grant execute on function public.mailbox_reply(text, text, text, text) to anon, authenticated;
 
 -- ═══════════════════════════════════════════════

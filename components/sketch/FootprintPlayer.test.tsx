@@ -64,4 +64,11 @@ describe("FootprintPlayer", () => {
     expect(screen.queryByRole("link", { name: "상세 보기" })).toBeNull();
     expect(screen.getAllByText("8월 13일 · 안목해변").length).toBeGreaterThan(0);
   });
+
+  it("제목을 바꾸고 달 막대를 뺄 수 있다 — 엽서(여행 하나)에서 쓴다", () => {
+    render(<FootprintPlayer steps={steps} monthCounts={counts} totals={totals} heading="다녀온 길" hint="곳을 하나씩 찍어 봐요" showMonths={false} />);
+    expect(screen.getByRole("heading", { name: "다녀온 길" })).toBeTruthy();
+    expect(screen.getByText("곳을 하나씩 찍어 봐요")).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "달별 여행 수" })).toBeNull();
+  });
 });

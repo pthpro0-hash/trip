@@ -75,6 +75,17 @@ describe("SiteHeader", () => {
     });
   });
 
+  it("가족 우편함의 받는 쪽(/m/…)에는 위 띠가 없다 — 부모님에게는 엽서와 답장 단추뿐", async () => {
+    const { container } = await 머리띠("/m/abc/p/def");
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByRole("link", { name: "내 여행" })).toBeNull();
+  });
+
+  it("보내는 쪽(/mailboxes)에는 평소처럼 있다", async () => {
+    await 머리띠("/mailboxes");
+    expect(screen.getByRole("link", { name: "내 여행" })).toBeTruthy();
+  });
+
   it("어느 쪽도 아닌 곳에서는 아무것도 켜지 않는다", async () => {
     await 머리띠("/privacy");
     expect(켜진곳()).toEqual([]);

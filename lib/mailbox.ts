@@ -1,4 +1,5 @@
 import { newInviteToken } from "./family";
+import type { FootprintStep } from "./footprint";
 import type { TripDetail } from "./supabase/tripDetail";
 
 /*
@@ -257,5 +258,50 @@ export function isPostcardSnapshot(value: unknown): value is PostcardSnapshot {
       Array.isArray(visit.photos) &&
       visit.photos.every(isFileName)
     );
+  });
+}
+
+/* ── 받는 쪽 화면에 쓰는 말과 점 ─────────────────────────── */
+
+/** 엽서의 제목. 여행에 이름이 없으면 곳 이름으로 짓는다("안목해변 외 2곳"). */
+export function postcardTitle(snapshot: PostcardSnapshot): string {
+  const title = snapshot.title?.trim();
+  if (title) return title;
+  const first = snapshot.visits[0]?.placeName;
+  if (!first) return "여행 엽서";
+  return snapshot.visits.length > 1 ? `${first} 외 ${snapshot.visits.length - 1}곳` : first;
+}
+
+/** 엽서의 기간을 말로. "9월 13일", "9월 13일 ~ 14일", 달이 넘어가면 "8월 31일 ~ 9월 1일". */
+export function postcardSpan(snapshot: PostcardSnapshot): string {
+  const parse = (day: string) => ({ month: Number(day.slice(5, 7)), date: Number(day.slice(8, 10)) });
+  const from = parse(snapshot.startedOn);
+  const to = parse(snapshot.endedOn);
+  if (!(from.month >= 1 && from.month <= 12 && from.date >= 1)) return "";
+  const start = `${from.month}월 ${from.date}일`;
+  if (snapshot.startedOn === snapshot.endedOn || !(to.month >= 1 && to.month <= 12 && to.date >= 1)) return start;
+  return from.month === to.month ? `${start} ~ ${to.date}일` : `${start} ~ ${to.month}월 ${to.date}일`;
+}
+
+/**
+ * 발자취 재생(FootprintPlayer)에 쓸 점들. 들른 차례 그대로이고, 링크로 받은 것과 같은 모양이라
+ * 눌러도 갈 곳이 없다(tripId 가 비어 있다). 날을 못 읽는 곳은 건너뛴다.
+ */
+export function postcardSteps(snapshot: PostcardSnapshot): FootprintStep[] {
+  return snapshot.visits.flatMap((visit) => {
+    const month = Number(visit.day.slice(5, 7));
+    if (!(month >= 1 && month <= 12)) return [];
+    return [
+      {
+        placeName: visit.placeName,
+        lat: visit.lat,
+        lng: visit.lng,
+        month,
+        day: Number(visit.day.slice(8, 10)) || null,
+        tripId: "",
+        photoCount: visit.photos.length,
+        photoPath: visit.photos[0] ?? null,
+      },
+    ];
   });
 }

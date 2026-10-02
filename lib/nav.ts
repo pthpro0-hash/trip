@@ -80,5 +80,11 @@ export function homeStart(fromUrl: string | null, remembered: Start | "unknown" 
  *   로그인 길   가려는 곳이 하나뿐이다.
  */
 export function showsBottomNav(pathname: string): boolean {
-  return !["/sketch", "/s", "/t", "/login", "/auth"].some((segment) => under(pathname, segment));
+  return !["/sketch", "/s", "/t", "/m", "/login", "/auth"].some((segment) => under(pathname, segment));
 }
+
+/**
+ * 가족 우편함의 받는 쪽(/m/…)인가. 부모님이 링크 하나로 들어오는 화면이라, 위 띠·하단 탭·처음 온
+ * 사람 안내창을 모두 걷어 엽서와 답장 단추만 남긴다. 보내는 쪽(/mailboxes)은 평소 화면이다.
+ */
+export const isReceiverPath = (pathname: string): boolean => under(pathname, "/m");
