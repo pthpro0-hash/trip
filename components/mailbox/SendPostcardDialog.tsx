@@ -77,7 +77,11 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
     void (async () => {
       const { data } = await supabase.auth.getUser();
       const meta = data.user?.user_metadata ?? {};
-      const account = String(meta.full_name ?? meta.name ?? "").trim().split(/\s+/)[0] ?? "";
+      // 로그인 수단마다 이름이 들어 있는 칸이 다르다(카카오는 nickname 만 있기도 하다). 없으면 이메일 앞부분.
+      const account = String(meta.full_name ?? meta.name ?? meta.nickname ?? meta.preferred_username ?? data.user?.email?.split("@")[0] ?? "")
+        .trim()
+        .split(/\s+/)[0]
+        .slice(0, 20);
       if (active) setSenderName(remembered() || account);
       const list = await fetchMailboxes(supabase, userId);
       if (!active) return;
@@ -113,11 +117,26 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
     setChecked(next);
   };
 
-  const canSend = body.trim().length > 0 && senderName.trim().length > 0 && selected.length > 0 && !working;
+  /*
+    무엇이 빠졌는지. 단추를 흐리게 막아 두면 눌러도 아무 일이 없어 고장 난 것처럼 보인다 — 눌렀을 때
+    빠진 것을 말로 알려 준다.
+  */
+  const missing =
+    selected.length === 0
+      ? "받을 우편함을 골라 주세요."
+      : body.trim().length === 0
+        ? "한 줄을 적어 주세요. 받는 분께 가는 인사말이에요."
+        : senderName.trim().length === 0
+          ? "보내는 이름을 적어 주세요. 받는 분께 ‘○○이 보낸 엽서’로 보여요."
+          : null;
 
   const send = async () => {
     const supabase = getBrowserClient();
-    if (!supabase || !canSend) return;
+    if (!supabase || working) return;
+    if (missing) {
+      setFailure(missing);
+      return;
+    }
     setFailure(null);
     setWorking({ done: 0, total: picked.length });
     const result = await sendPostcard(supabase, {
@@ -407,8 +426,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
                   <button
                     type="button"
                     onClick={() => void send()}
-                    disabled={!canSend}
-                    className="rounded-full bg-accent px-5 py-3 text-[15px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
+                    className="rounded-full bg-accent px-5 py-3 text-[15px] font-medium text-on-accent transition hover:bg-accent-hover"
                   >
                     {selected.length > 1 ? `${selected.length}곳에 엽서 보내기` : "엽서 보내기"}
                   </button>

@@ -122,10 +122,62 @@ describe("SendPostcardDialog", () => {
     expect((screen.getByLabelText("장인 장모님 우편함 인사말") as HTMLTextAreaElement).value).toBe("다녀왔습니다. 건강하시죠?");
   });
 
-  it("한 줄이 비어 있으면 보낼 수 없다", async () => {
+  it("한 줄이 비어 있으면 보내지 않고, 눌렀을 때 무엇이 빠졌는지 말로 알려 준다 — 단추를 흐리게 막지 않는다", async () => {
     open();
     await screen.findByText("우리 엄마 아빠");
-    expect(screen.getByRole("button", { name: "2곳에 엽서 보내기" })).toBeDisabled();
+    const button = screen.getByRole("button", { name: "2곳에 엽서 보내기" });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(await screen.findByRole("alert")).toHaveTextContent("한 줄을 적어 주세요");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("보내는 이름이 비어 있어도(계정에 이름이 없을 때) 눌러서 이유를 알 수 있다", async () => {
+    open();
+    await screen.findByText("우리 엄마 아빠");
+    fireEvent.change(screen.getByLabelText("보내는 이름"), { target: { value: "" } });
+    fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "안녕" } });
+    fireEvent.click(screen.getByRole("button", { name: "2곳에 엽서 보내기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("보내는 이름을 적어 주세요");
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("받을 우편함을 모두 풀고 누르면 우편함을 고르라고 알려 준다", async () => {
+    open();
+    await screen.findByText("우리 엄마 아빠");
+    fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "안녕" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /우리 엄마 아빠/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 우편함/ }));
+    fireEvent.click(screen.getByRole("button", { name: "엽서 보내기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("받을 우편함을 골라 주세요");
+  });
+
+  it("카카오처럼 이름 칸이 nickname 뿐인 계정도 이름이 채워진다", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/supabase/client", () => ({
+      getBrowserClient: () => ({
+        auth: { getUser: async () => ({ data: { user: { id: "me", email: "jimin@kakao.com", user_metadata: { nickname: "지민이" } } } }) },
+      }),
+    }));
+    const { SendPostcardDialog: Fresh } = await import("./SendPostcardDialog");
+    render(<Fresh userId="me" trip={trip} photoUrls={photoUrls} onClose={vi.fn()} />);
+    await screen.findByText("우리 엄마 아빠");
+    await waitFor(() => expect((screen.getByLabelText("보내는 이름") as HTMLInputElement).value).toBe("지민이"));
+    vi.doUnmock("@/lib/supabase/client");
+  });
+
+  it("이름 칸도 없으면 이메일 앞부분을 쓴다", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/supabase/client", () => ({
+      getBrowserClient: () => ({
+        auth: { getUser: async () => ({ data: { user: { id: "me", email: "jimin@example.com", user_metadata: {} } } }) },
+      }),
+    }));
+    const { SendPostcardDialog: Fresh } = await import("./SendPostcardDialog");
+    render(<Fresh userId="me" trip={trip} photoUrls={photoUrls} onClose={vi.fn()} />);
+    await screen.findByText("우리 엄마 아빠");
+    await waitFor(() => expect((screen.getByLabelText("보내는 이름") as HTMLInputElement).value).toBe("jimin"));
+    vi.doUnmock("@/lib/supabase/client");
   });
 
   it("보내면 고른 사진·우편함별 인사말·보내는 이름(계정 이름의 첫 말)으로 보낸다", async () => {
