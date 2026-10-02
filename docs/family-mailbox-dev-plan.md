@@ -143,3 +143,13 @@ from storage.objects where bucket_id = 'postcards';
 
 select mailbox_id, count(*) as 엽서수 from postcard_deliveries group by 1 order by 2 desc limit 10;
 ```
+
+## 9. 진행 상황 (2026-10-02 기준)
+1~7단계 모두 배포됨. 계획과 달라진 점:
+- 받는 쪽의 "열어 봤다" 표시는 읽는 함수(mailbox_postcard)가 아니라 화면이 연 뒤 따로 부르는 mailbox_open 이 적는다
+  (카카오톡 미리보기 기계가 링크를 읽어 가도 "읽으셨어요"가 찍히지 않게).
+- 우편함 지우기는 만들지 않았다(닫기만). 지우면 엽서 사진 복사본이 걸린 곳이 없어 남을 수 있어서다.
+- 엽서 보관함(postcards)의 "줄 없이 남은 폴더"는 앱에서 찾을 수 없다 — 보관함 정책이 엽서 줄이 있는 폴더만 보여 주기
+  때문이다. 줄 없는 폴더는 supabase/mailbox.sql 끝의 검색(SQL Editor)으로 찾고, 대시보드 Storage 에서 지운다.
+  회원 탈퇴 때도 같은 검색으로 그 사람의 엽서 폴더를 치운다.
+- 보내기 단추는 흐리게 막지 않고, 눌렀을 때 빠진 것(한 줄·이름·우편함)을 말로 알린다.

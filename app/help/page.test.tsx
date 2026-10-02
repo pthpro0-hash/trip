@@ -37,3 +37,16 @@ describe("HelpPage · 가족 공유", () => {
     }
   });
 });
+
+describe("HelpPage · 가족 우편함", () => {
+  it("엽서 보내기·받는 법·지우면 어떻게 되는지를 계정과 보관 갈래에 풀어 적었다", () => {
+    render(<HelpPage />);
+    for (const title of ["부모님께 여행 엽서 보내기", "부모님이 엽서 받는 법", "엽서와 지우기"]) {
+      expect(screen.getByText(title)).toBeTruthy();
+    }
+    const section = document.getElementById("account")!;
+    for (const word of ["가족 우편함", "우편함 3개", "엽서 사진 3장", "링크 하나", "로그인", "답장", "새로 만들기", "거두기", "함께 지워"]) {
+      expect(section.textContent).toContain(word);
+    }
+  });
+});
