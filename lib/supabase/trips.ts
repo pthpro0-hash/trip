@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { dayKey } from "@/lib/photo/grouping";
 import type { Trip } from "@/lib/photo/types";
 import { BUCKET, legacyThumbPath, markerPath, thumbPath } from "./photos";
+import { removeCopiesOfTrip } from "./postcardCleanup";
 import { fetchOwnTripShare, revokeTripShare } from "./tripShares";
 
 /** 저장할 때 방문마다 붙여 둔 장소 정보. */
@@ -175,6 +176,13 @@ export async function deleteTrip(
   const share = await fetchOwnTripShare(supabase, userId, tripId);
   if (share === "failed") return false;
   if (share && !(await revokeTripShare(supabase, share))) return false;
+
+  /*
+    이 여행으로 보낸 엽서의 사진 복사본도 먼저 치운다. 엽서 줄은 여행 줄과 함께 지워지는데(on delete
+    cascade), 줄이 먼저 사라지면 엽서 보관함의 사진이 주인 없이 공개로 남는다. 못 치웠으면 여행도
+    지우지 않는다.
+  */
+  if (!(await removeCopiesOfTrip(supabase, tripId))) return false;
 
   const { data: shots } = await supabase
     .from("trip_photos")

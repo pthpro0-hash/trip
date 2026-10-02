@@ -223,6 +223,10 @@ describe("deleteTrip · 링크로 보여 주던 여행", () => {
       ...base.supabase,
       storage: base.supabase.storage,
       from: (name: string) => {
+        if (name === "postcards") {
+          // 이 여행으로 보낸 엽서는 없다.
+          return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+        }
         if (name === "trip_photos") {
           return { select: () => ({ eq: () => ({ eq: async () => ({ data: [], error: null }) }) }) };
         }

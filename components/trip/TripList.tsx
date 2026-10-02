@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
+import { fetchPostcardCounts } from "@/lib/supabase/postcards";
 import { canIn, ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logEvent } from "@/lib/supabase/serviceLog";
@@ -49,6 +50,8 @@ export function TripList() {
     한 번 훑어 두면 그 뒤로는 안 그러므로, 있을 때만 조용히 권한다.
   */
   const [stale, setStale] = useState<string[]>([]);
+  /** 여행마다 보낸 엽서 수. 지우기 확인 창이 "엽서도 함께 지워져요"를 알리는 데 쓴다. 못 읽어도 지우기는 막지 않는다. */
+  const [postcardCounts, setPostcardCounts] = useState<Map<string, number>>(new Map());
   const family = useFamilyView();
   const canRemove = canIn(family, "remove");
   const canAdd = canIn(family, "add");
@@ -96,6 +99,11 @@ export function TripList() {
         // 권하지 못한 것뿐이다.
       }
       setStatus("ready");
+      void fetchPostcardCounts(supabase, owner)
+        .then((counts) => {
+          if (active) setPostcardCounts(counts);
+        })
+        .catch(() => undefined);
 
       const paths = rows.map((trip) => trip.coverPath).filter((path): path is string => !!path);
       if (paths.length > 0) {
@@ -443,7 +451,9 @@ export function TripList() {
                   {removing === trip.id
                     ? "지우는 중…"
                     : confirming === trip.id
-                      ? "정말 지울까요?"
+                      ? (postcardCounts.get(trip.id) ?? 0) > 0
+                        ? `정말 지울까요? 엽서 ${postcardCounts.get(trip.id)}장도 지워져요`
+                        : "정말 지울까요?"
                       : "지우기"}
                 </button>
               )}

@@ -19,6 +19,7 @@ import {
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { deletePhoto, setCoverPhoto, signedUrls, thumbUrls } from "@/lib/supabase/photos";
 import { deleteTrip } from "@/lib/supabase/trips";
+import { fetchPhotosInPostcards, fetchPostcardCounts } from "@/lib/supabase/postcards";
 import { canIn, ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
 import { LIST_HREF } from "@/lib/nav";
 import { rememberPlaceName } from "@/lib/supabase/placeNames";
@@ -34,6 +35,12 @@ import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 /* 링크 창은 누를 때만 받는다. */
 const TripShareDialog = dynamic(
   () => import("@/components/share/TripShareDialog").then((module) => module.TripShareDialog),
+  { ssr: false },
+);
+
+/* 엽서 창도 누를 때만 받는다. */
+const SendPostcardDialog = dynamic(
+  () => import("@/components/mailbox/SendPostcardDialog").then((module) => module.SendPostcardDialog),
   { ssr: false },
 );
 
@@ -113,6 +120,13 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [removingTrip, setRemovingTrip] = useState(false);
   const [tripError, setTripError] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [sendingPostcard, setSendingPostcard] = useState(false);
+  /*
+    이 여행으로 보낸 엽서 수와, 엽서에 쓰인 사진들. 지우기 확인 창이 "엽서도 함께 지워져요"를 미리
+    알리는 데 쓴다. 못 읽어도 지우기는 막지 않는다(숫자를 못 보여 줄 뿐이고, 지우는 규칙은 DB·코드가 지킨다).
+  */
+  const [postcardCount, setPostcardCount] = useState(0);
+  const [postcardPhotos, setPostcardPhotos] = useState<Set<string>>(new Set());
   /*
     크게 보고 있는 사진. 목록에는 작은 판을 쓰지만 여기서는 보관본을
     그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.
@@ -151,6 +165,19 @@ export function TripDetail({ tripId }: { tripId: string }) {
       void fetchUsedCompanions(supabase, owner).then((names) => {
         if (active) setUsedCompanions(names);
       });
+      void fetchPostcardCounts(supabase, owner)
+        .then((counts) => {
+          if (active) setPostcardCount(counts.get(tripId) ?? 0);
+        })
+        .catch(() => undefined);
+      void fetchPhotosInPostcards(
+        supabase,
+        detail.visits.flatMap((visit) => visit.photos.map((photo) => photo.id)),
+      )
+        .then((ids) => {
+          if (active) setPostcardPhotos(ids);
+        })
+        .catch(() => undefined);
 
       const paths = detail.visits.flatMap((visit) => visit.photos.map((p) => p.storagePath));
       if (paths.length > 0) {
@@ -421,6 +448,23 @@ export function TripDetail({ tripId }: { tripId: string }) {
       */}
       {removingTrip && <WaitingOverlay title="여행을 지우고 있어요" />}
       {sharing && userId && <TripShareDialog userId={userId} trip={trip} onClose={() => setSharing(false)} />}
+      {sendingPostcard && userId && ownTrip && (
+        <SendPostcardDialog
+          userId={userId}
+          trip={trip}
+          photoUrls={photoUrls}
+          onClose={() => {
+            setSendingPostcard(false);
+            // 방금 보낸 엽서가 지우기 확인 창에 반영되게 다시 센다.
+            const supabase = getBrowserClient();
+            if (!supabase) return;
+            void fetchPostcardCounts(supabase, userId).then((counts) => setPostcardCount(counts.get(tripId) ?? 0)).catch(() => undefined);
+            void fetchPhotosInPostcards(supabase, trip.visits.flatMap((visit) => visit.photos.map((photo) => photo.id)))
+              .then(setPostcardPhotos)
+              .catch(() => undefined);
+          }}
+        />
+      )}
       {removingPhoto && <WaitingOverlay title="사진을 지우고 있어요" />}
 
       <div>
@@ -515,6 +559,15 @@ export function TripDetail({ tripId }: { tripId: string }) {
             링크 공유
           </button>
         )}
+        {userId && ownTrip && (
+          <button
+            type="button"
+            onClick={() => setSendingPostcard(true)}
+            className="self-start rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-accent transition hover:bg-line"
+          >
+            엽서 보내기
+          </button>
+        )}
         {canRemove && (
           <button
             type="button"
@@ -530,7 +583,9 @@ export function TripDetail({ tripId }: { tripId: string }) {
             {removingTrip
               ? "지우는 중…"
               : confirmingTrip
-                ? "정말 지울까요? 사진도 함께 사라져요"
+                ? postcardCount > 0
+                  ? `정말 지울까요? 사진과 보낸 엽서 ${postcardCount}장이 함께 사라져요`
+                  : "정말 지울까요? 사진도 함께 사라져요"
                 : "이 여행 지우기"}
           </button>
         )}
@@ -548,6 +603,12 @@ export function TripDetail({ tripId }: { tripId: string }) {
       {visitFailed && (
         <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
           장소 이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.
+        </p>
+      )}
+
+      {confirmingPhoto && postcardPhotos.has(confirmingPhoto) && (
+        <p role="status" className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
+          부모님께 보낸 엽서에 쓴 사진이에요. 지우면 엽서에서도 사라져요.
         </p>
       )}
 

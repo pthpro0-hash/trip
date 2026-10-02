@@ -8,6 +8,10 @@ const state = vi.hoisted(() => ({
   invites: [] as PendingMailboxInvite[],
   token: "T".repeat(43),
 }));
+const postcards = vi.hoisted(() => ({
+  sent: [] as unknown[],
+  withdrawPostcard: vi.fn(),
+}));
 const api = vi.hoisted(() => ({
   createMailbox: vi.fn(),
   updateMailbox: vi.fn(),
@@ -26,6 +30,11 @@ vi.mock("@/lib/supabase/mailbox", async () => ({
   fetchMailboxes: async () => state.list,
   fetchMailboxInvites: async () => state.invites,
   ...api,
+}));
+
+vi.mock("@/lib/supabase/postcards", () => ({
+  fetchSentPostcards: async () => postcards.sent,
+  withdrawPostcard: postcards.withdrawPostcard,
 }));
 
 const { MailboxPanel } = await import("./MailboxPanel");
@@ -59,6 +68,9 @@ describe("MailboxPanel", () => {
     api.createMailboxInvite.mockResolvedValue("I".repeat(43));
     api.cancelMailboxInvite.mockResolvedValue(true);
     api.leaveMailbox.mockResolvedValue(true);
+    postcards.sent = [];
+    postcards.withdrawPostcard.mockReset();
+    postcards.withdrawPostcard.mockResolvedValue(true);
     copied.mockClear();
     Object.defineProperty(navigator, "clipboard", { value: { writeText: copied }, configurable: true });
   });
@@ -168,6 +180,55 @@ describe("MailboxPanel", () => {
     render(<MailboxPanel />);
     fireEvent.click(await screen.findByRole("button", { name: "다시 열기" }));
     expect(await screen.findByRole("status")).toHaveTextContent("열려 있는 우편함이 이미 3개");
+  });
+
+  it("닫은 우편함은 바탕색이 달라 한눈에 구분된다 — 보내는 사람으로 들어간 것도 같다", async () => {
+    state.list = {
+      owned: [box({ id: "a", name: "열린 곳" }), box({ id: "b", name: "닫은 곳", closed: true })],
+      joined: [box({ id: "j", ownerId: "sis", name: "닫은 남의 곳", closed: true })],
+    };
+    render(<MailboxPanel />);
+    const open = await screen.findByRole("article", { name: "열린 곳" });
+    const closed = screen.getByRole("article", { name: "닫은 곳" });
+    expect(closed.className).toContain("bg-bg-subtle");
+    expect(closed).toHaveAttribute("data-closed", "true");
+    expect(open.className).not.toContain("bg-bg-subtle");
+    expect(open).not.toHaveAttribute("data-closed");
+    expect(screen.getByText("닫은 남의 곳").closest("li")).toHaveAttribute("data-closed", "true");
+  });
+
+  it("보낸 엽서: 어느 우편함에서 열어 봤는지 보이고, 거두기는 한 번 더 묻는다", async () => {
+    state.list = { owned: [box({ id: "m1", name: "엄마 아빠" }), box({ id: "m2", name: "장모님" })], joined: [] };
+    postcards.sent = [
+      {
+        id: "pc1",
+        tripId: "t1",
+        title: "강릉 바다",
+        startedOn: "2026-09-13",
+        sentAt: "2026-10-02T00:00:00Z",
+        deliveries: [
+          { mailboxId: "m1", opened: true },
+          { mailboxId: "m2", opened: false },
+        ],
+      },
+    ];
+    render(<MailboxPanel />);
+    expect(await screen.findByRole("heading", { name: "보낸 엽서 1장" })).toBeTruthy();
+    expect(screen.getByText("열어 보셨어요")).toBeTruthy();
+    expect(screen.getByText("아직 안 열어 보셨어요")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "엽서 거두기" }));
+    expect(postcards.withdrawPostcard).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "거두기" }));
+    await waitFor(() => expect(postcards.withdrawPostcard).toHaveBeenCalledWith(expect.anything(), "pc1"));
+  });
+
+  it("엽서를 거두지 못하면 다시 누르라고 알린다", async () => {
+    postcards.withdrawPostcard.mockResolvedValue(false);
+    postcards.sent = [{ id: "pc1", tripId: "t1", title: null, startedOn: "", sentAt: "", deliveries: [] }];
+    render(<MailboxPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "엽서 거두기" }));
+    fireEvent.click(screen.getByRole("button", { name: "거두기" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("엽서를 거두지 못했어요");
   });
 
   it("보내는 사람 초대를 만들면 초대 링크가 보이고, 취소할 수 있다", async () => {

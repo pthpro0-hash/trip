@@ -9,6 +9,7 @@ import {
   UnsupportedImageError,
   type Shrunk,
 } from "@/lib/photo/resize";
+import { removeCopiesOfPhoto } from "./postcardCleanup";
 
 export const BUCKET = "trip-photos";
 /*
@@ -600,6 +601,12 @@ export async function deletePhoto(
   userId: string,
   photo: { id: string; storagePath: string; visitId: string },
 ): Promise<boolean> {
+  /*
+    이 사진에서 나온 엽서 복사본을 먼저 치운다. 원본을 지우면 복사본도 지운다는 약속이고, 복사본의
+    파일을 못 지웠으면 원본도 지우지 않는다(줄이 먼저 사라지면 엽서 보관함의 사진이 공개로 남는다).
+  */
+  if (!(await removeCopiesOfPhoto(supabase, photo.id))) return false;
+
   const { error } = await supabase
     .from("trip_photos")
     .delete()

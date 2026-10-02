@@ -18,6 +18,7 @@ import {
   type MailboxList,
   type PendingMailboxInvite,
 } from "@/lib/supabase/mailbox";
+import { fetchSentPostcards, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
 import { MAILBOX_LIMIT, MAILBOX_SENDER_LIMIT, mailboxInviteUrl, mailboxUrl } from "@/lib/mailbox";
 import { INVITE_DAYS } from "@/lib/family";
 import { MailboxForm } from "./MailboxForm";
@@ -29,7 +30,7 @@ import { MailboxForm } from "./MailboxForm";
   되돌릴 수 없는 일(링크 새로 만들기, 닫기, 나가기)은 한 번 더 묻는다.
 */
 
-type Loaded = { userId: string; list: MailboxList; invites: PendingMailboxInvite[] };
+type Loaded = { userId: string; list: MailboxList; invites: PendingMailboxInvite[]; sent: SentPostcard[] };
 
 const TONE_LABEL = { casual: "편하게", polite: "존댓말" } as const;
 
@@ -65,9 +66,14 @@ export function MailboxPanel() {
     if (!supabase) return setState("failed");
     const { data } = await supabase.auth.getUser();
     if (!data.user) return setState("login");
-    const [list, invites] = await Promise.all([fetchMailboxes(supabase, data.user.id), fetchMailboxInvites(supabase, data.user.id)]);
+    const [list, invites, sent] = await Promise.all([
+      fetchMailboxes(supabase, data.user.id),
+      fetchMailboxInvites(supabase, data.user.id),
+      // 보낸 엽서는 곁다리다. 못 읽어도 우편함 관리는 된다.
+      fetchSentPostcards(supabase, data.user.id).catch(() => []),
+    ]);
     if (list === "failed" || invites === "failed") return setState("failed");
-    setState({ userId: data.user.id, list, invites });
+    setState({ userId: data.user.id, list, invites, sent });
   }, []);
 
   useEffect(() => {
@@ -98,7 +104,8 @@ export function MailboxPanel() {
     );
   }
 
-  const { userId, list, invites } = state;
+  const { userId, list, invites, sent } = state;
+  const nameOf = new Map([...list.owned, ...list.joined].map((box) => [box.id, box.name]));
   const openCount = list.owned.filter((box) => !box.closed).length;
   const full = openCount >= MAILBOX_LIMIT;
 
@@ -189,6 +196,14 @@ export function MailboxPanel() {
       return (await cancelMailboxInvite(supabase, token)) ? null : "초대를 취소하지 못했어요.";
     });
 
+  const withdraw = (card: SentPostcard) =>
+    run(async () => {
+      const supabase = getBrowserClient();
+      if (!supabase) return "지금은 쓸 수 없어요.";
+      setAsking(null);
+      return (await withdrawPostcard(supabase, card.id)) ? null : "엽서를 거두지 못했어요. 다시 눌러 주세요.";
+    });
+
   const leave = (box: MailboxItem) =>
     run(async () => {
       const supabase = getBrowserClient();
@@ -232,7 +247,13 @@ export function MailboxPanel() {
             );
           }
           return (
-            <article key={box.id} aria-label={box.name} className="flex flex-col gap-2.5 rounded-xl bg-bg p-3.5 ring-1 ring-line">
+            <article
+              key={box.id}
+              aria-label={box.name}
+              // 닫은 우편함은 바탕색을 달리해 한눈에 구분한다(받는 쪽에는 아무것도 안 보이는 상태).
+              data-closed={box.closed ? "true" : undefined}
+              className={`flex flex-col gap-2.5 rounded-xl p-3.5 ring-1 ring-line ${box.closed ? "bg-bg-subtle" : "bg-bg"}`}
+            >
               <div className="flex items-center gap-2">
                 <h3 className="min-w-0 flex-1 truncate text-[16px] font-semibold text-text">{box.name}</h3>
                 {box.closed && <span className="rounded-full bg-bg-subtle px-2.5 py-0.5 text-[12px] text-text-muted">닫혀 있어요</span>}
@@ -352,11 +373,60 @@ export function MailboxPanel() {
         )}
       </Section>
 
+      {sent.length > 0 && (
+        <Section
+          title={`보낸 엽서 ${sent.length}장`}
+          note="받는 분이 열어 봤는지 볼 수 있어요. 엽서는 보낸 순간 그대로 남고, 거두면 모든 우편함에서 사라져요."
+        >
+          <ul className="flex flex-col gap-2">
+            {sent.map((card) => (
+              <li key={card.id} className="flex flex-col gap-1.5 rounded-xl bg-bg px-3.5 py-3 ring-1 ring-line">
+                <p className="text-[15px] font-semibold text-text">
+                  {card.title || "제목 없는 여행"}
+                  <span className="ml-2 text-[13px] font-normal text-text-faint">
+                    {card.startedOn ? new Date(card.startedOn).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) : ""}
+                  </span>
+                </p>
+                <ul className="flex flex-col gap-0.5 text-[13px] text-text-muted">
+                  {card.deliveries.map((delivery) => (
+                    <li key={delivery.mailboxId}>
+                      {nameOf.get(delivery.mailboxId) ?? "우편함"} ·{" "}
+                      <span className={delivery.opened ? "text-accent" : ""}>
+                        {delivery.opened ? "열어 보셨어요" : "아직 안 열어 보셨어요"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {asking === `withdraw-${card.id}` ? (
+                  <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                    <span className="text-text">거두면 받는 분이 더는 볼 수 없어요.</span>
+                    <button type="button" disabled={busy} onClick={() => void withdraw(card)} className="rounded-full bg-text px-3.5 py-1.5 font-medium text-bg">
+                      거두기
+                    </button>
+                    <button type="button" onClick={() => setAsking(null)} className="text-text-muted">
+                      그만두기
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setAsking(`withdraw-${card.id}`)} className="self-start text-[13px] font-medium text-text-muted hover:text-text">
+                    엽서 거두기
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
       {list.joined.length > 0 && (
         <Section title="보내는 사람으로 들어간 우편함" note="다른 가족이 만든 우편함이에요. 이곳에도 엽서를 보낼 수 있어요.">
           <ul className="flex flex-col gap-2">
             {list.joined.map((box) => (
-              <li key={box.id} className="flex flex-col gap-2 rounded-xl bg-bg px-3.5 py-3 ring-1 ring-line">
+              <li
+                key={box.id}
+                data-closed={box.closed ? "true" : undefined}
+                className={`flex flex-col gap-2 rounded-xl px-3.5 py-3 ring-1 ring-line ${box.closed ? "bg-bg-subtle" : "bg-bg"}`}
+              >
                 <div className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-text">{box.name}</span>
                   {box.closed && <span className="rounded-full bg-bg-subtle px-2.5 py-0.5 text-[12px] text-text-muted">닫혀 있어요</span>}
