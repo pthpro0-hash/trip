@@ -12,6 +12,7 @@ import {
   isMailboxToken,
   isPostcardId,
   isPostcardSnapshot,
+  mailboxInviteUrl,
   mailboxUrl,
   newMailboxToken,
   newPostcardId,
@@ -62,6 +63,7 @@ describe("링크의 글자", () => {
   it("주소 만들기", () => {
     expect(mailboxUrl("https://x.test", "TOK")).toBe("https://x.test/m/TOK");
     expect(postcardUrl("https://x.test", "TOK", "PID")).toBe("https://x.test/m/TOK/p/PID");
+    expect(mailboxInviteUrl("https://x.test", "TOK")).toBe("https://x.test/mailboxes/join/TOK");
   });
 });
 

@@ -1,0 +1,233 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { inviteExpiresAt } from "@/lib/family";
+import {
+  GREETING_NAME_MAX,
+  NAME_MAX,
+  isMailboxToken,
+  newMailboxToken,
+  normalizeMembers,
+  type Tone,
+} from "@/lib/mailbox";
+
+/*
+  가족 우편함 — 만들고, 고치고, 링크를 바꾸고, 보내는 사람을 들인다.
+
+  표와 규칙은 supabase/mailbox.sql 에 있다. 여기서 알아 둘 것:
+
+    - 우편함은 만든 사람(주인)만 고치고 닫는다. 보내는 사람으로 들어온 사람은 읽기만 한다
+      (엽서 링크를 만들려면 우편함 링크가 필요해서 읽을 수는 있다).
+    - 보내는 사람 표에 직접 넣는 길은 없다 — 초대 수락 함수(accept_mailbox_invite)로만 들어온다.
+    - 우편함을 지우는 기능은 아직 없다(닫기만). 지우면 엽서 사진 복사본이 어디에도 안 걸려 남을 수 있어
+      엽서 삭제 규칙(4단계)과 함께 만든다.
+*/
+
+export interface MailboxItem {
+  id: string;
+  ownerId: string;
+  name: string;
+  greetingName: string | null;
+  useGreeting: boolean;
+  tone: Tone;
+  members: string[];
+  /** 우편함 링크의 글자. 이것을 아는 사람이 우편함을 연다. */
+  token: string;
+  closed: boolean;
+  /** 주인을 포함한 보내는 사람 수. */
+  senderCount: number;
+}
+
+export interface MailboxList {
+  /** 내가 만든 우편함. */
+  owned: MailboxItem[];
+  /** 보내는 사람으로 들어간 남의 우편함. */
+  joined: MailboxItem[];
+}
+
+export interface MailboxInput {
+  name: string;
+  greetingName: string;
+  useGreeting: boolean;
+  tone: Tone;
+  /** "엄마, 아빠" 같은 글. 비우면 부르는 말에서 만든다. */
+  members: string;
+}
+
+export interface PendingMailboxInvite {
+  token: string;
+  mailboxId: string;
+  expiresAt: string;
+}
+
+type Failure = { ok: false; reason: "invalid" | "limit" | "failed" };
+
+const COLUMNS = "id,owner_id,name,greeting_name,use_greeting,tone,members,token,closed_at,created_at";
+
+/** 화면에서 받은 글을 DB 에 넣을 모양으로 다듬는다. 이름이 비었거나 길면 null. */
+function clean(input: MailboxInput) {
+  const name = input.name.trim();
+  const greetingName = input.greetingName.trim();
+  if (!name || name.length > NAME_MAX || greetingName.length > GREETING_NAME_MAX) return null;
+  const members = normalizeMembers(input.members);
+  return {
+    name,
+    greeting_name: greetingName || null,
+    use_greeting: input.useGreeting,
+    tone: input.tone,
+    // 받는 분 이름을 안 적었으면 부르는 말에서 만든다("엄마 아빠" → 엄마, 아빠).
+    members: members.length > 0 ? members : normalizeMembers(greetingName),
+  };
+}
+
+/** 내 우편함들. 못 읽었으면 "failed". */
+export async function fetchMailboxes(supabase: SupabaseClient, userId: string): Promise<MailboxList | "failed"> {
+  const [boxes, senders] = await Promise.all([
+    supabase.from("mailboxes").select(COLUMNS).order("created_at", { ascending: true }),
+    supabase.from("mailbox_senders").select("mailbox_id,user_id,role"),
+  ]);
+  if (boxes.error || !boxes.data || senders.error || !senders.data) return "failed";
+
+  const counts = new Map<string, number>();
+  for (const sender of senders.data as { mailbox_id: string }[]) {
+    counts.set(sender.mailbox_id, (counts.get(sender.mailbox_id) ?? 0) + 1);
+  }
+  const list: MailboxList = { owned: [], joined: [] };
+  for (const raw of boxes.data as Record<string, unknown>[]) {
+    const item: MailboxItem = {
+      id: String(raw.id),
+      ownerId: String(raw.owner_id),
+      name: String(raw.name),
+      greetingName: typeof raw.greeting_name === "string" ? raw.greeting_name : null,
+      useGreeting: raw.use_greeting !== false,
+      tone: raw.tone === "polite" ? "polite" : "casual",
+      members: Array.isArray(raw.members) ? raw.members.map(String) : [],
+      token: String(raw.token),
+      closed: raw.closed_at != null,
+      senderCount: counts.get(String(raw.id)) ?? 1,
+    };
+    (item.ownerId === userId ? list.owned : list.joined).push(item);
+  }
+  return list;
+}
+
+/** 우편함을 만든다. 우편함은 3개까지. */
+export async function createMailbox(
+  supabase: SupabaseClient,
+  ownerId: string,
+  input: MailboxInput,
+): Promise<{ ok: true; id: string; token: string } | Failure> {
+  const values = clean(input);
+  if (!values) return { ok: false, reason: "invalid" };
+  const token = newMailboxToken();
+  const { data, error } = await supabase
+    .from("mailboxes")
+    .insert({ owner_id: ownerId, token, ...values })
+    .select("id")
+    .single();
+  if (error || !data) return { ok: false, reason: /3개/.test(error?.message ?? "") ? "limit" : "failed" };
+  return { ok: true, id: String(data.id), token };
+}
+
+/** 이름·부르는 말·말투·받는 분을 고친다. 주인만 된다. */
+export async function updateMailbox(
+  supabase: SupabaseClient,
+  id: string,
+  input: MailboxInput,
+): Promise<{ ok: true } | Failure> {
+  const values = clean(input);
+  if (!values) return { ok: false, reason: "invalid" };
+  const { error } = await supabase.from("mailboxes").update(values).eq("id", id);
+  return error ? { ok: false, reason: "failed" } : { ok: true };
+}
+
+/** 링크를 새로 만든다. 옛 링크는 그 순간부터 열리지 않는다. 새 글자를 돌려주고, 못 했으면 "failed". */
+export async function rotateMailboxToken(supabase: SupabaseClient, id: string): Promise<string | "failed"> {
+  const token = newMailboxToken();
+  const { error } = await supabase.from("mailboxes").update({ token }).eq("id", id);
+  return error ? "failed" : token;
+}
+
+/** 닫거나 다시 연다. 닫으면 받는 쪽에 아무것도 보이지 않고 새 엽서도 보낼 수 없다. */
+export async function setMailboxClosed(
+  supabase: SupabaseClient,
+  id: string,
+  closed: boolean,
+): Promise<{ ok: true } | Failure> {
+  const { error } = await supabase
+    .from("mailboxes")
+    .update({ closed_at: closed ? new Date().toISOString() : null })
+    .eq("id", id);
+  if (!error) return { ok: true };
+  return { ok: false, reason: /3개/.test(error.message) ? "limit" : "failed" };
+}
+
+/** 보내는 사람으로 들어간 우편함에서 나간다(내 줄 하나만). */
+export async function leaveMailbox(supabase: SupabaseClient, mailboxId: string, userId: string): Promise<boolean> {
+  const { error } = await supabase.from("mailbox_senders").delete().eq("mailbox_id", mailboxId).eq("user_id", userId);
+  return !error;
+}
+
+/** 보내는 사람 초대를 만든다. 링크에 들어갈 글자를 돌려주고, 못 만들면 "failed". */
+export async function createMailboxInvite(
+  supabase: SupabaseClient,
+  mailboxId: string,
+  userId: string,
+  now: Date = new Date(),
+): Promise<string | "failed"> {
+  const token = newMailboxToken();
+  const { error } = await supabase.from("mailbox_invites").insert({
+    token,
+    mailbox_id: mailboxId,
+    created_by: userId,
+    expires_at: inviteExpiresAt(now).toISOString(),
+  });
+  return error ? "failed" : token;
+}
+
+/** 아직 쓸 수 있는 내 초대들. */
+export async function fetchMailboxInvites(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<PendingMailboxInvite[] | "failed"> {
+  const { data, error } = await supabase
+    .from("mailbox_invites")
+    .select("token,mailbox_id,expires_at")
+    .eq("created_by", userId)
+    .is("used_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+  if (error || !data) return "failed";
+  return (data as { token: string; mailbox_id: string; expires_at: string }[]).map((row) => ({
+    token: row.token,
+    mailboxId: row.mailbox_id,
+    expiresAt: row.expires_at,
+  }));
+}
+
+/** 아직 수락되지 않은 초대를 거둔다. */
+export async function cancelMailboxInvite(supabase: SupabaseClient, token: string): Promise<boolean> {
+  const { error } = await supabase.from("mailbox_invites").delete().eq("token", token);
+  return !error;
+}
+
+export type AcceptMailboxResult =
+  | { ok: true; mailboxId: string }
+  | { ok: false; reason: "missing" | "used" | "expired" | "closed" | "full" | "login" | "failed" };
+
+function reasonOf(message: string): Extract<AcceptMailboxResult, { ok: false }>["reason"] {
+  if (message.includes("없는 초대")) return "missing";
+  if (message.includes("이미 쓴")) return "used";
+  if (message.includes("만료")) return "expired";
+  if (message.includes("닫힌")) return "closed";
+  if (message.includes("8명")) return "full";
+  if (message.includes("로그인")) return "login";
+  return "failed";
+}
+
+/** 초대 링크의 글자로 보내는 사람이 된다. 로그인한 사람이 부른다. */
+export async function acceptMailboxInvite(supabase: SupabaseClient, token: string): Promise<AcceptMailboxResult> {
+  // 모양이 틀린 글자는 DB 에 묻지 않는다.
+  if (!isMailboxToken(token)) return { ok: false, reason: "missing" };
+  const { data, error } = await supabase.rpc("accept_mailbox_invite", { invite_token: token });
+  if (error) return { ok: false, reason: reasonOf(error.message) };
+  return typeof data === "string" ? { ok: true, mailboxId: data } : { ok: false, reason: "failed" };
+}

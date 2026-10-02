@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { FamilyPanel } from "@/components/family/FamilyPanel";
 
 export const metadata: Metadata = {
@@ -17,6 +18,13 @@ export default function FamilyPage() {
         </p>
       </header>
       <FamilyPanel />
+      <p className="text-[14px] text-text-faint">
+        앱을 쓰지 않는 부모님께 여행을 엽서로 보내려면{" "}
+        <Link href="/mailboxes" className="font-medium text-accent hover:text-accent-hover">
+          가족 우편함
+        </Link>
+        을 쓰세요.
+      </p>
     </main>
   );
 }

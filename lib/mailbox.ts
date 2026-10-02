@@ -46,6 +46,8 @@ export const newMailboxToken = (): string => newInviteToken();
 export const newPostcardId = (): string => newInviteToken();
 
 export const mailboxUrl = (origin: string, token: string): string => `${origin}/m/${token}`;
+/** 보내는 사람 초대 주소. 받는 쪽 링크(/m)와 다르다 — 로그인해서 수락하는 길이다. */
+export const mailboxInviteUrl = (origin: string, token: string): string => `${origin}/mailboxes/join/${token}`;
 export const postcardUrl = (origin: string, token: string, postcardId: string): string =>
   `${origin}/m/${token}/p/${postcardId}`;
 
