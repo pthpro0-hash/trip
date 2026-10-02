@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
 import { AccountChip } from "@/components/auth/AccountChip";
+import { MailboxBell } from "@/components/mailbox/MailboxBell";
 import { rememberStart, type Start } from "@/lib/start";
 import { canIn, useFamilyView } from "@/lib/familyView";
 import { isReceiverPath } from "@/lib/nav";
@@ -82,6 +83,8 @@ export function SiteHeader() {
           </nav>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {/* 부모님이 엽서에 답장하면 그때만 나타난다. */}
+          <MailboxBell />
           {/*
             사진을 넣는 것은 이 서비스의 가장 큰 일이라 어느 화면에서든 같은 자리에 있다.
             폰에서는 하단 탭의 가운데 단추가 그 일을 한다.

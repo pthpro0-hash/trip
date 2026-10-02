@@ -18,7 +18,9 @@ import {
   type MailboxList,
   type PendingMailboxInvite,
 } from "@/lib/supabase/mailbox";
-import { fetchSentPostcards, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
+import { fetchSentPostcards, markRepliesSeen, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
+import { attachParticle } from "@/lib/korean";
+import { REPLIES_SEEN } from "./MailboxBell";
 import { MAILBOX_LIMIT, MAILBOX_SENDER_LIMIT, mailboxInviteUrl, mailboxUrl } from "@/lib/mailbox";
 import { INVITE_DAYS } from "@/lib/family";
 import { MailboxForm } from "./MailboxForm";
@@ -60,6 +62,11 @@ export function MailboxPanel() {
   const [asking, setAsking] = useState<string | null>(null);
   /** 방금 만든 보내는 사람 초대의 글자(바로 복사할 수 있게 크게 보여 준다). */
   const [freshInvite, setFreshInvite] = useState<string | null>(null);
+  /*
+    이번에 처음 본 답장들. 화면을 열면 답장을 "봤다"고 표시하는데, 그 순간 "새 답장" 표시까지 사라지면
+    무엇이 새것인지 알 수 없다. 이 화면에 머무는 동안은 새것으로 남겨 둔다(다른 일로 목록을 다시 받아도).
+  */
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     const supabase = getBrowserClient();
@@ -74,6 +81,15 @@ export function MailboxPanel() {
     ]);
     if (list === "failed" || invites === "failed") return setState("failed");
     setState({ userId: data.user.id, list, invites, sent });
+
+    // 아직 못 본 답장은 이 화면이 보여 주는 순간 "봤다"고 적는다. 위 띠의 새 답장 표시도 따라 사라진다.
+    const unseen = sent.flatMap((card) => card.replies.filter((reply) => !reply.seen).map((reply) => reply.id));
+    if (unseen.length > 0) {
+      setFresh((current) => new Set([...current, ...unseen]));
+      void markRepliesSeen(supabase, unseen)
+        .then(() => window.dispatchEvent(new Event(REPLIES_SEEN)))
+        .catch(() => undefined);
+    }
   }, []);
 
   useEffect(() => {
@@ -376,7 +392,7 @@ export function MailboxPanel() {
       {sent.length > 0 && (
         <Section
           title={`보낸 엽서 ${sent.length}장`}
-          note="받는 분이 열어 봤는지 볼 수 있어요. 엽서는 보낸 순간 그대로 남고, 거두면 모든 우편함에서 사라져요."
+          note="받는 분이 열어 봤는지, 답장했는지 볼 수 있어요. 엽서는 보낸 순간 그대로 남고, 거두면 모든 우편함에서 사라져요."
         >
           <ul className="flex flex-col gap-2">
             {sent.map((card) => (
@@ -397,6 +413,24 @@ export function MailboxPanel() {
                     </li>
                   ))}
                 </ul>
+                {card.replies.length > 0 && (
+                  <ul className="flex flex-col gap-1" aria-label={`${card.title || "여행"} 답장`}>
+                    {card.replies.map((reply) => (
+                      <li key={reply.id} className="flex flex-wrap items-center gap-1.5 text-[14px] text-text">
+                        <span aria-hidden="true">💬</span>
+                        <span>
+                          {attachParticle(reply.who, "이", "가")} &lsquo;{reply.reaction}&rsquo; 하셨어요
+                        </span>
+                        {card.deliveries.length > 1 && (
+                          <span className="text-[12px] text-text-faint">· {nameOf.get(reply.mailboxId) ?? "우편함"}</span>
+                        )}
+                        {fresh.has(reply.id) && (
+                          <span className="rounded-full bg-[#d70015] px-2 py-0.5 text-[11px] font-bold text-white">새 답장</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {asking === `withdraw-${card.id}` ? (
                   <div className="flex flex-wrap items-center gap-2 text-[13px]">
                     <span className="text-text">거두면 받는 분이 더는 볼 수 없어요.</span>

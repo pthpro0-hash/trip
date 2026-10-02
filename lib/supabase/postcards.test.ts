@@ -12,6 +12,8 @@ const {
   fetchPhotosInPostcards,
   fetchPostcardCounts,
   fetchSentPostcards,
+  fetchUnreadReplyCount,
+  markRepliesSeen,
   removeCopiesOfPhoto,
   removeCopiesOfTrip,
   sendPostcard,
@@ -64,6 +66,9 @@ interface Options {
   inPostcards?: { source_photo_id: string }[];
   sentRows?: unknown[];
   deliveryRows?: unknown[];
+  replyRows?: unknown[];
+  unread?: number;
+  failUpdate?: boolean;
 }
 
 function fake(options: Options = {}) {
@@ -71,10 +76,12 @@ function fake(options: Options = {}) {
   const inserted: Record<string, unknown[]> = {};
   const uploaded: { path: string; options: { cacheControl?: string; upsert?: boolean } }[] = [];
   const folder: string[] = [];
+  const updated: { table: string; ids: string[]; patch: { seen_at?: string } }[] = [];
 
   const rowsFor = (name: string, columns: string) => {
     if (name === "postcards" && columns.includes("snapshot")) return options.sentRows ?? [];
     if (name === "postcard_deliveries") return options.deliveryRows ?? [];
+    if (name === "postcard_replies") return options.replyRows ?? [];
     if (name === "postcards" && columns === "id") return options.postcardsOfTrip ?? [];
     if (name === "postcards") return options.countRows ?? [];
     if (name === "postcard_photos" && columns.includes("postcard_id")) return options.photoRows ?? [];
@@ -89,20 +96,29 @@ function fake(options: Options = {}) {
       (inserted[name] ??= []).push(...(Array.isArray(row) ? row : [row]));
       return { error: null };
     },
-    select: (columns: string) => {
-      log.push(`select ${name}`);
+    select: (columns: string, opts?: { head?: boolean }) => {
+      log.push(`select ${name}${opts?.head ? " head" : ""}`);
       const result = options.selectError
-        ? { data: null, error: { code: options.selectError, message: "x" } }
-        : { data: rowsFor(name, columns), error: null };
+        ? { data: null, count: null, error: { code: options.selectError, message: "x" } }
+        : { data: rowsFor(name, columns), count: options.unread ?? 0, error: null };
       const chain: Record<string, unknown> = {
         eq: () => chain,
         in: () => chain,
+        is: () => chain,
         order: () => chain,
         limit: () => chain,
         then: (resolve: (v: typeof result) => void) => resolve(result),
       };
       return chain;
     },
+    update: (patch: { seen_at?: string }) => ({
+      in: async (column: string, ids: string[]) => {
+        log.push(`update ${name} ${column} in ${ids.length}`);
+        if (options.failUpdate) return { error: { message: "nope" } };
+        updated.push({ table: name, ids, patch });
+        return { error: null };
+      },
+    }),
     delete: () => ({
       eq: async (column: string, value: string) => {
         log.push(`delete ${name} ${column}=${value}`);
@@ -137,7 +153,7 @@ function fake(options: Options = {}) {
     },
   };
   const supabase = { from, storage } as unknown as SupabaseClient;
-  return { supabase, log, inserted, uploaded, folder };
+  return { supabase, log, inserted, uploaded, folder, updated };
 }
 
 beforeEach(() => {
@@ -395,12 +411,67 @@ describe("fetchSentPostcards · 보낸 엽서 목록", () => {
           { mailboxId: "m1", opened: true },
           { mailboxId: "m2", opened: false },
         ],
+        replies: [],
+        unread: 0,
       },
-      { id: "pc2", tripId: "t2", title: null, startedOn: "2026-08-01", sentAt: "2026-10-01T00:00:00Z", deliveries: [] },
+      { id: "pc2", tripId: "t2", title: null, startedOn: "2026-08-01", sentAt: "2026-10-01T00:00:00Z", deliveries: [], replies: [], unread: 0 },
     ]);
   });
 
   it("못 읽으면 빈 목록", async () => {
     expect(await fetchSentPostcards(fake({ selectError: "500" }).supabase, "u")).toEqual([]);
+  });
+});
+
+describe("답장 알림 · 보낸 사람이 받는 소식", () => {
+  const cards = [{ id: "pc1", trip_id: "t1", created_at: "2026-10-02T00:00:00Z", snapshot: { title: "강릉 바다", startedOn: "2026-09-13" } }];
+
+  it("엽서마다 답장이 오고, 아직 못 본 것은 새 답장으로 센다", async () => {
+    const f = fake({
+      sentRows: cards,
+      replyRows: [
+        { id: "r1", postcard_id: "pc1", mailbox_id: "m1", who: "엄마", reaction: "좋구나", created_at: "2026-10-03T00:00:00Z", seen_at: "2026-10-03T01:00:00Z" },
+        { id: "r2", postcard_id: "pc1", mailbox_id: "m2", who: "장모님", reaction: "잘 다녀왔니", created_at: "2026-10-04T00:00:00Z", seen_at: null },
+        { id: "r3", postcard_id: "other", mailbox_id: "m1", who: "아빠", reaction: "좋구나", created_at: "2026-10-04T00:00:00Z", seen_at: null },
+      ],
+    });
+    const [card] = await fetchSentPostcards(f.supabase, "u");
+    expect(card.replies).toEqual([
+      { id: "r1", mailboxId: "m1", who: "엄마", reaction: "좋구나", at: "2026-10-03T00:00:00Z", seen: true },
+      { id: "r2", mailboxId: "m2", who: "장모님", reaction: "잘 다녀왔니", at: "2026-10-04T00:00:00Z", seen: false },
+    ]);
+    expect(card.unread).toBe(1);
+  });
+
+  it("답장이 없으면 빈 목록", async () => {
+    const f = fake({ sentRows: cards });
+    const [card] = await fetchSentPostcards(f.supabase, "u");
+    expect(card.replies).toEqual([]);
+    expect(card.unread).toBe(0);
+  });
+
+  it("못 본 답장의 수 — 위 띠에 점으로 알린다", async () => {
+    expect(await fetchUnreadReplyCount(fake({ unread: 3 }).supabase)).toBe(3);
+    expect(await fetchUnreadReplyCount(fake({ unread: 0 }).supabase)).toBe(0);
+  });
+
+  it("수를 못 세면 0 — 알림이 없는 것처럼 조용히", async () => {
+    expect(await fetchUnreadReplyCount(fake({ selectError: "500" }).supabase)).toBe(0);
+    expect(await fetchUnreadReplyCount(fake({ selectError: "42P01" }).supabase)).toBe(0);
+  });
+
+  it("봤다고 표시한다 — 그 답장들에만, 본 시각을 적는다", async () => {
+    const f = fake();
+    expect(await markRepliesSeen(f.supabase, ["r1", "r2"])).toBe(true);
+    expect(f.updated).toHaveLength(1);
+    expect(f.updated[0].ids).toEqual(["r1", "r2"]);
+    expect(f.updated[0].patch.seen_at).toEqual(expect.any(String));
+  });
+
+  it("표시할 것이 없으면 묻지 않고, 실패하면 false", async () => {
+    const f = fake();
+    expect(await markRepliesSeen(f.supabase, [])).toBe(true);
+    expect(f.log).toHaveLength(0);
+    expect(await markRepliesSeen(fake({ failUpdate: true }).supabase, ["r1"])).toBe(false);
   });
 });

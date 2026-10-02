@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 vi.mock("@/components/auth/AccountChip", () => ({ AccountChip: () => null }));
+vi.mock("@/components/mailbox/MailboxBell", () => ({ MailboxBell: () => <span data-testid="bell" /> }));
 
 let path = "/";
 vi.mock("next/navigation", () => ({ usePathname: () => path }));
@@ -79,6 +80,11 @@ describe("SiteHeader", () => {
     const { container } = await 머리띠("/m/abc/p/def");
     expect(container.firstChild).toBeNull();
     expect(screen.queryByRole("link", { name: "내 여행" })).toBeNull();
+  });
+
+  it("새 답장 알림 자리가 위 띠에 있다 — 알림이 없으면 스스로 비어 있다", async () => {
+    await 머리띠("/trips/abc");
+    expect(screen.getByTestId("bell")).toBeTruthy();
   });
 
   it("보내는 쪽(/mailboxes)에는 평소처럼 있다", async () => {

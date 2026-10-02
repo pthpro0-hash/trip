@@ -152,6 +152,17 @@ export async function fetchPostcardCounts(supabase: SupabaseClient, userId: stri
   return counts;
 }
 
+/** 받는 분이 남긴 답장 한 번. */
+export interface SentReply {
+  id: string;
+  mailboxId: string;
+  who: string;
+  reaction: string;
+  at: string;
+  /** 보낸 사람이 이미 봤는가. 아니면 새 답장이다. */
+  seen: boolean;
+}
+
 export interface SentPostcard {
   id: string;
   tripId: string;
@@ -160,11 +171,14 @@ export interface SentPostcard {
   sentAt: string;
   /** 어느 우편함에 넣었고, 받는 분이 열어 봤는가. */
   deliveries: { mailboxId: string; opened: boolean }[];
+  /** 받는 분들의 답장(오래된 것부터)과 그중 못 본 수. */
+  replies: SentReply[];
+  unread: number;
 }
 
 /** 내가 보낸 엽서들(최근 것부터). 못 읽으면 빈 목록. */
 export async function fetchSentPostcards(supabase: SupabaseClient, userId: string): Promise<SentPostcard[]> {
-  const [cards, deliveries] = await Promise.all([
+  const [cards, deliveries, replyRows] = await Promise.all([
     supabase
       .from("postcards")
       .select("id,trip_id,created_at,snapshot")
@@ -172,20 +186,65 @@ export async function fetchSentPostcards(supabase: SupabaseClient, userId: strin
       .order("created_at", { ascending: false })
       .limit(50),
     supabase.from("postcard_deliveries").select("postcard_id,mailbox_id,opened_at"),
+    // 답장은 곁다리다. 못 읽어도 엽서 목록은 나온다(표가 아직 없을 때도).
+    Promise.resolve(
+      supabase
+        .from("postcard_replies")
+        .select("id,postcard_id,mailbox_id,who,reaction,created_at,seen_at")
+        .order("created_at", { ascending: true }),
+    ).catch(() => ({ data: null, error: { message: "x" } })),
   ]);
   if (cards.error || !cards.data) return [];
   const byCard = new Map<string, SentPostcard["deliveries"]>();
   for (const row of (deliveries.data ?? []) as { postcard_id: string; mailbox_id: string; opened_at: string | null }[]) {
     byCard.set(row.postcard_id, [...(byCard.get(row.postcard_id) ?? []), { mailboxId: row.mailbox_id, opened: row.opened_at != null }]);
   }
-  return (cards.data as { id: string; trip_id: string; created_at: string; snapshot: { title?: string | null; startedOn?: string } }[]).map((row) => ({
-    id: row.id,
-    tripId: row.trip_id,
-    title: row.snapshot?.title ?? null,
-    startedOn: row.snapshot?.startedOn ?? "",
-    sentAt: row.created_at,
-    deliveries: byCard.get(row.id) ?? [],
-  }));
+  const repliesByCard = new Map<string, SentReply[]>();
+  if (!replyRows.error && Array.isArray(replyRows.data)) {
+    for (const row of replyRows.data as {
+      id: string;
+      postcard_id: string;
+      mailbox_id: string;
+      who: string;
+      reaction: string;
+      created_at: string;
+      seen_at: string | null;
+    }[]) {
+      repliesByCard.set(row.postcard_id, [
+        ...(repliesByCard.get(row.postcard_id) ?? []),
+        { id: row.id, mailboxId: row.mailbox_id, who: row.who, reaction: row.reaction, at: row.created_at, seen: row.seen_at != null },
+      ]);
+    }
+  }
+  return (cards.data as { id: string; trip_id: string; created_at: string; snapshot: { title?: string | null; startedOn?: string } }[]).map((row) => {
+    const replies = repliesByCard.get(row.id) ?? [];
+    return {
+      id: row.id,
+      tripId: row.trip_id,
+      title: row.snapshot?.title ?? null,
+      startedOn: row.snapshot?.startedOn ?? "",
+      sentAt: row.created_at,
+      deliveries: byCard.get(row.id) ?? [],
+      replies,
+      unread: replies.filter((reply) => !reply.seen).length,
+    };
+  });
+}
+
+/** 아직 못 본 답장의 수. 위 띠에 점으로 알린다. 못 세면 0(알림이 없는 것처럼 조용히). */
+export async function fetchUnreadReplyCount(supabase: SupabaseClient): Promise<number> {
+  const { count, error } = await supabase
+    .from("postcard_replies")
+    .select("id", { count: "exact", head: true })
+    .is("seen_at", null);
+  return error || count == null ? 0 : count;
+}
+
+/** 답장을 봤다고 표시한다(보낸 사람만 된다 — DB 가 seen_at 말고는 못 고치게 막아 둔다). */
+export async function markRepliesSeen(supabase: SupabaseClient, ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const { error } = await supabase.from("postcard_replies").update({ seen_at: new Date().toISOString() }).in("id", ids);
+  return !error;
 }
 
 /** 이 사진들 가운데 엽서에 쓰인 것. 사진 지우기 확인 창에 보여 준다. */

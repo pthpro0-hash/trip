@@ -11,6 +11,7 @@ const state = vi.hoisted(() => ({
 const postcards = vi.hoisted(() => ({
   sent: [] as unknown[],
   withdrawPostcard: vi.fn(),
+  markRepliesSeen: vi.fn(),
 }));
 const api = vi.hoisted(() => ({
   createMailbox: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock("@/lib/supabase/mailbox", async () => ({
 vi.mock("@/lib/supabase/postcards", () => ({
   fetchSentPostcards: async () => postcards.sent,
   withdrawPostcard: postcards.withdrawPostcard,
+  markRepliesSeen: postcards.markRepliesSeen,
 }));
 
 const { MailboxPanel } = await import("./MailboxPanel");
@@ -71,6 +73,8 @@ describe("MailboxPanel", () => {
     postcards.sent = [];
     postcards.withdrawPostcard.mockReset();
     postcards.withdrawPostcard.mockResolvedValue(true);
+    postcards.markRepliesSeen.mockReset();
+    postcards.markRepliesSeen.mockResolvedValue(true);
     copied.mockClear();
     Object.defineProperty(navigator, "clipboard", { value: { writeText: copied }, configurable: true });
   });
@@ -210,6 +214,8 @@ describe("MailboxPanel", () => {
           { mailboxId: "m1", opened: true },
           { mailboxId: "m2", opened: false },
         ],
+        replies: [],
+        unread: 0,
       },
     ];
     render(<MailboxPanel />);
@@ -222,9 +228,53 @@ describe("MailboxPanel", () => {
     await waitFor(() => expect(postcards.withdrawPostcard).toHaveBeenCalledWith(expect.anything(), "pc1"));
   });
 
+  it("부모님이 답장하면 '엄마가 좋구나 하셨어요'로 보이고, 새 답장은 표시되며, 봤다고 적는다", async () => {
+    state.list = { owned: [box({ id: "m1", name: "엄마 아빠" }), box({ id: "m2", name: "장모님" })], joined: [] };
+    postcards.sent = [
+      {
+        id: "pc1",
+        tripId: "t1",
+        title: "강릉 바다",
+        startedOn: "2026-09-13",
+        sentAt: "2026-10-02T00:00:00Z",
+        deliveries: [
+          { mailboxId: "m1", opened: true },
+          { mailboxId: "m2", opened: true },
+        ],
+        replies: [
+          { id: "r1", mailboxId: "m1", who: "엄마", reaction: "좋구나", at: "2026-10-03T00:00:00Z", seen: true },
+          { id: "r2", mailboxId: "m2", who: "장모님", reaction: "잘 다녀왔니", at: "2026-10-04T00:00:00Z", seen: false },
+        ],
+        unread: 1,
+      },
+    ];
+    render(<MailboxPanel />);
+    const list = await screen.findByRole("list", { name: "강릉 바다 답장" });
+    expect(list).toHaveTextContent("엄마가 ‘좋구나’ 하셨어요");
+    expect(list).toHaveTextContent("장모님이 ‘잘 다녀왔니’ 하셨어요");
+    // 우편함이 둘이면 어느 우편함의 답장인지 알려 준다.
+    expect(list).toHaveTextContent("장모님");
+    // 못 본 답장만 '새 답장'.
+    expect(screen.getAllByText("새 답장")).toHaveLength(1);
+    await waitFor(() => expect(postcards.markRepliesSeen).toHaveBeenCalledWith(expect.anything(), ["r2"]));
+  });
+
+  it("이미 본 답장만 있으면 새 답장 표시도, 봤다는 표시 호출도 없다", async () => {
+    postcards.sent = [
+      {
+        id: "pc1", tripId: "t1", title: "강릉 바다", startedOn: "", sentAt: "", deliveries: [{ mailboxId: "m1", opened: true }],
+        replies: [{ id: "r1", mailboxId: "m1", who: "아빠", reaction: "좋구나", at: "", seen: true }], unread: 0,
+      },
+    ];
+    render(<MailboxPanel />);
+    expect(await screen.findByRole("list", { name: "강릉 바다 답장" })).toHaveTextContent("아빠가 ‘좋구나’ 하셨어요");
+    expect(screen.queryByText("새 답장")).toBeNull();
+    expect(postcards.markRepliesSeen).not.toHaveBeenCalled();
+  });
+
   it("엽서를 거두지 못하면 다시 누르라고 알린다", async () => {
     postcards.withdrawPostcard.mockResolvedValue(false);
-    postcards.sent = [{ id: "pc1", tripId: "t1", title: null, startedOn: "", sentAt: "", deliveries: [] }];
+    postcards.sent = [{ id: "pc1", tripId: "t1", title: null, startedOn: "", sentAt: "", deliveries: [], replies: [], unread: 0 }];
     render(<MailboxPanel />);
     fireEvent.click(await screen.findByRole("button", { name: "엽서 거두기" }));
     fireEvent.click(screen.getByRole("button", { name: "거두기" }));
