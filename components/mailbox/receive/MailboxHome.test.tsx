@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MailboxHome } from "./MailboxHome";
 import type { MailboxView } from "@/lib/supabase/mailboxPublic";
+import { RECOMMENDED } from "@/lib/mailboxSettings";
 
 const TOKEN = "T".repeat(43);
 const card = (over: Partial<MailboxView["postcards"][number]> = {}) => ({
@@ -10,13 +11,14 @@ const card = (over: Partial<MailboxView["postcards"][number]> = {}) => ({
   title: "강릉 바다",
   startedOn: "2026-09-13",
   cover: "a.webp",
+  photoCount: 14,
   greeting: "엄마 아빠, 바다 보고 왔어요",
   sentAt: "2026-10-02T09:00:00",
   opened: false,
   replies: [],
   ...over,
 });
-const view = (over: Partial<MailboxView> = {}): MailboxView => ({ tone: "casual", members: ["엄마", "아빠"], postcards: [card()], ...over });
+const view = (over: Partial<MailboxView> = {}): MailboxView => ({ tone: "casual", settings: RECOMMENDED, members: ["엄마", "아빠"], postcards: [card()], ...over });
 
 describe("MailboxHome · 부모님이 보는 우편함", () => {
   beforeEach(() => window.localStorage.clear());
@@ -74,5 +76,27 @@ describe("MailboxHome · 부모님이 보는 우편함", () => {
     const links = screen.getAllByRole("link").map((link) => link.getAttribute("href"));
     expect(links.every((href) => href?.startsWith("/m/"))).toBe(true);
     expect(screen.getByText(/홈 화면에 추가/)).toBeTruthy();
+  });
+
+  it("엽서마다 사진이 몇 장인지 보인다 — 앨범이 있다는 뜻", () => {
+    render(<MailboxHome token={TOKEN} view={view()} />);
+    expect(screen.getByText(/사진 14장/)).toBeTruthy();
+  });
+
+  it("사진이 없는 엽서에는 사진 수를 적지 않는다", () => {
+    render(<MailboxHome token={TOKEN} view={view({ postcards: [card({ photoCount: 0, cover: null })] })} />);
+    expect(screen.queryByText(/사진 0장/)).toBeNull();
+  });
+
+  it("설정의 글씨 크기가 화면 전체의 배율이 된다 — 보통 0.85·크게 1·아주 크게 1.2", () => {
+    const scaleOf = (font: "normal" | "large" | "xlarge") => {
+      const { container, unmount } = render(<MailboxHome token={TOKEN} view={view({ settings: { ...RECOMMENDED, font } })} />);
+      const value = (container.querySelector("main") as HTMLElement).style.getPropertyValue("--rs");
+      unmount();
+      return value;
+    };
+    expect(scaleOf("normal")).toBe("0.85");
+    expect(scaleOf("large")).toBe("1");
+    expect(scaleOf("xlarge")).toBe("1.2");
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import type { TripDetail } from "@/lib/supabase/tripDetail";
 import type { MailboxItem } from "@/lib/supabase/mailbox";
+import { RECOMMENDED } from "@/lib/mailboxSettings";
 
 const state = vi.hoisted(() => ({ boxes: [] as MailboxItem[] }));
 const send = vi.hoisted(() => vi.fn());
@@ -28,6 +29,7 @@ const box = (over: Partial<MailboxItem>): MailboxItem => ({
   members: ["엄마", "아빠"],
   token: "T".repeat(43),
   closed: false,
+  settings: RECOMMENDED,
   senderCount: 1,
   ...over,
 });
@@ -78,16 +80,58 @@ describe("SendPostcardDialog", () => {
     expect(screen.queryByText("닫은 곳")).toBeNull();
   });
 
-  it("사진 3장을 곳별로 자동으로 골라 두고, 3장이 차면 나머지는 막힌다", async () => {
+  it("사진을 책장 설정만큼(기본 20장) 곳별로 자동으로 골라 둔다 — 8장짜리 여행은 8장 모두", async () => {
     open();
     await screen.findByText("우리 엄마 아빠");
-    expect(screen.getByText("3/3")).toBeTruthy();
-    const remove = screen.getAllByRole("button", { name: "엽서에서 빼기" });
-    expect(remove).toHaveLength(3);
-    for (const add of screen.getAllByRole("button", { name: "엽서에 넣기" })) expect(add).toBeDisabled();
-    fireEvent.click(remove[0]);
-    expect(screen.getByText("2/3")).toBeTruthy();
+    expect(screen.getByText("8/20")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "엽서에서 빼기" })).toHaveLength(8);
+    expect(screen.queryAllByRole("button", { name: "엽서에 넣기" })).toHaveLength(0);
+  });
+
+  it("책장 설정이 6장이면 6장까지만 골라지고, 가득 차면 나머지는 막힌다", async () => {
+    state.boxes = [box({ id: "m1", settings: { ...RECOMMENDED, photos: 6 } })];
+    open();
+    await screen.findByText("우리 엄마 아빠");
+    expect(screen.getByText("6/6")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "엽서에서 빼기" })).toHaveLength(6);
+    const add = screen.getAllByRole("button", { name: "엽서에 넣기" });
+    expect(add).toHaveLength(2);
+    for (const button of add) expect(button).toBeDisabled();
+    fireEvent.click(screen.getAllByRole("button", { name: "엽서에서 빼기" })[0]);
+    expect(screen.getByText("5/6")).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "엽서에 넣기" })[0]).toBeEnabled();
+  });
+
+  it("책장이 여럿이면 가장 적은 쪽에 맞추고, 왜 그런지 알려 준다", async () => {
+    state.boxes = [
+      box({ id: "m1", settings: { ...RECOMMENDED, photos: 20 } }),
+      box({ id: "m2", name: "장인 장모님 우편함", greetingName: "장모님", tone: "polite", token: "U".repeat(43), settings: { ...RECOMMENDED, photos: 6 } }),
+    ];
+    open();
+    await screen.findByText("우리 엄마 아빠");
+    expect(screen.getByText("6/6")).toBeTruthy();
+    expect(screen.getByText(/장인 장모님 우편함은 6장까지라/)).toBeTruthy();
+    // 그 책장을 풀면 한도가 20장으로 돌아온다.
+    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 우편함/ }));
+    expect(screen.getByText("8/20")).toBeTruthy();
+  });
+
+  it("직접 고른 뒤 [추천으로 고르기]를 누르면 자동 선택으로 돌아간다", async () => {
+    open();
+    await screen.findByText("우리 엄마 아빠");
+    fireEvent.click(screen.getAllByRole("button", { name: "엽서에서 빼기" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "엽서에서 빼기" })[0]);
+    expect(screen.getByText("6/20")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "추천으로 고르기" }));
+    expect(screen.getByText("8/20")).toBeTruthy();
+  });
+
+  it("사진 그림은 필요할 때만 받는다(lazy) — 사진이 많은 여행도 창이 가볍게 열린다", async () => {
+    const { container } = open();
+    await screen.findByText("우리 엄마 아빠");
+    const images = [...container.ownerDocument.querySelectorAll("[role=dialog] img")];
+    expect(images.length).toBeGreaterThan(0);
+    for (const image of images) expect(image.getAttribute("loading")).toBe("lazy");
   });
 
   it("한 줄을 쓰면 우편함마다 호칭만 다르게 복사된다", async () => {
@@ -189,11 +233,26 @@ describe("SendPostcardDialog", () => {
     const input = send.mock.calls[0][1];
     expect(input.senderId).toBe("me");
     expect(input.senderName).toBe("김지민");
-    expect(input.photoIds).toHaveLength(3);
+    expect(input.photoIds).toHaveLength(8);
+    expect(input.maxPhotos).toBe(20);
+    expect(input.size).toBe(640);
     expect(input.deliveries).toEqual([
       { mailboxId: "m1", greeting: "엄마 아빠, 바다 보고 왔어요!" },
       { mailboxId: "m2", greeting: "장모님, 바다 보고 왔어요!" },
     ]);
+  });
+
+  it("책장 설정의 사진 크기·한도를 보내기에 넘긴다 — 선명(960)이 한 곳이라도 있으면 선명", async () => {
+    state.boxes = [
+      box({ id: "m1", settings: { ...RECOMMENDED, photos: 12, size: 640 } }),
+      box({ id: "m2", name: "장인 장모님 우편함", token: "U".repeat(43), settings: { ...RECOMMENDED, photos: 20, size: 960 } }),
+    ];
+    open();
+    await screen.findByText("우리 엄마 아빠");
+    fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "안녕" } });
+    fireEvent.click(screen.getByRole("button", { name: "2곳에 엽서 보내기" }));
+    await waitFor(() => expect(send).toHaveBeenCalled());
+    expect(send.mock.calls[0][1]).toMatchObject({ maxPhotos: 12, size: 960 });
   });
 
   it("우편함 체크를 풀면 그곳에는 보내지 않는다", async () => {

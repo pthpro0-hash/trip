@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { RECOMMENDED } from "@/lib/mailboxSettings";
 import {
   acceptMailboxInvite,
   cancelMailboxInvite,
@@ -12,6 +13,7 @@ import {
   rotateMailboxToken,
   setMailboxClosed,
   updateMailbox,
+  updateMailboxSettings,
 } from "./mailbox";
 
 type Call = { op: string; table?: string; value?: unknown; eq?: [string, unknown][] };
@@ -129,6 +131,46 @@ describe("fetchMailboxes", () => {
     const result = await fetchMailboxes(client, "me");
     if (result === "failed") throw new Error("failed");
     expect(result.owned[0]).toMatchObject({ closed: true, tone: "casual" });
+  });
+});
+
+describe("책장 설정 읽고 쓰기", () => {
+  it("우편함에 설정이 없으면 권장값으로 읽는다", async () => {
+    const { client } = fake({ mailboxes: [row()], senders: [] });
+    const result = await fetchMailboxes(client, "me");
+    if (result === "failed") throw new Error("failed");
+    expect(result.owned[0].settings).toEqual(RECOMMENDED);
+  });
+
+  it("저장된 설정은 칸마다 확인해 읽는다 — 깨진 칸만 권장으로", async () => {
+    const { client } = fake({ mailboxes: [row({ settings: { photos: 12, size: 999, font: "xlarge", words: ["고맙다"] } })], senders: [] });
+    const result = await fetchMailboxes(client, "me");
+    if (result === "failed") throw new Error("failed");
+    expect(result.owned[0].settings).toMatchObject({ photos: 12, size: 640, font: "xlarge" });
+    expect(result.owned[0].settings.words[0]).toBe("고맙다");
+  });
+
+  it("설정을 저장한다 — 그 우편함 한 줄에만, 다듬은 값 전체를", async () => {
+    const { client, calls } = fake();
+    const result = await updateMailboxSettings(client, "m1", { ...RECOMMENDED, photos: 12, words: ["  고맙다 ", "또 가자", "잘했다"] });
+    expect(result).toEqual({ ok: true });
+    expect(calls[0]).toMatchObject({ op: "update", table: "mailboxes", eq: [["id", "m1"]] });
+    expect((calls[0].value as { settings: { photos: number; words: string[] } }).settings.photos).toBe(12);
+    expect((calls[0].value as { settings: { words: string[] } }).settings.words[0]).toBe("고맙다");
+  });
+
+  it("범위를 벗어난 값을 넣어도 권장으로 다듬어 저장한다", async () => {
+    const { client, calls } = fake();
+    // @ts-expect-error 일부러 틀린 값
+    await updateMailboxSettings(client, "m1", { ...RECOMMENDED, photos: 7, size: 800 });
+    const saved = (calls[0].value as { settings: { photos: number; size: number } }).settings;
+    expect(saved.photos).toBe(20);
+    expect(saved.size).toBe(640);
+  });
+
+  it("저장하지 못하면 failed", async () => {
+    const { client } = fake({ updateError: { message: "x" } });
+    expect(await updateMailboxSettings(client, "m1", RECOMMENDED)).toEqual({ ok: false, reason: "failed" });
   });
 });
 

@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TripDetail } from "./tripDetail";
 
+const shrink = vi.hoisted(() => ({ postcardFromBlob: vi.fn(async (blob: Blob) => new Blob(["small"], { type: blob.type })) }));
+vi.mock("@/lib/photo/resize", () => ({ postcardFromBlob: shrink.postcardFromBlob }));
 vi.mock("./photos", () => ({
   thumbUrls: vi.fn(async (_supabase: unknown, paths: string[]) => new Map(paths.map((path) => [path, `https://signed/${path}`]))),
 }));
@@ -157,6 +159,8 @@ function fake(options: Options = {}) {
 }
 
 beforeEach(() => {
+  shrink.postcardFromBlob.mockClear();
+  shrink.postcardFromBlob.mockImplementation(async (blob: Blob) => new Blob(["small"], { type: blob.type }));
   vi.stubGlobal("fetch", vi.fn(async () => new Response(new Blob(["x"], { type: "image/webp" }))));
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -262,12 +266,60 @@ describe("sendPostcard · 실패하면 깨끗이 되돌린다", () => {
     expect(f.uploaded).toHaveLength(0);
   });
 
-  it("받을 우편함이 없거나, 이름이 비었거나, 사진이 4장이면 묻지도 않는다", async () => {
+  it("받을 우편함이 없거나, 이름이 비었거나, 같은 사진을 두 번 골랐으면 묻지도 않는다", async () => {
     const f = fake();
     expect(await sendPostcard(f.supabase, { ...input, deliveries: [] })).toEqual({ ok: false, reason: "invalid" });
     expect(await sendPostcard(f.supabase, { ...input, senderName: "  " })).toEqual({ ok: false, reason: "invalid" });
     expect(await sendPostcard(f.supabase, { ...input, photoIds: ["p1", "p2", "p3", "p1"] })).toEqual({ ok: false, reason: "invalid" });
     expect(f.log).toHaveLength(0);
+  });
+
+  it("책장이 정한 한도(maxPhotos)를 넘으면 묻지도 않는다 — 한도 안에서는 20장까지 된다", async () => {
+    const f = fake();
+    expect(await sendPostcard(f.supabase, { ...input, maxPhotos: 2, photoIds: ["p1", "p2", "p3"] })).toEqual({ ok: false, reason: "invalid" });
+    expect(f.log).toHaveLength(0);
+    const ok = await sendPostcard(fake().supabase, { ...input, maxPhotos: 3, photoIds: ["p1", "p2", "p3"] });
+    expect(ok.ok).toBe(true);
+  });
+
+  it("한도를 안 주면 20장까지 — 21장은 거절", async () => {
+    const photos = Array.from({ length: 21 }, (_, i) => ({ id: `x${i}`, storagePath: `u/x${i}.webp`, takenAt: new Date("2026-09-13T09:00:00"), isCover: false }));
+    const big = { ...trip, visits: [{ ...trip.visits[0], photos }] };
+    const f = fake();
+    expect(await sendPostcard(f.supabase, { ...input, trip: big, photoIds: photos.map((p) => p.id) })).toEqual({ ok: false, reason: "invalid" });
+    expect(f.log).toHaveLength(0);
+    const twenty = await sendPostcard(fake().supabase, { ...input, trip: big, photoIds: photos.slice(0, 20).map((p) => p.id) });
+    expect(twenty.ok).toBe(true);
+  });
+});
+
+describe("sendPostcard · 사진 크기", () => {
+  it("보통(640px)이면 목록 판(960px)을 받아 줄여서 올린다 — 책 한 권이 가벼워진다", async () => {
+    const f = fake();
+    await sendPostcard(f.supabase, { ...input, size: 640 });
+    expect(shrink.postcardFromBlob).toHaveBeenCalledTimes(2);
+    expect(f.uploaded).toHaveLength(2);
+  });
+
+  it("크기를 안 주면 보통(640px)", async () => {
+    await sendPostcard(fake().supabase, input);
+    expect(shrink.postcardFromBlob).toHaveBeenCalledTimes(2);
+  });
+
+  it("선명(960px)이면 목록 판을 그대로 올린다", async () => {
+    const f = fake();
+    await sendPostcard(f.supabase, { ...input, size: 960 });
+    expect(shrink.postcardFromBlob).not.toHaveBeenCalled();
+    expect(f.uploaded).toHaveLength(2);
+  });
+
+  it("줄이다 실패하면 올리다 실패한 것과 같다 — 올린 것을 치우고 엽서 줄도 지운다", async () => {
+    shrink.postcardFromBlob.mockRejectedValue(new Error("canvas"));
+    const f = fake();
+    const result = await sendPostcard(f.supabase, input);
+    expect(result).toEqual({ ok: false, reason: "photos" });
+    expect(f.log.some((entry) => entry.startsWith("delete postcards id="))).toBe(true);
+    expect(f.inserted.postcard_deliveries).toBeUndefined();
   });
 });
 

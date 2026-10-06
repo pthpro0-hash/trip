@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { ReceivedPostcard } from "@/lib/supabase/mailboxPublic";
+import { RECOMMENDED } from "@/lib/mailboxSettings";
 
 const calls = vi.hoisted(() => ({ opened: vi.fn(async () => undefined), reply: vi.fn() }));
 vi.mock("@/lib/supabase/client", () => ({ getBrowserClient: () => ({}) }));
@@ -37,6 +38,7 @@ const card = (over: Partial<ReceivedPostcard> = {}): ReceivedPostcard => ({
   greeting: "엄마 아빠, 바다 보고 왔어요",
   sentAt: "2026-10-02T00:00:00Z",
   tone: "casual",
+  settings: RECOMMENDED,
   members: ["엄마", "아빠"],
   replies: [],
   ...over,
@@ -58,14 +60,21 @@ describe("ReceivedPostcardView · 부모님이 보는 엽서", () => {
     expect(screen.getByText("엄마 아빠, 바다 보고 왔어요")).toBeTruthy();
   });
 
-  it("사진은 엽서 보관함의 공개 주소로 보인다", () => {
+  it("사진은 앨범으로 한 장씩 — 첫 사진이 엽서 보관함의 공개 주소로 크게 보이고 몇 번째인지 알린다", () => {
     const { container } = render(<ReceivedPostcardView token={TOKEN} card={card()} />);
     const sources = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
-    expect(sources).toHaveLength(2);
+    expect(sources).toHaveLength(1);
     expect(sources[0]).toMatch(/\/postcards\/P+\/a\.webp$/);
+    expect(screen.getByText("1 / 2")).toBeTruthy();
   });
 
-  it("사진을 못 불러오면(보낸 분이 지웠으면) 부드러운 안내로 바뀐다", () => {
+  it("앨범은 넘겨 볼 수 있다 — 책 한 권이 사진 여러 장이라서", () => {
+    const { container } = render(<ReceivedPostcardView token={TOKEN} card={card()} />);
+    fireEvent.click(screen.getByRole("button", { name: "다음 사진" }));
+    expect(container.querySelector("img")?.getAttribute("src")).toMatch(/b\.webp$/);
+  });
+
+  it("사진을 못 불러오면(보낸 분이 지웠으면) 그 쪽만 부드러운 안내로 바뀐다", () => {
     const { container } = render(<ReceivedPostcardView token={TOKEN} card={card()} />);
     fireEvent.error(container.querySelector("img")!);
     expect(screen.getByText("보낸 분이 이 사진을 지웠어요")).toBeTruthy();
@@ -134,5 +143,18 @@ describe("ReceivedPostcardView · 부모님이 보는 엽서", () => {
   it("우편함으로 돌아가는 길이 있다", () => {
     render(<ReceivedPostcardView token={TOKEN} card={card()} />);
     expect(screen.getByRole("link", { name: "우편함으로 가기" })).toHaveAttribute("href", `/m/${TOKEN}`);
+  });
+
+  it("답장 단추 문구는 책장 설정의 것을 쓴다 — 집마다 말투가 다르다", () => {
+    window.localStorage.setItem(whoKey, "엄마");
+    render(<ReceivedPostcardView token={TOKEN} card={card({ settings: { ...RECOMMENDED, words: ["고맙다", "또 가자", "잘했다"] } })} />);
+    expect(screen.getByRole("button", { name: "고맙다" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "또 가자" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "좋구나" })).toBeNull();
+  });
+
+  it("설정의 글씨 크기가 배율로 내려온다", () => {
+    const { container } = render(<ReceivedPostcardView token={TOKEN} card={card({ settings: { ...RECOMMENDED, font: "xlarge" } })} />);
+    expect((container.querySelector("main") as HTMLElement).style.getPropertyValue("--rs")).toBe("1.2");
   });
 });

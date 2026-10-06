@@ -43,6 +43,14 @@ create table if not exists public.mailboxes (
 
 create index if not exists mailboxes_owner_idx on public.mailboxes (owner_id);
 
+-- 책장 설정(사진 수·크기·부모님 화면 글씨·답장 문구 …). 비어 있으면 앱이 권장값으로 읽는다(lib/mailboxSettings.ts).
+-- 값의 모양은 앱이 칸마다 확인해 읽으므로 DB 는 "JSON 객체이고 작다"만 막는다. 고치는 것은 우편함의 주인만
+-- (아래 mailboxes_update 정책). 이미 만들어 둔 표에도 더해진다.
+alter table public.mailboxes add column if not exists settings jsonb not null default '{}'::jsonb;
+alter table public.mailboxes drop constraint if exists mailboxes_settings_check;
+alter table public.mailboxes add constraint mailboxes_settings_check
+  check (jsonb_typeof(settings) = 'object' and octet_length(settings::text) < 2000);
+
 -- 이 우편함에 엽서를 보낼 수 있는 사람들. 우편함을 만든 사람이 'owner' 로 자동으로 들어간다.
 create table if not exists public.mailbox_senders (
   mailbox_id uuid        not null references public.mailboxes (id) on delete cascade,
@@ -518,6 +526,14 @@ as $$
     'name', m.name,
     'tone', m.tone,
     'members', to_jsonb(m.members),
+    -- 부모님 화면에 필요한 것만. 사진 수·크기·보관 권수는 보내는 쪽 일이라 내려가지 않는다.
+    'settings', jsonb_build_object(
+      'font', m.settings -> 'font',
+      'heart', m.settings -> 'heart',
+      'words', m.settings -> 'words',
+      'past', m.settings -> 'past',
+      'year', m.settings -> 'year'
+    ),
     'postcards', coalesce((
       select jsonb_agg(
         jsonb_build_object(
@@ -526,6 +542,7 @@ as $$
           'title', p.snapshot -> 'title',
           'startedOn', p.snapshot -> 'startedOn',
           'cover', p.snapshot -> 'files' -> 0,
+          'photoCount', jsonb_array_length(p.snapshot -> 'files'),
           'greeting', d.greeting,
           'sentAt', d.delivered_at,
           'openedAt', d.opened_at,
@@ -573,7 +590,18 @@ begin
     'snapshot', p.snapshot,
     'greeting', d.greeting,
     'sentAt', d.delivered_at,
-    'mailbox', jsonb_build_object('name', box.name, 'tone', box.tone, 'members', to_jsonb(box.members)),
+    'mailbox', jsonb_build_object(
+      'name', box.name,
+      'tone', box.tone,
+      'members', to_jsonb(box.members),
+      'settings', jsonb_build_object(
+        'font', box.settings -> 'font',
+        'heart', box.settings -> 'heart',
+        'words', box.settings -> 'words',
+        'past', box.settings -> 'past',
+        'year', box.settings -> 'year'
+      )
+    ),
     'replies', coalesce((
       select jsonb_agg(
         jsonb_build_object('who', r.who, 'reaction', r.reaction, 'at', r.created_at)

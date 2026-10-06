@@ -78,3 +78,19 @@ h2 {
   letter-spacing: -0.022em;
   text-wrap: balance;
 }
+
+
+/*
+  가족 우편함 받는 쪽의 글씨. 설정의 글씨 크기가 --rs(보통 0.85 · 크게 1 · 아주 크게 1.2)로 내려와, 이 클래스들이
+  그 배율을 곱한다. 크게(1)가 부모님 화면의 기본 크기다. components/mailbox/receive 안에서만 쓴다.
+*/
+.rs-13 { font-size: calc(13px * var(--rs, 1)); }
+.rs-14 { font-size: calc(14px * var(--rs, 1)); }
+.rs-16 { font-size: calc(16px * var(--rs, 1)); }
+.rs-17 { font-size: calc(17px * var(--rs, 1)); }
+.rs-18 { font-size: calc(18px * var(--rs, 1)); }
+.rs-20 { font-size: calc(20px * var(--rs, 1)); }
+.rs-22 { font-size: calc(22px * var(--rs, 1)); }
+.rs-24 { font-size: calc(24px * var(--rs, 1)); }
+.rs-28 { font-size: calc(28px * var(--rs, 1)); }
+.rs-32 { font-size: calc(32px * var(--rs, 1)); }

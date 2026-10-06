@@ -1,8 +1,10 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import type { InboxCard, MailboxView } from "@/lib/supabase/mailboxPublic";
 import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
+import { FONT_SCALE } from "@/lib/mailboxSettings";
 import { useWho } from "@/lib/mailboxWho";
 import { WhoPicker } from "./WhoPicker";
 
@@ -33,25 +35,26 @@ function Card({ token, card }: { token: string; card: InboxCard }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={cover} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span aria-hidden="true" className="text-[28px]">
+            <span aria-hidden="true" className="rs-28">
               ✉️
             </span>
           )}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex items-center gap-2">
-            <span className="truncate text-[22px] font-bold leading-snug tracking-tight text-text">
+            <span className="truncate rs-22 font-bold leading-snug tracking-tight text-text">
               {card.title || "여행 엽서"}
             </span>
             {!card.opened && (
-              <span className="shrink-0 rounded-full bg-[#e2661b] px-2.5 py-0.5 text-[14px] font-bold text-white">새 엽서</span>
+              <span className="shrink-0 rounded-full bg-[#e2661b] px-2.5 py-0.5 rs-14 font-bold text-white">새 엽서</span>
             )}
           </span>
-          <span className="text-[17px] text-text-muted">
+          <span className="rs-17 text-text-muted">
             {card.senderName} · {dayOf(card.sentAt) || card.startedOn}
+            {card.photoCount > 0 && ` · 사진 ${card.photoCount}장`}
           </span>
           {last && (
-            <span className="truncate text-[16px] text-accent">
+            <span className="truncate rs-16 text-accent">
               {last.who}: {last.reaction}
             </span>
           )}
@@ -66,10 +69,13 @@ export function MailboxHome({ token, view }: { token: string; view: MailboxView 
   const fresh = view.postcards.filter((card) => !card.opened).length;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-5 pb-16 pt-8">
+    <main
+      style={{ "--rs": FONT_SCALE[view.settings.font] } as CSSProperties}
+      className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-5 pb-16 pt-8"
+    >
       <header className="flex flex-col gap-2">
-        <h1 className="text-[32px] font-bold tracking-tight text-text">우리 가족 우편함</h1>
-        <p className="text-[18px] leading-relaxed text-text-muted">
+        <h1 className="rs-32 font-bold tracking-tight text-text">우리 가족 우편함</h1>
+        <p className="rs-18 leading-relaxed text-text-muted">
           {view.postcards.length === 0
             ? "아직 도착한 엽서가 없어요. 가족이 여행을 다녀오면 이곳으로 엽서가 와요."
             : fresh > 0
@@ -89,7 +95,7 @@ export function MailboxHome({ token, view }: { token: string; view: MailboxView 
         </ul>
       )}
 
-      <section className="mt-auto rounded-2xl bg-bg-subtle p-5 text-[16px] leading-relaxed text-text-muted">
+      <section className="mt-auto rounded-2xl bg-bg-subtle p-5 rs-16 leading-relaxed text-text-muted">
         <p className="font-semibold text-text">홈 화면에 두면 편해요</p>
         <p className="mt-1">
           아이폰은 아래 가운데 공유 단추를 누르고 &lsquo;홈 화면에 추가&rsquo;, 안드로이드는 위 메뉴(점 세 개)에서

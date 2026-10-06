@@ -18,8 +18,8 @@ import type { TripDetail } from "./supabase/tripDetail";
 export const MAILBOX_LIMIT = 3;
 /** 한 우편함에 보낼 수 있는 사람(주인 포함). */
 export const MAILBOX_SENDER_LIMIT = 8;
-/** 엽서 한 장에 싣는 사진. */
-export const POSTCARD_PHOTOS = 3;
+/** 책(엽서) 한 권에 싣는 사진의 최대 수. 책장 설정(6·12·20장)이 이 안에서 정한다. */
+export const POSTCARD_PHOTOS_MAX = 20;
 /** 인사말 본문의 글자 수. */
 export const BODY_MAX = 300;
 export const NAME_MAX = 40;
@@ -137,7 +137,7 @@ export interface PostcardPhotoCandidate {
  * 아니라 고르게 흩어 뽑는다. 곳이 모자라면 남는 자리를 곳들을 돌아가며 다른 사진으로 채운다.
  * 결과는 여행에 나온 차례(찍은 때)로 돌려준다.
  */
-export function pickPostcardPhotos(photos: PostcardPhotoCandidate[], count = POSTCARD_PHOTOS): PostcardPhotoCandidate[] {
+export function pickPostcardPhotos(photos: PostcardPhotoCandidate[], count = POSTCARD_PHOTOS_MAX): PostcardPhotoCandidate[] {
   const byTime = (a: PostcardPhotoCandidate, b: PostcardPhotoCandidate) =>
     a.takenAt.getTime() - b.takenAt.getTime() || a.id.localeCompare(b.id);
   const sorted = [...photos].sort(byTime);
@@ -245,7 +245,7 @@ export function isPostcardSnapshot(value: unknown): value is PostcardSnapshot {
   if (snap.v !== 1) return false;
   if (!(snap.title === null || isString(snap.title))) return false;
   if (!isDay(snap.startedOn) || !isDay(snap.endedOn)) return false;
-  if (!Array.isArray(snap.files) || !snap.files.every(isFileName)) return false;
+  if (!Array.isArray(snap.files) || snap.files.length > POSTCARD_PHOTOS_MAX || !snap.files.every(isFileName)) return false;
   if (!Array.isArray(snap.visits)) return false;
   return snap.visits.every((raw) => {
     if (!raw || typeof raw !== "object") return false;

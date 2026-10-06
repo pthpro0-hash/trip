@@ -13,6 +13,7 @@ import {
   rotateMailboxToken,
   setMailboxClosed,
   updateMailbox,
+  updateMailboxSettings,
   type MailboxInput,
   type MailboxItem,
   type MailboxList,
@@ -20,10 +21,12 @@ import {
 } from "@/lib/supabase/mailbox";
 import { fetchSentPostcards, markRepliesSeen, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
 import { attachParticle } from "@/lib/korean";
+import type { MailboxSettings } from "@/lib/mailboxSettings";
 import { REPLIES_SEEN } from "./MailboxBell";
 import { MAILBOX_LIMIT, MAILBOX_SENDER_LIMIT, mailboxInviteUrl, mailboxUrl } from "@/lib/mailbox";
 import { INVITE_DAYS } from "@/lib/family";
 import { MailboxForm } from "./MailboxForm";
+import { MailboxSettingsEditor } from "./MailboxSettingsEditor";
 
 /*
   내 우편함 — 집 한 곳당 하나. 부모님 두 분은 한 우편함에서 같이 받는다.
@@ -58,6 +61,8 @@ export function MailboxPanel() {
   /** 만들기 칸이 열려 있나, 고치는 중인 우편함 id. */
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  /** 설정 칸이 열려 있는 우편함 id. */
+  const [configuring, setConfiguring] = useState<string | null>(null);
   /** 한 번 더 묻는 중인 일("rotate-<id>", "close-<id>", "leave-<id>"). */
   const [asking, setAsking] = useState<string | null>(null);
   /** 방금 만든 보내는 사람 초대의 글자(바로 복사할 수 있게 크게 보여 준다). */
@@ -171,6 +176,18 @@ export function MailboxPanel() {
       return result.reason === "invalid" ? "이름은 1~40자, 부르는 말은 20자까지예요." : "고치지 못했어요.";
     });
 
+  const saveSettings = (id: string, settings: MailboxSettings) =>
+    run(async () => {
+      const supabase = getBrowserClient();
+      if (!supabase) return "지금은 쓸 수 없어요.";
+      const result = await updateMailboxSettings(supabase, id, settings);
+      if (result.ok) {
+        setConfiguring(null);
+        return null;
+      }
+      return "설정을 저장하지 못했어요. 잠시 뒤 다시 해 주세요.";
+    });
+
   const rotate = (box: MailboxItem) =>
     run(async () => {
       const supabase = getBrowserClient();
@@ -244,6 +261,19 @@ export function MailboxPanel() {
 
         {list.owned.map((box) => {
           const boxInvites = invites.filter((entry) => entry.mailboxId === box.id);
+          if (configuring === box.id) {
+            return (
+              <article key={box.id} aria-label={`${box.name} 설정`} className="flex flex-col gap-2.5">
+                <h3 className="truncate text-[16px] font-semibold text-text">{box.name} · 설정</h3>
+                <MailboxSettingsEditor
+                  initial={box.settings}
+                  busy={busy}
+                  onSave={(settings) => void saveSettings(box.id, settings)}
+                  onCancel={() => setConfiguring(null)}
+                />
+              </article>
+            );
+          }
           if (editing === box.id) {
             return (
               <MailboxForm
@@ -279,7 +309,7 @@ export function MailboxPanel() {
                 받는 분 {box.members.length > 0 ? box.members.join(" · ") : "—"}
                 {box.greetingName && box.useGreeting && <> · 부르는 말 &lsquo;{box.greetingName}&rsquo;</>}
                 <br />
-                보내는 사람 {box.senderCount}명
+                보내는 사람 {box.senderCount}명 · 책 한 권 사진 {box.settings.photos}장
               </p>
 
               <div className="flex flex-wrap gap-1.5">
@@ -288,6 +318,9 @@ export function MailboxPanel() {
                 </button>
                 <button type="button" className={pill} onClick={() => setEditing(box.id)}>
                   고치기
+                </button>
+                <button type="button" className={pill} onClick={() => setConfiguring(box.id)}>
+                  설정
                 </button>
                 <button type="button" className={pill} disabled={busy || box.closed} onClick={() => void invite(box)}>
                   보내는 사람 초대

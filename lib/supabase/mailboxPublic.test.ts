@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { RECOMMENDED } from "@/lib/mailboxSettings";
 import {
   fetchMailboxPostcard,
   fetchMailboxView,
@@ -98,6 +99,49 @@ describe("fetchMailboxView", () => {
     const result = await fetchMailboxView(client, TOKEN);
     expect(result?.members).toEqual(["엄마"]);
     expect(result?.postcards).toHaveLength(1);
+  });
+});
+
+describe("받는 쪽 설정 · 사진 수", () => {
+  const base = { name: "우리 엄마 아빠", tone: "casual", members: ["엄마"], postcards: [] };
+
+  it("설정이 없으면 권장값으로 읽는다", async () => {
+    const view = await fetchMailboxView(fake({ mailbox_view: { data: base } }).client, TOKEN);
+    expect(view?.settings).toEqual(RECOMMENDED);
+  });
+
+  it("부모님 화면용 설정(글씨·답장 문구)을 읽는다 — 엉뚱한 칸은 권장으로", async () => {
+    const view = await fetchMailboxView(
+      fake({ mailbox_view: { data: { ...base, settings: { font: "xlarge", words: ["고맙다", "또 가자", "잘했다"], heart: "all", past: null } } } }).client,
+      TOKEN,
+    );
+    expect(view?.settings.font).toBe("xlarge");
+    expect(view?.settings.words).toEqual(["고맙다", "또 가자", "잘했다"]);
+    expect(view?.settings.heart).toBe(RECOMMENDED.heart);
+    expect(view?.settings.past).toBe(RECOMMENDED.past);
+  });
+
+  it("엽서 한 장에도 설정이 따라온다", async () => {
+    const card = {
+      id: CARD,
+      senderName: "지민",
+      snapshot,
+      greeting: "",
+      sentAt: "",
+      mailbox: { name: "x", tone: "casual", members: [], settings: { font: "normal" } },
+      replies: [],
+    };
+    const result = await fetchMailboxPostcard(fake({ mailbox_postcard: { data: card } }).client, TOKEN, CARD);
+    expect(result?.settings.font).toBe("normal");
+  });
+
+  it("엽서 목록에 사진 수(photoCount)가 있다 — 없으면 대표 사진 유무로 0·1", async () => {
+    const card = { id: CARD, senderName: "지민", title: "t", startedOn: "", cover: "a.webp", greeting: "", sentAt: "", openedAt: null, replies: [] };
+    const view = await fetchMailboxView(
+      fake({ mailbox_view: { data: { ...base, postcards: [{ ...card, photoCount: 14 }, { ...card, id: "Q".repeat(43), photoCount: undefined }, { ...card, id: "R".repeat(43), cover: null, photoCount: 0 }] } } }).client,
+      TOKEN,
+    );
+    expect(view?.postcards.map((entry) => entry.photoCount)).toEqual([14, 1, 0]);
   });
 });
 

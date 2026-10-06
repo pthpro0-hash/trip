@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveSettings, type MailboxSettings } from "@/lib/mailboxSettings";
 import { isMailboxToken, isPostcardId, isPostcardSnapshot, type PostcardSnapshot, type Tone } from "@/lib/mailbox";
 import { SUPABASE_URL } from "./config";
 import { POSTCARD_BUCKET } from "./postcardCleanup";
@@ -28,6 +29,8 @@ export interface InboxCard {
   startedOn: string;
   /** 첫 사진 파일 이름. 사진이 없으면 null. */
   cover: string | null;
+  /** 책(엽서)에 든 사진 수. */
+  photoCount: number;
   greeting: string;
   sentAt: string;
   /** 받는 분이 열어 봤는가. */
@@ -37,6 +40,8 @@ export interface InboxCard {
 
 export interface MailboxView {
   tone: Tone;
+  /** 부모님 화면 설정(글씨 크기·답장 문구 …). 칸마다 확인해 읽는다. */
+  settings: MailboxSettings;
   /** 받는 분 이름들("엄마", "아빠"). */
   members: string[];
   postcards: InboxCard[];
@@ -49,6 +54,7 @@ export interface ReceivedPostcard {
   greeting: string;
   sentAt: string;
   tone: Tone;
+  settings: MailboxSettings;
   members: string[];
   replies: Reply[];
 }
@@ -73,6 +79,8 @@ function cardOf(raw: unknown): InboxCard | null {
     title: isString(raw.title) ? raw.title : null,
     startedOn: isString(raw.startedOn) ? raw.startedOn : "",
     cover: isString(raw.cover) && /^[A-Za-z0-9._-]{1,80}$/.test(raw.cover) ? raw.cover : null,
+    // 사진 수를 못 받았으면(옛 SQL) 대표 사진이 있으면 1장으로 본다.
+    photoCount: typeof raw.photoCount === "number" && raw.photoCount >= 0 ? Math.floor(raw.photoCount) : isString(raw.cover) ? 1 : 0,
     greeting: isString(raw.greeting) ? raw.greeting : "",
     sentAt: isString(raw.sentAt) ? raw.sentAt : "",
     opened: raw.openedAt != null,
@@ -86,7 +94,7 @@ export async function fetchMailboxView(supabase: SupabaseClient, token: string):
   const { data, error } = await supabase.rpc("mailbox_view", { box_token: token });
   if (error || !isRecord(data)) return null;
   const cards = Array.isArray(data.postcards) ? data.postcards.map(cardOf).filter((card): card is InboxCard => card !== null) : [];
-  return { tone: toneOf(data.tone), members: strings(data.members), postcards: cards };
+  return { tone: toneOf(data.tone), settings: resolveSettings(data.settings), members: strings(data.members), postcards: cards };
 }
 
 /** 엽서 한 장. 그 우편함에 없는 엽서·모양이 틀린 스냅샷이면 null. */
@@ -107,6 +115,7 @@ export async function fetchMailboxPostcard(
     greeting: isString(data.greeting) ? data.greeting : "",
     sentAt: isString(data.sentAt) ? data.sentAt : "",
     tone: toneOf(mailbox.tone),
+    settings: resolveSettings(mailbox.settings),
     members: strings(mailbox.members),
     replies: repliesOf(data.replies),
   };

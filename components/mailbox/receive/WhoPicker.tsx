@@ -12,7 +12,7 @@ export function WhoPicker({ token, members, compact = false }: { token: string; 
 
   if (who && compact) {
     return (
-      <p className="text-[16px] text-text-muted">
+      <p className="rs-16 text-text-muted">
         <span className="font-semibold text-text">{who}</span>(으)로 보고 계세요.{" "}
         <button
           type="button"
@@ -28,15 +28,15 @@ export function WhoPicker({ token, members, compact = false }: { token: string; 
 
   return (
     <section aria-label="누가 보시나요?" className="flex flex-col gap-3 rounded-2xl bg-accent-soft p-5">
-      <p className="text-[20px] font-bold text-text">누가 보시나요?</p>
-      <p className="text-[16px] leading-relaxed text-text-muted">한 번만 골라 두면, 답장에 이름이 붙어요.</p>
+      <p className="rs-20 font-bold text-text">누가 보시나요?</p>
+      <p className="rs-16 leading-relaxed text-text-muted">한 번만 골라 두면, 답장에 이름이 붙어요.</p>
       <div className="flex flex-wrap gap-3">
         {members.map((member) => (
           <button
             key={member}
             type="button"
             onClick={() => keepWho(token, member)}
-            className="min-h-14 min-w-28 rounded-2xl bg-bg px-6 text-[20px] font-semibold text-text ring-1 ring-line transition hover:bg-bg-subtle"
+            className="min-h-14 min-w-28 rounded-2xl bg-bg px-6 rs-20 font-semibold text-text ring-1 ring-line transition hover:bg-bg-subtle"
           >
             {member}
           </button>

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { inviteExpiresAt } from "@/lib/family";
+import { resolveSettings, type MailboxSettings } from "@/lib/mailboxSettings";
 import {
   GREETING_NAME_MAX,
   NAME_MAX,
@@ -32,6 +33,8 @@ export interface MailboxItem {
   /** 우편함 링크의 글자. 이것을 아는 사람이 우편함을 연다. */
   token: string;
   closed: boolean;
+  /** 책장 설정(사진 수·크기·부모님 화면 …). 저장된 값이 없거나 틀리면 칸마다 권장값이다. */
+  settings: MailboxSettings;
   /** 주인을 포함한 보내는 사람 수. */
   senderCount: number;
 }
@@ -60,7 +63,7 @@ export interface PendingMailboxInvite {
 
 type Failure = { ok: false; reason: "invalid" | "limit" | "failed" };
 
-const COLUMNS = "id,owner_id,name,greeting_name,use_greeting,tone,members,token,closed_at,created_at";
+const COLUMNS = "id,owner_id,name,greeting_name,use_greeting,tone,members,token,closed_at,settings,created_at";
 
 /** 화면에서 받은 글을 DB 에 넣을 모양으로 다듬는다. 이름이 비었거나 길면 null. */
 function clean(input: MailboxInput) {
@@ -102,6 +105,7 @@ export async function fetchMailboxes(supabase: SupabaseClient, userId: string): 
       members: Array.isArray(raw.members) ? raw.members.map(String) : [],
       token: String(raw.token),
       closed: raw.closed_at != null,
+      settings: resolveSettings(raw.settings),
       senderCount: counts.get(String(raw.id)) ?? 1,
     };
     (item.ownerId === userId ? list.owned : list.joined).push(item);
@@ -136,6 +140,19 @@ export async function updateMailbox(
   const values = clean(input);
   if (!values) return { ok: false, reason: "invalid" };
   const { error } = await supabase.from("mailboxes").update(values).eq("id", id);
+  return error ? { ok: false, reason: "failed" } : { ok: true };
+}
+
+/**
+ * 책장 설정을 저장한다. 주인만 된다(DB 정책). 범위를 벗어난 값은 권장으로 다듬어 저장한다.
+ * 새로 꽂는 책부터 적용되는 것(사진 수·크기)과 바로 적용되는 것(부모님 화면)이 섞여 있다.
+ */
+export async function updateMailboxSettings(
+  supabase: SupabaseClient,
+  id: string,
+  settings: MailboxSettings,
+): Promise<{ ok: true } | Failure> {
+  const { error } = await supabase.from("mailboxes").update({ settings: resolveSettings(settings) }).eq("id", id);
   return error ? { ok: false, reason: "failed" } : { ok: true };
 }
 

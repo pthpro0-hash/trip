@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import type { MailboxItem, MailboxList, PendingMailboxInvite } from "@/lib/supabase/mailbox";
+import { RECOMMENDED } from "@/lib/mailboxSettings";
 
 const state = vi.hoisted(() => ({
   user: { id: "me" } as { id: string } | null,
@@ -16,6 +17,7 @@ const postcards = vi.hoisted(() => ({
 const api = vi.hoisted(() => ({
   createMailbox: vi.fn(),
   updateMailbox: vi.fn(),
+  updateMailboxSettings: vi.fn(),
   rotateMailboxToken: vi.fn(),
   setMailboxClosed: vi.fn(),
   createMailboxInvite: vi.fn(),
@@ -51,6 +53,7 @@ const box = (over: Partial<MailboxItem> = {}): MailboxItem => ({
   members: ["엄마", "아빠"],
   token: "T".repeat(43),
   closed: false,
+  settings: RECOMMENDED,
   senderCount: 2,
   ...over,
 });
@@ -65,6 +68,7 @@ describe("MailboxPanel", () => {
     for (const fn of Object.values(api)) fn.mockReset();
     api.createMailbox.mockResolvedValue({ ok: true, id: "new", token: "N".repeat(43) });
     api.updateMailbox.mockResolvedValue({ ok: true });
+    api.updateMailboxSettings.mockResolvedValue({ ok: true });
     api.rotateMailboxToken.mockResolvedValue("R".repeat(43));
     api.setMailboxClosed.mockResolvedValue({ ok: true });
     api.createMailboxInvite.mockResolvedValue("I".repeat(43));
@@ -303,6 +307,42 @@ describe("MailboxPanel", () => {
     await waitFor(() =>
       expect(api.updateMailbox).toHaveBeenCalledWith(expect.anything(), "m1", expect.objectContaining({ name: "엄마 아빠 집", tone: "casual" })),
     );
+  });
+
+  it("카드에 책 한 권 사진 수가 보이고, [설정]을 누르면 설정 칸이 열린다", async () => {
+    state.list = { owned: [box({ settings: { ...RECOMMENDED, photos: 12 } })], joined: [] };
+    render(<MailboxPanel />);
+    const card = await screen.findByRole("article", { name: "우리 엄마 아빠" });
+    expect(card.textContent).toContain("책 한 권 사진 12장");
+    fireEvent.click(screen.getByRole("button", { name: "설정" }));
+    expect(screen.getByRole("radio", { name: /12장/ })).toBeChecked();
+    expect(screen.getByRole("button", { name: "권장으로 되돌리기" })).toBeTruthy();
+  });
+
+  it("설정을 저장하면 그 우편함에 저장하고 칸을 닫는다", async () => {
+    state.list = { owned: [box()], joined: [] };
+    render(<MailboxPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "설정" }));
+    fireEvent.click(screen.getByRole("radio", { name: /6장/ }));
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    await waitFor(() => expect(api.updateMailboxSettings).toHaveBeenCalledWith(expect.anything(), "m1", expect.objectContaining({ photos: 6 })));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "권장으로 되돌리기" })).toBeNull());
+  });
+
+  it("설정을 저장하지 못하면 알린다", async () => {
+    api.updateMailboxSettings.mockResolvedValue({ ok: false, reason: "failed" });
+    state.list = { owned: [box()], joined: [] };
+    render(<MailboxPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "설정" }));
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("설정을 저장하지 못했어요");
+  });
+
+  it("보내는 사람으로 들어간 우편함에는 [설정]이 없다 — 주인만 바꾼다", async () => {
+    state.list = { owned: [], joined: [box({ id: "j1", ownerId: "sis", name: "장모님" })] };
+    render(<MailboxPanel />);
+    await screen.findByText("장모님");
+    expect(screen.queryByRole("button", { name: "설정" })).toBeNull();
   });
 
   it("보내는 사람으로 들어간 우편함은 링크 복사와 나가기만 — 고치기·닫기는 없다", async () => {

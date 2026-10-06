@@ -46,6 +46,12 @@ describe("개인정보처리방침 · 가족 우편함", () => {
     expect(t).toContain("약 1km");
   });
 
+  it("엽서의 사진은 책장 설정에 따라 최대 20장이고, 설정이 우편함 단위라고 적는다", () => {
+    const t = text();
+    expect(t).toContain("최대 20장");
+    expect(t).toContain("책장 설정");
+  });
+
   it("받는 분에게서는 계정 정보를 받지 않는다고 적는다", () => {
     expect(text()).toContain("받는 분의 이메일·전화번호는 받지 않습니다");
   });

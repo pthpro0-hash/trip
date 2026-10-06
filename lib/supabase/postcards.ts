@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { POSTCARD_PHOTOS, buildPostcardSnapshot, newPostcardId } from "@/lib/mailbox";
+import { POSTCARD_PHOTOS_MAX, buildPostcardSnapshot, newPostcardId } from "@/lib/mailbox";
+import { postcardFromBlob } from "@/lib/photo/resize";
 import { thumbUrls } from "./photos";
 import { POSTCARD_BUCKET, sweepPostcardFolder } from "./postcardCleanup";
 import type { TripDetail } from "./tripDetail";
@@ -36,6 +37,10 @@ export interface SendPostcardInput {
   photoIds: string[];
   /** 받을 우편함과 그 우편함에 보일 인사말(호칭 포함). */
   deliveries: { mailboxId: string; greeting: string }[];
+  /** 이 책에 실을 수 있는 사진 수(책장 설정의 가장 적은 쪽). 안 주면 20장. */
+  maxPhotos?: number;
+  /** 복사하는 사진의 긴 변. 보통(640)은 줄여서, 선명(960)은 목록 판 그대로. 안 주면 640. */
+  size?: 640 | 960;
   onProgress?: (done: number, total: number) => void;
 }
 
@@ -50,7 +55,8 @@ export async function sendPostcard(supabase: SupabaseClient, input: SendPostcard
   if (deliveries.length === 0 || senderName.length < 1 || senderName.length > 20) {
     return { ok: false, reason: "invalid" };
   }
-  if (input.photoIds.length > POSTCARD_PHOTOS || new Set(input.photoIds).size !== input.photoIds.length) {
+  const limit = Math.min(input.maxPhotos ?? POSTCARD_PHOTOS_MAX, POSTCARD_PHOTOS_MAX);
+  if (input.photoIds.length > limit || new Set(input.photoIds).size !== input.photoIds.length) {
     return { ok: false, reason: "invalid" };
   }
 
@@ -107,7 +113,9 @@ export async function sendPostcard(supabase: SupabaseClient, input: SendPostcard
           const url = urls.get(path);
           const response = url ? await fetch(url) : null;
           if (!response?.ok) throw new Error("download failed");
-          const body = await response.blob();
+          const downloaded = await response.blob();
+          // 보통 크기(640px)는 목록 판(960px)을 한 번 더 줄인다. 선명(960px)은 그대로 쓴다.
+          const body = input.size === 960 ? downloaded : await postcardFromBlob(downloaded, file);
           const { error } = await supabase.storage.from(POSTCARD_BUCKET).upload(`${postcardId}/${file}`, body, {
             contentType: body.type.startsWith("image/") ? body.type : "image/webp",
             upsert: false,

@@ -67,6 +67,32 @@ describe("mailbox.sql · 표", () => {
   });
 });
 
+describe("mailbox.sql · 책장 설정", () => {
+  it("설정 칸(settings)이 있고 JSON 객체이며 크기가 제한된다 — 이미 만든 표에도 더해진다", () => {
+    expect(sql).toMatch(/alter table public\.mailboxes add column if not exists settings jsonb not null default '\{\}'::jsonb/);
+    expect(sql).toMatch(/jsonb_typeof\(settings\) = 'object'/);
+    expect(sql).toMatch(/octet_length\(settings::text\) < 2000/);
+  });
+
+  it("받는 쪽에는 부모님 화면에 필요한 다섯 칸만 내려간다 — 사진 수·크기·보관 권수는 안 나간다", () => {
+    for (const name of ["mailbox_view", "mailbox_postcard"]) {
+      const body = fn(name);
+      expect(body, name).toContain("'settings'");
+      for (const key of ["font", "heart", "words", "past", "year"]) expect(body, `${name} ${key}`).toContain(`settings -> '${key}'`);
+      for (const key of ["photos", "size", "keep"]) expect(body, `${name} ${key}`).not.toContain(`settings -> '${key}'`);
+    }
+  });
+
+  it("우편함 목록에는 엽서마다 사진 수(photoCount)가 있다 — 앨범이 몇 장인지 보이게", () => {
+    expect(fn("mailbox_view")).toContain("'photoCount'");
+    expect(fn("mailbox_view")).toContain("jsonb_array_length");
+  });
+
+  it("설정은 우편함의 주인만 고친다 — 기존 우편함 고치기 정책 그대로", () => {
+    expect(policy("mailboxes_update")).toMatch(/auth\.uid\(\) = owner_id/);
+  });
+});
+
 describe("mailbox.sql · 한도", () => {
   it("한 사람이 만들 수 있는 우편함은 3개", () => {
     expect(fn("mailboxes_limit")).toMatch(/>= 3/);

@@ -5,7 +5,7 @@ import {
   DEFAULT_REACTIONS,
   MAILBOX_LIMIT,
   MAILBOX_SENDER_LIMIT,
-  POSTCARD_PHOTOS,
+  POSTCARD_PHOTOS_MAX,
   buildPostcardSnapshot,
   composeGreeting,
   greetingsFor,
@@ -29,10 +29,10 @@ import type { TripDetail } from "./supabase/tripDetail";
 import type { PostcardSnapshot as PostcardSnapshotLike } from "./mailbox";
 
 describe("한도", () => {
-  it("우편함은 3개, 보내는 사람은 8명, 엽서 사진은 3장", () => {
+  it("우편함은 3개, 보내는 사람은 8명, 책 한 권 사진은 최대 20장", () => {
     expect(MAILBOX_LIMIT).toBe(3);
     expect(MAILBOX_SENDER_LIMIT).toBe(8);
-    expect(POSTCARD_PHOTOS).toBe(3);
+    expect(POSTCARD_PHOTOS_MAX).toBe(20);
   });
 
   it("답장 단추의 기본 문구는 셋", () => {
@@ -161,7 +161,7 @@ describe("suggestionsFor · 말투별 추천 문구", () => {
   });
 });
 
-describe("pickPostcardPhotos · 엽서에 실을 사진 3장", () => {
+describe("pickPostcardPhotos · 책에 실을 사진 고르기", () => {
   const photo = (id: string, visitId: string, at: string, isCover = false): PostcardPhotoCandidate => ({
     id,
     visitId,
@@ -182,7 +182,7 @@ describe("pickPostcardPhotos · 엽서에 실을 사진 3장", () => {
       photo("b1", "B", "2026-09-13T12:00"),
       photo("c1", "C", "2026-09-13T15:00"),
     ];
-    expect(pickPostcardPhotos(photos).map((p) => p.id)).toEqual(["a2", "b1", "c1"]);
+    expect(pickPostcardPhotos(photos, 3).map((p) => p.id)).toEqual(["a2", "b1", "c1"]);
   });
 
   it("곳이 둘뿐이면 곳마다 한 장씩 고르고 남는 자리는 이어서 채운다", () => {
@@ -192,7 +192,7 @@ describe("pickPostcardPhotos · 엽서에 실을 사진 3장", () => {
       photo("b1", "B", "2026-09-13T12:00"),
       photo("b2", "B", "2026-09-13T12:05"),
     ];
-    const picked = pickPostcardPhotos(photos).map((p) => p.id);
+    const picked = pickPostcardPhotos(photos, 3).map((p) => p.id);
     expect(picked).toHaveLength(3);
     expect(picked).toContain("a1");
     expect(picked).toContain("b1");
@@ -200,7 +200,19 @@ describe("pickPostcardPhotos · 엽서에 실을 사진 3장", () => {
 
   it("곳이 많으면 앞에서 3곳이 아니라 고르게 흩어 뽑는다", () => {
     const photos = ["A", "B", "C", "D", "E", "F"].map((v, i) => photo(v.toLowerCase() + "1", v, `2026-09-1${i + 1}T09:00`));
-    expect(pickPostcardPhotos(photos).map((p) => p.id)).toEqual(["a1", "c1", "f1"]);
+    expect(pickPostcardPhotos(photos, 3).map((p) => p.id)).toEqual(["a1", "c1", "f1"]);
+  });
+
+  it("한도를 안 주면 20장까지 — 사진이 20장 이하면 모두, 넘으면 곳별로 고르게 20장", () => {
+    const many = Array.from({ length: 30 }, (_, i) => photo(`p${String(i).padStart(2, "0")}`, `v${i % 6}`, `2026-09-13T${String(i % 24).padStart(2, "0")}:${String(i).padStart(2, "0")}`, i % 5 === 0));
+    expect(pickPostcardPhotos(many)).toHaveLength(20);
+    expect(pickPostcardPhotos(many.slice(0, 14))).toHaveLength(14);
+  });
+
+  it("20장을 고를 때도 여섯 곳이 모두 한 장 이상 들어간다 — 한 곳에 몰리지 않는다", () => {
+    const many = Array.from({ length: 60 }, (_, i) => photo(`q${String(i).padStart(2, "0")}`, `v${i % 6}`, `2026-09-13T${String(Math.floor(i / 6)).padStart(2, "0")}:${String(i).padStart(2, "0")}`));
+    const picked = pickPostcardPhotos(many, 20);
+    expect(new Set(picked.map((p) => p.visitId)).size).toBe(6);
   });
 
   it("사진이 없으면 빈 배열이고, 개수를 바꿀 수 있다", () => {
@@ -264,6 +276,13 @@ describe("엽서 스냅샷 · 보낸 순간의 모습", () => {
     const snap = buildPostcardSnapshot(trip, new Map([["u/v2/1.webp", "b.webp"]]));
     expect(snap.visits[0].photos).toEqual([]);
     expect(snap.files).toEqual(["b.webp"]);
+  });
+
+  it("사진 파일이 20개를 넘는 스냅샷은 받지 않는다 — 남용을 막는다", () => {
+    const files = Array.from({ length: 21 }, (_, i) => `f${i}.webp`);
+    const snap = { v: 1, title: "t", startedOn: "2026-09-13", endedOn: "2026-09-13", visits: [], files };
+    expect(isPostcardSnapshot(snap)).toBe(false);
+    expect(isPostcardSnapshot({ ...snap, files: files.slice(0, 20) })).toBe(true);
   });
 
   it("isPostcardSnapshot 은 이 모양만 받는다", () => {

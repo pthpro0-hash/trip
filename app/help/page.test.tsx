@@ -45,7 +45,7 @@ describe("HelpPage · 가족 우편함", () => {
       expect(screen.getByText(title)).toBeTruthy();
     }
     const section = document.getElementById("account")!;
-    for (const word of ["가족 우편함", "우편함 3개", "엽서 사진 3장", "링크 하나", "로그인", "답장", "새로 만들기", "거두기", "함께 지워"]) {
+    for (const word of ["가족 우편함", "우편함 3개", "기본 20장까지", "책장 설정", "권장", "링크 하나", "로그인", "답장", "새로 만들기", "거두기", "함께 지워"]) {
       expect(section.textContent).toContain(word);
     }
   });

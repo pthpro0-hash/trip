@@ -145,6 +145,19 @@ export async function thumbFromBlob(blob: Blob, name = "photo"): Promise<Blob> {
   return bakeFromBlob(blob, THUMB_EDGE, THUMB_QUALITY, name, THUMB_BUDGET);
 }
 
+/** 엽서(책) 사진의 보통 크기(긴 변)와 그 크기의 용량 상한. 선명(960px)은 목록 판을 그대로 쓴다. */
+export const POSTCARD_EDGE = 640;
+export const POSTCARD_QUALITY = 0.78;
+export const POSTCARD_BUDGET = 110 * 1024;
+
+/**
+ * 엽서에 실을 사진을 보통 크기(640px)로 줄인다. 목록 판(960px)에서 만든다 — 원본(2048px)을 다시 받을 까닭이
+ * 없다. 선명(960px)을 고른 책장은 목록 판을 그대로 쓰므로 이 함수를 부르지 않는다.
+ */
+export async function postcardFromBlob(blob: Blob, name = "photo"): Promise<Blob> {
+  return bakeFromBlob(blob, POSTCARD_EDGE, POSTCARD_QUALITY, name, POSTCARD_BUDGET);
+}
+
 /**
  * 이미 보관된 그림에서 지도 핀 판을 만든다.
  *

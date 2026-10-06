@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import {
@@ -10,9 +10,11 @@ import {
   type Reply,
   type ReceivedPostcard,
 } from "@/lib/supabase/mailboxPublic";
-import { DEFAULT_REACTIONS, postcardSpan, postcardSteps, postcardTitle } from "@/lib/mailbox";
+import { postcardSpan, postcardSteps, postcardTitle } from "@/lib/mailbox";
+import { FONT_SCALE } from "@/lib/mailboxSettings";
 import { keepWho, useWho } from "@/lib/mailboxWho";
 import { FootprintPlayer } from "@/components/sketch/FootprintPlayer";
+import { PhotoAlbum } from "./PhotoAlbum";
 import { WhoPicker } from "./WhoPicker";
 
 /*
@@ -22,28 +24,6 @@ import { WhoPicker } from "./WhoPicker";
   사진이 지워졌으면(보낸 분이 원본을 지우면 복사본도 지워진다) 그 자리에 부드러운 안내를 둔다.
   화면을 연 뒤에 "열어 봤다"고 적는다(미리보기 기계가 링크를 읽어 가도 찍히지 않게).
 */
-
-function Photo({ postcardId, file }: { postcardId: string; file: string }) {
-  const [gone, setGone] = useState(false);
-  if (gone) {
-    return (
-      <div className="grid aspect-[4/3] w-full place-items-center rounded-3xl bg-bg-subtle px-6 text-center text-[17px] leading-relaxed text-text-muted">
-        보낸 분이 이 사진을 지웠어요
-      </div>
-    );
-  }
-  return (
-    // 우리 엽서 보관함의 공개 주소라 next/image 로 미리 최적화할 수 없다.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={postcardFileUrl(postcardId, file)}
-      alt=""
-      loading="lazy"
-      onError={() => setGone(true)}
-      className="w-full rounded-3xl bg-bg-subtle object-cover"
-    />
-  );
-}
 
 export function ReceivedPostcardView({ token, card }: { token: string; card: ReceivedPostcard }) {
   const who = useWho(token);
@@ -91,24 +71,21 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
   const photos = snapshot.files;
 
   return (
-    <main className="mx-auto flex max-w-xl flex-col gap-6 px-5 pb-20 pt-6">
-      <p className="text-[18px] font-semibold text-accent">{card.senderName}이(가) 보낸 여행 엽서</p>
+    <main
+      style={{ "--rs": FONT_SCALE[card.settings.font] } as CSSProperties}
+      className="mx-auto flex max-w-xl flex-col gap-6 px-5 pb-20 pt-6"
+    >
+      <p className="rs-18 font-semibold text-accent">{card.senderName}이(가) 보낸 여행 엽서</p>
 
-      {photos.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {photos.map((file) => (
-            <Photo key={file} postcardId={card.id} file={file} />
-          ))}
-        </div>
-      )}
+      <PhotoAlbum postcardId={card.id} files={photos} />
 
       <header className="flex flex-col gap-1.5">
-        <h1 className="text-[32px] font-bold leading-snug tracking-tight text-text">{postcardTitle(snapshot)}</h1>
-        <p className="text-[18px] text-text-muted">{postcardSpan(snapshot)}</p>
+        <h1 className="rs-32 font-bold leading-snug tracking-tight text-text">{postcardTitle(snapshot)}</h1>
+        <p className="rs-18 text-text-muted">{postcardSpan(snapshot)}</p>
       </header>
 
       {card.greeting && (
-        <blockquote className="rounded-3xl bg-bg-subtle px-6 py-5 text-[22px] leading-relaxed text-text">
+        <blockquote className="rounded-3xl bg-bg-subtle px-6 py-5 rs-22 leading-relaxed text-text">
           {card.greeting}
         </blockquote>
       )}
@@ -127,14 +104,14 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
       )}
 
       <section aria-label="답장하기" className="flex flex-col gap-3 rounded-3xl bg-accent-soft p-5">
-        <h2 className="text-[22px] font-bold text-text">답장하기</h2>
+        <h2 className="rs-22 font-bold text-text">답장하기</h2>
 
         {!name ? (
           <WhoPicker token={token} members={card.members} />
         ) : (
           <>
             {card.members.length > 0 && (
-              <p className="text-[16px] text-text-muted">
+              <p className="rs-16 text-text-muted">
                 <span className="font-semibold text-text">{name}</span>(으)로 답장해요.{" "}
                 <button type="button" onClick={() => keepWho(token, "")} className="font-medium text-accent underline underline-offset-4">
                   바꾸기
@@ -142,13 +119,13 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
               </p>
             )}
             <div className="flex flex-col gap-3">
-              {DEFAULT_REACTIONS.map((reaction) => (
+              {card.settings.words.map((reaction) => (
                 <button
                   key={reaction}
                   type="button"
                   disabled={sending !== null}
                   onClick={() => void reply(reaction)}
-                  className="min-h-16 rounded-2xl bg-accent px-5 text-[22px] font-semibold text-on-accent transition active:scale-[0.99] disabled:opacity-60"
+                  className="min-h-16 rounded-2xl bg-accent px-5 rs-22 font-semibold text-on-accent transition active:scale-[0.99] disabled:opacity-60"
                 >
                   {sending === reaction ? "보내는 중…" : reaction}
                 </button>
@@ -158,7 +135,7 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
         )}
 
         {message && (
-          <p role="status" className="text-[18px] font-semibold text-accent">
+          <p role="status" className="rs-18 font-semibold text-accent">
             {message}
           </p>
         )}
@@ -166,7 +143,7 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
         {replies.length > 0 && (
           <ul className="flex flex-col gap-1.5 border-t border-line pt-3" aria-label="보낸 답장">
             {replies.map((entry, index) => (
-              <li key={index} className="text-[18px] text-text">
+              <li key={index} className="rs-18 text-text">
                 <span className="font-semibold">{entry.who}</span>: {entry.reaction}
               </li>
             ))}
@@ -176,7 +153,7 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
 
       <Link
         href={`/m/${token}`}
-        className="flex min-h-14 items-center justify-center rounded-2xl bg-bg-subtle text-[20px] font-semibold text-text"
+        className="flex min-h-14 items-center justify-center rounded-2xl bg-bg-subtle rs-20 font-semibold text-text"
       >
         우편함으로 가기
       </Link>

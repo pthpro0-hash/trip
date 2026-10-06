@@ -8,12 +8,13 @@ import { sendPostcard, type SendPostcardResult } from "@/lib/supabase/postcards"
 import type { TripDetail } from "@/lib/supabase/tripDetail";
 import {
   BODY_MAX,
-  POSTCARD_PHOTOS,
   greetingsFor,
   pickPostcardPhotos,
   postcardUrl,
   suggestionsFor,
 } from "@/lib/mailbox";
+import { attachParticle } from "@/lib/korean";
+import { sendLimits } from "@/lib/mailboxSettings";
 import { HubDialog } from "@/components/hub/HubDialog";
 import { WaitingOverlay } from "@/components/layout/Waiting";
 
@@ -62,7 +63,8 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
     () => trip.visits.flatMap((visit) => visit.photos.map((photo) => ({ ...photo, visitId: visit.id }))),
     [trip],
   );
-  const [picked, setPicked] = useState<string[]>(() => pickPostcardPhotos(photos).map((photo) => photo.id));
+  /** 직접 고른 사진. null 이면 자동으로 고른 것(곳마다 골고루)을 쓴다. */
+  const [manual, setManual] = useState<string[] | null>(null);
   const [checked, setChecked] = useState<Set<string> | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [working, setWorking] = useState<{ done: number; total: number } | null>(null);
@@ -101,13 +103,24 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   const rows = greetingsFor(body, selected, overrides);
   const rowOf = (id: string) => rows.find((row) => row.mailboxId === id);
 
+  /*
+    이 책에 실을 수 있는 사진 수와 크기. 책장마다 설정이 다른데 사진 복사본은 하나라서, 고른 책장들 중
+    가장 적은 수에, 가장 선명한 크기에 맞춘다(sendLimits).
+  */
+  const limits = sendLimits(selected.map((box) => box.settings));
+  const auto = pickPostcardPhotos(photos, limits.photos).map((photo) => photo.id);
+  const picked = (manual ?? auto).slice(0, limits.photos);
+  const strictest = selected.filter((box) => box.settings.photos === limits.photos);
+  const limitNote =
+    limits.photos >= 20
+      ? null
+      : selected.length > 1 && strictest.length < selected.length
+        ? `${attachParticle(strictest.map((box) => box.name).join(", "), "은", "는")} ${limits.photos}장까지라 ${limits.photos}장까지 고를 수 있어요.`
+        : `책장 설정에 따라 ${limits.photos}장까지 고를 수 있어요.`;
+
   const togglePhoto = (id: string) =>
-    setPicked((current) =>
-      current.includes(id)
-        ? current.filter((entry) => entry !== id)
-        : current.length >= POSTCARD_PHOTOS
-          ? current
-          : [...current, id],
+    setManual(
+      picked.includes(id) ? picked.filter((entry) => entry !== id) : picked.length >= limits.photos ? picked : [...picked, id],
     );
 
   const toggleBox = (id: string) => {
@@ -144,6 +157,8 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
       senderName,
       trip,
       photoIds: picked,
+      maxPhotos: limits.photos,
+      size: limits.size as 640 | 960,
       deliveries: rows.map((row) => ({ mailboxId: row.mailboxId, greeting: row.text })),
       onProgress: (done, total) => setWorking({ done, total }),
     });
@@ -274,9 +289,17 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
             {Array.isArray(boxes) && boxes.length > 0 && (
               <>
                 <section className="flex flex-col gap-2">
-                  <h3 className="text-[14px] font-semibold text-text">
-                    사진 <span className="font-normal text-text-muted">{picked.length}/{POSTCARD_PHOTOS}</span>
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-[14px] font-semibold text-text">
+                      사진 <span className="font-normal text-text-muted">{picked.length}/{limits.photos}</span>
+                    </h3>
+                    {manual !== null && (
+                      <button type="button" onClick={() => setManual(null)} className="text-[12px] font-medium text-accent hover:text-accent-hover">
+                        추천으로 고르기
+                      </button>
+                    )}
+                  </div>
+                  {limitNote && <p className="text-[12px] leading-relaxed text-text-faint">{limitNote}</p>}
                   {photos.length === 0 ? (
                     <p className="text-[13px] text-text-faint">이 여행에는 사진이 없어요. 글과 지도만 가요.</p>
                   ) : (
@@ -291,14 +314,14 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
                             aria-pressed={on}
                             aria-label={on ? "엽서에서 빼기" : "엽서에 넣기"}
                             onClick={() => togglePhoto(photo.id)}
-                            disabled={!on && picked.length >= POSTCARD_PHOTOS}
+                            disabled={!on && picked.length >= limits.photos}
                             className={`relative aspect-square overflow-hidden rounded-lg bg-bg-subtle ring-2 transition disabled:opacity-40 ${
                               on ? "ring-accent" : "ring-transparent"
                             }`}
                           >
                             {url && (
                               // eslint-disable-next-line @next/next/no-img-element -- 서명 주소는 그때그때 바뀐다
-                              <img src={url} alt="" className="h-full w-full object-cover" />
+                              <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" />
                             )}
                             {on && (
                               <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-accent text-[11px] font-bold text-on-accent">
