@@ -158,6 +158,8 @@ describe("YearBookPrint · 올해의 책을 쪽으로 나눈 인쇄용 책", () 
       expect(help).toHaveTextContent("A5");
       expect(help).toHaveTextContent("여백");
       expect(help).toHaveTextContent("크롬");
+      // 인쇄 창이 주소·날짜를 위아래에 찍는 것은 끌 수 있다.
+      expect(help).toHaveTextContent("머리글");
     });
 
     it("사진 크기에 맞는 쓰임을 솔직히 말한다 — 가족용 기념 PDF", () => {
@@ -171,6 +173,39 @@ describe("YearBookPrint · 올해의 책을 쪽으로 나눈 인쇄용 책", () 
     const style = container.querySelector("style");
     expect(style?.textContent).toContain("@page");
     expect(style?.textContent).toContain("A5");
+  });
+
+  /*
+    아이폰 사파리에서 쪽이 어긋나 한 쪽이 두 장에 걸쳐 찍혔다 — 사파리는 flex 안에 든 것의 쪽 나누기(break-after)를
+    지키지 않는다. 그래서 인쇄할 때는 쪽을 감싸는 상자들(main, 쪽 묶음)을 flex 가 아닌 일반 상자로 되돌려야 한다.
+  */
+  it("인쇄할 때는 쪽을 감싸는 상자가 flex 가 아닌 일반 상자다 — 사파리가 쪽 나누기를 지키게", () => {
+    const { container } = render(<YearBookPrint token={TOKEN} view={view(books)} year="2026" filesById={filesById} />);
+    const css = container.querySelector("style")?.textContent ?? "";
+    const print = css.slice(css.indexOf("@media print"));
+    expect(print).toMatch(/\.book-main\s*\{[^}]*display:\s*block\s*!important/);
+    expect(print).toMatch(/\.book-zoom\s*\{[^}]*display:\s*block\s*!important/);
+    expect(container.querySelector("main")?.className).toContain("book-main");
+    expect(container.querySelector(".book-zoom")).toBeTruthy();
+  });
+
+  it("쪽은 한 장에 한 쪽씩 — 쪽 앞뒤로 줄바꿈하고, 한 쪽이 두 장에 걸쳐 쪼개지지 않게 한다", () => {
+    const { container } = render(<YearBookPrint token={TOKEN} view={view(books)} year="2026" filesById={filesById} />);
+    const css = container.querySelector("style")?.textContent ?? "";
+    expect(css).toMatch(/break-after:\s*page/);
+    expect(css).toMatch(/page-break-after:\s*always/);
+    expect(css).toMatch(/break-inside:\s*avoid/);
+    expect(css).toMatch(/page-break-inside:\s*avoid/);
+    // 마지막 쪽 뒤에는 빈 장이 생기지 않게.
+    expect(css).toMatch(/\.book-page:last-child\s*\{[^}]*break-after:\s*auto/);
+  });
+
+  it("쪽을 감싸는 상자 안에서 쪽이 첫째 자식 상자 없이 바로 이어진다 — :last-child 가 쪽 자신을 가리키게", () => {
+    const { container } = render(<YearBookPrint token={TOKEN} view={view(books)} year="2026" filesById={filesById} />);
+    const zoom = container.querySelector(".book-zoom") as HTMLElement;
+    const children = [...zoom.children];
+    expect(children.length).toBeGreaterThan(1);
+    for (const child of children) expect(child.getAttribute("data-page")).not.toBeNull();
   });
 
   it("책장으로 돌아가는 길이 있다 — 올해의 책으로", () => {

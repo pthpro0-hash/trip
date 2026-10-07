@@ -373,15 +373,26 @@ export function YearBookPrint({
   });
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-4 pb-16 pt-8 print:m-0 print:max-w-none print:gap-0 print:p-0">
+    <main className="book-main mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-4 pb-16 pt-8">
       {/* 쪽 크기와 인쇄 규칙. 이 화면이 열려 있는 동안에만 인쇄 설정에 들어간다. */}
       <style>{`
         @page { size: A5 portrait; margin: 0; }
         .book-page { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         @media print {
           html, body { background: #fff !important; }
-          .book-zoom { zoom: 1 !important; gap: 0 !important; }
-          .book-page { box-shadow: none !important; margin: 0 !important; break-after: page; page-break-after: always; }
+          /* 사파리는 flex·grid 안에 든 것의 쪽 나누기(break-after)를 지키지 않아 쪽이 두 장에 걸쳐 어긋난다.
+             인쇄할 때는 쪽을 감싸는 상자들을 일반(block) 상자로 되돌리고, 쪽을 가운데에 둔다. */
+          .book-main { display: block !important; min-height: 0 !important; max-width: none !important; margin: 0 !important; padding: 0 !important; }
+          .book-zoom { display: block !important; zoom: 1 !important; }
+          .book-page {
+            display: flex !important;
+            margin: 0 auto !important;
+            box-shadow: none !important;
+            break-after: page;
+            page-break-after: always;
+            break-inside: avoid;
+            page-break-inside: avoid;
+          }
           .book-page:last-child { break-after: auto; page-break-after: auto; }
         }
       `}</style>
@@ -399,8 +410,14 @@ export function YearBookPrint({
         <h2 className="text-[18px] font-bold text-text">책으로 저장하기</h2>
         <ol className="list-decimal space-y-1 pl-5 text-[14px] leading-relaxed text-text-muted">
           <li>사진을 다 불러오면 아래 [PDF로 저장]이 켜져요.</li>
-          <li>인쇄 창에서 프린터를 &lsquo;PDF로 저장&rsquo;으로 고르세요. 용지는 A5, 여백은 &lsquo;없음&rsquo;이 좋아요.</li>
-          <li>PC 크롬·엣지에서 하는 것을 권해요. 폰은 공유 → 인쇄(아이폰은 인쇄 미리보기를 두 손가락으로 벌리면 PDF)예요.</li>
+          <li>
+            인쇄 창에서 프린터를 &lsquo;PDF로 저장&rsquo;으로 고르세요. 용지는 A5, 여백은 &lsquo;없음&rsquo;, &lsquo;머리글 및 바닥글&rsquo;은 끄는 것이 좋아요(끄지
+            않으면 쪽 위아래에 주소와 날짜가 찍혀요).
+          </li>
+          <li>
+            PC 크롬·엣지에서 하는 것을 권해요. 폰은 공유 → 인쇄(아이폰은 인쇄 미리보기를 두 손가락으로 벌리면 PDF)인데, 아이폰은 용지가 A4로 잡히고
+            주소·날짜 줄을 끌 수 없어요.
+          </li>
         </ol>
         <p className="text-[13px] leading-relaxed text-text-faint">
           사진은 책장에 있는 크기(약 640px)라 가족용 기념 PDF에 알맞아요. 전문 인쇄소에 맡길 만큼 또렷하지는 않아요.
