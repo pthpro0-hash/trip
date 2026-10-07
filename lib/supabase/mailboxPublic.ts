@@ -23,11 +23,27 @@ export interface Reply {
   reaction: string;
 }
 
+/** 책 한 권에 든 곳 하나. 올해 지도와 작년 오늘이 쓴다(좌표는 보낸 때 이미 1km 로 흐려져 있다). */
+export interface InboxPlace {
+  placeName: string;
+  lat: number;
+  lng: number;
+  /** 그곳에 간 날. "2025-10-05". */
+  day: string;
+  photoCount: number;
+  /** 그곳의 첫 사진 파일 이름. 없으면 null. */
+  photo: string | null;
+}
+
 export interface InboxCard {
   id: string;
   senderName: string;
   title: string | null;
   startedOn: string;
+  /** 여행이 끝난 날. 모르면 시작한 날. */
+  endedOn: string;
+  /** 다녀온 곳들(들른 차례). */
+  places: InboxPlace[];
   /** 첫 사진 파일 이름. 사진이 없으면 null. */
   cover: string | null;
   /** 책(엽서)에 든 사진 수. */
@@ -84,6 +100,29 @@ function heartsOf(value: unknown): Heart[] {
   );
 }
 
+const isDay = (value: unknown): value is string => isString(value) && /^\d{4}-\d{2}-\d{2}$/.test(value);
+const isFile = (value: unknown): value is string => isString(value) && /^[A-Za-z0-9._-]{1,80}$/.test(value);
+
+/** 곳 목록. 모양이 틀린 곳만 버린다(옛 SQL 이면 빈 목록). */
+function placesOf(value: unknown): InboxPlace[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    if (!isRecord(raw) || !isString(raw.placeName) || !isDay(raw.day)) return [];
+    if (typeof raw.lat !== "number" || typeof raw.lng !== "number" || !Number.isFinite(raw.lat) || !Number.isFinite(raw.lng)) return [];
+    if (raw.photo != null && !isFile(raw.photo)) return [];
+    return [
+      {
+        placeName: raw.placeName,
+        lat: raw.lat,
+        lng: raw.lng,
+        day: raw.day,
+        photoCount: typeof raw.photoCount === "number" && raw.photoCount >= 0 ? Math.floor(raw.photoCount) : 0,
+        photo: raw.photo ?? null,
+      },
+    ];
+  });
+}
+
 function cardOf(raw: unknown): InboxCard | null {
   if (!isRecord(raw) || !isString(raw.id) || !isPostcardId(raw.id) || !isString(raw.senderName)) return null;
   return {
@@ -91,6 +130,8 @@ function cardOf(raw: unknown): InboxCard | null {
     senderName: raw.senderName,
     title: isString(raw.title) ? raw.title : null,
     startedOn: isString(raw.startedOn) ? raw.startedOn : "",
+    endedOn: isDay(raw.endedOn) ? raw.endedOn : isString(raw.startedOn) ? raw.startedOn : "",
+    places: placesOf(raw.places),
     cover: isString(raw.cover) && /^[A-Za-z0-9._-]{1,80}$/.test(raw.cover) ? raw.cover : null,
     // 사진 수를 못 받았으면(옛 SQL) 대표 사진이 있으면 1장으로 본다.
     photoCount: typeof raw.photoCount === "number" && raw.photoCount >= 0 ? Math.floor(raw.photoCount) : isString(raw.cover) ? 1 : 0,

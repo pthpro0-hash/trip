@@ -14,7 +14,7 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
   it("처음에는 모두 권장 — '권장' 표시가 각 묶음에 붙고, 안내도 그렇게 말한다", () => {
     open();
     expect(screen.getByText("지금 모두 권장 설정이에요")).toBeTruthy();
-    expect(screen.getAllByText("권장").length).toBeGreaterThanOrEqual(5);
+    expect(screen.getAllByText("권장").length).toBeGreaterThanOrEqual(6);
     expect(screen.getByRole("radio", { name: /20장/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /보통/, checked: true })).toBeTruthy();
   });
@@ -84,12 +84,27 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ heart: "book" }));
   });
 
-  it("아직 기능이 없는 설정(보관 권수·작년 오늘·올해의 책)은 화면에 내지 않지만 저장할 때 값은 지킨다", () => {
-    const stored: MailboxSettings = { ...RECOMMENDED, keep: "all", past: false, year: false };
-    const { onSave } = open(stored);
-    for (const word of ["보관 권수", "작년 오늘", "올해의 책"]) expect(screen.queryByText(new RegExp(word))).toBeNull();
+  it("작년 오늘을 보여 줄지(권장) 고른다", () => {
+    const { onSave } = open();
+    expect(screen.getByRole("radio", { name: "보여 주기" })).toBeChecked();
+    fireEvent.click(screen.getByRole("radio", { name: "안 보여 주기" }));
+    expect(screen.getByText("권장과 다른 설정 1개")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ keep: "all", past: false, year: false }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ past: false }));
+  });
+
+  it("끈 작년 오늘이 저장된 설정을 열면 '안 보여 주기'로 보인다", () => {
+    open({ ...RECOMMENDED, past: false });
+    expect(screen.getByRole("radio", { name: "안 보여 주기" })).toBeChecked();
+    expect(screen.getByText("권장과 다른 설정 1개")).toBeTruthy();
+  });
+
+  it("아직 기능이 없는 설정(보관 권수·올해의 책)은 화면에 내지 않지만 저장할 때 값은 지킨다", () => {
+    const stored: MailboxSettings = { ...RECOMMENDED, keep: "all", year: false };
+    const { onSave } = open(stored);
+    for (const word of ["보관 권수", "올해의 책"]) expect(screen.queryByText(new RegExp(word))).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ keep: "all", year: false }));
   });
 
   it("그만두기는 저장하지 않고 닫는다", () => {

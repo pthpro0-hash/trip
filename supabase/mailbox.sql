@@ -601,6 +601,22 @@ as $$
           'startedOn', p.snapshot -> 'startedOn',
           'cover', p.snapshot -> 'files' -> 0,
           'photoCount', jsonb_array_length(p.snapshot -> 'files'),
+          'endedOn', p.snapshot -> 'endedOn',
+          -- 책꽂이의 올해 지도·작년 오늘에 쓰는 곳 목록. 스냅샷 통째가 아니라 곳마다 필요한 칸만 내린다.
+          -- 보낸 사람의 브라우저가 적은 것이라 배열이 아니어도 목록 전체가 깨지지 않게 배열일 때만 푼다.
+          'places', coalesce((
+            select jsonb_agg(jsonb_build_object(
+              'placeName', v -> 'placeName',
+              'lat', v -> 'lat',
+              'lng', v -> 'lng',
+              'day', v -> 'day',
+              'photoCount', case when jsonb_typeof(v -> 'photos') = 'array' then jsonb_array_length(v -> 'photos') else 0 end,
+              'photo', case when jsonb_typeof(v -> 'photos') = 'array' then v -> 'photos' -> 0 else null end
+            ))
+            from jsonb_array_elements(
+              case when jsonb_typeof(p.snapshot -> 'visits') = 'array' then p.snapshot -> 'visits' else '[]'::jsonb end
+            ) as v
+          ), '[]'::jsonb),
           'greeting', d.greeting,
           'sentAt', d.delivered_at,
           'openedAt', d.opened_at,

@@ -184,6 +184,65 @@ describe("fetchMailboxPostcard", () => {
   });
 });
 
+describe("책꽂이 재료 · 끝난 날과 곳 목록", () => {
+  const base = { name: "x", tone: "casual", members: [], postcards: [] };
+  const raw = { id: CARD, senderName: "지민", title: "여수", startedOn: "2025-10-05", cover: "a.webp", greeting: "", sentAt: "", openedAt: null, replies: [] };
+  const read = async (over: Record<string, unknown>) =>
+    (await fetchMailboxView(fake({ mailbox_view: { data: { ...base, postcards: [{ ...raw, ...over }] } } }).client, TOKEN))?.postcards[0];
+
+  it("끝난 날과 곳 목록을 읽는다", async () => {
+    const card = await read({
+      endedOn: "2025-10-07",
+      places: [
+        { placeName: "오동도", lat: 34.74, lng: 127.76, day: "2025-10-05", photoCount: 2, photo: "a.webp" },
+        { placeName: "향일암", lat: 34.59, lng: 127.8, day: "2025-10-06", photoCount: 0, photo: null },
+      ],
+    });
+    expect(card?.endedOn).toBe("2025-10-07");
+    expect(card?.places).toEqual([
+      { placeName: "오동도", lat: 34.74, lng: 127.76, day: "2025-10-05", photoCount: 2, photo: "a.webp" },
+      { placeName: "향일암", lat: 34.59, lng: 127.8, day: "2025-10-06", photoCount: 0, photo: null },
+    ]);
+  });
+
+  it("옛 SQL 이라 없으면 — 끝난 날은 시작한 날로, 곳 목록은 빈 목록으로", async () => {
+    const card = await read({});
+    expect(card?.endedOn).toBe("2025-10-05");
+    expect(card?.places).toEqual([]);
+  });
+
+  it("모양이 틀린 곳만 버린다 — 좌표가 글자, 날이 이상함, 사진 이름에 ../ , 이름이 없음", async () => {
+    const good = { placeName: "오동도", lat: 34.74, lng: 127.76, day: "2025-10-05", photoCount: 1, photo: "a.webp" };
+    const card = await read({
+      places: [
+        good,
+        { ...good, lat: "34" },
+        { ...good, day: "어제" },
+        { ...good, photo: "../x" },
+        { ...good, placeName: 3 },
+        "x",
+        null,
+      ],
+    });
+    expect(card?.places).toEqual([good]);
+  });
+
+  it("사진 수가 이상하면 0, 소수는 내림", async () => {
+    const card = await read({
+      places: [
+        { placeName: "가", lat: 1, lng: 2, day: "2025-10-05", photoCount: -3, photo: null },
+        { placeName: "나", lat: 1, lng: 2, day: "2025-10-05", photoCount: 2.9, photo: null },
+        { placeName: "다", lat: 1, lng: 2, day: "2025-10-05", photoCount: "많이", photo: null },
+      ],
+    });
+    expect(card?.places.map((place) => place.photoCount)).toEqual([0, 2, 0]);
+  });
+
+  it("끝난 날이 이상하면 시작한 날로", async () => {
+    expect((await read({ endedOn: "내일" }))?.endedOn).toBe("2025-10-05");
+  });
+});
+
 describe("하트 · 받는 쪽", () => {
   const card = {
     id: CARD,

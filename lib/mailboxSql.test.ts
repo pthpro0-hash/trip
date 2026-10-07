@@ -89,6 +89,24 @@ describe("mailbox.sql · 책장 설정", () => {
     expect(fn("mailbox_view")).toContain("jsonb_array_length");
   });
 
+  it("우편함 목록에는 엽서마다 끝난 날과 곳 목록(places)이 있다 — 책꽂이·작년 오늘·올해 지도의 재료", () => {
+    const body = fn("mailbox_view");
+    expect(body).toContain("'endedOn'");
+    expect(body).toContain("'places'");
+    for (const key of ["placeName", "lat", "lng", "day", "photoCount", "photo"]) expect(body, key).toContain(`'${key}'`);
+    expect(body).toContain("jsonb_array_elements");
+  });
+
+  it("곳 목록은 모양이 틀린 스냅샷에도 목록 전체를 깨뜨리지 않는다 — 배열일 때만 풀어 읽는다", () => {
+    const body = fn("mailbox_view");
+    expect(body).toMatch(/jsonb_typeof\(p\.snapshot -> 'visits'\) = 'array'/);
+    expect(body).toMatch(/jsonb_typeof\(v -> 'photos'\) = 'array'/);
+  });
+
+  it("목록에는 엽서의 스냅샷 통째가 내려가지 않는다 — 곳마다 필요한 칸만", () => {
+    expect(fn("mailbox_view")).not.toMatch(/'snapshot',\s*p\.snapshot/);
+  });
+
   it("설정은 우편함의 주인만 고친다 — 기존 우편함 고치기 정책 그대로", () => {
     expect(policy("mailboxes_update")).toMatch(/auth\.uid\(\) = owner_id/);
   });
