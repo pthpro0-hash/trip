@@ -107,8 +107,12 @@ export function TripList() {
 
       const paths = rows.map((trip) => trip.coverPath).filter((path): path is string => !!path);
       if (paths.length > 0) {
-        const urls = await thumbUrls(supabase, paths);
-        if (active) setCovers(urls);
+        try {
+          const urls = await thumbUrls(supabase, paths);
+          if (active) setCovers(urls);
+        } catch {
+          // 표지 그림은 곁다리다. 못 받으면 그림 없이 목록만 보인다(처리하지 않은 오류로 남기지 않는다).
+        }
       }
     });
 

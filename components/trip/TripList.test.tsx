@@ -84,6 +84,15 @@ vi.mock("@/lib/supabase/photos", () => ({
   backfillThumbs: async () => ({ made: 0, failed: 0 }),
 }));
 
+/** 이 시험 파일 맨 위의 가짜 사진 모듈을 다시 건다. doUnmock 으로 지우면 뒤 시험이 진짜 모듈을 불러 터진다. */
+function 복원() {
+  vi.doMock("@/lib/supabase/photos", () => ({
+    thumbUrls: async () => new Map(),
+    missingThumbs: async () => [],
+    backfillThumbs: async () => ({ made: 0, failed: 0 }),
+  }));
+}
+
 async function 목록() {
   vi.resetModules();
   const { TripList } = await import("./TripList");
@@ -183,7 +192,7 @@ describe("작은 판 정리 권유", () => {
 
     expect(await screen.findByText(/사진 2장을 더 빠르게 열리도록/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "정리하기" })).toBeTruthy();
-    vi.doUnmock("@/lib/supabase/photos");
+    복원();
   });
 
   it("권유가 터져도 목록은 뜬다 — 곁다리가 본체를 막지 않게", async () => {
@@ -201,7 +210,24 @@ describe("작은 판 정리 권유", () => {
     // 여행 목록은 그대로 나온다.
     expect(await screen.findByText("민수랑 첫 휴가")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "정리하기" })).toBeNull();
-    vi.doUnmock("@/lib/supabase/photos");
+    복원();
+  });
+});
+
+describe("표지 그림", () => {
+  it("표지 그림 주소를 못 받아도 목록은 뜬다 — 그림은 곁다리다", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/supabase/photos", () => ({
+      thumbUrls: async () => {
+        throw new Error("연결이 끊겼다");
+      },
+      missingThumbs: async () => [],
+      backfillThumbs: async () => ({ made: 0, failed: 0 }),
+    }));
+    const { TripList } = await import("./TripList");
+    render(<TripList />);
+    expect(await screen.findByText("민수랑 첫 휴가")).toBeTruthy();
+    복원();
   });
 });
 
