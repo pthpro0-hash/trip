@@ -391,3 +391,29 @@ describe("MailboxHome · 올해의 책", () => {
     for (const link of screen.getAllByRole("link", { name: /올해의 책/ })) expect(link.getAttribute("href")).toMatch(/\?preview=1$/);
   });
 });
+
+describe("MailboxHome · 미리보기 방식(모두 열어 본 것처럼 / 지금 모습)", () => {
+  beforeEach(() => window.localStorage.clear());
+  const one = view({ postcards: [card({ opened: true })] });
+
+  it("'모두 열어 본 것처럼'이면 그렇게 보여 주는 중이라고 말하고, 지금 모습으로 바꾸는 길을 준다", () => {
+    render(<MailboxHome token={TOKEN} view={one} preview="all" />);
+    const note = screen.getByRole("note", { name: "미리보기" });
+    expect(note).toHaveTextContent("모든 엽서를 열어 본 것처럼");
+    expect(within(note).getByRole("link", { name: /지금 부모님이 보시는 대로/ })).toHaveAttribute("href", `/m/${TOKEN}?preview=1`);
+  });
+
+  it("'지금 모습'이면 모두 열어 본 것처럼 보는 길을 준다 — 책꽂이가 비어 보이는 까닭을 알 수 있게", () => {
+    render(<MailboxHome token={TOKEN} view={one} preview />);
+    const note = screen.getByRole("note", { name: "미리보기" });
+    expect(note).not.toHaveTextContent("모든 엽서를 열어 본 것처럼 보여");
+    expect(within(note).getByRole("link", { name: /모든 엽서를 열어 본 것처럼 보기/ })).toHaveAttribute("href", `/m/${TOKEN}?preview=all`);
+  });
+
+  it("'모두 열어 본 것처럼'의 엽서 길에는 그 방식이 이어진다", () => {
+    render(<MailboxHome token={TOKEN} view={one} preview="all" />);
+    const book = screen.getAllByRole("link").map((link) => link.getAttribute("href") ?? "").filter((href) => href.includes("/p/"));
+    expect(book.length).toBeGreaterThan(0);
+    for (const href of book) expect(href).toMatch(/\?preview=all$/);
+  });
+});

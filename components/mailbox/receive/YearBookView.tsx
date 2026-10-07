@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import type { MailboxView } from "@/lib/supabase/mailboxPublic";
 import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
-import { mailboxPath, postcardPath } from "@/lib/mailbox";
+import { mailboxPath, postcardPath, yearBookPath, type PreviewMode } from "@/lib/mailbox";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
 import { yearBook } from "@/lib/mailboxYearBook";
 import { PreviewBanner } from "./PreviewBanner";
@@ -20,14 +20,14 @@ import { Cover, YearMap } from "./shelfParts";
 
 const MOSAIC: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-2", 4: "grid-cols-2" };
 
-export function YearBookView({ token, view, year, preview = false }: { token: string; view: MailboxView; year: string; preview?: boolean }) {
+export function YearBookView({ token, view, year, preview = false }: { token: string; view: MailboxView; year: string; preview?: PreviewMode }) {
   const back = mailboxPath(token, preview);
   const scale = { "--rs": FONT_SCALE[view.settings.font] } as CSSProperties;
   const book = view.settings.year ? yearBook(view.postcards, year) : null;
 
   const shell = (children: ReactNode) => (
     <main style={scale} className="mx-auto flex min-h-screen max-w-xl flex-col gap-7 px-5 pb-16 pt-8">
-      {preview && <PreviewBanner />}
+      {preview && <PreviewBanner all={preview === "all"} toggle={{ href: yearBookPath(token, year, preview === "all" ? true : "all") }} />}
       <Link href={back} className="self-start rs-18 font-semibold text-accent">
         ← 우편함
       </Link>

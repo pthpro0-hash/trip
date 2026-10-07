@@ -12,7 +12,7 @@ import {
   type Reply,
   type ReceivedPostcard,
 } from "@/lib/supabase/mailboxPublic";
-import { mailboxPath, postcardSpan, postcardSteps, postcardTitle } from "@/lib/mailbox";
+import { mailboxPath, postcardSpan, postcardSteps, postcardTitle, type PreviewMode } from "@/lib/mailbox";
 import { heartCount, heartedBy, heartNames, withHeart, type Heart } from "@/lib/mailboxHearts";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
 import { keepWho, useWho } from "@/lib/mailboxWho";
@@ -33,7 +33,7 @@ import { WhoPicker } from "./WhoPicker";
  * preview: 보내는 사람이 부모님 화면을 미리 보는 중. 열어 봤다는 표시도, 답장도, 하트도 보내지 않는다 —
  * 부모님이 안 보셨는데 "열어 보셨어요"가 찍히거나 보내는 사람의 답장이 부모님 것으로 남으면 안 된다.
  */
-export function ReceivedPostcardView({ token, card, preview = false }: { token: string; card: ReceivedPostcard; preview?: boolean }) {
+export function ReceivedPostcardView({ token, card, preview = false }: { token: string; card: ReceivedPostcard; preview?: PreviewMode }) {
   const who = useWho(token);
   const [replies, setReplies] = useState<Reply[]>(card.replies);
   const [sending, setSending] = useState<string | null>(null);

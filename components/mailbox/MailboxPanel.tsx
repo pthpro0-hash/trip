@@ -67,6 +67,8 @@ function heartTarget(line: HeartLine): string {
 
 /**
  * 부모님 화면을 미리 본다(새 탭). 받는 쪽 화면 그대로이되 "열어 봤다" 표시·답장·하트는 가지 않는다.
+ * 모든 엽서를 열어 본 것처럼 보여 준다 — 부모님이 열어 본 엽서가 없으면 책꽂이가 비어 있어, 보내는 쪽에서는 책꽂이를
+ * 볼 길이 없기 때문이다(화면 위 띠에서 '지금 부모님이 보시는 대로'로 바꿀 수 있다).
  * 닫은 우편함은 부모님께 아무것도 안 보이니 미리볼 것도 없다.
  */
 function Preview({ box }: { box: MailboxItem }) {
@@ -78,7 +80,7 @@ function Preview({ box }: { box: MailboxItem }) {
     );
   }
   return (
-    <a href={mailboxPath(box.token, true)} target="_blank" rel="noopener noreferrer" className={pill}>
+    <a href={mailboxPath(box.token, "all")} target="_blank" rel="noopener noreferrer" className={pill}>
       부모님 화면 보기
     </a>
   );
@@ -253,7 +255,7 @@ export function MailboxPanel() {
       const supabase = getBrowserClient();
       if (!supabase) return "지금은 쓸 수 없어요.";
       const plan = await planMailboxDelete(supabase, box.id);
-      if (!plan) return "지울 내용을 읽지 못했어요. 잠시 뒤 다시 해 주세요.";
+      if (!plan) return "지울 내용을 읽지 못했어요. 잠시 뒤 다시 해 주세요. 계속 안 되면 서버 설정(supabase/mailbox.sql)을 다시 실행해야 할 수 있어요.";
       setDeletePlan({ id: box.id, sole: plan.sole.length, kept: plan.kept });
       setAsking(`delete-${box.id}`);
       return null;
@@ -312,7 +314,8 @@ export function MailboxPanel() {
   return (
     <div className="flex flex-col gap-5">
       {message && (
-        <p role="status" className="break-all rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
+        // 목록이 길어 아래쪽 카드의 단추를 누르면 맨 위의 알림이 화면 밖이다. 아무 일도 안 일어난 것처럼 보이지 않게 위 띠 아래에 붙인다.
+        <p role="status" className="sticky top-[4.25rem] z-20 break-all rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text shadow-md ring-1 ring-line">
           {message}
         </p>
       )}

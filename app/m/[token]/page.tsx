@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
-import { fetchMailboxView } from "@/lib/supabase/mailboxPublic";
+import { asOpened, fetchMailboxView } from "@/lib/supabase/mailboxPublic";
 import { isMailboxToken, isPreview } from "@/lib/mailbox";
 import { MailboxHome } from "@/components/mailbox/receive/MailboxHome";
 
@@ -48,5 +48,5 @@ export default async function MailboxPage({ params, searchParams }: Props) {
   const preview = isPreview((await searchParams).preview);
   const view = await load(token);
   if (!view) notFound();
-  return <MailboxHome token={token} view={view} preview={preview} />;
+  return <MailboxHome token={token} view={preview === "all" ? asOpened(view) : view} preview={preview} />;
 }

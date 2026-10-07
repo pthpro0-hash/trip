@@ -152,8 +152,10 @@ describe("YearBookView · 올해의 책", () => {
     it("띠가 붙고, 모든 길에 미리보기 표시가 이어진다", () => {
       render(<YearBookView token={TOKEN} view={view(books)} year="2026" preview />);
       expect(screen.getByRole("note", { name: "미리보기" })).toBeTruthy();
+      // 띠 안의 링크(방식 바꾸기)는 따로 본다 — 책 안의 길들만.
       const hrefs = screen
         .getAllByRole("link")
+        .filter((link) => !link.closest("[role=note]"))
         .map((link) => link.getAttribute("href") ?? "")
         .filter((href) => href.startsWith("/m/"));
       expect(hrefs.length).toBeGreaterThan(0);
@@ -165,5 +167,20 @@ describe("YearBookView · 올해의 책", () => {
       expect(screen.queryByRole("note", { name: "미리보기" })).toBeNull();
       for (const link of screen.getAllByRole("link")) expect(link.getAttribute("href")).not.toContain("preview");
     });
+  });
+});
+
+describe("YearBookView · 미리보기 방식", () => {
+  it("'모두 열어 본 것처럼'이면 그 말과 지금 모습으로 바꾸는 길이 있다", () => {
+    render(<YearBookView token={TOKEN} view={view(books)} year="2026" preview="all" />);
+    const note = screen.getByRole("note", { name: "미리보기" });
+    expect(note).toHaveTextContent("모든 엽서를 열어 본 것처럼");
+    expect(within(note).getByRole("link", { name: /지금 부모님이 보시는 대로/ })).toHaveAttribute("href", `/m/${TOKEN}/year/2026?preview=1`);
+  });
+
+  it("'지금 모습'이면 모두 열어 본 것처럼 보는 길이 있다", () => {
+    render(<YearBookView token={TOKEN} view={view(books)} year="2026" preview />);
+    const note = screen.getByRole("note", { name: "미리보기" });
+    expect(within(note).getByRole("link", { name: /모든 엽서를 열어 본 것처럼 보기/ })).toHaveAttribute("href", `/m/${TOKEN}/year/2026?preview=all`);
   });
 });

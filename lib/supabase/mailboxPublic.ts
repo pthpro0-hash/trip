@@ -195,6 +195,11 @@ export async function fetchMailboxPostcard(
   };
 }
 
+/** 미리보기에서 모든 엽서를 열어 본 것처럼 — 책꽂이·작년 오늘·올해의 책을 볼 수 있게. 원래 것은 바꾸지 않는다. */
+export function asOpened(view: MailboxView): MailboxView {
+  return { ...view, postcards: view.postcards.map((card) => ({ ...card, opened: true })) };
+}
+
 /** 열어 봤다고 적는다. 사람이 화면을 연 뒤 화면이 부른다(미리보기 기계가 읽어도 찍히지 않게). 실패해도 조용히. */
 export async function markPostcardOpened(supabase: SupabaseClient, token: string, postcardId: string): Promise<void> {
   if (!isMailboxToken(token) || !isPostcardId(postcardId)) return;

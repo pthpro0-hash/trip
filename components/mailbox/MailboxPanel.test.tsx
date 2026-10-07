@@ -427,6 +427,15 @@ describe("MailboxPanel", () => {
     expect(screen.queryByRole("button", { name: "설정" })).toBeNull();
   });
 
+  it("알림 문구는 스크롤해도 화면에 붙어 있다 — 아래쪽 카드의 단추를 눌렀을 때 맨 위에 떠서 안 보이면 '아무 일도 안 일어난 것'처럼 보인다", async () => {
+    state.list = { owned: [box({ closed: true })], joined: [] };
+    api.planMailboxDelete.mockResolvedValue(null);
+    render(<MailboxPanel />);
+    fireEvent.click(await screen.findByRole("button", { name: "우편함 지우기" }));
+    const status = await screen.findByRole("status");
+    expect(status.className).toContain("sticky");
+  });
+
   describe("우편함 지우기", () => {
     const closedBox = () => box({ id: "m1", name: "우리 엄마 아빠", closed: true });
 
@@ -506,7 +515,10 @@ describe("MailboxPanel", () => {
       state.list = { owned: [closedBox()], joined: [] };
       render(<MailboxPanel />);
       fireEvent.click(await screen.findByRole("button", { name: "우편함 지우기" }));
-      expect(await screen.findByRole("status")).toHaveTextContent("지울 내용을 읽지 못했어요");
+      const status = await screen.findByRole("status");
+      expect(status).toHaveTextContent("지울 내용을 읽지 못했어요");
+      // 서버 설정(mailbox.sql)을 아직 다시 실행하지 않은 때도 이 말로 알아챌 수 있게.
+      expect(status).toHaveTextContent("mailbox.sql");
       expect(screen.queryByText(/지울까요/)).toBeNull();
     });
 
@@ -519,11 +531,11 @@ describe("MailboxPanel", () => {
   });
 
   describe("부모님 화면 보기(미리보기)", () => {
-    it("우편함마다 '부모님 화면 보기'가 있고, 새 탭에서 미리보기 주소로 열린다", async () => {
+    it("우편함마다 '부모님 화면 보기'가 있고, 새 탭에서 미리보기 주소로 열린다 — 책꽂이까지 보이게 모든 엽서를 열어 본 것처럼", async () => {
       state.list = { owned: [box({ id: "m1", token: "T".repeat(43) })], joined: [] };
       render(<MailboxPanel />);
       const link = await screen.findByRole("link", { name: "부모님 화면 보기" });
-      expect(link).toHaveAttribute("href", `/m/${"T".repeat(43)}?preview=1`);
+      expect(link).toHaveAttribute("href", `/m/${"T".repeat(43)}?preview=all`);
       expect(link).toHaveAttribute("target", "_blank");
       expect(link.getAttribute("rel")).toContain("noopener");
     });
@@ -539,7 +551,7 @@ describe("MailboxPanel", () => {
       state.list = { owned: [], joined: [box({ id: "j1", ownerId: "other", name: "남의 곳", token: "J".repeat(43) })] };
       render(<MailboxPanel />);
       const link = await screen.findByRole("link", { name: "부모님 화면 보기" });
-      expect(link).toHaveAttribute("href", `/m/${"J".repeat(43)}?preview=1`);
+      expect(link).toHaveAttribute("href", `/m/${"J".repeat(43)}?preview=all`);
     });
   });
 

@@ -358,9 +358,16 @@ describe("미리보기 주소", () => {
     expect(postcardPath(TOKEN, CARD, true)).toBe(`/m/${TOKEN}/p/${CARD}?preview=1`);
   });
 
-  it("preview=1 일 때만 미리보기다 — 다른 값·여러 값·없음은 평소 화면", () => {
+  it("preview=1 은 지금 부모님이 보시는 대로, preview=all 은 모든 엽서를 열어 본 것처럼 — 그 밖은 평소 화면", () => {
     expect(isPreview("1")).toBe(true);
-    for (const value of [undefined, "", "0", "true", "yes", ["1", "1"]]) expect(isPreview(value)).toBe(false);
+    expect(isPreview("all")).toBe("all");
+    for (const value of [undefined, "", "0", "true", "yes", "ALL", ["1", "1"], ["all"]]) expect(isPreview(value)).toBe(false);
+  });
+
+  it("'모두 열어 본 것처럼' 미리보기의 주소는 preview=all 이고, 어느 길에서도 이어진다", () => {
+    expect(mailboxPath(TOKEN, "all")).toBe(`/m/${TOKEN}?preview=all`);
+    expect(postcardPath(TOKEN, CARD, "all")).toBe(`/m/${TOKEN}/p/${CARD}?preview=all`);
+    expect(yearBookPath(TOKEN, "2026", "all")).toBe(`/m/${TOKEN}/year/2026?preview=all`);
   });
 });
 

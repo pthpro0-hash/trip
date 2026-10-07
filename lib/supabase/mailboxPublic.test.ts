@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RECOMMENDED } from "@/lib/mailboxSettings";
 import {
+  asOpened,
   fetchMailboxPostcard,
   fetchMailboxView,
   markPostcardOpened,
@@ -387,5 +388,28 @@ describe("markPostcardOpened · replyToPostcard", () => {
     expect(await replyToPostcard(client, TOKEN, CARD, "가".repeat(11), "좋구나")).toEqual({ ok: false, reason: "invalid" });
     expect(await replyToPostcard(client, TOKEN, CARD, "엄마", "가".repeat(31))).toEqual({ ok: false, reason: "invalid" });
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("asOpened · 미리보기에서 모든 엽서를 열어 본 것처럼", () => {
+  const base = { name: "x", tone: "casual", members: [], postcards: [] };
+  const raw = { id: CARD, senderName: "지민", title: "여수", startedOn: "2025-10-05", cover: "a.webp", greeting: "", sentAt: "", replies: [] };
+
+  it("안 열어 본 엽서도 열어 본 것으로 바꾼다 — 나머지는 그대로", async () => {
+    const view = await fetchMailboxView(
+      fake({ mailbox_view: { data: { ...base, postcards: [{ ...raw, openedAt: null }, { ...raw, id: "Q".repeat(43), openedAt: "2026-10-03T00:00:00Z" }] } } }).client,
+      TOKEN,
+    );
+    expect(view?.postcards.map((card) => card.opened)).toEqual([false, true]);
+    const all = asOpened(view!);
+    expect(all.postcards.map((card) => card.opened)).toEqual([true, true]);
+    expect(all.postcards.map((card) => card.title)).toEqual(["여수", "여수"]);
+    expect(all.settings).toEqual(view!.settings);
+  });
+
+  it("원래 것은 바꾸지 않는다", async () => {
+    const view = await fetchMailboxView(fake({ mailbox_view: { data: { ...base, postcards: [{ ...raw, openedAt: null }] } } }).client, TOKEN);
+    asOpened(view!);
+    expect(view?.postcards[0].opened).toBe(false);
   });
 });

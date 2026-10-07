@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
-import { fetchMailboxView } from "@/lib/supabase/mailboxPublic";
+import { asOpened, fetchMailboxView } from "@/lib/supabase/mailboxPublic";
 import { isMailboxToken, isPreview } from "@/lib/mailbox";
 import { YearBookView } from "@/components/mailbox/receive/YearBookView";
 
@@ -49,5 +49,5 @@ export default async function YearBookPage({ params, searchParams }: Props) {
   const preview = isPreview((await searchParams).preview);
   const view = await load(token);
   if (!view) notFound();
-  return <YearBookView token={token} view={view} year={year} preview={preview} />;
+  return <YearBookView token={token} view={preview === "all" ? asOpened(view) : view} year={year} preview={preview} />;
 }

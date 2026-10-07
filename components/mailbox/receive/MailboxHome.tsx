@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import type { InboxCard, MailboxView } from "@/lib/supabase/mailboxPublic";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
-import { postcardPath, yearBookPath } from "@/lib/mailbox";
+import { mailboxPath, postcardPath, yearBookPath, type PreviewMode } from "@/lib/mailbox";
 import { lastYearLabel, lastYearToday, shelfYears, yearTitle, type ShelfYear } from "@/lib/mailboxShelf";
 import { yearBookSeason } from "@/lib/mailboxYearBook";
 import { useWho } from "@/lib/mailboxWho";
@@ -23,7 +23,7 @@ import { WhoPicker } from "./WhoPicker";
 */
 
 /** 안 열어 본 엽서 — 큰 카드. */
-function Card({ token, card, preview }: { token: string; card: InboxCard; preview: boolean }) {
+function Card({ token, card, preview }: { token: string; card: InboxCard; preview: PreviewMode }) {
   const last = card.replies.at(-1);
   return (
     <li>
@@ -55,7 +55,7 @@ function Card({ token, card, preview }: { token: string; card: InboxCard; previe
 }
 
 /** 책꽂이의 책 한 권 — 표지. */
-function Book({ token, card, preview }: { token: string; card: InboxCard; preview: boolean }) {
+function Book({ token, card, preview }: { token: string; card: InboxCard; preview: PreviewMode }) {
   const last = card.replies.at(-1);
   return (
     <li>
@@ -87,7 +87,7 @@ function Year({
   token: string;
   entry: ShelfYear;
   defaultOpen: boolean;
-  preview: boolean;
+  preview: PreviewMode;
   showBook: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -148,7 +148,7 @@ function Year({
 }
 
 /** 올해의 책이 만들어졌다는 알림(12월~2월). */
-function YearBookNotice({ token, year, preview }: { token: string; year: string; preview: boolean }) {
+function YearBookNotice({ token, year, preview }: { token: string; year: string; preview: PreviewMode }) {
   return (
     <Link
       href={yearBookPath(token, year, preview)}
@@ -169,7 +169,7 @@ function YearBookNotice({ token, year, preview }: { token: string; year: string;
 }
 
 /** 오늘 즈음 다녀온 지난 해의 책 한 권. */
-function LastYear({ token, card, yearsAgo, preview }: { token: string; card: InboxCard; yearsAgo: number; preview: boolean }) {
+function LastYear({ token, card, yearsAgo, preview }: { token: string; card: InboxCard; yearsAgo: number; preview: PreviewMode }) {
   const label = lastYearLabel(yearsAgo);
   return (
     <section aria-label={label} className="flex flex-col gap-2">
@@ -195,7 +195,7 @@ function LastYear({ token, card, yearsAgo, preview }: { token: string; card: Inb
  * preview 는 보내는 사람이 부모님 화면을 미리 보는 중이다 — 띠를 달고, 엽서로 가는 길에 그 표시를 잇고,
  * 부모님이 고르는 '누가 보시나요?'는 묻지 않는다.
  */
-export function MailboxHome({ token, view, today, preview = false }: { token: string; view: MailboxView; today?: string; preview?: boolean }) {
+export function MailboxHome({ token, view, today, preview = false }: { token: string; view: MailboxView; today?: string; preview?: PreviewMode }) {
   const who = useWho(token);
   const phoneToday = useToday();
   const fresh = view.postcards.filter((card) => !card.opened);
@@ -209,7 +209,7 @@ export function MailboxHome({ token, view, today, preview = false }: { token: st
       style={{ "--rs": FONT_SCALE[view.settings.font] } as CSSProperties}
       className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-5 pb-16 pt-8"
     >
-      {preview && <PreviewBanner />}
+      {preview && <PreviewBanner all={preview === "all"} toggle={{ href: mailboxPath(token, preview === "all" ? true : "all") }} />}
 
       <header className="flex flex-col gap-2">
         <h1 className="rs-32 font-bold tracking-tight text-text">우리 가족 우편함</h1>

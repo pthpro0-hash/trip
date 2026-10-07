@@ -57,17 +57,22 @@ export const postcardUrl = (origin: string, token: string, postcardId: string): 
   가지 않는다. 주소 끝에 ?preview=1 이 붙고, 화면 안의 길(엽서·우편함)에도 그 표시가 이어진다.
   이 표시는 화면이 무엇을 보낼지만 정한다 — 미리보기 주소로 와도 부모님이 볼 수 있는 것 외에는 더 보이지 않는다.
 */
-const PREVIEW = "?preview=1";
+/**
+ * 미리보기 방식. true 는 지금 부모님이 보시는 대로(안 열어 본 엽서는 '새 엽서'), "all" 은 모든 엽서를 열어 본 것처럼
+ * (책꽂이·작년 오늘·올해의 책을 확인할 수 있다 — 부모님이 열어 본 엽서가 없으면 책꽂이는 비어 있어서).
+ */
+export type PreviewMode = boolean | "all";
+const previewSuffix = (preview: PreviewMode): string => (preview === "all" ? "?preview=all" : preview ? "?preview=1" : "");
 /** 받는 쪽 우편함 첫 화면의 길. 같은 서비스 안의 길이라 origin 은 붙이지 않는다. */
-export const mailboxPath = (token: string, preview = false): string => `/m/${token}${preview ? PREVIEW : ""}`;
+export const mailboxPath = (token: string, preview: PreviewMode = false): string => `/m/${token}${previewSuffix(preview)}`;
 /** 받는 쪽 엽서 한 장의 길. */
-export const postcardPath = (token: string, postcardId: string, preview = false): string =>
-  `/m/${token}/p/${postcardId}${preview ? PREVIEW : ""}`;
+export const postcardPath = (token: string, postcardId: string, preview: PreviewMode = false): string =>
+  `/m/${token}/p/${postcardId}${previewSuffix(preview)}`;
 /** 받는 쪽 올해의 책의 길. */
-export const yearBookPath = (token: string, year: string, preview = false): string =>
-  `/m/${token}/year/${year}${preview ? PREVIEW : ""}`;
-/** 주소의 ?preview= 값이 미리보기인가. 1 일 때만 그렇다. */
-export const isPreview = (value: string | string[] | undefined): boolean => value === "1";
+export const yearBookPath = (token: string, year: string, preview: PreviewMode = false): string =>
+  `/m/${token}/year/${year}${previewSuffix(preview)}`;
+/** 주소의 ?preview= 값. 1 은 지금 모습, all 은 모두 열어 본 것처럼, 그 밖은 평소 화면(false). */
+export const isPreview = (value: string | string[] | undefined): PreviewMode => (value === "all" ? "all" : value === "1");
 
 /* ── 받는 분 이름 ────────────────────────────────────────── */
 
