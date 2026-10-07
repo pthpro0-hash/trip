@@ -26,8 +26,14 @@ export const ADD_HREF = "/trips/new";
 /** 여행 100선. */
 export const SPOTS_HREF = startHref("spots");
 
+/**
+ * 내 정보 — 가족 공유·가족 우편함·보관함 정리·도움말·약관·로그아웃이 모인 곳.
+ * 예전에는 위 띠의 이름을 눌러야 가족 공유가 열렸고, 우편함은 그 맨 아래 링크로만 갈 수 있었다.
+ */
+export const ME_HREF = "/me";
+
 /** 위 띠·하단 탭의 갈래. */
-export type NavId = "trips" | "sketch" | "spots";
+export type NavId = "trips" | "sketch" | "spots" | "me";
 
 /** 주소의 ?view= 에서 모습을 읽는다. list 만 목록이고, 나머지는 지도. */
 export function viewOf(value: string | null | undefined): MyView {
@@ -54,6 +60,8 @@ export function activeNav(pathname: string, start: Start | null): NavId | null {
   if (under(pathname, "/sketch")) return "sketch";
   if (under(pathname, "/trips") || under(pathname, "/places")) return "trips";
   if (["/spots", "/regions", "/course"].some((segment) => under(pathname, segment))) return "spots";
+  // 내 정보와 그 한 칸인 가족 공유·가족 우편함(부모님이 보는 /m 은 따로 — 거기엔 이 띠가 없다).
+  if (["/me", "/family", "/mailboxes"].some((segment) => under(pathname, segment))) return "me";
   return null;
 }
 

@@ -2,23 +2,24 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { forgetSignedUrls } from "@/lib/supabase/photos";
-import { writeCollections } from "@/lib/collections";
+import { accountOf, type Account } from "@/lib/account";
+import { ME_HREF, activeNav } from "@/lib/nav";
 
-interface Account {
-  name: string;
-  avatar?: string;
-}
+/*
+  지금 누구로 들어와 있는지, 그리고 '내 정보'로 가는 문.
 
-/** 지금 누구로 들어와 있는지, 그리고 나가는 길. */
+  예전에는 이름을 누르면 가족 공유로만 갔고, 로그아웃 단추도 여기 붙어 있었다. 이제 이름·사진은 가족 공유·
+  가족 우편함·보관함 정리·로그아웃이 모인 내 정보로 간다. 폰의 위 띠가 빠듯해 로그아웃은 거기로 옮겼다.
+*/
 export function AccountChip() {
+  const pathname = usePathname();
   const [account, setAccount] = useState<Account | null>(null);
   // 로그인 설정이 아예 없으면 기다릴 것도 없다. 효과 안에서 setState 하지
   // 않도록 처음 값으로 정한다.
   const [ready, setReady] = useState(!isSupabaseConfigured);
-  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -28,26 +29,11 @@ export function AccountChip() {
     const apply = (user: { user_metadata?: Record<string, unknown>; email?: string } | null) => {
       if (!active) return;
       setReady(true);
-      if (!user) {
-        setAccount(null);
-        return;
-      }
-      const meta = user.user_metadata ?? {};
-      setAccount({
-        // 이름이 없을 수도 있다. 그때는 이메일 앞부분이라도 보여준다.
-        name:
-          (meta.full_name as string) ||
-          (meta.name as string) ||
-          user.email?.split("@")[0] ||
-          "내 계정",
-        avatar: meta.avatar_url as string | undefined,
-      });
+      setAccount(user ? accountOf(user) : null);
     };
 
     supabase.auth.getUser().then(({ data }) => apply(data.user));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) =>
-      apply(session?.user ?? null),
-    );
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => apply(session?.user ?? null));
 
     return () => {
       active = false;
@@ -70,63 +56,34 @@ export function AccountChip() {
     );
   }
 
-  const signOut = async () => {
-    const supabase = getBrowserClient();
-    if (!supabase) return;
-    setSigningOut(true);
-    await supabase.auth.signOut();
-    // 받아 둔 내 사진 주소도 이 탭에서 지운다.
-    forgetSignedUrls();
-
-    /*
-      이 기기의 목록을 비우고 통째로 새로고침한다.
-
-      CollectionSync 도 로그아웃을 듣고 비우지만, 여기서 한 번 더 비운다 —
-      새로고침이 그 처리보다 먼저 일어나면 앞사람의 목록이 남고, 다음 사람이
-      로그인할 때 그 사람 계정으로 합쳐진다. 두 번 비우는 편이 낫다.
-
-      router.refresh() 가 아니라 통째로 새로고침하는 것도 같은 이유다.
-      앞사람의 화면 상태가 조금도 남지 않는다.
-    */
-    writeCollections({ wishlist: [], trip: [] });
-    window.location.reload();
-  };
+  const on = activeNav(pathname, null) === "me";
 
   return (
-    <div className="flex shrink-0 items-center gap-2">
-      {/*
-        좁은 화면에서는 이름을 접는다. 위 띠에 서비스 이름과 갈래 둘이
-        함께 서 있어 375px 에서 이 칩이 화면 밖으로 밀려났다. 사진이
-        있으면 그것으로 누구인지 알 수 있으니 이름은 접어도 된다.
-      */}
-      <Link
-        href="/family"
-        aria-label="가족 공유"
-        title="가족 공유"
-        className="flex items-center gap-2 rounded-full transition hover:opacity-80"
+    /*
+      좁은 화면에서는 이름을 접는다. 위 띠에 서비스 이름과 갈래 둘이
+      함께 서 있어 375px 에서 이 칩이 화면 밖으로 밀려났다. 사진이
+      있으면 그것으로 누구인지 알 수 있으니 이름은 접어도 된다.
+    */
+    <Link
+      href={ME_HREF}
+      aria-label="내 정보"
+      title="내 정보"
+      aria-current={on ? "page" : undefined}
+      className={`flex shrink-0 items-center gap-2 rounded-full transition ${on ? "bg-accent-soft pr-2.5" : "hover:opacity-80"}`}
+    >
+      {account.avatar && (
+        // 다른 서비스의 프로필 사진이라 도메인을 미리 알 수 없다.
+        // next/image 를 쓰려면 도메인을 등록해야 해서 그냥 img 로 둔다.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={account.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
+      )}
+      <span
+        className={`max-w-[10ch] truncate text-[13px] font-medium text-text ${
+          account.avatar ? "hidden sm:inline" : ""
+        }`}
       >
-        {account.avatar && (
-          // 다른 서비스의 프로필 사진이라 도메인을 미리 알 수 없다.
-          // next/image 를 쓰려면 도메인을 등록해야 해서 그냥 img 로 둔다.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={account.avatar} alt="" className="h-7 w-7 rounded-full object-cover" />
-        )}
-        <span
-          className={`max-w-[10ch] truncate text-[13px] font-medium text-text ${
-            account.avatar ? "hidden sm:inline" : ""
-          }`}
-        >
-          {account.name}
-        </span>
-      </Link>
-      <button
-        type="button"
-        onClick={signOut}
-        disabled={signingOut}
-        className="rounded-full bg-bg-subtle px-3 py-1.5 text-[13px] font-medium text-text-muted transition hover:bg-line disabled:opacity-60"
-      >
-        로그아웃
-      </button>
-    </div>
+        {account.name}
+      </span>
+    </Link>
   );
 }

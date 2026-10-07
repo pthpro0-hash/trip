@@ -3,6 +3,7 @@ import {
   ADD_HREF,
   LIST_HREF,
   MAP_HREF,
+  ME_HREF,
   SKETCH_HREF,
   SPOTS_HREF,
   activeNav,
@@ -24,6 +25,7 @@ describe("주소", () => {
     expect(SPOTS_HREF).toBe("/?v=spots");
     expect(SKETCH_HREF).toBe("/sketch");
     expect(ADD_HREF).toBe("/trips/new");
+    expect(ME_HREF).toBe("/me");
   });
 });
 
@@ -76,6 +78,10 @@ describe("activeNav · 켜질 갈래", () => {
     expect(activeNav("/course", null)).toBe("spots");
   });
 
+  it("내 정보와 그 안의 가족 공유·가족 우편함은 '내 정보'", () => {
+    for (const path of ["/me", "/family", "/mailboxes", "/mailboxes/join/abc"]) expect(activeNav(path, null)).toBe("me");
+  });
+
   it("어느 쪽도 아니면 아무것도 켜지 않는다", () => {
     expect(activeNav("/privacy", null)).toBeNull();
     expect(activeNav("/help", null)).toBeNull();
@@ -86,6 +92,8 @@ describe("activeNav · 켜질 갈래", () => {
     expect(activeNav("/sketchbook", null)).toBeNull();
     expect(activeNav("/tripsy", null)).toBeNull();
     expect(activeNav("/spotsfoo", null)).toBeNull();
+    expect(activeNav("/mentor", null)).toBeNull();
+    expect(activeNav("/family-tree", null)).toBeNull();
   });
 });
 
@@ -109,7 +117,7 @@ describe("isReceiverPath · 가족 우편함 받는 쪽", () => {
 });
 
 describe("showsBottomNav · 폰 하단 탭을 보일 화면", () => {
-  it.each(["/", "/trips", "/trips/abc", "/trips/new", "/spots/경복궁", "/regions/강원권", "/course", "/places", "/help", "/privacy"])(
+  it.each(["/", "/trips", "/trips/abc", "/trips/new", "/spots/경복궁", "/regions/강원권", "/course", "/places", "/help", "/privacy", "/me", "/family", "/mailboxes"])(
     "%s 에서는 보인다",
     (path) => {
       expect(showsBottomNav(path)).toBe(true);

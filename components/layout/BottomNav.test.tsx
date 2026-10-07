@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { readStart } from "@/lib/start";
-import { ADD_HREF, MAP_HREF, SKETCH_HREF, SPOTS_HREF } from "@/lib/nav";
+import { ADD_HREF, MAP_HREF, ME_HREF, SKETCH_HREF, SPOTS_HREF } from "@/lib/nav";
 
 let path = "/";
 let search = "";
@@ -35,12 +35,27 @@ describe("BottomNav", () => {
     search = "";
   });
 
-  it("내 여행 · 한장 · 사진 고르기 · 여행 100선, 네 곳으로 간다", () => {
+  it("내 여행 · 한장 · 사진 고르기 · 여행 100선 · 내 정보, 다섯 곳으로 간다", () => {
     at("/trips/abc");
     expect(screen.getByRole("link", { name: "내 여행" })).toHaveAttribute("href", MAP_HREF);
     expect(screen.getByRole("link", { name: "한장" })).toHaveAttribute("href", SKETCH_HREF);
     expect(screen.getByRole("link", { name: "사진 고르기" })).toHaveAttribute("href", ADD_HREF);
     expect(screen.getByRole("link", { name: "여행 100선" })).toHaveAttribute("href", SPOTS_HREF);
+    expect(screen.getByRole("link", { name: "내 정보" })).toHaveAttribute("href", ME_HREF);
+  });
+
+  it("＋가 가운데에 온다 — 내 여행 · 한장 · ＋ · 여행 100선 · 내 정보 순서", () => {
+    at("/trips/abc");
+    const bar_ = bar()!;
+    // 가운데 단추는 글자 앞에 ＋ 표시가 붙어 있다.
+    expect([...bar_.querySelectorAll("a")].map((link) => link.textContent?.replace(/^\+/, ""))).toEqual([
+      "내 여행",
+      "한장",
+      "사진 고르기",
+      "여행 100선",
+      "내 정보",
+    ]);
+    expect(bar_.querySelector("ul")!.className).toContain("grid-cols-5");
   });
 
   it("폰에서만 보인다 — 넓은 화면에는 위 띠가 있다", () => {
@@ -55,6 +70,9 @@ describe("BottomNav", () => {
       ["/spots/경복궁", "", "여행 100선"],
       ["/regions/강원권", "", "여행 100선"],
       ["/course", "", "여행 100선"],
+      ["/me", "", "내 정보"],
+      ["/family", "", "내 정보"],
+      ["/mailboxes", "", "내 정보"],
     ])("%s → %s", (pathname, query, expected) => {
       at(pathname, query);
       expect(on()).toEqual([expected]);

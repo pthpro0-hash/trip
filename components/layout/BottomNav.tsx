@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import {
   ADD_HREF,
   MAP_HREF,
+  ME_HREF,
   SKETCH_HREF,
   SPOTS_HREF,
   activeNav,
@@ -17,11 +18,13 @@ import { readStart, rememberStart, type Start } from "@/lib/start";
 import { canIn, useFamilyView } from "@/lib/familyView";
 
 /*
-  폰 하단 탭 — 내 여행 · 한장 · 사진 고르기 · 여행 100선.
+  폰 하단 탭 — 내 여행 · 한장 · 사진 고르기 · 여행 100선 · 내 정보.
 
   폰에서는 위 띠가 좁아 갈래를 둘 이상 두기 어렵고(375px 에서는 갈래 둘과 계정 칩만으로
   폭이 꽉 찬다), 화면마다 "사진 고르기 · 한장 요약 · 여행 목록" 단추가 제각각 흩어져
-  있었다. 엄지가 닿는 아래에 네 곳을 한 줄로 모은다. 넓은 화면(640px~)에는 위 띠가
+  있었다. 엄지가 닿는 아래에 다섯 곳을 한 줄로 모은다(＋가 가운데). 맨 끝의 내 정보는 가족 공유·가족 우편함·
+  보관함 정리·로그아웃이 모인 곳이다 — 예전에는 위 띠의 이름 칩을 눌러야 했는데, 폰에서는 그 칩이 사진만
+  남아 메뉴인 줄 알기 어려웠다. 넓은 화면(640px~)에는 위 띠가
   있어 이 탭은 없다.
 
   숨기는 화면은 lib/nav 의 showsBottomNav 가 정한다 — 한장 요약(저장 막대가 그 자리를
@@ -66,6 +69,13 @@ const COMPASS = (
   </Icon>
 );
 
+const PERSON = (
+  <Icon>
+    <circle cx="12" cy="8.5" r="3.5" />
+    <path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" />
+  </Icon>
+);
+
 interface Item {
   id: NavId | "add";
   label: string;
@@ -80,6 +90,7 @@ const ITEMS: Item[] = [
   { id: "sketch", label: "한장", href: SKETCH_HREF, icon: FRAME },
   { id: "add", label: "사진 고르기", href: ADD_HREF, icon: null },
   { id: "spots", label: "여행 100선", href: SPOTS_HREF, icon: COMPASS, remember: "spots" },
+  { id: "me", label: "내 정보", href: ME_HREF, icon: PERSON },
 ];
 
 function Bar({ active }: { active: NavId | null }) {
@@ -94,7 +105,7 @@ function Bar({ active }: { active: NavId | null }) {
       */
       className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/95 backdrop-blur-md sm:hidden [padding-bottom:env(safe-area-inset-bottom,0px)]"
     >
-      <ul className={`mx-auto grid h-14 max-w-md ${items.length === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+      <ul className={`mx-auto grid h-14 max-w-md ${items.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
         {items.map((item) => {
           const on = item.id !== "add" && item.id === active;
           return (

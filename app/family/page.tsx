@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FamilyPanel } from "@/components/family/FamilyPanel";
+import { BackToMe } from "@/components/me/BackToMe";
 
 export const metadata: Metadata = {
   title: "가족 공유",
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 export default function FamilyPage() {
   return (
     <main className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-20 pt-8">
+      <BackToMe />
       <header>
         <h1 className="text-[28px] font-bold tracking-tight text-text">가족 공유</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-text-muted">

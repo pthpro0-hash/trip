@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackToMe } from "@/components/me/BackToMe";
 import { MailboxPanel } from "@/components/mailbox/MailboxPanel";
 
 export const metadata: Metadata = {
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 export default function MailboxesPage() {
   return (
     <main className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-20 pt-8">
+      <BackToMe />
       <header>
         <h1 className="text-[28px] font-bold tracking-tight text-text">가족 우편함</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-text-muted">
