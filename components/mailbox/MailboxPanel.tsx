@@ -24,7 +24,7 @@ import { summarizeHearts, type HeartLine } from "@/lib/mailboxHearts";
 import { attachParticle } from "@/lib/korean";
 import type { MailboxSettings } from "@/lib/mailboxSettings";
 import { REPLIES_SEEN } from "./MailboxBell";
-import { MAILBOX_LIMIT, MAILBOX_SENDER_LIMIT, mailboxInviteUrl, mailboxUrl } from "@/lib/mailbox";
+import { MAILBOX_LIMIT, MAILBOX_SENDER_LIMIT, mailboxInviteUrl, mailboxPath, mailboxUrl } from "@/lib/mailbox";
 import { INVITE_DAYS } from "@/lib/family";
 import { MailboxForm } from "./MailboxForm";
 import { MailboxSettingsEditor } from "./MailboxSettingsEditor";
@@ -60,6 +60,25 @@ function heartTarget(line: HeartLine): string {
   if (line.book && line.photos > 0) return `이 여행과 사진 ${line.photos}장에`;
   if (line.book) return "이 여행에";
   return `사진 ${line.photos}장에`;
+}
+
+/**
+ * 부모님 화면을 미리 본다(새 탭). 받는 쪽 화면 그대로이되 "열어 봤다" 표시·답장·하트는 가지 않는다.
+ * 닫은 우편함은 부모님께 아무것도 안 보이니 미리볼 것도 없다.
+ */
+function Preview({ box }: { box: MailboxItem }) {
+  if (box.closed) {
+    return (
+      <button type="button" className={pill} disabled>
+        부모님 화면 보기
+      </button>
+    );
+  }
+  return (
+    <a href={mailboxPath(box.token, true)} target="_blank" rel="noopener noreferrer" className={pill}>
+      부모님 화면 보기
+    </a>
+  );
 }
 
 export function MailboxPanel() {
@@ -328,6 +347,7 @@ export function MailboxPanel() {
                 <button type="button" className={pill} disabled={box.closed} onClick={() => void copy(mailboxUrl(window.location.origin, box.token), "받는 분께 보낼 우편함 링크를 복사했어요.")}>
                   링크 복사
                 </button>
+                <Preview box={box} />
                 <button type="button" className={pill} onClick={() => setEditing(box.id)}>
                   고치기
                 </button>
@@ -535,6 +555,7 @@ export function MailboxPanel() {
                   <button type="button" className={pill} disabled={box.closed} onClick={() => void copy(mailboxUrl(window.location.origin, box.token), "우편함 링크를 복사했어요.")}>
                     링크 복사
                   </button>
+                  <Preview box={box} />
                   {asking === `leave-${box.id}` ? (
                     <>
                       <span className="text-[13px] text-text">나가면 이 우편함에 엽서를 보낼 수 없어요.</span>

@@ -6,8 +6,10 @@ import Link from "next/link";
 import type { InboxCard, MailboxView } from "@/lib/supabase/mailboxPublic";
 import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
+import { postcardPath } from "@/lib/mailbox";
 import { lastYearLabel, lastYearToday, shelfYears, yearTitle, type ShelfYear } from "@/lib/mailboxShelf";
 import { useWho } from "@/lib/mailboxWho";
+import { PreviewBanner } from "./PreviewBanner";
 import { WhoPicker } from "./WhoPicker";
 
 /*
@@ -69,12 +71,12 @@ function Cover({ card, className }: { card: InboxCard; className: string }) {
 }
 
 /** 안 열어 본 엽서 — 큰 카드. */
-function Card({ token, card }: { token: string; card: InboxCard }) {
+function Card({ token, card, preview }: { token: string; card: InboxCard; preview: boolean }) {
   const last = card.replies.at(-1);
   return (
     <li>
       <Link
-        href={`/m/${token}/p/${card.id}`}
+        href={postcardPath(token, card.id, preview)}
         className="flex items-center gap-4 rounded-3xl bg-surface p-3.5 ring-1 ring-line transition active:scale-[0.99]"
       >
         <Cover card={card} className="h-24 w-24 shrink-0 rounded-2xl" />
@@ -101,11 +103,11 @@ function Card({ token, card }: { token: string; card: InboxCard }) {
 }
 
 /** 책꽂이의 책 한 권 — 표지. */
-function Book({ token, card }: { token: string; card: InboxCard }) {
+function Book({ token, card, preview }: { token: string; card: InboxCard; preview: boolean }) {
   const last = card.replies.at(-1);
   return (
     <li>
-      <Link href={`/m/${token}/p/${card.id}`} className="flex flex-col gap-2 transition active:scale-[0.98]">
+      <Link href={postcardPath(token, card.id, preview)} className="flex flex-col gap-2 transition active:scale-[0.98]">
         <Cover card={card} className="aspect-[3/4] w-full rounded-2xl" />
         <span className="line-clamp-2 rs-18 font-bold leading-snug text-text">{card.title || "여행 엽서"}</span>
         <span className="rs-14 leading-snug text-text-muted">
@@ -123,7 +125,7 @@ function Book({ token, card }: { token: string; card: InboxCard }) {
 }
 
 /** 한 해의 책꽂이. 접었다 펼 수 있고, 펼치면 표지와 그해 지도 단추가 나온다. */
-function Year({ token, entry, defaultOpen }: { token: string; entry: ShelfYear; defaultOpen: boolean }) {
+function Year({ token, entry, defaultOpen, preview }: { token: string; entry: ShelfYear; defaultOpen: boolean; preview: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const [mapOpen, setMapOpen] = useState(false);
   const title = yearTitle(entry.year, entry.cards.length);
@@ -150,7 +152,7 @@ function Year({ token, entry, defaultOpen }: { token: string; entry: ShelfYear; 
         <>
           <ul aria-label={`${title} 책꽂이`} className="grid grid-cols-2 gap-x-3.5 gap-y-5">
             {entry.cards.map((card) => (
-              <Book key={card.id} token={token} card={card} />
+              <Book key={card.id} token={token} card={card} preview={preview} />
             ))}
           </ul>
 
@@ -173,13 +175,13 @@ function Year({ token, entry, defaultOpen }: { token: string; entry: ShelfYear; 
 }
 
 /** 오늘 즈음 다녀온 지난 해의 책 한 권. */
-function LastYear({ token, card, yearsAgo }: { token: string; card: InboxCard; yearsAgo: number }) {
+function LastYear({ token, card, yearsAgo, preview }: { token: string; card: InboxCard; yearsAgo: number; preview: boolean }) {
   const label = lastYearLabel(yearsAgo);
   return (
     <section aria-label={label} className="flex flex-col gap-2">
       <p className="px-1 rs-18 font-bold text-accent">{label}</p>
       <Link
-        href={`/m/${token}/p/${card.id}`}
+        href={postcardPath(token, card.id, preview)}
         className="flex items-center gap-4 rounded-3xl bg-accent-soft p-3.5 transition active:scale-[0.99]"
       >
         <Cover card={card} className="h-24 w-24 shrink-0 rounded-2xl" />
@@ -196,8 +198,10 @@ function LastYear({ token, card, yearsAgo }: { token: string; card: InboxCard; y
 
 /**
  * today 는 시험에서 오늘을 정해 줄 때만 쓴다. 평소에는 이 폰의 오늘을 쓴다.
+ * preview 는 보내는 사람이 부모님 화면을 미리 보는 중이다 — 띠를 달고, 엽서로 가는 길에 그 표시를 잇고,
+ * 부모님이 고르는 '누가 보시나요?'는 묻지 않는다.
  */
-export function MailboxHome({ token, view, today }: { token: string; view: MailboxView; today?: string }) {
+export function MailboxHome({ token, view, today, preview = false }: { token: string; view: MailboxView; today?: string; preview?: boolean }) {
   const who = useWho(token);
   const phoneToday = useToday();
   const fresh = view.postcards.filter((card) => !card.opened);
@@ -209,6 +213,8 @@ export function MailboxHome({ token, view, today }: { token: string; view: Mailb
       style={{ "--rs": FONT_SCALE[view.settings.font] } as CSSProperties}
       className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-5 pb-16 pt-8"
     >
+      {preview && <PreviewBanner />}
+
       <header className="flex flex-col gap-2">
         <h1 className="rs-32 font-bold tracking-tight text-text">우리 가족 우편함</h1>
         <p className="rs-18 leading-relaxed text-text-muted">
@@ -218,23 +224,23 @@ export function MailboxHome({ token, view, today }: { token: string; view: Mailb
               ? `새 엽서가 ${fresh.length}장 도착했어요.`
               : `받은 엽서 ${view.postcards.length}장`}
         </p>
-        {who && <WhoPicker token={token} members={view.members} compact />}
+        {who && !preview && <WhoPicker token={token} members={view.members} compact />}
       </header>
 
-      <WhoPicker token={token} members={view.members} />
+      {!preview && <WhoPicker token={token} members={view.members} />}
 
       {fresh.length > 0 && (
         <ul className="flex flex-col gap-3.5" aria-label="새로 온 엽서">
           {fresh.map((card) => (
-            <Card key={card.id} token={token} card={card} />
+            <Card key={card.id} token={token} card={card} preview={preview} />
           ))}
         </ul>
       )}
 
-      {past && <LastYear token={token} card={past.card} yearsAgo={past.yearsAgo} />}
+      {past && <LastYear token={token} card={past.card} yearsAgo={past.yearsAgo} preview={preview} />}
 
       {years.map((entry, index) => (
-        <Year key={entry.year} token={token} entry={entry} defaultOpen={index === 0} />
+        <Year key={entry.year} token={token} entry={entry} defaultOpen={index === 0} preview={preview} />
       ))}
 
       <section className="mt-auto rounded-2xl bg-bg-subtle p-5 rs-16 leading-relaxed text-text-muted">

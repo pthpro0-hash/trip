@@ -5,7 +5,7 @@ import { connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchMailboxView } from "@/lib/supabase/mailboxPublic";
-import { isMailboxToken } from "@/lib/mailbox";
+import { isMailboxToken, isPreview } from "@/lib/mailbox";
 import { MailboxHome } from "@/components/mailbox/receive/MailboxHome";
 
 /*
@@ -29,7 +29,7 @@ const load = cache(async (token: string) => {
   }
 });
 
-type Props = { params: Promise<{ token: string }> };
+type Props = { params: Promise<{ token: string }>; searchParams: Promise<{ preview?: string | string[] }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { token } = await params;
@@ -42,9 +42,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function MailboxPage({ params }: Props) {
+export default async function MailboxPage({ params, searchParams }: Props) {
   const { token } = await params;
+  // ?preview=1 — 보내는 사람이 부모님 화면을 미리 보는 중. 화면이 무엇을 보내지 않을지만 정한다.
+  const preview = isPreview((await searchParams).preview);
   const view = await load(token);
   if (!view) notFound();
-  return <MailboxHome token={token} view={view} />;
+  return <MailboxHome token={token} view={view} preview={preview} />;
 }

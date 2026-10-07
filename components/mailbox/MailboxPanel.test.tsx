@@ -423,6 +423,31 @@ describe("MailboxPanel", () => {
     expect(screen.queryByRole("button", { name: "설정" })).toBeNull();
   });
 
+  describe("부모님 화면 보기(미리보기)", () => {
+    it("우편함마다 '부모님 화면 보기'가 있고, 새 탭에서 미리보기 주소로 열린다", async () => {
+      state.list = { owned: [box({ id: "m1", token: "T".repeat(43) })], joined: [] };
+      render(<MailboxPanel />);
+      const link = await screen.findByRole("link", { name: "부모님 화면 보기" });
+      expect(link).toHaveAttribute("href", `/m/${"T".repeat(43)}?preview=1`);
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link.getAttribute("rel")).toContain("noopener");
+    });
+
+    it("닫힌 우편함은 부모님께 아무것도 안 보이니 미리볼 것도 없다 — 막혀 있다", async () => {
+      state.list = { owned: [box({ closed: true })], joined: [] };
+      render(<MailboxPanel />);
+      expect(await screen.findByRole("button", { name: "부모님 화면 보기" })).toBeDisabled();
+      expect(screen.queryByRole("link", { name: "부모님 화면 보기" })).toBeNull();
+    });
+
+    it("보내는 사람으로 들어간 우편함에서도 미리볼 수 있다", async () => {
+      state.list = { owned: [], joined: [box({ id: "j1", ownerId: "other", name: "남의 곳", token: "J".repeat(43) })] };
+      render(<MailboxPanel />);
+      const link = await screen.findByRole("link", { name: "부모님 화면 보기" });
+      expect(link).toHaveAttribute("href", `/m/${"J".repeat(43)}?preview=1`);
+    });
+  });
+
   it("보내는 사람으로 들어간 우편함은 링크 복사와 나가기만 — 고치기·닫기는 없다", async () => {
     state.list = { owned: [], joined: [box({ id: "j1", ownerId: "sis", name: "장모님" })] };
     render(<MailboxPanel />);

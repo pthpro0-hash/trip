@@ -288,3 +288,48 @@ describe("MailboxHome · 새 엽서와 책꽂이", () => {
     });
   });
 });
+
+describe("MailboxHome · 미리보기(보내는 사람이 부모님 화면을 미리 본다)", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  const mixed = view({
+    postcards: [
+      card({ id: "N".repeat(43), title: "새 여행", opened: false }),
+      card({ id: "O".repeat(43), title: "열어 본 여행", opened: true, startedOn: "2025-10-05", endedOn: "2025-10-06" }),
+    ],
+  });
+
+  it("맨 위에 미리보기라고 알린다 — 부모님께는 아무 표시도 가지 않는다는 말과 함께", () => {
+    render(<MailboxHome token={TOKEN} view={mixed} preview today="2026-10-07" />);
+    const note = screen.getByRole("note", { name: "미리보기" });
+    expect(note).toHaveTextContent("미리보기예요");
+    expect(note).toHaveTextContent("부모님께는 아무 표시도 가지 않아요");
+    expect(within(note).getByRole("link", { name: /내 우편함/ })).toHaveAttribute("href", "/mailboxes");
+  });
+
+  it("평소에는 미리보기 띠가 없다", () => {
+    render(<MailboxHome token={TOKEN} view={mixed} />);
+    expect(screen.queryByRole("note", { name: "미리보기" })).toBeNull();
+  });
+
+  it("엽서·책·작년 오늘의 길마다 미리보기 표시가 이어진다 — 엽서로 들어가도 미리보기", () => {
+    render(<MailboxHome token={TOKEN} view={mixed} preview today="2026-10-07" />);
+    const links = screen
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href") ?? "")
+      .filter((href) => href.startsWith(`/m/${TOKEN}/p/`));
+    // 새 엽서 하나, 작년 오늘 하나, 책꽂이 하나.
+    expect(links).toHaveLength(3);
+    for (const href of links) expect(href).toMatch(/\?preview=1$/);
+  });
+
+  it("'누가 보시나요?'는 묻지 않는다 — 부모님이 고르는 것이다", () => {
+    render(<MailboxHome token={TOKEN} view={mixed} preview />);
+    expect(screen.queryByText("누가 보시나요?")).toBeNull();
+  });
+
+  it("평소 길에는 미리보기 표시가 붙지 않는다", () => {
+    render(<MailboxHome token={TOKEN} view={mixed} today="2026-10-07" />);
+    for (const link of screen.getAllByRole("link")) expect(link.getAttribute("href")).not.toContain("preview");
+  });
+});

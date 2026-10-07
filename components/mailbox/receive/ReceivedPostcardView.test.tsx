@@ -279,3 +279,71 @@ describe("ReceivedPostcardView · 하트", () => {
     expect(screen.queryByRole("button", { name: /하트/ })).toBeNull();
   });
 });
+
+describe("ReceivedPostcardView · 미리보기", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    calls.opened.mockClear();
+    calls.reply.mockReset();
+    calls.heart.mockReset();
+  });
+
+  const preview = () => render(<ReceivedPostcardView token={TOKEN} card={card()} preview />);
+
+  it("맨 위에 미리보기라고 알린다", () => {
+    preview();
+    const note = screen.getByRole("note", { name: "미리보기" });
+    expect(note).toHaveTextContent("부모님께는 아무 표시도 가지 않아요");
+  });
+
+  it("평소에는 미리보기 띠가 없다", () => {
+    render(<ReceivedPostcardView token={TOKEN} card={card()} />);
+    expect(screen.queryByRole("note", { name: "미리보기" })).toBeNull();
+  });
+
+  it("열어 봤다고 적지 않는다 — 부모님이 안 보셨는데 '열어 보셨어요'가 찍히면 안 된다", async () => {
+    preview();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(calls.opened).not.toHaveBeenCalled();
+  });
+
+  it("'누가 보시나요?'를 묻지 않고, 답장 단추를 그대로 보여 준다 — 부모님 화면 그대로", () => {
+    preview();
+    expect(screen.queryByText("누가 보시나요?")).toBeNull();
+    expect(screen.getByRole("button", { name: "좋구나" })).toBeTruthy();
+    expect(screen.queryByText(/\(으\)로 답장해요/)).toBeNull();
+  });
+
+  it("답장 단추를 눌러도 보내지 않고, 미리보기라서 안 보낸다고 말한다", async () => {
+    preview();
+    fireEvent.click(screen.getByRole("button", { name: "좋구나" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("미리보기라서 답장은 보내지 않아요");
+    expect(calls.reply).not.toHaveBeenCalled();
+    expect(screen.queryByRole("list", { name: "보낸 답장" })).toBeNull();
+  });
+
+  it("하트를 눌러도 보내지 않고, 눌린 모양도 되지 않는다 — 미리보기라서 안 보낸다고 말한다", async () => {
+    preview();
+    fireEvent.click(screen.getByRole("button", { name: "이 사진에 하트" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("미리보기라서 하트는 보내지 않아요");
+    expect(calls.heart).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "이 사진에 하트" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("책마다 하트(설정)여도 마찬가지로 보내지 않는다", async () => {
+    render(<ReceivedPostcardView token={TOKEN} card={card({ settings: { ...RECOMMENDED, heart: "book" } })} preview />);
+    fireEvent.click(screen.getByRole("button", { name: "이 여행에 하트" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("미리보기라서 하트는 보내지 않아요");
+    expect(calls.heart).not.toHaveBeenCalled();
+  });
+
+  it("우편함으로 돌아가는 길도 미리보기로 이어진다", () => {
+    preview();
+    expect(screen.getByRole("link", { name: "우편함으로 가기" })).toHaveAttribute("href", `/m/${TOKEN}?preview=1`);
+  });
+
+  it("평소 화면의 돌아가는 길에는 표시가 붙지 않는다", () => {
+    render(<ReceivedPostcardView token={TOKEN} card={card()} />);
+    expect(screen.getByRole("link", { name: "우편함으로 가기" })).toHaveAttribute("href", `/m/${TOKEN}`);
+  });
+});

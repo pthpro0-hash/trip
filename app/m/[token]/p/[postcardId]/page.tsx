@@ -5,7 +5,7 @@ import { connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchMailboxPostcard, postcardFileUrl } from "@/lib/supabase/mailboxPublic";
-import { isMailboxToken, isPostcardId, postcardTitle } from "@/lib/mailbox";
+import { isMailboxToken, isPostcardId, isPreview, postcardTitle } from "@/lib/mailbox";
 import { ReceivedPostcardView } from "@/components/mailbox/receive/ReceivedPostcardView";
 
 /*
@@ -28,7 +28,7 @@ const load = cache(async (token: string, postcardId: string) => {
   }
 });
 
-type Props = { params: Promise<{ token: string; postcardId: string }> };
+type Props = { params: Promise<{ token: string; postcardId: string }>; searchParams: Promise<{ preview?: string | string[] }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { token, postcardId } = await params;
@@ -56,9 +56,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function PostcardPage({ params }: Props) {
+export default async function PostcardPage({ params, searchParams }: Props) {
   const { token, postcardId } = await params;
+  const preview = isPreview((await searchParams).preview);
   const card = await load(token, postcardId);
   if (!card) notFound();
-  return <ReceivedPostcardView token={token} card={card} />;
+  return <ReceivedPostcardView token={token} card={card} preview={preview} />;
 }

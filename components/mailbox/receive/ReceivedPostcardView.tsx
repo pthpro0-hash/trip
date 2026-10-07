@@ -12,12 +12,13 @@ import {
   type Reply,
   type ReceivedPostcard,
 } from "@/lib/supabase/mailboxPublic";
-import { postcardSpan, postcardSteps, postcardTitle } from "@/lib/mailbox";
+import { mailboxPath, postcardSpan, postcardSteps, postcardTitle } from "@/lib/mailbox";
 import { heartCount, heartedBy, heartNames, withHeart, type Heart } from "@/lib/mailboxHearts";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
 import { keepWho, useWho } from "@/lib/mailboxWho";
 import { FootprintPlayer } from "@/components/sketch/FootprintPlayer";
 import { PhotoAlbum, type AlbumHearts } from "./PhotoAlbum";
+import { PreviewBanner } from "./PreviewBanner";
 import { WhoPicker } from "./WhoPicker";
 
 /*
@@ -28,7 +29,11 @@ import { WhoPicker } from "./WhoPicker";
   화면을 연 뒤에 "열어 봤다"고 적는다(미리보기 기계가 링크를 읽어 가도 찍히지 않게).
 */
 
-export function ReceivedPostcardView({ token, card }: { token: string; card: ReceivedPostcard }) {
+/**
+ * preview: 보내는 사람이 부모님 화면을 미리 보는 중. 열어 봤다는 표시도, 답장도, 하트도 보내지 않는다 —
+ * 부모님이 안 보셨는데 "열어 보셨어요"가 찍히거나 보내는 사람의 답장이 부모님 것으로 남으면 안 된다.
+ */
+export function ReceivedPostcardView({ token, card, preview = false }: { token: string; card: ReceivedPostcard; preview?: boolean }) {
   const who = useWho(token);
   const [replies, setReplies] = useState<Reply[]>(card.replies);
   const [sending, setSending] = useState<string | null>(null);
@@ -41,9 +46,10 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
 
   // 사람이 화면을 연 뒤에 한 번, 열어 봤다고 적는다.
   useEffect(() => {
+    if (preview) return;
     const supabase = getBrowserClient();
     if (supabase) void markPostcardOpened(supabase, token, card.id);
-  }, [token, card.id]);
+  }, [token, card.id, preview]);
 
   const steps = useMemo(() => postcardSteps(snapshot), [snapshot]);
   const photoUrls = useMemo(
@@ -51,10 +57,14 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
     [snapshot.files, card.id],
   );
 
-  // 받는 분 이름이 정해져 있지 않은 우편함이면 "가족"으로 답한다.
-  const name = card.members.length === 0 ? "가족" : who || null;
+  // 받는 분 이름이 정해져 있지 않은 우편함이면 "가족"으로 답한다. 미리보기에서는 이름을 묻지 않는다.
+  const name = preview ? "미리보기" : card.members.length === 0 ? "가족" : who || null;
 
   const reply = async (reaction: string) => {
+    if (preview) {
+      setMessage("미리보기라서 답장은 보내지 않아요");
+      return;
+    }
     const supabase = getBrowserClient();
     if (!supabase || !name) return;
     setMessage(null);
@@ -87,6 +97,10 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
     failed: "하트를 보내지 못했어요. 잠시 뒤에 다시 눌러 주세요.",
   };
   const heart = async (file: string) => {
+    if (preview) {
+      setHeartMessage("미리보기라서 하트는 보내지 않아요");
+      return;
+    }
     const supabase = getBrowserClient();
     if (!supabase) return;
     if (!name) {
@@ -123,6 +137,8 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
       style={{ "--rs": FONT_SCALE[card.settings.font] } as CSSProperties}
       className="mx-auto flex max-w-xl flex-col gap-6 px-5 pb-20 pt-6"
     >
+      {preview && <PreviewBanner />}
+
       <p className="rs-18 font-semibold text-accent">{card.senderName}이(가) 보낸 여행 엽서</p>
 
       <PhotoAlbum postcardId={card.id} files={photos} hearts={albumHearts} />
@@ -191,7 +207,7 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
           <WhoPicker token={token} members={card.members} />
         ) : (
           <>
-            {card.members.length > 0 && (
+            {card.members.length > 0 && !preview && (
               <p className="rs-16 text-text-muted">
                 <span className="font-semibold text-text">{name}</span>(으)로 답장해요.{" "}
                 <button type="button" onClick={() => keepWho(token, "")} className="font-medium text-accent underline underline-offset-4">
@@ -233,7 +249,7 @@ export function ReceivedPostcardView({ token, card }: { token: string; card: Rec
       </section>
 
       <Link
-        href={`/m/${token}`}
+        href={mailboxPath(token, preview)}
         className="flex min-h-14 items-center justify-center rounded-2xl bg-bg-subtle rs-20 font-semibold text-text"
       >
         우편함으로 가기

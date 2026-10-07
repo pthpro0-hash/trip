@@ -24,6 +24,9 @@ import {
   postcardUrl,
   suggestionsFor,
   type PostcardPhotoCandidate,
+  isPreview,
+  mailboxPath,
+  postcardPath,
 } from "./mailbox";
 import type { TripDetail } from "./supabase/tripDetail";
 import type { PostcardSnapshot as PostcardSnapshotLike } from "./mailbox";
@@ -333,5 +336,29 @@ describe("엽서 화면에 쓰는 말 · 점", () => {
   it("날을 못 읽는 곳은 건너뛴다", () => {
     const bad = snap({ visits: [{ placeName: "x", lat: 1, lng: 1, day: "깨짐", photos: [] }, snap().visits[0]] });
     expect(postcardSteps(bad)).toHaveLength(1);
+  });
+});
+
+/*
+  미리보기 — 보내는 사람이 부모님 화면을 미리 보는 길. 같은 화면이지만 "열어 봤다"는 표시도, 답장도, 하트도
+  가지 않는다. 주소 끝에 ?preview=1 이 붙고, 엽서로 들어가도 그 표시가 이어져야 한다.
+*/
+describe("미리보기 주소", () => {
+  const TOKEN = "T".repeat(43);
+  const CARD = "P".repeat(43);
+
+  it("평소 주소에는 아무것도 붙지 않는다", () => {
+    expect(mailboxPath(TOKEN)).toBe(`/m/${TOKEN}`);
+    expect(postcardPath(TOKEN, CARD)).toBe(`/m/${TOKEN}/p/${CARD}`);
+  });
+
+  it("미리보기 주소에는 preview=1 이 붙는다 — 우편함에도 엽서에도", () => {
+    expect(mailboxPath(TOKEN, true)).toBe(`/m/${TOKEN}?preview=1`);
+    expect(postcardPath(TOKEN, CARD, true)).toBe(`/m/${TOKEN}/p/${CARD}?preview=1`);
+  });
+
+  it("preview=1 일 때만 미리보기다 — 다른 값·여러 값·없음은 평소 화면", () => {
+    expect(isPreview("1")).toBe(true);
+    for (const value of [undefined, "", "0", "true", "yes", ["1", "1"]]) expect(isPreview(value)).toBe(false);
   });
 });

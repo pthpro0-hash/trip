@@ -52,6 +52,20 @@ export const mailboxInviteUrl = (origin: string, token: string): string => `${or
 export const postcardUrl = (origin: string, token: string, postcardId: string): string =>
   `${origin}/m/${token}/p/${postcardId}`;
 
+/*
+  미리보기 — 보내는 사람이 부모님 화면을 미리 보는 길. 같은 화면이지만 "열어 봤다"는 표시도, 답장도, 하트도
+  가지 않는다. 주소 끝에 ?preview=1 이 붙고, 화면 안의 길(엽서·우편함)에도 그 표시가 이어진다.
+  이 표시는 화면이 무엇을 보낼지만 정한다 — 미리보기 주소로 와도 부모님이 볼 수 있는 것 외에는 더 보이지 않는다.
+*/
+const PREVIEW = "?preview=1";
+/** 받는 쪽 우편함 첫 화면의 길. 같은 서비스 안의 길이라 origin 은 붙이지 않는다. */
+export const mailboxPath = (token: string, preview = false): string => `/m/${token}${preview ? PREVIEW : ""}`;
+/** 받는 쪽 엽서 한 장의 길. */
+export const postcardPath = (token: string, postcardId: string, preview = false): string =>
+  `/m/${token}/p/${postcardId}${preview ? PREVIEW : ""}`;
+/** 주소의 ?preview= 값이 미리보기인가. 1 일 때만 그렇다. */
+export const isPreview = (value: string | string[] | undefined): boolean => value === "1";
+
 /* ── 받는 분 이름 ────────────────────────────────────────── */
 
 /**
