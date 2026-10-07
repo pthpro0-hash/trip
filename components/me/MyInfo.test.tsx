@@ -42,7 +42,7 @@ describe("MyInfo · 내 정보 메뉴", () => {
       render(<MyInfo />);
       await screen.findByText("김지민");
       expect(hrefOf(/^가족 공유/)).toBe("/family");
-      expect(hrefOf(/^가족 우편함/)).toBe("/mailboxes");
+      expect(hrefOf(/^가족 책장/)).toBe("/mailboxes");
       expect(hrefOf(/^보관함 정리/)).toBe("/help#data");
       expect(hrefOf(/^도움말/)).toBe("/help");
       expect(hrefOf(/^개인정보처리방침/)).toBe("/privacy");
@@ -59,20 +59,20 @@ describe("MyInfo · 내 정보 메뉴", () => {
       render(<MyInfo />);
       await screen.findByText("김지민");
       expect(within(screen.getByRole("link", { name: /^가족 공유/ })).getByText(/가족을 초대해/)).toBeTruthy();
-      expect(within(screen.getByRole("link", { name: /^가족 우편함/ })).getByText(/부모님께 엽서/)).toBeTruthy();
+      expect(within(screen.getByRole("link", { name: /^가족 책장/ })).getByText(/부모님께 엽서/)).toBeTruthy();
     });
 
-    it("새 소식이 없으면 우편함 줄에 숫자가 없다", async () => {
+    it("새 소식이 없으면 책장 줄에 숫자가 없다", async () => {
       render(<MyInfo />);
       await screen.findByText("김지민");
       expect(screen.queryByText(/새 소식/)).toBeNull();
     });
 
-    it("새 답장과 새 하트를 더해 우편함 줄에 알린다", async () => {
+    it("새 답장과 새 하트를 더해 책장 줄에 알린다", async () => {
       state.replies = 1;
       state.hearts = 2;
       render(<MyInfo />);
-      const row = await screen.findByRole("link", { name: /^가족 우편함/ });
+      const row = await screen.findByRole("link", { name: /^가족 책장/ });
       await waitFor(() => expect(within(row).getByText("새 소식 3")).toBeTruthy());
     });
 
@@ -100,7 +100,7 @@ describe("MyInfo · 내 정보 메뉴", () => {
 
     it("로그인하면 무엇을 쓸 수 있는지 알리고 로그인으로 보낸다 — 돌아올 곳은 내 정보", async () => {
       render(<MyInfo />);
-      expect(await screen.findByText(/로그인하면 가족 공유·가족 우편함·보관함 정리를 쓸 수 있어요/)).toBeTruthy();
+      expect(await screen.findByText(/로그인하면 가족 공유·가족 책장·보관함 정리를 쓸 수 있어요/)).toBeTruthy();
       expect(screen.getByRole("link", { name: "로그인하기" })).toHaveAttribute("href", "/login?next=/me");
     });
 
@@ -108,7 +108,7 @@ describe("MyInfo · 내 정보 메뉴", () => {
       render(<MyInfo />);
       await screen.findByRole("link", { name: "로그인하기" });
       expect(screen.queryByRole("link", { name: /^가족 공유/ })).toBeNull();
-      expect(screen.queryByRole("link", { name: /^가족 우편함/ })).toBeNull();
+      expect(screen.queryByRole("link", { name: /^가족 책장/ })).toBeNull();
       expect(screen.queryByRole("link", { name: /^보관함 정리/ })).toBeNull();
       expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
       expect(hrefOf(/^도움말/)).toBe("/help");

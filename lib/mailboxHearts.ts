@@ -2,7 +2,7 @@
   하트 — 부모님이 사진에(또는 책 한 권에) 누르는 가장 작은 답장.
 
   받는 쪽은 로그인이 없어서 "누가"는 이름 글자(who)다. 하트 한 개 = (이름, 사진 파일). 책마다 하트를 받는
-  우편함(설정 heart:"book")은 사진 파일이 빈 글자다. 켜고 끄는 일은 함수(mailbox_heart)가 하고, 여기는 화면이
+  책장(설정 heart:"book")은 사진 파일이 빈 글자다. 켜고 끄는 일은 함수(mailbox_heart)가 하고, 여기는 화면이
   쓰는 순수한 계산만 둔다.
 */
 
@@ -40,7 +40,7 @@ export function withHeart(hearts: Heart[], who: string, file: string, on: boolea
   return on ? [...rest, { who, file }] : rest;
 }
 
-/** 보낸 사람이 읽는 하트 한 줄(우편함·이름마다). 사진 하트는 몇 장, 책 하트는 책 하나. */
+/** 보낸 사람이 읽는 하트 한 줄(책장·이름마다). 사진 하트는 몇 장, 책 하트는 책 하나. */
 export interface HeartLine {
   mailboxId: string;
   who: string;

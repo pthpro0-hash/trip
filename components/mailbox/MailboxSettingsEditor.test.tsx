@@ -14,7 +14,7 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
   it("처음에는 모두 권장 — '권장' 표시가 각 묶음에 붙고, 안내도 그렇게 말한다", () => {
     open();
     expect(screen.getByText("지금 모두 권장 설정이에요")).toBeTruthy();
-    expect(screen.getAllByText("권장").length).toBeGreaterThanOrEqual(7);
+    expect(screen.getAllByText("권장").length).toBeGreaterThanOrEqual(8);
     expect(screen.getByRole("radio", { name: /20장/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /보통/, checked: true })).toBeTruthy();
   });
@@ -117,12 +117,26 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
     expect(within(group).getByRole("radio", { name: "안 보여 주기" })).toBeChecked();
   });
 
-  it("아직 기능이 없는 설정(보관 권수)은 화면에 내지 않지만 저장할 때 값은 지킨다", () => {
-    const stored: MailboxSettings = { ...RECOMMENDED, keep: "all" };
-    const { onSave } = open(stored);
-    expect(screen.queryByText(/보관 권수/)).toBeNull();
+  it("사진까지 보관할 책을 고른다 — 최근 10권(권장) 또는 전부", () => {
+    const { onSave } = open();
+    const group = screen.getByRole("radiogroup", { name: "사진까지 보관할 책" });
+    expect(within(group).getByRole("radio", { name: /최근 10권/ })).toBeChecked();
+    fireEvent.click(within(group).getByRole("radio", { name: /^전부/ }));
+    expect(screen.getByText("권장과 다른 설정 1개")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ keep: "all" }));
+  });
+
+  it("줄이기는 저절로 되지 않고 주인이 단추를 눌러야 한다고 말해 준다 — 무엇이 남는지도", () => {
+    open();
+    expect(screen.getByText(/저절로 지워지지 않아요/)).toBeTruthy();
+    expect(screen.getByText(/표지·하트 받은 사진/)).toBeTruthy();
+  });
+
+  it("'전부'로 저장된 설정을 열면 '전부'로 보인다", () => {
+    open({ ...RECOMMENDED, keep: "all" });
+    const group = screen.getByRole("radiogroup", { name: "사진까지 보관할 책" });
+    expect(within(group).getByRole("radio", { name: /^전부/ })).toBeChecked();
   });
 
   it("그만두기는 저장하지 않고 닫는다", () => {

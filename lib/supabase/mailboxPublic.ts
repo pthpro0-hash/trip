@@ -6,11 +6,11 @@ import { SUPABASE_URL } from "./config";
 import { POSTCARD_BUCKET } from "./postcardCleanup";
 
 /*
-  가족 우편함 · 받는 쪽(로그인 없음)이 읽고 답하는 길.
+  가족 책장 · 받는 쪽(로그인 없음)이 읽고 답하는 길.
 
-  받는 쪽은 표를 읽지 못하고, 링크의 글자를 받아 그 우편함 것만 돌려주는 함수(RPC)만 쓴다
+  받는 쪽은 표를 읽지 못하고, 링크의 글자를 받아 그 책장 것만 돌려주는 함수(RPC)만 쓴다
   (supabase/mailbox.sql). 내려받은 것은 보낸 사람의 브라우저가 적은 것이라 모양을 확인하고, 모르는
-  모양은 그리지 않는다. 모르는 링크·닫힌 우편함·오류는 모두 null — 화면은 "열리지 않는 링크"를 보인다.
+  모양은 그리지 않는다. 모르는 링크·닫힌 책장·오류는 모두 null — 화면은 "열리지 않는 링크"를 보인다.
 */
 
 /** 엽서 보관함 파일의 공개 주소. 이름은 한 칸으로 묶어 "../" 같은 것이 섞여도 폴더 밖을 못 가리킨다. */
@@ -82,7 +82,7 @@ export interface ReceivedPostcard {
   settings: MailboxSettings;
   members: string[];
   replies: Reply[];
-  /** 이 우편함에서 누가 어느 사진(책 하트면 빈 글자)에 하트를 달았나. */
+  /** 이 책장에서 누가 어느 사진(책 하트면 빈 글자)에 하트를 달았나. */
   hearts: Heart[];
 }
 
@@ -161,7 +161,7 @@ function cardOf(raw: unknown): InboxCard | null {
   };
 }
 
-/** 우편함 첫 화면: 받은 엽서 목록. 모르는 링크·닫힌 우편함이면 null. */
+/** 책장 첫 화면: 받은 엽서 목록. 모르는 링크·닫힌 책장이면 null. */
 export async function fetchMailboxView(supabase: SupabaseClient, token: string): Promise<MailboxView | null> {
   if (!isMailboxToken(token)) return null;
   const { data, error } = await supabase.rpc("mailbox_view", { box_token: token });
@@ -170,7 +170,7 @@ export async function fetchMailboxView(supabase: SupabaseClient, token: string):
   return { tone: toneOf(data.tone), settings: resolveSettings(data.settings), members: strings(data.members), postcards: cards };
 }
 
-/** 엽서 한 장. 그 우편함에 없는 엽서·모양이 틀린 스냅샷이면 null. */
+/** 엽서 한 장. 그 책장에 없는 엽서·모양이 틀린 스냅샷이면 null. */
 export async function fetchMailboxPostcard(
   supabase: SupabaseClient,
   token: string,
@@ -181,10 +181,16 @@ export async function fetchMailboxPostcard(
   if (error || !isRecord(data) || !isString(data.id) || !isString(data.senderName)) return null;
   if (!isPostcardSnapshot(data.snapshot)) return null;
   const mailbox = isRecord(data.mailbox) ? data.mailbox : {};
+  // 사진을 줄인 책은 files 에 남은 사진만 있다. 곳마다의 사진 목록도 거기 맞춘다(지도가 지워진 사진을 가리키지 않게).
+  const kept = new Set(data.snapshot.files);
+  const snapshot = {
+    ...data.snapshot,
+    visits: data.snapshot.visits.map((visit) => ({ ...visit, photos: visit.photos.filter((file) => kept.has(file)) })),
+  };
   return {
     id: data.id,
     senderName: data.senderName,
-    snapshot: data.snapshot,
+    snapshot,
     greeting: isString(data.greeting) ? data.greeting : "",
     sentAt: isString(data.sentAt) ? data.sentAt : "",
     tone: toneOf(mailbox.tone),
@@ -213,7 +219,7 @@ export async function markPostcardOpened(supabase: SupabaseClient, token: string
 export type HeartResult = { ok: true } | { ok: false; reason: "invalid" | "closed" | "often" | "changed" | "failed" };
 
 /**
- * 하트를 켜거나 끈다. 사진 하트는 파일 이름, 책 하트는 빈 글자. 서버가 우편함 설정(사진마다·책마다)과 맞지
+ * 하트를 켜거나 끈다. 사진 하트는 파일 이름, 책 하트는 빈 글자. 서버가 책장 설정(사진마다·책마다)과 맞지
  * 않으면 거절한다 — 그때는 "하트 방식이 바뀌었어요"(changed)로 알려 화면을 다시 열게 한다.
  */
 export async function toggleHeart(

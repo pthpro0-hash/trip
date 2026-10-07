@@ -15,18 +15,18 @@ describe("MailboxJoinCard", () => {
     expect(screen.getByRole("button", { name: "초대 수락하기" })).toBeTruthy();
   });
 
-  it("수락하면 알리고 내 우편함으로 안내한다", async () => {
+  it("수락하면 알리고 내 책장으로 안내한다", async () => {
     accept.mockResolvedValue({ ok: true, mailboxId: "m1" });
     render(<MailboxJoinCard token={TOKEN} />);
     fireEvent.click(screen.getByRole("button", { name: "초대 수락하기" }));
     expect(await screen.findByText(/엽서를 보낼 수 있어요/)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "내 우편함 보기" })).toHaveAttribute("href", "/mailboxes");
+    expect(screen.getByRole("link", { name: "내 책장 보기" })).toHaveAttribute("href", "/mailboxes");
   });
 
   it.each([
     ["used", /이미 쓴 초대/],
     ["expired", /기간이 지난 초대/],
-    ["closed", /닫힌 우편함/],
+    ["closed", /닫힌 책장/],
     ["full", /8명까지/],
   ])("%s 이면 이유를 알려 준다", async (reason, text) => {
     accept.mockResolvedValue({ ok: false, reason });

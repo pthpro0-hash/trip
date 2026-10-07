@@ -10,17 +10,17 @@ import {
   normalizeMembers,
   type Tone,
 } from "@/lib/mailbox";
-import { sweepPostcardFolder } from "./postcardCleanup";
+import { removePostcardFiles, sweepPostcardFolder } from "./postcardCleanup";
 
 /*
-  가족 우편함 — 만들고, 고치고, 링크를 바꾸고, 보내는 사람을 들인다.
+  가족 책장 — 만들고, 고치고, 링크를 바꾸고, 보내는 사람을 들인다.
 
   표와 규칙은 supabase/mailbox.sql 에 있다. 여기서 알아 둘 것:
 
-    - 우편함은 만든 사람(주인)만 고치고 닫는다. 보내는 사람으로 들어온 사람은 읽기만 한다
-      (엽서 링크를 만들려면 우편함 링크가 필요해서 읽을 수는 있다).
+    - 책장은 만든 사람(주인)만 고치고 닫는다. 보내는 사람으로 들어온 사람은 읽기만 한다
+      (엽서 링크를 만들려면 책장 링크가 필요해서 읽을 수는 있다).
     - 보내는 사람 표에 직접 넣는 길은 없다 — 초대 수락 함수(accept_mailbox_invite)로만 들어온다.
-    - 우편함을 지우려면 먼저 닫아야 한다(닫기 → 지우기). 지울 때는 이 우편함에만 보낸 엽서의 사진 파일을 먼저 모두
+    - 책장을 지우려면 먼저 닫아야 한다(닫기 → 지우기). 지울 때는 이 책장에만 보낸 엽서의 사진 파일을 먼저 모두
       치우고 줄은 나중에 지운다(deleteMailbox). 표에서 직접 지우는 길은 DB 가 막아 두었다 — 그러면 사진 복사본이
       어디에도 안 걸려 공개 보관함에 영영 남는다.
 */
@@ -33,7 +33,7 @@ export interface MailboxItem {
   useGreeting: boolean;
   tone: Tone;
   members: string[];
-  /** 우편함 링크의 글자. 이것을 아는 사람이 우편함을 연다. */
+  /** 책장 링크의 글자. 이것을 아는 사람이 책장을 연다. */
   token: string;
   closed: boolean;
   /** 책장 설정(사진 수·크기·부모님 화면 …). 저장된 값이 없거나 틀리면 칸마다 권장값이다. */
@@ -43,9 +43,9 @@ export interface MailboxItem {
 }
 
 export interface MailboxList {
-  /** 내가 만든 우편함. */
+  /** 내가 만든 책장. */
   owned: MailboxItem[];
-  /** 보내는 사람으로 들어간 남의 우편함. */
+  /** 보내는 사람으로 들어간 남의 책장. */
   joined: MailboxItem[];
 }
 
@@ -84,7 +84,7 @@ function clean(input: MailboxInput) {
   };
 }
 
-/** 내 우편함들. 못 읽었으면 "failed". */
+/** 내 책장들. 못 읽었으면 "failed". */
 export async function fetchMailboxes(supabase: SupabaseClient, userId: string): Promise<MailboxList | "failed"> {
   const [boxes, senders] = await Promise.all([
     supabase.from("mailboxes").select(COLUMNS).order("created_at", { ascending: true }),
@@ -116,7 +116,7 @@ export async function fetchMailboxes(supabase: SupabaseClient, userId: string): 
   return list;
 }
 
-/** 우편함을 만든다. 우편함은 3개까지. */
+/** 책장을 만든다. 책장은 3개까지. */
 export async function createMailbox(
   supabase: SupabaseClient,
   ownerId: string,
@@ -180,14 +180,14 @@ export async function setMailboxClosed(
   return { ok: false, reason: /3개/.test(error.message) ? "limit" : "failed" };
 }
 
-/** 지우면 무엇이 되나. sole 은 이 우편함에만 보낸 엽서(지워진다), kept 는 다른 우편함에도 보내서 남는 엽서의 수. */
+/** 지우면 무엇이 되나. sole 은 이 책장에만 보낸 엽서(지워진다), kept 는 다른 책장에도 보내서 남는 엽서의 수. */
 export interface MailboxDeletePlan {
   sole: string[];
   kept: number;
 }
 
 /**
- * 지울 계획을 읽는다. 내 우편함이 아니거나 닫혀 있지 않으면, 읽지 못했어도 null — 지울 수 없다.
+ * 지울 계획을 읽는다. 내 책장이 아니거나 닫혀 있지 않으면, 읽지 못했어도 null — 지울 수 없다.
  * 확인 창이 "엽서 N장이 지워져요"를 말하는 데 쓴다.
  */
 export async function planMailboxDelete(supabase: SupabaseClient, id: string): Promise<MailboxDeletePlan | null> {
@@ -204,13 +204,13 @@ export async function planMailboxDelete(supabase: SupabaseClient, id: string): P
   }
 }
 
-/** "files" 는 사진 파일을 다 못 치워 멈춘 것(우편함은 그대로), "failed" 는 그 밖의 실패. */
+/** "files" 는 사진 파일을 다 못 치워 멈춘 것(책장은 그대로), "failed" 는 그 밖의 실패. */
 export type DeleteMailboxResult = "ok" | "files" | "failed";
 
 /**
- * 닫은 우편함을 지운다. 순서는 늘 같다 — 이 우편함에만 보낸 엽서의 사진 파일을 먼저 모두 치우고, 줄은 나중에 지운다.
+ * 닫은 책장을 지운다. 순서는 늘 같다 — 이 책장에만 보낸 엽서의 사진 파일을 먼저 모두 치우고, 줄은 나중에 지운다.
  * 줄이 먼저 사라지면 폴더의 주인을 밝힐 길이 없어 사진이 공개 보관함에 영영 남는다. 파일을 하나라도 못 치우면 거기서
- * 멈춘다(우편함도 엽서 줄도 그대로 — 다시 하면 된다).
+ * 멈춘다(책장도 엽서 줄도 그대로 — 다시 하면 된다).
  */
 export async function deleteMailbox(supabase: SupabaseClient, id: string): Promise<DeleteMailboxResult> {
   const plan = await planMailboxDelete(supabase, id);
@@ -226,7 +226,70 @@ export async function deleteMailbox(supabase: SupabaseClient, id: string): Promi
   }
 }
 
-/** 보내는 사람으로 들어간 우편함에서 나간다(내 줄 하나만). */
+/** 줄일 책 하나와 그 책에서 지울 사진 파일들(표지와 하트 받은 사진은 빠져 있다). */
+export interface TrimBook {
+  id: string;
+  drop: string[];
+}
+
+export interface MailboxTrimPlan {
+  books: TrimBook[];
+}
+
+const isFileName = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9._-]{1,80}$/.test(value);
+
+/**
+ * 오래된 책의 사진을 줄일 계획을 읽는다 — 책장 설정의 보관 권수(최근 10권 …)를 넘은 책 가운데 지울 사진이 있는 것.
+ * 내 책장이 아니거나 읽지 못하면 null(아무것도 안 보인다). 모양이 틀린 줄은 버린다.
+ */
+export async function planMailboxTrim(supabase: SupabaseClient, id: string): Promise<MailboxTrimPlan | null> {
+  try {
+    const { data, error } = await supabase.rpc("mailbox_trim_plan", { box: id });
+    if (error || !data || typeof data !== "object") return null;
+    const raw = (data as { books?: unknown }).books;
+    const books = Array.isArray(raw)
+      ? raw.flatMap((entry): TrimBook[] => {
+          if (!entry || typeof entry !== "object") return [];
+          const { id: postcardId, drop } = entry as { id?: unknown; drop?: unknown };
+          if (typeof postcardId !== "string" || !isPostcardId(postcardId) || !Array.isArray(drop)) return [];
+          const files = drop.filter(isFileName);
+          return files.length > 0 ? [{ id: postcardId, drop: files }] : [];
+        })
+      : [];
+    return { books };
+  } catch {
+    return null;
+  }
+}
+
+export type TrimMailboxResult = { ok: true; books: number; files: number } | { ok: false; reason: "files" | "failed" };
+
+/**
+ * 오래된 책의 사진을 줄인다. 순서는 책장 지우기와 같다 — 사진 파일을 먼저 지우고 기록은 나중에 고친다. 한 책의 파일을
+ * 못 지워도 나머지는 계속하고, 마지막에 기록을 고친다(서버가 파일이 정말 사라진 것만 기록에서 빼므로, 지운 만큼만
+ * 맞춰진다). 못 지운 책이 있었으면 "files".
+ */
+export async function trimMailbox(supabase: SupabaseClient, id: string): Promise<TrimMailboxResult> {
+  const plan = await planMailboxTrim(supabase, id);
+  if (!plan) return { ok: false, reason: "failed" };
+  if (plan.books.length === 0) return { ok: true, books: 0, files: 0 };
+
+  let stuck = false;
+  for (const book of plan.books) {
+    if (!(await removePostcardFiles(supabase, book.id, book.drop))) stuck = true;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("mailbox_trim_apply", { box: id, cards: plan.books.map((book) => book.id) });
+    if (error || typeof data !== "number") return { ok: false, reason: "failed" };
+  } catch {
+    return { ok: false, reason: "failed" };
+  }
+  if (stuck) return { ok: false, reason: "files" };
+  return { ok: true, books: plan.books.length, files: plan.books.reduce((sum, book) => sum + book.drop.length, 0) };
+}
+
+/** 보내는 사람으로 들어간 책장에서 나간다(내 줄 하나만). */
 export async function leaveMailbox(supabase: SupabaseClient, mailboxId: string, userId: string): Promise<boolean> {
   const { error } = await supabase.from("mailbox_senders").delete().eq("mailbox_id", mailboxId).eq("user_id", userId);
   return !error;

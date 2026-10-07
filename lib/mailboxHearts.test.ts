@@ -62,7 +62,7 @@ describe("summarizeHearts · 보낸 사람이 보는 하트 한 줄", () => {
     { id: "h4", mailboxId: "m2", who: "엄마", file: "a.webp", seen: true },
   ];
 
-  it("(우편함, 이름)마다 한 줄 — 사진 하트는 몇 장인지, 책 하트는 책 하나", () => {
+  it("(책장, 이름)마다 한 줄 — 사진 하트는 몇 장인지, 책 하트는 책 하나", () => {
     expect(summarizeHearts(rows)).toEqual([
       { mailboxId: "m1", who: "엄마", photos: 2, book: false, ids: ["h1", "h2"] },
       { mailboxId: "m1", who: "아빠", photos: 0, book: true, ids: ["h3"] },

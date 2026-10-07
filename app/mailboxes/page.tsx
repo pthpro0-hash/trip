@@ -4,7 +4,7 @@ import { BackToMe } from "@/components/me/BackToMe";
 import { MailboxPanel } from "@/components/mailbox/MailboxPanel";
 
 export const metadata: Metadata = {
-  title: "가족 우편함",
+  title: "가족 책장",
   description: "여행 엽서를 부모님께 보내요.",
   robots: { index: false, follow: false },
 };
@@ -14,7 +14,7 @@ export default function MailboxesPage() {
     <main className="mx-auto flex max-w-xl flex-col gap-5 px-5 pb-20 pt-8">
       <BackToMe />
       <header>
-        <h1 className="text-[28px] font-bold tracking-tight text-text">가족 우편함</h1>
+        <h1 className="text-[28px] font-bold tracking-tight text-text">가족 책장</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-text-muted">
           다녀온 여행을 엽서로 만들어 부모님께 보내요. 받는 분은 앱도 로그인도 없이 링크 하나로 열어 보고 답장해요.
         </p>

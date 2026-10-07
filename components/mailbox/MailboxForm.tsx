@@ -5,7 +5,7 @@ import { GREETING_NAME_MAX, NAME_MAX, normalizeMembers, suggestionsFor, type Ton
 import type { MailboxInput } from "@/lib/supabase/mailbox";
 
 /*
-  우편함 하나의 모습을 정하는 칸들. 만들 때와 고칠 때 같이 쓴다.
+  책장 하나의 모습을 정하는 칸들. 만들 때와 고칠 때 같이 쓴다.
 
     이름        내가 구분하려고 붙이는 이름("우리 엄마 아빠")
     부르는 말   인사말 맨 앞에 저절로 붙는다("엄마 아빠, …")
@@ -40,7 +40,7 @@ export function MailboxForm({ initial, submitLabel, busy, onSubmit, onCancel }: 
       className="flex flex-col gap-3 rounded-xl bg-bg p-3.5 ring-1 ring-line"
     >
       <label className="flex flex-col gap-1">
-        <span className="text-[13px] font-medium text-text-muted">우편함 이름</span>
+        <span className="text-[13px] font-medium text-text-muted">책장 이름</span>
         <input
           type="text"
           value={name}

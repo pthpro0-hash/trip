@@ -57,7 +57,7 @@ export function ReceivedPostcardView({ token, card, preview = false }: { token: 
     [snapshot.files, card.id],
   );
 
-  // 받는 분 이름이 정해져 있지 않은 우편함이면 "가족"으로 답한다. 미리보기에서는 이름을 묻지 않는다.
+  // 받는 분 이름이 정해져 있지 않은 책장이면 "가족"으로 답한다. 미리보기에서는 이름을 묻지 않는다.
   const name = preview ? "미리보기" : card.members.length === 0 ? "가족" : who || null;
 
   const reply = async (reaction: string) => {
@@ -80,18 +80,18 @@ export function ReceivedPostcardView({ token, card, preview = false }: { token: 
       result.reason === "often"
         ? "답장을 너무 자주 보냈어요. 잠시 뒤에 다시 눌러 주세요."
         : result.reason === "closed"
-          ? "이 우편함은 지금 닫혀 있어요."
+          ? "이 책장은 지금 닫혀 있어요."
           : "답장을 보내지 못했어요. 잠시 뒤에 다시 눌러 주세요.",
     );
   };
 
   /*
     하트를 켜고 끈다. 누르면 먼저 눌린 모양으로 바꾸고(느린 인터넷에서도 바로 반응하게), 안 되면 되돌리고
-    이유를 말로 알린다. 이름을 모르면(여러 분이 쓰는 우편함에서 아직 안 골랐으면) 먼저 고르게 한다.
+    이유를 말로 알린다. 이름을 모르면(여러 분이 쓰는 책장에서 아직 안 골랐으면) 먼저 고르게 한다.
   */
   const heartText: Record<Exclude<HeartResult, { ok: true }>["reason"], string> = {
     often: "하트를 너무 자주 눌렀어요. 잠시 뒤에 다시 눌러 주세요.",
-    closed: "이 우편함은 지금 닫혀 있어요.",
+    closed: "이 책장은 지금 닫혀 있어요.",
     changed: "하트 방식이 바뀌었어요. 화면을 다시 열어 주세요.",
     invalid: "하트를 보내지 못했어요. 잠시 뒤에 다시 눌러 주세요.",
     failed: "하트를 보내지 못했어요. 잠시 뒤에 다시 눌러 주세요.",
@@ -252,7 +252,7 @@ export function ReceivedPostcardView({ token, card, preview = false }: { token: 
         href={mailboxPath(token, preview)}
         className="flex min-h-14 items-center justify-center rounded-2xl bg-bg-subtle rs-20 font-semibold text-text"
       >
-        우편함으로 가기
+        책장으로 가기
       </Link>
     </main>
   );

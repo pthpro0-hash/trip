@@ -11,6 +11,8 @@ import {
   sendLimits,
   settingsDiffCount,
   type MailboxSettings,
+  KEEP_CHOICES,
+  trimSavingsText,
 } from "./mailboxSettings";
 
 /*
@@ -140,5 +142,17 @@ describe("bookSizeText · 책 한 권의 보관 용량 어림", () => {
   it("장수가 적으면 용량도 준다", () => {
     expect(bookSizeText(6, 640)).toBe("약 0.3~0.4MB");
     expect(bookSizeText(12, 960)).toBe("약 1.2~1.7MB");
+  });
+});
+
+describe("보관 권수(keep) · 사진 줄이기", () => {
+  it("고를 수 있는 것은 최근 10권(권장)과 전부", () => {
+    expect([...KEEP_CHOICES]).toEqual([10, "all"]);
+  });
+
+  it("줄이면 얼마나 아끼는지 어림해 말한다 — 640px 사진 한 장 0.05~0.07MB", () => {
+    expect(trimSavingsText(0)).toBe("약 0.0~0.0MB");
+    expect(trimSavingsText(10)).toBe("약 0.5~0.7MB");
+    expect(trimSavingsText(120)).toBe("약 6.0~8.4MB");
   });
 });

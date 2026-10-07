@@ -10,7 +10,7 @@ import { fetchUnreadHeartCount, fetchUnreadReplyCount } from "@/lib/supabase/pos
 /*
   내 정보 — 흩어져 있던 것들이 한 곳에 모인 메뉴.
 
-  예전에는 위 띠의 이름을 눌러야 '가족 공유'가 열렸고, 가족 우편함은 그 맨 아래 링크로만 갈 수 있었다.
+  예전에는 위 띠의 이름을 눌러야 '가족 공유'가 열렸고, 가족 책장은 그 맨 아래 링크로만 갈 수 있었다.
   폰에서는 이름이 접혀 사진만 남아 그것이 메뉴인지도 알기 어려웠다. 이제 폰의 하단 탭 맨 끝과 위 띠의
   이름·사진이 모두 여기로 온다. 로그아웃도 여기 있다(폰의 위 띠가 빠듯해서).
 
@@ -91,7 +91,7 @@ export function MyInfoView({
 
       {state === "login" ? (
         <section className="flex flex-col items-start gap-3 rounded-2xl bg-accent-soft p-4">
-          <p className="text-[15px] leading-relaxed text-text">로그인하면 가족 공유·가족 우편함·보관함 정리를 쓸 수 있어요.</p>
+          <p className="text-[15px] leading-relaxed text-text">로그인하면 가족 공유·가족 책장·보관함 정리를 쓸 수 있어요.</p>
           <Link
             href="/login?next=/me"
             className="rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-on-accent transition hover:bg-accent-hover"
@@ -105,7 +105,7 @@ export function MyInfoView({
             <Row href="/family" title="가족 공유" hint="가족을 초대해 내 여행을 함께 봐요" />
             <Row
               href="/mailboxes"
-              title="가족 우편함"
+              title="가족 책장"
               hint="부모님께 엽서 보내기 — 앱도 로그인도 필요 없어요"
               badge={unread > 0 ? `새 소식 ${unread}` : undefined}
             />

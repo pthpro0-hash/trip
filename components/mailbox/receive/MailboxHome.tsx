@@ -13,7 +13,7 @@ import { Cover, YearMap, sentDay, tripDay, useToday } from "./shelfParts";
 import { WhoPicker } from "./WhoPicker";
 
 /*
-  우편함 첫 화면 — 부모님이 보는 곳.
+  책장 첫 화면 — 부모님이 보는 곳.
 
   글씨는 크게(본문 18px 이상), 단추는 손가락 하나 크기로. 할 수 있는 일은 "열어 보기"뿐이다. 설정·메뉴·계정은 없다.
 
@@ -212,7 +212,7 @@ export function MailboxHome({ token, view, today, preview = false }: { token: st
       {preview && <PreviewBanner all={preview === "all"} toggle={{ href: mailboxPath(token, preview === "all" ? true : "all") }} />}
 
       <header className="flex flex-col gap-2">
-        <h1 className="rs-32 font-bold tracking-tight text-text">우리 가족 우편함</h1>
+        <h1 className="rs-32 font-bold tracking-tight text-text">우리 가족 책장</h1>
         <p className="rs-18 leading-relaxed text-text-muted">
           {view.postcards.length === 0
             ? "아직 도착한 엽서가 없어요. 가족이 여행을 다녀오면 이곳으로 엽서가 와요."

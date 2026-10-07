@@ -1,5 +1,5 @@
 /*
-  책장(우편함) 설정.
+  책장 설정.
 
   권장값이 기본이다. 저장된 값은 칸마다 따로 읽는다 — 비었거나, 모양이 틀렸거나, 선택지 밖이면 그 칸만
   권장으로 되돌리고 나머지는 살린다. 저장된 값 하나가 틀려도 화면이 깨지지 않게 하려는 것이다.
@@ -7,8 +7,7 @@
   어느 설정이 어디에 쓰이나:
     photos·size   엽서를 보낼 때(새로 꽂는 책부터). 이미 보낸 엽서는 보낸 순간 그대로다.
     font·words·heart·past·year  부모님 화면(바로 바뀐다). 하트는 사진마다 / 책마다, past 는 '작년 오늘', year 는 '올해의 책'을 보일지.
-    keep  앞으로 붙는 기능의 자리. 값은 지금부터 저장할 수 있지만 그 기능이 생기기 전에는
-                  화면에 내지 않는다.
+    keep  오래된 책의 사진 줄이기(책장 주인이 단추로). 최근 10권만 사진까지, 나머지는 표지·하트 받은 사진만.
 */
 
 export type FontSize = "normal" | "large" | "xlarge";
@@ -47,6 +46,8 @@ export const PHOTO_CHOICES = [6, 12, 20] as const;
 export const SIZE_CHOICES = [640, 960] as const;
 export const FONT_CHOICES: FontSize[] = ["normal", "large", "xlarge"];
 export const HEART_CHOICES = ["photo", "book"] as const;
+/** 사진까지 보관할 책 수: 최근 10권(권장) 또는 전부. */
+export const KEEP_CHOICES = [10, "all"] as const;
 /** 답장 문구 한 칸의 글자 수. */
 export const WORD_MAX = 15;
 
@@ -85,7 +86,7 @@ export function resolveSettings(raw: unknown): MailboxSettings {
     font: pick(source.font, FONT_CHOICES, RECOMMENDED.font),
     heart: pick(source.heart, HEART_CHOICES, RECOMMENDED.heart),
     words: wordsOf(source.words),
-    keep: pick(source.keep, [10, "all"] as const, RECOMMENDED.keep),
+    keep: pick(source.keep, KEEP_CHOICES, RECOMMENDED.keep),
     past: bool(source.past, RECOMMENDED.past),
     year: bool(source.year, RECOMMENDED.year),
   };
@@ -137,5 +138,14 @@ export function settingsDiffCount(settings: MailboxSettings): number {
 export function bookSizeText(photos: number, size: number): string {
   const each = size === 960 ? [0.1, 0.14] : [0.05, 0.07];
   const [low, high] = each.map((mb) => (photos * mb).toFixed(1));
+  return `약 ${low}~${high}MB`;
+}
+
+/**
+ * 오래된 책의 사진을 줄이면 얼마나 아끼는지의 어림. 640px 사진 한 장은 50~70KB 쯤이다(960px 로 보낸 것은 더 크다 —
+ * 어림이라 작은 쪽으로 말한다).
+ */
+export function trimSavingsText(files: number): string {
+  const [low, high] = [0.05, 0.07].map((mb) => (files * mb).toFixed(1));
   return `약 ${low}~${high}MB`;
 }

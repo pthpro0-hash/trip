@@ -26,7 +26,7 @@ export const HELP_CLOSED = "help:closed";
 */
 export function FirstVisitHelp() {
   const [open, setOpen] = useState(false);
-  // 가족 우편함의 받는 쪽(부모님)에는 사용법 창을 내밀지 않는다 — 처음 온 사람이 아니라 엽서를 받은 사람이다.
+  // 가족 책장의 받는 쪽(부모님)에는 사용법 창을 내밀지 않는다 — 처음 온 사람이 아니라 엽서를 받은 사람이다.
   const receiver = isReceiverPath(usePathname() ?? "");
 
   useEffect(() => {

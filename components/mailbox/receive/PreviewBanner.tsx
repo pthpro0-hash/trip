@@ -24,7 +24,7 @@ export function PreviewBanner({ all = false, toggle }: { all?: boolean; toggle?:
         </Link>
       )}
       <Link href="/mailboxes" className="self-start font-semibold underline underline-offset-4">
-        ← 내 우편함으로
+        ← 내 책장으로
       </Link>
     </div>
   );

@@ -12,13 +12,16 @@ import {
   fetchMailboxes,
   leaveMailbox,
   planMailboxDelete,
+  planMailboxTrim,
   rotateMailboxToken,
   setMailboxClosed,
+  trimMailbox,
   updateMailbox,
   updateMailboxSettings,
   type MailboxInput,
   type MailboxItem,
   type MailboxList,
+  type MailboxTrimPlan,
   type PendingMailboxInvite,
 } from "@/lib/supabase/mailbox";
 import { fetchSentPostcards, markHeartsSeen, markRepliesSeen, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
@@ -29,17 +32,25 @@ import { REPLIES_SEEN } from "./MailboxBell";
 import { MAILBOX_LIMIT, MAILBOX_SENDER_LIMIT, mailboxInviteUrl, mailboxPath, mailboxUrl } from "@/lib/mailbox";
 import { INVITE_DAYS } from "@/lib/family";
 import { MailboxForm } from "./MailboxForm";
+import { trimSavingsText } from "@/lib/mailboxSettings";
 import { MailboxSettingsEditor } from "./MailboxSettingsEditor";
 
 /*
-  내 우편함 — 집 한 곳당 하나. 부모님 두 분은 한 우편함에서 같이 받는다.
+  내 책장 — 집 한 곳당 하나. 부모님 두 분은 한 책장에서 같이 받는다.
 
-  위에서부터: 내가 만든 우편함(만들기·고치기·링크·보내는 사람 초대·닫기·지우기) → 보내는 사람으로 들어간 우편함.
-  되돌릴 수 없는 일(링크 새로 만들기, 닫기, 지우기, 나가기)은 한 번 더 묻는다. 지우기는 닫은 우편함에만 있다 —
+  위에서부터: 내가 만든 책장(만들기·고치기·링크·보내는 사람 초대·닫기·지우기) → 보내는 사람으로 들어간 책장.
+  되돌릴 수 없는 일(링크 새로 만들기, 닫기, 지우기, 나가기)은 한 번 더 묻는다. 지우기는 닫은 책장에만 있다 —
   닫기(되돌릴 수 있다) → 지우기(되돌릴 수 없다) 두 단계라 실수로 지우기 어렵다.
 */
 
-type Loaded = { userId: string; list: MailboxList; invites: PendingMailboxInvite[]; sent: SentPostcard[] };
+/** trims: 책장 id → 오래된 책의 사진을 줄일 계획(줄일 책이 있는 책장만). */
+type Loaded = {
+  userId: string;
+  list: MailboxList;
+  invites: PendingMailboxInvite[];
+  sent: SentPostcard[];
+  trims: Record<string, MailboxTrimPlan>;
+};
 
 const TONE_LABEL = { casual: "편하게", polite: "존댓말" } as const;
 
@@ -69,7 +80,7 @@ function heartTarget(line: HeartLine): string {
  * 부모님 화면을 미리 본다(새 탭). 받는 쪽 화면 그대로이되 "열어 봤다" 표시·답장·하트는 가지 않는다.
  * 모든 엽서를 열어 본 것처럼 보여 준다 — 부모님이 열어 본 엽서가 없으면 책꽂이가 비어 있어, 보내는 쪽에서는 책꽂이를
  * 볼 길이 없기 때문이다(화면 위 띠에서 '지금 부모님이 보시는 대로'로 바꿀 수 있다).
- * 닫은 우편함은 부모님께 아무것도 안 보이니 미리볼 것도 없다.
+ * 닫은 책장은 부모님께 아무것도 안 보이니 미리볼 것도 없다.
  */
 function Preview({ box }: { box: MailboxItem }) {
   if (box.closed) {
@@ -90,14 +101,14 @@ export function MailboxPanel() {
   const [state, setState] = useState<Loaded | "loading" | "login" | "failed">("loading");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  /** 만들기 칸이 열려 있나, 고치는 중인 우편함 id. */
+  /** 만들기 칸이 열려 있나, 고치는 중인 책장 id. */
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
-  /** 설정 칸이 열려 있는 우편함 id. */
+  /** 설정 칸이 열려 있는 책장 id. */
   const [configuring, setConfiguring] = useState<string | null>(null);
   /** 한 번 더 묻는 중인 일("rotate-<id>", "close-<id>", "leave-<id>"). */
   const [asking, setAsking] = useState<string | null>(null);
-  /** 지우기 확인 창이 말할 숫자 — 이 우편함에만 보낸 엽서(지워진다)와 다른 우편함에도 가서 남는 엽서. */
+  /** 지우기 확인 창이 말할 숫자 — 이 책장에만 보낸 엽서(지워진다)와 다른 책장에도 가서 남는 엽서. */
   const [deletePlan, setDeletePlan] = useState<{ id: string; sole: number; kept: number } | null>(null);
   /** 방금 만든 보내는 사람 초대의 글자(바로 복사할 수 있게 크게 보여 준다). */
   const [freshInvite, setFreshInvite] = useState<string | null>(null);
@@ -115,11 +126,21 @@ export function MailboxPanel() {
     const [list, invites, sent] = await Promise.all([
       fetchMailboxes(supabase, data.user.id),
       fetchMailboxInvites(supabase, data.user.id),
-      // 보낸 엽서는 곁다리다. 못 읽어도 우편함 관리는 된다.
+      // 보낸 엽서는 곁다리다. 못 읽어도 책장 관리는 된다.
       fetchSentPostcards(supabase, data.user.id).catch(() => []),
     ]);
     if (list === "failed" || invites === "failed") return setState("failed");
-    setState({ userId: data.user.id, list, invites, sent });
+    // 오래된 책의 사진 줄이기는 곁다리다. 못 읽으면(서버 설정 전) 그 칸만 없다. 열려 있고 보관을 '전부'로 안 둔 곳만 묻는다.
+    const trims: Record<string, MailboxTrimPlan> = {};
+    await Promise.all(
+      list.owned
+        .filter((box) => !box.closed && box.settings.keep !== "all")
+        .map(async (box) => {
+          const plan = await planMailboxTrim(supabase, box.id);
+          if (plan && plan.books.length > 0) trims[box.id] = plan;
+        }),
+    );
+    setState({ userId: data.user.id, list, invites, sent, trims });
 
     // 아직 못 본 답장·하트는 이 화면이 보여 주는 순간 "봤다"고 적는다. 위 띠의 새 소식 표시도 따라 사라진다.
     const unseen = sent.flatMap((card) => card.replies.filter((reply) => !reply.seen).map((reply) => reply.id));
@@ -145,7 +166,7 @@ export function MailboxPanel() {
   if (state === "login") {
     return (
       <p className="text-[15px] text-text-muted">
-        가족 우편함은 로그인해야 쓸 수 있어요.{" "}
+        가족 책장은 로그인해야 쓸 수 있어요.{" "}
         <Link href="/login?next=/mailboxes" className="font-medium text-accent hover:text-accent-hover">
           로그인하기
         </Link>
@@ -163,7 +184,7 @@ export function MailboxPanel() {
     );
   }
 
-  const { userId, list, invites, sent } = state;
+  const { userId, list, invites, sent, trims } = state;
   const nameOf = new Map([...list.owned, ...list.joined].map((box) => [box.id, box.name]));
   const openCount = list.owned.filter((box) => !box.closed).length;
   const full = openCount >= MAILBOX_LIMIT;
@@ -197,7 +218,7 @@ export function MailboxPanel() {
         setCreating(false);
         return null;
       }
-      if (result.reason === "limit") return `우편함은 ${MAILBOX_LIMIT}개까지 열어 둘 수 있어요.`;
+      if (result.reason === "limit") return `책장은 ${MAILBOX_LIMIT}개까지 열어 둘 수 있어요.`;
       if (result.reason === "invalid") return "이름은 1~40자, 부르는 말은 20자까지예요.";
       return "만들지 못했어요. 잠시 뒤 다시 해 주세요.";
     });
@@ -245,7 +266,7 @@ export function MailboxPanel() {
       setAsking(null);
       if (result.ok) return null;
       return result.reason === "limit"
-        ? `열려 있는 우편함이 이미 ${MAILBOX_LIMIT}개예요. 하나를 닫고 다시 열어 주세요.`
+        ? `열려 있는 책장이 이미 ${MAILBOX_LIMIT}개예요. 하나를 닫고 다시 열어 주세요.`
         : "바꾸지 못했어요.";
     });
 
@@ -269,12 +290,27 @@ export function MailboxPanel() {
       if (result === "ok") {
         setAsking(null);
         setDeletePlan(null);
-        return "우편함을 지웠어요.";
+        return "책장을 지웠어요.";
       }
       // 못 지웠으면 확인 창을 그대로 둔다 — 다시 누르면 된다.
       return result === "files"
-        ? "사진을 모두 지우지 못했어요. 우편함은 그대로 있어요. 잠시 뒤 다시 해 주세요."
-        : "우편함을 지우지 못했어요. 잠시 뒤 다시 해 주세요.";
+        ? "사진을 모두 지우지 못했어요. 책장은 그대로 있어요. 잠시 뒤 다시 해 주세요."
+        : "책장을 지우지 못했어요. 잠시 뒤 다시 해 주세요.";
+    });
+
+  /** 보관 권수를 넘은 오래된 책의 사진 파일을 지우고 기록을 맞춘다. 못 지웠으면 확인 창을 그대로 둔다 — 다시 누르면 된다. */
+  const trimBooks = (box: MailboxItem) =>
+    run(async () => {
+      const supabase = getBrowserClient();
+      if (!supabase) return "지금은 쓸 수 없어요.";
+      const result = await trimMailbox(supabase, box.id);
+      if (result.ok) {
+        setAsking(null);
+        return `오래된 책 ${result.books}권의 사진 ${result.files}장을 줄였어요.`;
+      }
+      return result.reason === "files"
+        ? "사진을 모두 지우지 못했어요. 지운 만큼만 줄였어요. 잠시 뒤 다시 해 주세요."
+        : "사진을 줄이지 못했어요. 잠시 뒤 다시 해 주세요.";
     });
 
   const invite = (box: MailboxItem) =>
@@ -321,8 +357,8 @@ export function MailboxPanel() {
       )}
 
       <Section
-        title={`내 우편함 ${openCount}/${MAILBOX_LIMIT}`}
-        note="집 한 곳당 하나예요. 부모님 두 분은 한 우편함에서 같이 받아요. 받는 분은 링크 하나로 열고, 로그인은 필요 없어요."
+        title={`내 책장 ${openCount}/${MAILBOX_LIMIT}`}
+        note="집 한 곳당 하나예요. 부모님 두 분은 한 책장에서 같이 받아요. 받는 분은 링크 하나로 열고, 로그인은 필요 없어요."
       >
         {list.owned.length === 0 && !creating && <p className="text-[14px] text-text-faint">아직 없어요.</p>}
 
@@ -363,7 +399,7 @@ export function MailboxPanel() {
             <article
               key={box.id}
               aria-label={box.name}
-              // 닫은 우편함은 바탕색을 달리해 한눈에 구분한다(받는 쪽에는 아무것도 안 보이는 상태).
+              // 닫은 책장은 바탕색을 달리해 한눈에 구분한다(받는 쪽에는 아무것도 안 보이는 상태).
               data-closed={box.closed ? "true" : undefined}
               className={`flex flex-col gap-2.5 rounded-xl p-3.5 ring-1 ring-line ${box.closed ? "bg-bg-subtle" : "bg-bg"}`}
             >
@@ -379,8 +415,42 @@ export function MailboxPanel() {
                 보내는 사람 {box.senderCount}명 · 책 한 권 사진 {box.settings.photos}장
               </p>
 
+              {trims[box.id] && (
+                <div className="flex flex-col gap-2 rounded-lg bg-accent-soft p-3 text-[13px] leading-relaxed">
+                  {(() => {
+                    const books = trims[box.id].books.length;
+                    const files = trims[box.id].books.reduce((sum, book) => sum + book.drop.length, 0);
+                    return asking === `trim-${box.id}` ? (
+                      <>
+                        <p className="font-medium text-text">
+                          오래된 책 {books}권의 사진 {files}장을 지워요({trimSavingsText(files)}). 표지와 하트 받은 사진은 남고, 한 줄 인사말·지도·답장·하트는
+                          그대로예요. 되돌릴 수 없어요.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button type="button" disabled={busy} onClick={() => void trimBooks(box)} className="rounded-full bg-text px-3.5 py-1.5 font-medium text-bg disabled:opacity-60">
+                            줄이기
+                          </button>
+                          <button type="button" onClick={() => setAsking(null)} className="text-text-muted">
+                            그만두기
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-text">
+                          오래된 책 {books}권의 사진 {files}장을 줄일 수 있어요 · {trimSavingsText(files)} 절약
+                        </p>
+                        <button type="button" className={`${pill} self-start`} onClick={() => setAsking(`trim-${box.id}`)}>
+                          사진 줄이기
+                        </button>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-1.5">
-                <button type="button" className={pill} disabled={box.closed} onClick={() => void copy(mailboxUrl(window.location.origin, box.token), "받는 분께 보낼 우편함 링크를 복사했어요.")}>
+                <button type="button" className={pill} disabled={box.closed} onClick={() => void copy(mailboxUrl(window.location.origin, box.token), "받는 분께 보낼 책장 링크를 복사했어요.")}>
                   링크 복사
                 </button>
                 <Preview box={box} />
@@ -418,12 +488,12 @@ export function MailboxPanel() {
               ) : asking === `delete-${box.id}` && deletePlan?.id === box.id ? (
                 <div className="flex flex-col gap-2 rounded-lg bg-bg-subtle p-3 text-[13px] leading-relaxed">
                   <p className="font-medium text-text">
-                    ‘{box.name}’ 우편함을 지울까요?{" "}
+                    ‘{box.name}’ 책장을 지울까요?{" "}
                     {deletePlan.sole > 0
-                      ? `이 우편함에만 보낸 엽서 ${deletePlan.sole}장과 그 사진 복사본·답장·하트가 모두 지워지고 되돌릴 수 없어요.`
-                      : "이 우편함에만 보낸 엽서는 없어요. 받은 답장·하트와 보내는 사람 초대가 지워지고 되돌릴 수 없어요."}
+                      ? `이 책장에만 보낸 엽서 ${deletePlan.sole}장과 그 사진 복사본·답장·하트가 모두 지워지고 되돌릴 수 없어요.`
+                      : "이 책장에만 보낸 엽서는 없어요. 받은 답장·하트와 보내는 사람 초대가 지워지고 되돌릴 수 없어요."}
                   </p>
-                  {deletePlan.kept > 0 && <p className="text-text-muted">다른 우편함에도 보낸 엽서 {deletePlan.kept}장은 그쪽에 그대로 남아요.</p>}
+                  {deletePlan.kept > 0 && <p className="text-text-muted">다른 책장에도 보낸 엽서 {deletePlan.kept}장은 그쪽에 그대로 남아요.</p>}
                   <p className="text-text-muted">내 여행과 원본 사진은 그대로예요. 받는 분의 링크는 다시 열리지 않아요.</p>
                   <div className="flex items-center gap-2">
                     <button type="button" disabled={busy} onClick={() => void removeBox(box)} className="rounded-full bg-[#d70015] px-3.5 py-1.5 font-medium text-white disabled:opacity-60">
@@ -445,12 +515,12 @@ export function MailboxPanel() {
                         다시 열기
                       </button>
                       <button type="button" disabled={busy} onClick={() => void askDelete(box)} className="text-[#d70015] hover:opacity-80">
-                        우편함 지우기
+                        책장 지우기
                       </button>
                     </>
                   ) : (
                     <button type="button" onClick={() => setAsking(`close-${box.id}`)} className="hover:text-text">
-                      우편함 닫기
+                      책장 닫기
                     </button>
                   )}
                 </div>
@@ -493,22 +563,22 @@ export function MailboxPanel() {
         })}
 
         {creating ? (
-          <MailboxForm submitLabel="우편함 만들기" busy={busy} onSubmit={(input) => void create(input)} onCancel={() => setCreating(false)} />
+          <MailboxForm submitLabel="책장 만들기" busy={busy} onSubmit={(input) => void create(input)} onCancel={() => setCreating(false)} />
         ) : full ? (
-          <p className="text-[14px] text-text-muted">우편함은 {MAILBOX_LIMIT}개까지 열어 둘 수 있어요. 하나를 닫으면 새로 만들 수 있어요.</p>
+          <p className="text-[14px] text-text-muted">책장은 {MAILBOX_LIMIT}개까지 열어 둘 수 있어요. 하나를 닫으면 새로 만들 수 있어요.</p>
         ) : (
           <button
             type="button"
             onClick={() => setCreating(true)}
             className="self-start rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-on-accent transition hover:bg-accent-hover"
           >
-            우편함 만들기
+            책장 만들기
           </button>
         )}
 
         {list.owned.some((box) => !box.closed) && (
           <p className="text-[12px] leading-relaxed text-text-faint">
-            보내는 사람 초대는 {INVITE_DAYS}일 안에 한 번만 쓸 수 있고, 한 우편함에 {MAILBOX_SENDER_LIMIT}명까지 들일 수 있어요.
+            보내는 사람 초대는 {INVITE_DAYS}일 안에 한 번만 쓸 수 있고, 한 책장에 {MAILBOX_SENDER_LIMIT}명까지 들일 수 있어요.
             링크가 퍼졌다면 &lsquo;링크 새로 만들기&rsquo;로 옛 링크를 끊을 수 있어요.
           </p>
         )}
@@ -517,7 +587,7 @@ export function MailboxPanel() {
       {sent.length > 0 && (
         <Section
           title={`보낸 엽서 ${sent.length}장`}
-          note="받는 분이 열어 봤는지, 답장했는지 볼 수 있어요. 엽서는 보낸 순간 그대로 남고, 거두면 모든 우편함에서 사라져요."
+          note="받는 분이 열어 봤는지, 답장했는지 볼 수 있어요. 엽서는 보낸 순간 그대로 남고, 거두면 모든 책장에서 사라져요."
         >
           <ul className="flex flex-col gap-2">
             {sent.map((card) => (
@@ -531,7 +601,7 @@ export function MailboxPanel() {
                 <ul className="flex flex-col gap-0.5 text-[13px] text-text-muted">
                   {card.deliveries.map((delivery) => (
                     <li key={delivery.mailboxId}>
-                      {nameOf.get(delivery.mailboxId) ?? "우편함"} ·{" "}
+                      {nameOf.get(delivery.mailboxId) ?? "책장"} ·{" "}
                       <span className={delivery.opened ? "text-accent" : ""}>
                         {delivery.opened ? "열어 보셨어요" : "아직 안 열어 보셨어요"}
                       </span>
@@ -547,7 +617,7 @@ export function MailboxPanel() {
                           {attachParticle(reply.who, "이", "가")} &lsquo;{reply.reaction}&rsquo; 하셨어요
                         </span>
                         {card.deliveries.length > 1 && (
-                          <span className="text-[12px] text-text-faint">· {nameOf.get(reply.mailboxId) ?? "우편함"}</span>
+                          <span className="text-[12px] text-text-faint">· {nameOf.get(reply.mailboxId) ?? "책장"}</span>
                         )}
                         {fresh.has(reply.id) && (
                           <span className="rounded-full bg-[#d70015] px-2 py-0.5 text-[11px] font-bold text-white">새 답장</span>
@@ -567,7 +637,7 @@ export function MailboxPanel() {
                           {attachParticle(line.who, "이", "가")} {heartTarget(line)} 하트를 눌렀어요
                         </span>
                         {card.deliveries.length > 1 && (
-                          <span className="text-[12px] text-text-faint">· {nameOf.get(line.mailboxId) ?? "우편함"}</span>
+                          <span className="text-[12px] text-text-faint">· {nameOf.get(line.mailboxId) ?? "책장"}</span>
                         )}
                         {line.ids.some((id) => fresh.has(id)) && (
                           <span className="rounded-full bg-[#d70015] px-2 py-0.5 text-[11px] font-bold text-white">새 하트</span>
@@ -598,7 +668,7 @@ export function MailboxPanel() {
       )}
 
       {list.joined.length > 0 && (
-        <Section title="보내는 사람으로 들어간 우편함" note="다른 가족이 만든 우편함이에요. 이곳에도 엽서를 보낼 수 있어요.">
+        <Section title="보내는 사람으로 들어간 책장" note="다른 가족이 만든 책장이에요. 이곳에도 엽서를 보낼 수 있어요.">
           <ul className="flex flex-col gap-2">
             {list.joined.map((box) => (
               <li
@@ -612,13 +682,13 @@ export function MailboxPanel() {
                 </div>
                 <p className="text-[13px] text-text-muted">받는 분 {box.members.join(" · ") || "—"} · 보내는 사람 {box.senderCount}명</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" className={pill} disabled={box.closed} onClick={() => void copy(mailboxUrl(window.location.origin, box.token), "우편함 링크를 복사했어요.")}>
+                  <button type="button" className={pill} disabled={box.closed} onClick={() => void copy(mailboxUrl(window.location.origin, box.token), "책장 링크를 복사했어요.")}>
                     링크 복사
                   </button>
                   <Preview box={box} />
                   {asking === `leave-${box.id}` ? (
                     <>
-                      <span className="text-[13px] text-text">나가면 이 우편함에 엽서를 보낼 수 없어요.</span>
+                      <span className="text-[13px] text-text">나가면 이 책장에 엽서를 보낼 수 없어요.</span>
                       <button type="button" disabled={busy} onClick={() => void leave(box)} className="rounded-full bg-text px-3.5 py-1.5 text-[13px] font-medium text-bg">
                         나가기
                       </button>

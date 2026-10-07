@@ -425,3 +425,62 @@ describe("mailbox.sql · 우편함 지우기", () => {
     for (const verb of ["insert", "update"]) expect(policy(`postcards_files_${verb}_own`)).not.toContain("owns_all_deliveries");
   });
 });
+
+describe("mailbox.sql · 오래된 책의 사진 줄이기", () => {
+  it("보관 권수는 설정(keep)에서 읽는다 — 'all' 이면 제한 없음(null), 비었거나 모르는 값이면 권장 10", () => {
+    const body = fn("mailbox_keep_count");
+    expect(body).toContain("to_jsonb('all'::text)");
+    expect(body).toMatch(/else 10/);
+  });
+
+  it("줄이기 계획·적용은 로그인한 사람만, 우편함 주인만 부른다", () => {
+    for (const name of ["mailbox_trim_plan", "mailbox_trim_apply"]) {
+      const body = fn(name);
+      expect(body, name).toContain("security definer");
+      expect(body, name).toMatch(/owner_id = auth\.uid\(\)/);
+      expect(sql).toMatch(new RegExp(`revoke all on function public\\.${name}\\([^)]*\\) from public`));
+      expect(sql).toMatch(new RegExp(`grant execute on function public\\.${name}\\([^)]*\\) to authenticated`));
+      expect(sql, name).not.toMatch(new RegExp(`grant execute on function public\\.${name}\\([^)]*\\) to[^;]*anon`));
+    }
+  });
+
+  it("후보를 고르는 안쪽 함수는 아무에게도 열지 않는다 — 계획·적용 함수만 부른다", () => {
+    expect(sql).toMatch(/revoke all on function public\.mailbox_trim_candidates\(uuid\) from public/);
+    expect(sql).not.toMatch(/grant execute on function public\.mailbox_trim_candidates/);
+    expect(sql).not.toMatch(/grant execute on function public\.mailbox_keep_count/);
+  });
+
+  it("배달된 우편함이 모두 내 것이고, 모든 우편함에서 보관 권수를 넘은 책만 후보다", () => {
+    const body = fn("mailbox_trim_candidates");
+    expect(body).toContain("owns_all_deliveries");
+    expect(body).toContain("mailbox_keep_count");
+    expect(body).toMatch(/x\.keep is null or x\.rank <= x\.keep/);
+    expect(body).toContain("row_number() over");
+  });
+
+  it("표지(첫 사진)와 하트를 받은 사진은 지울 목록에서 뺀다", () => {
+    const body = fn("mailbox_trim_candidates");
+    expect(body).toMatch(/snapshot -> 'files' ->> 0/);
+    expect(body).toContain("postcard_hearts");
+  });
+
+  it("적용은 사진 파일이 정말 사라진 것만 기록에서 뺀다 — 파일이 남아 있으면 기록도 둔다", () => {
+    const body = fn("mailbox_trim_apply");
+    expect(body).toContain("delete from public.postcard_photos");
+    expect(body).toMatch(/not exists \(select 1 from storage\.objects/);
+  });
+
+  it("받는 쪽은 남은 사진만 본다 — 목록의 사진 수·표지·곳의 대표 사진과 엽서 한 장의 files 모두", () => {
+    const view = fn("mailbox_view");
+    expect(view).toContain("postcard_live_files");
+    const card = fn("mailbox_postcard");
+    expect(card).toContain("postcard_live_files");
+    expect(card).toContain("jsonb_set");
+  });
+
+  it("남은 사진은 복사본 기록(postcard_photos)에서 읽는다 — 기록이 아예 없으면 스냅샷의 것을 그대로", () => {
+    const body = fn("postcard_live_files");
+    expect(body).toContain("public.postcard_photos");
+    expect(body).toMatch(/coalesce\(snap -> 'files'/);
+  });
+});

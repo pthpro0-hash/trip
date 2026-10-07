@@ -78,7 +78,7 @@ describe("activeNav · 켜질 갈래", () => {
     expect(activeNav("/course", null)).toBe("spots");
   });
 
-  it("내 정보와 그 안의 가족 공유·가족 우편함은 '내 정보'", () => {
+  it("내 정보와 그 안의 가족 공유·가족 책장은 '내 정보'", () => {
     for (const path of ["/me", "/family", "/mailboxes", "/mailboxes/join/abc"]) expect(activeNav(path, null)).toBe("me");
   });
 
@@ -97,7 +97,7 @@ describe("activeNav · 켜질 갈래", () => {
   });
 });
 
-describe("isReceiverPath · 가족 우편함 받는 쪽", () => {
+describe("isReceiverPath · 가족 책장 받는 쪽", () => {
   /*
     부모님은 링크 하나로 들어온다. 위 띠(내 여행·여행 100선·로그인)와 하단 탭, 처음 온 사람 안내창이
     보이면 어디를 눌러야 할지 헷갈린다 — 받는 쪽에는 엽서와 답장 단추뿐이다.

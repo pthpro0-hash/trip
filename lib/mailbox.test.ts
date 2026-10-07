@@ -33,7 +33,7 @@ import type { TripDetail } from "./supabase/tripDetail";
 import type { PostcardSnapshot as PostcardSnapshotLike } from "./mailbox";
 
 describe("한도", () => {
-  it("우편함은 3개, 보내는 사람은 8명, 책 한 권 사진은 최대 20장", () => {
+  it("책장은 3개, 보내는 사람은 8명, 책 한 권 사진은 최대 20장", () => {
     expect(MAILBOX_LIMIT).toBe(3);
     expect(MAILBOX_SENDER_LIMIT).toBe(8);
     expect(POSTCARD_PHOTOS_MAX).toBe(20);
@@ -45,7 +45,7 @@ describe("한도", () => {
 });
 
 describe("링크의 글자", () => {
-  it("우편함 링크와 엽서 주소는 무작위이고 서로 다르다", () => {
+  it("책장 링크와 엽서 주소는 무작위이고 서로 다르다", () => {
     expect(newMailboxToken()).not.toBe(newMailboxToken());
     expect(newPostcardId()).not.toBe(newPostcardId());
     expect(isMailboxToken(newMailboxToken())).toBe(true);
@@ -127,7 +127,7 @@ describe("greetingsFor · 복사 후 수정", () => {
     { id: "b", greetingName: "장모님", useGreeting: true },
   ];
 
-  it("처음 쓴 본문을 모든 우편함에 복사하고 호칭만 우편함 것을 붙인다", () => {
+  it("처음 쓴 본문을 모든 책장에 복사하고 호칭만 책장 것을 붙인다", () => {
     const result = greetingsFor("바다 보고 왔어요!", boxes, {});
     expect(result).toEqual([
       { mailboxId: "a", body: "바다 보고 왔어요!", edited: false, text: "엄마 아빠, 바다 보고 왔어요!" },
@@ -135,13 +135,13 @@ describe("greetingsFor · 복사 후 수정", () => {
     ]);
   });
 
-  it("직접 고친 우편함은 그 글을 쓰고 '고쳤다'고 표시한다", () => {
+  it("직접 고친 책장은 그 글을 쓰고 '고쳤다'고 표시한다", () => {
     const result = greetingsFor("바다 보고 왔어요!", boxes, { b: "건강하시죠? 바다 보고 왔습니다." });
     expect(result[0].edited).toBe(false);
     expect(result[1]).toEqual({ mailboxId: "b", body: "건강하시죠? 바다 보고 왔습니다.", edited: true, text: "장모님, 건강하시죠? 바다 보고 왔습니다." });
   });
 
-  it("처음 글을 고치면 고치지 않은 우편함만 따라간다", () => {
+  it("처음 글을 고치면 고치지 않은 책장만 따라간다", () => {
     const result = greetingsFor("산 보고 왔어요", boxes, { b: "직접 쓴 글" });
     expect(result.map((r) => r.body)).toEqual(["산 보고 왔어요", "직접 쓴 글"]);
   });
@@ -154,11 +154,11 @@ describe("greetingsFor · 복사 후 수정", () => {
 });
 
 describe("suggestionsFor · 말투별 추천 문구", () => {
-  it("존댓말 우편함에는 존대 인사를 권한다", () => {
+  it("존댓말 책장에는 존대 인사를 권한다", () => {
     expect(suggestionsFor("polite")).toContain("건강하시죠?");
   });
 
-  it("편한 우편함에는 편한 말을 권한다", () => {
+  it("편한 책장에는 편한 말을 권한다", () => {
     const casual = suggestionsFor("casual");
     expect(casual.length).toBeGreaterThan(0);
     expect(casual).not.toContain("건강하시죠?");
@@ -353,7 +353,7 @@ describe("미리보기 주소", () => {
     expect(postcardPath(TOKEN, CARD)).toBe(`/m/${TOKEN}/p/${CARD}`);
   });
 
-  it("미리보기 주소에는 preview=1 이 붙는다 — 우편함에도 엽서에도", () => {
+  it("미리보기 주소에는 preview=1 이 붙는다 — 책장에도 엽서에도", () => {
     expect(mailboxPath(TOKEN, true)).toBe(`/m/${TOKEN}?preview=1`);
     expect(postcardPath(TOKEN, CARD, true)).toBe(`/m/${TOKEN}/p/${CARD}?preview=1`);
   });

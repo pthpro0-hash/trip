@@ -181,7 +181,7 @@ const input = {
 };
 
 describe("sendPostcard · 보내는 순서", () => {
-  it("엽서 줄 → 복사본 기록 → 사진 올리기 → 우편함에 넣기 순서로, 사진은 한 번만 복사한다", async () => {
+  it("엽서 줄 → 복사본 기록 → 사진 올리기 → 책장에 넣기 순서로, 사진은 한 번만 복사한다", async () => {
     const f = fake();
     const result = await sendPostcard(f.supabase, input);
     expect(result.ok).toBe(true);
@@ -190,7 +190,7 @@ describe("sendPostcard · 보내는 순서", () => {
     expect(order[1]).toBe("insert postcard_photos");
     expect(order.slice(2, 4).every((entry) => entry.startsWith("upload "))).toBe(true);
     expect(order[4]).toBe("insert postcard_deliveries");
-    // 우편함이 둘이어도 사진은 두 장만 — 우편함마다 복사하지 않는다.
+    // 책장이 둘이어도 사진은 두 장만 — 책장마다 복사하지 않는다.
     expect(f.uploaded).toHaveLength(2);
   });
 
@@ -226,7 +226,7 @@ describe("sendPostcard · 보내는 순서", () => {
     );
   });
 
-  it("우편함마다 인사말이 따로 들어간다", async () => {
+  it("책장마다 인사말이 따로 들어간다", async () => {
     const f = fake();
     await sendPostcard(f.supabase, input);
     expect(f.inserted.postcard_deliveries).toEqual([
@@ -245,7 +245,7 @@ describe("sendPostcard · 보내는 순서", () => {
 });
 
 describe("sendPostcard · 실패하면 깨끗이 되돌린다", () => {
-  it("사진을 올리지 못하면 올린 것을 치우고 엽서 줄도 지운다 — 우편함에는 넣지 않는다", async () => {
+  it("사진을 올리지 못하면 올린 것을 치우고 엽서 줄도 지운다 — 책장에는 넣지 않는다", async () => {
     const f = fake({ failUpload: true });
     const result = await sendPostcard(f.supabase, input);
     expect(result).toEqual({ ok: false, reason: "photos" });
@@ -253,7 +253,7 @@ describe("sendPostcard · 실패하면 깨끗이 되돌린다", () => {
     expect(f.inserted.postcard_deliveries).toBeUndefined();
   });
 
-  it("우편함에 넣다 실패해도 사진과 엽서 줄을 치운다", async () => {
+  it("책장에 넣다 실패해도 사진과 엽서 줄을 치운다", async () => {
     const f = fake({ failInsert: "postcard_deliveries" });
     const result = await sendPostcard(f.supabase, input);
     expect(result).toEqual({ ok: false, reason: "failed" });
@@ -270,7 +270,7 @@ describe("sendPostcard · 실패하면 깨끗이 되돌린다", () => {
     expect(f.uploaded).toHaveLength(0);
   });
 
-  it("받을 우편함이 없거나, 이름이 비었거나, 같은 사진을 두 번 골랐으면 묻지도 않는다", async () => {
+  it("받을 책장이 없거나, 이름이 비었거나, 같은 사진을 두 번 골랐으면 묻지도 않는다", async () => {
     const f = fake();
     expect(await sendPostcard(f.supabase, { ...input, deliveries: [] })).toEqual({ ok: false, reason: "invalid" });
     expect(await sendPostcard(f.supabase, { ...input, senderName: "  " })).toEqual({ ok: false, reason: "invalid" });
@@ -444,7 +444,7 @@ describe("지울 때 보여 줄 숫자", () => {
 });
 
 describe("fetchSentPostcards · 보낸 엽서 목록", () => {
-  it("엽서마다 제목·날짜·어느 우편함에 넣었는지·열어 봤는지", async () => {
+  it("엽서마다 제목·날짜·어느 책장에 넣었는지·열어 봤는지", async () => {
     const f = fake({
       sentRows: [
         { id: "pc1", trip_id: "t1", created_at: "2026-10-02T00:00:00Z", snapshot: { title: "강릉 바다", startedOn: "2026-09-13" } },
@@ -558,7 +558,7 @@ describe("하트 알림 · 보낸 사람이 받는 소식", () => {
     expect(card.hearts).toEqual([]);
   });
 
-  it("못 본 하트의 수는 (엽서, 우편함, 이름)마다 하나로 센다 — 사진 스무 장에 눌러도 한 소식", async () => {
+  it("못 본 하트의 수는 (엽서, 책장, 이름)마다 하나로 센다 — 사진 스무 장에 눌러도 한 소식", async () => {
     const row = (id: string, who: string, card = "pc1") => ({ id, postcard_id: card, mailbox_id: "m1", who });
     const f = fake({ heartRows: [row("1", "엄마"), row("2", "엄마"), row("3", "엄마"), row("4", "아빠"), row("5", "엄마", "pc2")] });
     expect(await fetchUnreadHeartCount(f.supabase)).toBe(3);

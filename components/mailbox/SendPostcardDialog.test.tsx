@@ -61,19 +61,19 @@ const open = () => render(<SendPostcardDialog userId="me" trip={trip} photoUrls=
 
 describe("SendPostcardDialog", () => {
   beforeEach(() => {
-    state.boxes = [box({ id: "m1" }), box({ id: "m2", name: "장인 장모님 우편함", greetingName: "장모님", tone: "polite", token: "U".repeat(43) })];
+    state.boxes = [box({ id: "m1" }), box({ id: "m2", name: "장인 장모님 책장", greetingName: "장모님", tone: "polite", token: "U".repeat(43) })];
     send.mockReset();
     send.mockResolvedValue({ ok: true, postcardId: "P".repeat(43) });
     window.localStorage.clear();
   });
 
-  it("우편함이 없으면 만들러 가는 안내", async () => {
+  it("책장이 없으면 만들러 가는 안내", async () => {
     state.boxes = [];
     open();
-    expect(await screen.findByRole("link", { name: "우편함을 만들어" })).toHaveAttribute("href", "/mailboxes");
+    expect(await screen.findByRole("link", { name: "책장을 만들어" })).toHaveAttribute("href", "/mailboxes");
   });
 
-  it("닫은 우편함은 고를 수 없다", async () => {
+  it("닫은 책장은 고를 수 없다", async () => {
     state.boxes = [box({ id: "m1" }), box({ id: "m2", name: "닫은 곳", closed: true })];
     open();
     expect(await screen.findByText("우리 엄마 아빠")).toBeTruthy();
@@ -105,14 +105,14 @@ describe("SendPostcardDialog", () => {
   it("책장이 여럿이면 가장 적은 쪽에 맞추고, 왜 그런지 알려 준다", async () => {
     state.boxes = [
       box({ id: "m1", settings: { ...RECOMMENDED, photos: 20 } }),
-      box({ id: "m2", name: "장인 장모님 우편함", greetingName: "장모님", tone: "polite", token: "U".repeat(43), settings: { ...RECOMMENDED, photos: 6 } }),
+      box({ id: "m2", name: "장인 장모님 책장", greetingName: "장모님", tone: "polite", token: "U".repeat(43), settings: { ...RECOMMENDED, photos: 6 } }),
     ];
     open();
     await screen.findByText("우리 엄마 아빠");
     expect(screen.getByText("6/6")).toBeTruthy();
-    expect(screen.getByText(/장인 장모님 우편함은 6장까지라/)).toBeTruthy();
+    expect(screen.getByText(/장인 장모님 책장은 6장까지라/)).toBeTruthy();
     // 그 책장을 풀면 한도가 20장으로 돌아온다.
-    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 우편함/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 책장/ }));
     expect(screen.getByText("8/20")).toBeTruthy();
   });
 
@@ -134,7 +134,7 @@ describe("SendPostcardDialog", () => {
     for (const image of images) expect(image.getAttribute("loading")).toBe("lazy");
   });
 
-  it("한 줄을 쓰면 우편함마다 호칭만 다르게 복사된다", async () => {
+  it("한 줄을 쓰면 책장마다 호칭만 다르게 복사된다", async () => {
     open();
     await screen.findByText("우리 엄마 아빠");
     fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "바다 보고 왔어요!" } });
@@ -143,14 +143,14 @@ describe("SendPostcardDialog", () => {
     expect(screen.getAllByText("자동으로 채웠어요")).toHaveLength(2);
   });
 
-  it("한 우편함 인사말을 직접 고치면 그것만 따로 가고, 원래대로로 되돌린다", async () => {
+  it("한 책장 인사말을 직접 고치면 그것만 따로 가고, 원래대로로 되돌린다", async () => {
     open();
     await screen.findByText("우리 엄마 아빠");
     fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "바다 보고 왔어요!" } });
-    fireEvent.change(screen.getByLabelText("장인 장모님 우편함 인사말"), { target: { value: "건강하시죠? 바다에 다녀왔습니다." } });
+    fireEvent.change(screen.getByLabelText("장인 장모님 책장 인사말"), { target: { value: "건강하시죠? 바다에 다녀왔습니다." } });
     expect(screen.getByText("직접 고쳤어요")).toBeTruthy();
     expect(screen.getByText(/“장모님, 건강하시죠\? 바다에 다녀왔습니다\.”/)).toBeTruthy();
-    // 위 글을 고치면 고치지 않은 우편함만 따라간다.
+    // 위 글을 고치면 고치지 않은 책장만 따라간다.
     fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "산 보고 왔어요" } });
     expect(screen.getByText(/“엄마 아빠, 산 보고 왔어요”/)).toBeTruthy();
     expect(screen.getByText(/“장모님, 건강하시죠\?/)).toBeTruthy();
@@ -158,12 +158,12 @@ describe("SendPostcardDialog", () => {
     expect(screen.getByText(/“장모님, 산 보고 왔어요”/)).toBeTruthy();
   });
 
-  it("존댓말 우편함에는 추천 문구가 뜨고, 누르면 덧붙는다", async () => {
+  it("존댓말 책장에는 추천 문구가 뜨고, 누르면 덧붙는다", async () => {
     open();
     await screen.findByText("우리 엄마 아빠");
     fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "다녀왔습니다." } });
     fireEvent.click(screen.getByRole("button", { name: "건강하시죠?" }));
-    expect((screen.getByLabelText("장인 장모님 우편함 인사말") as HTMLTextAreaElement).value).toBe("다녀왔습니다. 건강하시죠?");
+    expect((screen.getByLabelText("장인 장모님 책장 인사말") as HTMLTextAreaElement).value).toBe("다녀왔습니다. 건강하시죠?");
   });
 
   it("한 줄이 비어 있으면 보내지 않고, 눌렀을 때 무엇이 빠졌는지 말로 알려 준다 — 단추를 흐리게 막지 않는다", async () => {
@@ -186,14 +186,14 @@ describe("SendPostcardDialog", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
-  it("받을 우편함을 모두 풀고 누르면 우편함을 고르라고 알려 준다", async () => {
+  it("받을 책장을 모두 풀고 누르면 책장을 고르라고 알려 준다", async () => {
     open();
     await screen.findByText("우리 엄마 아빠");
     fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "안녕" } });
     fireEvent.click(screen.getByRole("checkbox", { name: /우리 엄마 아빠/ }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 우편함/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 책장/ }));
     fireEvent.click(screen.getByRole("button", { name: "엽서 보내기" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("받을 우편함을 골라 주세요");
+    expect(await screen.findByRole("alert")).toHaveTextContent("받을 책장을 골라 주세요");
   });
 
   it("카카오처럼 이름 칸이 nickname 뿐인 계정도 이름이 채워진다", async () => {
@@ -224,7 +224,7 @@ describe("SendPostcardDialog", () => {
     vi.doUnmock("@/lib/supabase/client");
   });
 
-  it("보내면 고른 사진·우편함별 인사말·보내는 이름(계정 이름의 첫 말)으로 보낸다", async () => {
+  it("보내면 고른 사진·책장별 인사말·보내는 이름(계정 이름의 첫 말)으로 보낸다", async () => {
     open();
     await screen.findByText("우리 엄마 아빠");
     fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "바다 보고 왔어요!" } });
@@ -245,7 +245,7 @@ describe("SendPostcardDialog", () => {
   it("책장 설정의 사진 크기·한도를 보내기에 넘긴다 — 선명(960)이 한 곳이라도 있으면 선명", async () => {
     state.boxes = [
       box({ id: "m1", settings: { ...RECOMMENDED, photos: 12, size: 640 } }),
-      box({ id: "m2", name: "장인 장모님 우편함", token: "U".repeat(43), settings: { ...RECOMMENDED, photos: 20, size: 960 } }),
+      box({ id: "m2", name: "장인 장모님 책장", token: "U".repeat(43), settings: { ...RECOMMENDED, photos: 20, size: 960 } }),
     ];
     open();
     await screen.findByText("우리 엄마 아빠");
@@ -255,17 +255,17 @@ describe("SendPostcardDialog", () => {
     expect(send.mock.calls[0][1]).toMatchObject({ maxPhotos: 12, size: 960 });
   });
 
-  it("우편함 체크를 풀면 그곳에는 보내지 않는다", async () => {
+  it("책장 체크를 풀면 그곳에는 보내지 않는다", async () => {
     open();
     await screen.findByText("우리 엄마 아빠");
     fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "안녕" } });
-    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 우편함/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 책장/ }));
     fireEvent.click(screen.getByRole("button", { name: "엽서 보내기" }));
     await waitFor(() => expect(send).toHaveBeenCalled());
     expect(send.mock.calls[0][1].deliveries.map((d: { mailboxId: string }) => d.mailboxId)).toEqual(["m1"]);
   });
 
-  it("보낸 뒤에는 우편함마다 링크를 복사·공유할 수 있고, 엽서는 그 우편함 링크로 연다", async () => {
+  it("보낸 뒤에는 책장마다 링크를 복사·공유할 수 있고, 엽서는 그 책장 링크로 연다", async () => {
     const share = vi.fn(async () => undefined);
     const copied = vi.fn(async () => undefined);
     Object.defineProperty(navigator, "share", { value: share, configurable: true });
@@ -275,7 +275,7 @@ describe("SendPostcardDialog", () => {
     fireEvent.change(screen.getByPlaceholderText(/강릉 바다 보고 왔어요/), { target: { value: "안녕" } });
     fireEvent.click(screen.getByRole("button", { name: "2곳에 엽서 보내기" }));
     expect(await screen.findByText("엽서를 만들었어요")).toBeTruthy();
-    const second = screen.getByText("장인 장모님 우편함").closest("li")!;
+    const second = screen.getByText("장인 장모님 책장").closest("li")!;
     fireEvent.click(within(second).getByRole("button", { name: "카카오톡 등으로 보내기" }));
     await waitFor(() =>
       expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: `${window.location.origin}/m/${"U".repeat(43)}/p/${"P".repeat(43)}`, text: "장모님, 안녕" })),

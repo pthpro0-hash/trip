@@ -25,7 +25,18 @@ export async function sweepPostcardFolder(supabase: SupabaseClient, postcardId: 
   return !removed.error && (removed.data?.length ?? 0) === names.length;
 }
 
-/** 엽서를 거둔다 — 모든 우편함에서 사라진다. 파일을 못 지웠으면 줄도 남긴다. */
+/**
+ * 엽서 사진 폴더에서 이 파일들만 지운다(오래된 책의 사진 줄이기). 지운 수가 맞는지까지 본다 — 권한이 없으면 오류 없이
+ * 못 지운다. 지울 것이 없으면 묻지도 않고 true.
+ */
+export async function removePostcardFiles(supabase: SupabaseClient, postcardId: string, files: string[]): Promise<boolean> {
+  if (files.length === 0) return true;
+  const paths = files.map((file) => `${postcardId}/${file}`);
+  const removed = await supabase.storage.from(POSTCARD_BUCKET).remove(paths);
+  return !removed.error && (removed.data?.length ?? 0) === paths.length;
+}
+
+/** 엽서를 거둔다 — 모든 책장에서 사라진다. 파일을 못 지웠으면 줄도 남긴다. */
 export async function withdrawPostcard(supabase: SupabaseClient, postcardId: string): Promise<boolean> {
   if (!(await sweepPostcardFolder(supabase, postcardId))) return false;
   const { error } = await supabase.from("postcards").delete().eq("id", postcardId);

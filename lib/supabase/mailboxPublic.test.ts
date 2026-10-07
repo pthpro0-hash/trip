@@ -14,7 +14,7 @@ import {
 
 /*
   받는 쪽(로그인 없음)이 읽는 것. 내려받은 것은 보낸 사람의 브라우저가 적은 것이라 모양을 확인하고,
-  모르는 모양은 그리지 않는다. 링크가 틀렸거나 우편함이 닫혔으면 null — 화면은 "열리지 않는 링크"를 보인다.
+  모르는 모양은 그리지 않는다. 링크가 틀렸거나 책장이 닫혔으면 null — 화면은 "열리지 않는 링크"를 보인다.
 */
 
 const TOKEN = "T".repeat(43);
@@ -68,7 +68,7 @@ describe("fetchMailboxView", () => {
     ],
   };
 
-  it("우편함과 받은 엽서 목록을 읽을 수 있는 모양으로", async () => {
+  it("책장과 받은 엽서 목록을 읽을 수 있는 모양으로", async () => {
     const { client, calls } = fake({ mailbox_view: { data: view } });
     const result = await fetchMailboxView(client, TOKEN);
     expect(calls[0]).toEqual({ name: "mailbox_view", args: { box_token: TOKEN } });
@@ -82,7 +82,7 @@ describe("fetchMailboxView", () => {
     expect((await fetchMailboxView(client, TOKEN))?.postcards[0].opened).toBe(true);
   });
 
-  it("모르는 링크·닫힌 우편함(null)은 null", async () => {
+  it("모르는 링크·닫힌 책장(null)은 null", async () => {
     expect(await fetchMailboxView(fake({ mailbox_view: { data: null } }).client, TOKEN)).toBeNull();
   });
 
@@ -166,6 +166,20 @@ describe("fetchMailboxPostcard", () => {
     expect(result?.snapshot.title).toBe("강릉 바다");
   });
 
+  it("줄인 책은 곳마다 사진 목록에서도 지워진 사진을 뺀다 — 앨범과 지도가 같은 사진만 가리키게", async () => {
+    const trimmed = {
+      ...snapshot,
+      files: ["a.webp"],
+      visits: [
+        { placeName: "안목해변", lat: 37.77, lng: 128.95, day: "2026-09-13", photos: ["a.webp", "b.webp"] },
+        { placeName: "경포대", lat: 37.8, lng: 128.9, day: "2026-09-13", photos: ["c.webp"] },
+      ],
+    };
+    const result = await fetchMailboxPostcard(fake({ mailbox_postcard: { data: { ...data, snapshot: trimmed } } }).client, TOKEN, CARD);
+    expect(result?.snapshot.files).toEqual(["a.webp"]);
+    expect(result?.snapshot.visits.map((visit) => visit.photos)).toEqual([["a.webp"], []]);
+  });
+
   it("스냅샷 모양이 틀리면 null — 그리지 않는다", async () => {
     const bad = fake({ mailbox_postcard: { data: { ...data, snapshot: { v: 9 } } } });
     expect(await fetchMailboxPostcard(bad.client, TOKEN, CARD)).toBeNull();
@@ -180,7 +194,7 @@ describe("fetchMailboxPostcard", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("그 우편함에 없는 엽서(null)는 null", async () => {
+  it("그 책장에 없는 엽서(null)는 null", async () => {
     expect(await fetchMailboxPostcard(fake({ mailbox_postcard: { data: null } }).client, TOKEN, CARD)).toBeNull();
   });
 });

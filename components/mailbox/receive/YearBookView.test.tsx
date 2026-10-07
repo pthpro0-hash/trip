@@ -121,9 +121,9 @@ describe("YearBookView · 올해의 책", () => {
     expect(within(section).getByRole("link", { name: /A 여행/ })).toHaveAttribute("href", `/m/${TOKEN}/p/${idOf("A")}`);
   });
 
-  it("우편함으로 돌아가는 길이 맨 위와 맨 아래에 있다", () => {
+  it("책장으로 돌아가는 길이 맨 위와 맨 아래에 있다", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2026" />);
-    const back = screen.getAllByRole("link", { name: /우편함/ });
+    const back = screen.getAllByRole("link", { name: /책장/ });
     expect(back.length).toBeGreaterThanOrEqual(2);
     for (const link of back) expect(link).toHaveAttribute("href", `/m/${TOKEN}`);
   });
@@ -132,10 +132,10 @@ describe("YearBookView · 올해의 책", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2024" />);
     expect(screen.getByText("2024년의 책은 아직 없어요")).toBeTruthy();
     expect(screen.getByText(/열어 본 엽서가 모이면/)).toBeTruthy();
-    expect(screen.getAllByRole("link", { name: /우편함/ })[0]).toHaveAttribute("href", `/m/${TOKEN}`);
+    expect(screen.getAllByRole("link", { name: /책장/ })[0]).toHaveAttribute("href", `/m/${TOKEN}`);
   });
 
-  it("설정에서 끈 우편함이면 올해의 책은 열리지 않는다 — 우편함으로 돌려보낸다", () => {
+  it("설정에서 끈 책장이면 올해의 책은 열리지 않는다 — 책장으로 돌려보낸다", () => {
     render(<YearBookView token={TOKEN} view={view(books, { settings: { ...RECOMMENDED, year: false } })} year="2026" />);
     expect(screen.queryByRole("heading", { level: 1, name: "2026년" })).toBeNull();
     expect(screen.getByText("올해의 책은 지금 쓰지 않고 있어요")).toBeTruthy();

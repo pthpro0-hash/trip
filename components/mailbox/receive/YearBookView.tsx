@@ -15,7 +15,7 @@ import { Cover, YearMap } from "./shelfParts";
 
   저장하지 않고 열어 본 책에서 그때그때 만든다. 위에서 아래로: 표지(그림 몇 장과 숫자) → 가장 사랑받은 사진 →
   가장 사랑받은 책 → 한 해 다녀온 길(지도) → 달마다. 하트가 없으면 '사랑받은' 두 칸은 비운다.
-  설정에서 올해의 책을 끈 우편함이면 열지 않는다(주소를 직접 열어도).
+  설정에서 올해의 책을 끈 책장이면 열지 않는다(주소를 직접 열어도).
 */
 
 const MOSAIC: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-2", 4: "grid-cols-2" };
@@ -29,7 +29,7 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
     <main style={scale} className="mx-auto flex min-h-screen max-w-xl flex-col gap-7 px-5 pb-16 pt-8">
       {preview && <PreviewBanner all={preview === "all"} toggle={{ href: yearBookPath(token, year, preview === "all" ? true : "all") }} />}
       <Link href={back} className="self-start rs-18 font-semibold text-accent">
-        ← 우편함
+        ← 책장
       </Link>
       {children}
     </main>
@@ -39,7 +39,7 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
     return shell(
       <header className="flex flex-col gap-2">
         <h1 className="rs-28 font-bold text-text">올해의 책은 지금 쓰지 않고 있어요</h1>
-        <p className="rs-18 leading-relaxed text-text-muted">보내는 가족이 올해의 책을 꺼 두었어요. 우편함에서 엽서와 책꽂이는 그대로 볼 수 있어요.</p>
+        <p className="rs-18 leading-relaxed text-text-muted">보내는 가족이 올해의 책을 꺼 두었어요. 책장에서 엽서와 책꽂이는 그대로 볼 수 있어요.</p>
       </header>,
     );
   }
@@ -153,7 +153,7 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
       </section>
 
       <Link href={back} className="flex min-h-14 items-center justify-center rounded-2xl bg-bg-subtle rs-20 font-semibold text-text">
-        우편함으로 가기
+        책장으로 가기
       </Link>
     </>,
   );

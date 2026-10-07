@@ -9,10 +9,10 @@ import { isMailboxToken, isPostcardId, isPreview, postcardTitle } from "@/lib/ma
 import { ReceivedPostcardView } from "@/components/mailbox/receive/ReceivedPostcardView";
 
 /*
-  가족 우편함 · 엽서 한 장. 카톡으로 받은 링크가 바로 여기로 온다.
+  가족 책장 · 엽서 한 장. 카톡으로 받은 링크가 바로 여기로 온다.
 
   읽기만 한다 — 열어 봤다는 표시는 화면이 열린 뒤에 화면이 따로 적는다(미리보기 기계가 읽어도
-  찍히지 않게). 거둔 엽서·닫은 우편함은 곧바로 열리지 않으므로 요청마다 새로 읽는다.
+  찍히지 않게). 거둔 엽서·닫은 책장은 곧바로 열리지 않으므로 요청마다 새로 읽는다.
 */
 
 const load = cache(async (token: string, postcardId: string) => {

@@ -41,7 +41,7 @@ export function SiteHeader() {
   // 가족의 여행을 보는 동안에는 내 사진을 더하는 단추를 내지 않는다(남의 여행에 올리는 것으로 헷갈린다).
   const canAdd = canIn(useFamilyView(), "add");
 
-  // 가족 우편함의 받는 쪽(부모님)에는 위 띠가 없다 — 엽서와 답장 단추뿐이다.
+  // 가족 책장의 받는 쪽(부모님)에는 위 띠가 없다 — 엽서와 답장 단추뿐이다.
   if (isReceiverPath(pathname)) return null;
 
   return (

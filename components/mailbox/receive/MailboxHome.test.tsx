@@ -47,7 +47,7 @@ const idOf = (letter: string) => letter.repeat(43);
 const place = (placeName: string, day: string) => ({ placeName, lat: 35, lng: 127, day, photoCount: 1, photo: "a.webp" });
 const view = (over: Partial<MailboxView> = {}): MailboxView => ({ tone: "casual", settings: RECOMMENDED, members: ["엄마", "아빠"], postcards: [card()], ...over });
 
-describe("MailboxHome · 부모님이 보는 우편함", () => {
+describe("MailboxHome · 부모님이 보는 책장", () => {
   beforeEach(() => window.localStorage.clear());
 
   it("새 엽서가 있으면 말로 알리고 '새 엽서' 표시가 보인다", () => {
@@ -93,7 +93,7 @@ describe("MailboxHome · 부모님이 보는 우편함", () => {
     expect(window.localStorage.getItem(`mailbox-who:${TOKEN.slice(0, 16)}`)).toBe("엄마");
   });
 
-  it("받는 분 이름이 없는 우편함은 묻지 않는다", () => {
+  it("받는 분 이름이 없는 책장은 묻지 않는다", () => {
     render(<MailboxHome token={TOKEN} view={view({ members: [] })} />);
     expect(screen.queryByText("누가 보시나요?")).toBeNull();
   });
@@ -305,7 +305,7 @@ describe("MailboxHome · 미리보기(보내는 사람이 부모님 화면을 �
     const note = screen.getByRole("note", { name: "미리보기" });
     expect(note).toHaveTextContent("미리보기예요");
     expect(note).toHaveTextContent("부모님께는 아무 표시도 가지 않아요");
-    expect(within(note).getByRole("link", { name: /내 우편함/ })).toHaveAttribute("href", "/mailboxes");
+    expect(within(note).getByRole("link", { name: /내 책장/ })).toHaveAttribute("href", "/mailboxes");
   });
 
   it("평소에는 미리보기 띠가 없다", () => {

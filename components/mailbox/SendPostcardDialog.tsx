@@ -19,10 +19,10 @@ import { HubDialog } from "@/components/hub/HubDialog";
 import { WaitingOverlay } from "@/components/layout/Waiting";
 
 /*
-  엽서 보내기 — 이 여행을 부모님 우편함으로.
+  엽서 보내기 — 이 여행을 부모님 책장으로.
 
-  사진 3장(자동으로 골라 두고 바꿀 수 있다)과 한 줄을 쓰고, 받을 우편함을 고른다. 인사말은 우편함마다
-  따로다 — 한 번 쓰면 다른 우편함에 복사되고 호칭만 그 우편함 것으로 바뀐다. 직접 고친 우편함은 따로 간다.
+  사진 3장(자동으로 골라 두고 바꿀 수 있다)과 한 줄을 쓰고, 받을 책장을 고른다. 인사말은 책장마다
+  따로다 — 한 번 쓰면 다른 책장에 복사되고 호칭만 그 책장 것으로 바뀐다. 직접 고친 책장은 따로 간다.
   보내면 엽서는 그 순간의 모습으로 남는다(사진은 한 번만 복사한다).
 
   보내기 단추는 폰의 공유창(카카오톡이 목록에 나온다)을 연다. 안 되는 브라우저에서는 링크 복사.
@@ -50,7 +50,7 @@ function remembered(): string {
 type Sent = { postcardId: string; boxes: { box: MailboxItem; greeting: string }[]; senderName: string };
 
 const REASON: Record<Extract<SendPostcardResult, { ok: false }>["reason"], string> = {
-  invalid: "받을 우편함, 한 줄, 보내는 이름을 확인해 주세요.",
+  invalid: "받을 책장, 한 줄, 보내는 이름을 확인해 주세요.",
   photos: "사진을 옮기지 못했어요. 인터넷이 약한가 봐요. 잠시 뒤 다시 해 주세요. (엽서는 나가지 않았어요)",
   failed: "보내지 못했어요. 잠시 뒤 다시 해 주세요. (엽서는 나가지 않았어요)",
 };
@@ -88,7 +88,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
       const list = await fetchMailboxes(supabase, userId);
       if (!active) return;
       if (list === "failed") return setBoxes("failed");
-      // 닫은 우편함에는 보낼 수 없다.
+      // 닫은 책장에는 보낼 수 없다.
       setBoxes([...list.owned, ...list.joined].filter((box) => !box.closed));
     })();
     return () => {
@@ -97,7 +97,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   }, [userId]);
 
   const openBoxes = Array.isArray(boxes) ? boxes : [];
-  // 처음에는 열린 우편함을 모두 고른 것으로 둔다. 하나뿐이면 더 쉽다.
+  // 처음에는 열린 책장을 모두 고른 것으로 둔다. 하나뿐이면 더 쉽다.
   const selectedIds = checked ?? new Set(openBoxes.map((box) => box.id));
   const selected = openBoxes.filter((box) => selectedIds.has(box.id));
   const rows = greetingsFor(body, selected, overrides);
@@ -136,7 +136,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   */
   const missing =
     selected.length === 0
-      ? "받을 우편함을 골라 주세요."
+      ? "받을 책장을 골라 주세요."
       : body.trim().length === 0
         ? "한 줄을 적어 주세요. 받는 분께 가는 인사말이에요."
         : senderName.trim().length === 0
@@ -274,13 +274,13 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
               </p>
             </div>
 
-            {boxes === "loading" && <p className="text-[14px] text-text-muted">우편함을 불러오는 중…</p>}
-            {boxes === "failed" && <p className="text-[14px] text-text-muted">우편함을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>}
+            {boxes === "loading" && <p className="text-[14px] text-text-muted">책장을 불러오는 중…</p>}
+            {boxes === "failed" && <p className="text-[14px] text-text-muted">책장을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>}
             {Array.isArray(boxes) && boxes.length === 0 && (
               <p className="rounded-xl bg-bg-subtle p-4 text-[14px] leading-relaxed text-text-muted">
-                보낼 수 있는 우편함이 없어요.{" "}
+                보낼 수 있는 책장이 없어요.{" "}
                 <Link href="/mailboxes" className="font-medium text-accent hover:text-accent-hover">
-                  우편함을 만들어
+                  책장을 만들어
                 </Link>{" "}
                 주세요.
               </p>
@@ -362,7 +362,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
                 </section>
 
                 <section className="flex flex-col gap-2.5">
-                  <h3 className="text-[14px] font-semibold text-text">받을 우편함</h3>
+                  <h3 className="text-[14px] font-semibold text-text">받을 책장</h3>
                   {openBoxes.map((box) => {
                     const row = rowOf(box.id);
                     return (

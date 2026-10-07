@@ -564,6 +564,29 @@ create policy "postcard_hearts_update" on public.postcard_hearts
     exists (select 1 from public.postcards p where p.id = postcard_id and p.sender_id = auth.uid())
   );
 
+-- 이 엽서에 아직 남아 있는 사진 파일(줄인 책은 일부만 남는다). 복사본 기록(postcard_photos)에 남은 것만, 스냅샷의 차례대로.
+-- 기록이 아예 없으면 스냅샷의 것을 그대로 쓴다(기록 없이 만들어진 옛 엽서를 빈 책으로 만들지 않게).
+create or replace function public.postcard_live_files(card text, snap jsonb)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when exists (select 1 from public.postcard_photos x where x.postcard_id = card) then coalesce((
+      select jsonb_agg(t.f order by t.i)
+      from jsonb_array_elements_text(
+        case when jsonb_typeof(snap -> 'files') = 'array' then snap -> 'files' else '[]'::jsonb end
+      ) with ordinality as t(f, i)
+      where exists (select 1 from public.postcard_photos x where x.postcard_id = card and x.file = t.f)
+    ), '[]'::jsonb)
+    else coalesce(snap -> 'files', '[]'::jsonb)
+  end;
+$$;
+
+revoke all on function public.postcard_live_files(text, jsonb) from public;
+
 -- ═══════════════════════════════════════════════
 -- 받는 쪽(로그인 없음) — 링크를 정확히 아는 사람에게만, 그 우편함 것만.
 --
@@ -599,8 +622,8 @@ as $$
           'senderName', p.sender_name,
           'title', p.snapshot -> 'title',
           'startedOn', p.snapshot -> 'startedOn',
-          'cover', p.snapshot -> 'files' -> 0,
-          'photoCount', jsonb_array_length(p.snapshot -> 'files'),
+          'cover', public.postcard_live_files(p.id, p.snapshot) -> 0,
+          'photoCount', jsonb_array_length(public.postcard_live_files(p.id, p.snapshot)),
           'endedOn', p.snapshot -> 'endedOn',
           -- 책꽂이의 올해 지도·작년 오늘에 쓰는 곳 목록. 스냅샷 통째가 아니라 곳마다 필요한 칸만 내린다.
           -- 보낸 사람의 브라우저가 적은 것이라 배열이 아니어도 목록 전체가 깨지지 않게 배열일 때만 푼다.
@@ -611,7 +634,8 @@ as $$
               'lng', v -> 'lng',
               'day', v -> 'day',
               'photoCount', case when jsonb_typeof(v -> 'photos') = 'array' then jsonb_array_length(v -> 'photos') else 0 end,
-              'photo', case when jsonb_typeof(v -> 'photos') = 'array' then v -> 'photos' -> 0 else null end
+              -- 줄인 책에서 이미 지워진 사진은 대표 사진으로 내리지 않는다.
+              'photo', case when jsonb_typeof(v -> 'photos') = 'array' and public.postcard_live_files(p.id, p.snapshot) ? (v -> 'photos' ->> 0) then v -> 'photos' -> 0 else null end
             ))
             from jsonb_array_elements(
               case when jsonb_typeof(p.snapshot -> 'visits') = 'array' then p.snapshot -> 'visits' else '[]'::jsonb end
@@ -671,7 +695,7 @@ begin
   select jsonb_build_object(
     'id', p.id,
     'senderName', p.sender_name,
-    'snapshot', p.snapshot,
+    'snapshot', jsonb_set(p.snapshot, '{files}', public.postcard_live_files(p.id, p.snapshot)),
     'greeting', d.greeting,
     'sentAt', d.delivered_at,
     'mailbox', jsonb_build_object(
@@ -947,6 +971,136 @@ revoke all on function public.mailbox_delete_plan(uuid) from public;
 revoke all on function public.mailbox_delete(uuid) from public;
 grant execute on function public.mailbox_delete_plan(uuid) to authenticated;
 grant execute on function public.mailbox_delete(uuid) to authenticated;
+
+-- ═══════════════════════════════════════════════
+-- 오래된 책의 사진 줄이기
+--
+-- 책장 설정 keep(사진까지 보관할 책 수, 권장 10, 'all' 이면 줄이지 않음). 책장마다 다녀온 날이 최근인 순으로 차례를 매겨,
+-- 보관 권수를 넘은 오래된 책은 사진 파일만 지우고 표지(첫 사진)·하트 받은 사진·한 줄·지도·답장·하트는 둔다.
+-- 줄이는 일은 저절로 하지 않는다 — 주인이 단추를 누를 때만, 순서는 우편함 지우기와 같다: mailbox_trim_plan 으로
+-- 줄일 책과 지울 파일을 알아내고 → 앱이 사진 파일을 먼저 지우고 → mailbox_trim_apply 로 기록(postcard_photos)을 고친다.
+-- 받는 쪽은 기록에 남은 사진만 본다(postcard_live_files). 한 책이 여러 우편함에 있으면 모든 우편함에서 보관 권수를 넘고
+-- 모두 내 우편함일 때만 줄인다(한 곳이라도 안 넘었거나 제한이 없으면 건너뛴다).
+-- ═══════════════════════════════════════════════
+
+-- 한 우편함이 사진까지 보관할 책 수. null 은 제한 없음('all'). 비었거나 모르는 값이면 권장 10.
+create or replace function public.mailbox_keep_count(s jsonb)
+returns integer
+language sql
+immutable
+as $$
+  select case
+    when s -> 'keep' = to_jsonb('all'::text) then null
+    when jsonb_typeof(s -> 'keep') = 'number' then floor(least(1000::numeric, greatest(1::numeric, (s ->> 'keep')::numeric)))::integer
+    else 10
+  end;
+$$;
+
+-- 내 우편함 box 에서 사진을 줄일 책과, 책마다 지울 파일들. 내 우편함이 아니면 아무것도 안 준다.
+create or replace function public.mailbox_trim_candidates(box uuid)
+returns table (postcard_id text, drop_files text[])
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with mine as (
+    -- 내 우편함마다 그 우편함에 든 책의 차례(1 = 가장 최근에 다녀온 책)와 그 우편함의 보관 권수.
+    select d.postcard_id,
+           row_number() over (
+             partition by d.mailbox_id
+             order by coalesce(p.snapshot ->> 'startedOn', '') desc, d.delivered_at desc, d.postcard_id
+           ) as rank,
+           public.mailbox_keep_count(m.settings) as keep
+    from public.postcard_deliveries d
+    join public.postcards p on p.id = d.postcard_id
+    join public.mailboxes m on m.id = d.mailbox_id
+    where m.owner_id = auth.uid()
+  )
+  select c.postcard_id,
+         array(
+           select f.file
+           from public.postcard_photos f
+           where f.postcard_id = c.postcard_id
+             and f.file is distinct from (p.snapshot -> 'files' ->> 0)
+             and not exists (select 1 from public.postcard_hearts h where h.postcard_id = f.postcard_id and h.file = f.file)
+           order by f.position, f.file
+         ) as drop_files
+  from (
+    select distinct d.postcard_id
+    from public.postcard_deliveries d
+    where d.mailbox_id = box
+      and exists (select 1 from public.mailboxes b where b.id = box and b.owner_id = auth.uid())
+      and public.owns_all_deliveries(d.postcard_id)
+      and not exists (select 1 from mine x where x.postcard_id = d.postcard_id and (x.keep is null or x.rank <= x.keep))
+  ) c
+  join public.postcards p on p.id = c.postcard_id
+  where exists (
+    select 1
+    from public.postcard_photos f
+    where f.postcard_id = c.postcard_id
+      and f.file is distinct from (p.snapshot -> 'files' ->> 0)
+      and not exists (select 1 from public.postcard_hearts h where h.postcard_id = f.postcard_id and h.file = f.file)
+  );
+$$;
+
+-- 줄일 계획: 책마다 지울 파일. 내 우편함이 아니면 null.
+create or replace function public.mailbox_trim_plan(box uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (select 1 from public.mailboxes where id = box and owner_id = auth.uid()) then
+    return null;
+  end if;
+  return jsonb_build_object(
+    'books', coalesce((
+      select jsonb_agg(jsonb_build_object('id', c.postcard_id, 'drop', to_jsonb(c.drop_files)) order by c.postcard_id)
+      from public.mailbox_trim_candidates(box) c
+    ), '[]'::jsonb)
+  );
+end;
+$$;
+
+-- 사진 파일이 정말 사라진 것만 복사본 기록에서 뺀다(파일이 남아 있으면 기록도 둔다). 지금도 후보인 책만, 지운 줄 수를 돌려준다.
+-- 내 우편함이 아니면 null.
+create or replace function public.mailbox_trim_apply(box uuid, cards text[])
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  removed integer;
+begin
+  if not exists (select 1 from public.mailboxes where id = box and owner_id = auth.uid()) then
+    return null;
+  end if;
+  with picked as (
+    select c.postcard_id, c.drop_files from public.mailbox_trim_candidates(box) c where c.postcard_id = any(cards)
+  ),
+  gone as (
+    delete from public.postcard_photos f
+    using picked c
+    where f.postcard_id = c.postcard_id
+      and f.file = any(c.drop_files)
+      and not exists (select 1 from storage.objects o where o.bucket_id = 'postcards' and o.name = f.postcard_id || '/' || f.file)
+    returning 1
+  )
+  select count(*)::integer into removed from gone;
+  return removed;
+end;
+$$;
+
+revoke all on function public.mailbox_keep_count(jsonb) from public;
+revoke all on function public.mailbox_trim_candidates(uuid) from public;
+revoke all on function public.mailbox_trim_plan(uuid) from public;
+revoke all on function public.mailbox_trim_apply(uuid, text[]) from public;
+grant execute on function public.mailbox_trim_plan(uuid) to authenticated;
+grant execute on function public.mailbox_trim_apply(uuid, text[]) to authenticated;
 
 -- ═══════════════════════════════════════════════
 -- 사진 보관함(postcards 버킷, 공개)

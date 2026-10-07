@@ -18,7 +18,7 @@ import type { TripDetail } from "./tripDetail";
              줄이 먼저 사라지면 폴더의 주인을 밝힐 길이 없어 사진이 공개 보관함에 영영 남는다.
              파일을 못 지웠으면 줄도, 원본도 지우지 않고 실패를 알린다. 다시 누르면 된다.
 
-  사진은 엽서당 한 번만 복사한다(우편함이 몇 개든). 보관함은 공개라 CDN 이 캐시하므로 캐시를
+  사진은 엽서당 한 번만 복사한다(책장이 몇 개든). 보관함은 공개라 CDN 이 캐시하므로 캐시를
   짧게(1분) 둔다 — 길게 두면 지운 뒤에도 한동안 사진이 보인다.
 */
 
@@ -35,7 +35,7 @@ export interface SendPostcardInput {
   trip: TripDetail;
   /** 엽서에 실을 사진(trip_photos id). */
   photoIds: string[];
-  /** 받을 우편함과 그 우편함에 보일 인사말(호칭 포함). */
+  /** 받을 책장과 그 책장에 보일 인사말(호칭 포함). */
   deliveries: { mailboxId: string; greeting: string }[];
   /** 이 책에 실을 수 있는 사진 수(책장 설정의 가장 적은 쪽). 안 주면 20장. */
   maxPhotos?: number;
@@ -48,7 +48,7 @@ export type SendPostcardResult =
   | { ok: true; postcardId: string }
   | { ok: false; reason: "invalid" | "photos" | "failed" };
 
-/** 엽서를 보낸다. 우편함마다 다른 인사말이 들어가고, 사진은 한 번만 복사한다. */
+/** 엽서를 보낸다. 책장마다 다른 인사말이 들어가고, 사진은 한 번만 복사한다. */
 export async function sendPostcard(supabase: SupabaseClient, input: SendPostcardInput): Promise<SendPostcardResult> {
   const { senderId, trip, deliveries, onProgress } = input;
   const senderName = input.senderName.trim();
@@ -136,7 +136,7 @@ export async function sendPostcard(supabase: SupabaseClient, input: SendPostcard
     }
   }
 
-  // 우편함에 넣는다. 우편함마다 인사말이 다르다.
+  // 책장에 넣는다. 책장마다 인사말이 다르다.
   const delivered = await supabase.from("postcard_deliveries").insert(
     deliveries.map((delivery) => ({
       postcard_id: postcardId,
@@ -187,7 +187,7 @@ export interface SentPostcard {
   title: string | null;
   startedOn: string;
   sentAt: string;
-  /** 어느 우편함에 넣었고, 받는 분이 열어 봤는가. */
+  /** 어느 책장에 넣었고, 받는 분이 열어 봤는가. */
   deliveries: { mailboxId: string; opened: boolean }[];
   /** 받는 분들의 답장(오래된 것부터)과 그중 못 본 수. */
   replies: SentReply[];
@@ -292,7 +292,7 @@ export async function markRepliesSeen(supabase: SupabaseClient, ids: string[]): 
 }
 
 /**
- * 아직 못 본 하트 소식의 수. 한 사람이 사진 스무 장에 눌러도 한 소식이다 — (엽서, 우편함, 이름)마다 하나.
+ * 아직 못 본 하트 소식의 수. 한 사람이 사진 스무 장에 눌러도 한 소식이다 — (엽서, 책장, 이름)마다 하나.
  * 못 세면 0(알림이 없는 것처럼 조용히).
  */
 export async function fetchUnreadHeartCount(supabase: SupabaseClient): Promise<number> {

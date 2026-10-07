@@ -18,7 +18,7 @@ describe("받는 쪽 · 누가 보시나요", () => {
     expect(readWho(token)).toBe("엄마");
   });
 
-  it("우편함마다 따로 기억한다", () => {
+  it("책장마다 따로 기억한다", () => {
     keepWho("A".repeat(43), "엄마");
     expect(readWho("B".repeat(43))).toBeNull();
   });

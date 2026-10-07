@@ -25,7 +25,7 @@ vi.mock("@/lib/supabase/client", () => ({
 const { AccountChip } = await import("./AccountChip");
 
 /*
-  위 띠의 이름·사진은 이제 '내 정보'로 가는 문이다. 예전에는 가족 공유로만 가서, 우편함 같은 것은 그 안에서
+  위 띠의 이름·사진은 이제 '내 정보'로 가는 문이다. 예전에는 가족 공유로만 가서, 책장 같은 것은 그 안에서
   한참 찾아야 했다. 로그아웃도 거기로 옮겼다 — 폰의 위 띠가 빠듯하다.
 */
 describe("AccountChip", () => {

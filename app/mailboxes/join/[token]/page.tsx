@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { isMailboxToken } from "@/lib/mailbox";
 
 export const metadata: Metadata = {
-  title: "가족 우편함 초대",
+  title: "가족 책장 초대",
   robots: { index: false, follow: false },
 };
 

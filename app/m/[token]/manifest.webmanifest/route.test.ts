@@ -7,12 +7,12 @@ import { GET } from "./route";
 const TOKEN = "T".repeat(43);
 const call = (token: string) => GET(new Request("https://x.test"), { params: Promise.resolve({ token }) });
 
-describe("우편함 홈 화면 아이콘 정보", () => {
-  it("이 우편함을 바로 여는 앱으로 설치된다", async () => {
+describe("책장 홈 화면 아이콘 정보", () => {
+  it("이 책장을 바로 여는 앱으로 설치된다", async () => {
     const response = await call(TOKEN);
     expect(response.headers.get("content-type")).toContain("application/manifest+json");
     const manifest = await response.json();
-    expect(manifest.name).toBe("가족 우편함");
+    expect(manifest.name).toBe("가족 책장");
     expect(manifest.start_url).toBe(`/m/${TOKEN}`);
     expect(manifest.scope).toBe(`/m/${TOKEN}`);
     expect(manifest.display).toBe("standalone");
@@ -28,7 +28,7 @@ describe("우편함 홈 화면 아이콘 정보", () => {
     expect((await call("../x")).status).toBe(404);
   });
 
-  it("캐시하지 않는다 — 링크를 새로 만들면 옛 우편함 아이콘이 되살아나지 않게", async () => {
+  it("캐시하지 않는다 — 링크를 새로 만들면 옛 책장 아이콘이 되살아나지 않게", async () => {
     expect((await call(TOKEN)).headers.get("cache-control")).toBe("no-store");
   });
 });

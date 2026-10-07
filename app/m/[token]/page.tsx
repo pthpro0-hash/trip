@@ -9,10 +9,10 @@ import { isMailboxToken, isPreview } from "@/lib/mailbox";
 import { MailboxHome } from "@/components/mailbox/receive/MailboxHome";
 
 /*
-  가족 우편함 · 받는 쪽 첫 화면. 부모님이 링크 하나로 들어온다 — 로그인이 없다.
+  가족 책장 · 받는 쪽 첫 화면. 부모님이 링크 하나로 들어온다 — 로그인이 없다.
 
-  링크의 글자를 받아 그 우편함 것만 읽는다(supabase/mailbox.sql 의 mailbox_view). 링크를 새로
-  만들었거나 우편함을 닫았으면 곧바로 열리지 않아야 하므로 요청마다 새로 읽는다.
+  링크의 글자를 받아 그 책장 것만 읽는다(supabase/mailbox.sql 의 mailbox_view). 링크를 새로
+  만들었거나 책장을 닫았으면 곧바로 열리지 않아야 하므로 요청마다 새로 읽는다.
   검색에는 나오지 않게 한다. robots.txt 로 막지는 않는다 — 막으면 카톡이 미리보기를 가지러 오지 못한다.
 */
 
@@ -34,10 +34,10 @@ type Props = { params: Promise<{ token: string }>; searchParams: Promise<{ previ
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { token } = await params;
   return {
-    // 우편함 이름은 보낸 사람이 정한 사적인 이름이라 제목에 쓰지 않는다.
-    title: "가족 우편함",
+    // 책장 이름은 보낸 사람이 정한 사적인 이름이라 제목에 쓰지 않는다.
+    title: "가족 책장",
     robots: { index: false, follow: false },
-    // 홈 화면에 추가하면 이 우편함을 바로 여는 아이콘이 된다.
+    // 홈 화면에 추가하면 이 책장을 바로 여는 아이콘이 된다.
     manifest: `/m/${token}/manifest.webmanifest`,
   };
 }

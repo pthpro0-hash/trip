@@ -16,7 +16,7 @@ describe("FirstVisitHelp · 받는 쪽", () => {
     expect(await screen.findByText("사용법 창")).toBeTruthy();
   });
 
-  it("가족 우편함의 받는 쪽(부모님)에게는 내지 않는다 — 엽서를 받은 사람이지 처음 온 사람이 아니다", async () => {
+  it("가족 책장의 받는 쪽(부모님)에게는 내지 않는다 — 엽서를 받은 사람이지 처음 온 사람이 아니다", async () => {
     path = "/m/abc/p/def";
     render(<FirstVisitHelp />);
     await new Promise((resolve) => setTimeout(resolve, 20));

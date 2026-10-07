@@ -3,20 +3,20 @@ import type { FootprintStep } from "./footprint";
 import type { TripDetail } from "./supabase/tripDetail";
 
 /*
-  가족 우편함 — 여행을 기록한 사람이 부모님 같은 가족에게 "엽서"를 보낸다.
+  가족 책장 — 여행을 기록한 사람이 부모님 같은 가족에게 "엽서"를 보낸다.
 
   받는 사람은 앱도 로그인도 없이 링크 하나로 엽서를 보고 답장한다. 규칙은 DB(supabase/mailbox.sql)가
   지키고, 여기 있는 것은 화면이 같은 규칙을 알고 셈하는 데 쓰는 순수 함수들이다. 올리고 지우는 일은
   lib/supabase/ 쪽이 한다(링크 공유와 같은 나눔).
 
-    우편함  집 한 곳당 하나(부모님 두 분은 한 우편함). 보내는 사람은 여럿.
-    엽서    보낸 순간 그대로 남는다 — 사진은 한 번만 복사해 두고 우편함끼리 같이 쓴다.
-    인사말  우편함마다 따로. 호칭은 본문과 따로 저장해 맨 앞에만 붙인다.
+    책장  집 한 곳당 하나(부모님 두 분은 한 책장). 보내는 사람은 여럿.
+    엽서    보낸 순간 그대로 남는다 — 사진은 한 번만 복사해 두고 책장끼리 같이 쓴다.
+    인사말  책장마다 따로. 호칭은 본문과 따로 저장해 맨 앞에만 붙인다.
 */
 
-/** 한 사람이 만들 수 있는 우편함. DB 도 같은 수로 막는다. */
+/** 한 사람이 만들 수 있는 책장. DB 도 같은 수로 막는다. */
 export const MAILBOX_LIMIT = 3;
-/** 한 우편함에 보낼 수 있는 사람(주인 포함). */
+/** 한 책장에 보낼 수 있는 사람(주인 포함). */
 export const MAILBOX_SENDER_LIMIT = 8;
 /** 책(엽서) 한 권에 싣는 사진의 최대 수. 책장 설정(6·12·20장)이 이 안에서 정한다. */
 export const POSTCARD_PHOTOS_MAX = 20;
@@ -24,7 +24,7 @@ export const POSTCARD_PHOTOS_MAX = 20;
 export const BODY_MAX = 300;
 export const NAME_MAX = 40;
 export const GREETING_NAME_MAX = 20;
-/** 받는 분 이름("엄마") 하나의 글자 수와 우편함당 수. */
+/** 받는 분 이름("엄마") 하나의 글자 수와 책장당 수. */
 export const MEMBER_MAX = 10;
 export const MEMBERS_MAX = 6;
 
@@ -41,7 +41,7 @@ const POSTCARD_ID = /^[A-Za-z0-9_-]{16,64}$/;
 export const isMailboxToken = (value: string): boolean => TOKEN.test(value);
 export const isPostcardId = (value: string): boolean => POSTCARD_ID.test(value);
 
-/** 짐작해서 맞힐 수 없는 무작위 글자(256비트). 우편함 링크에 들어간다. */
+/** 짐작해서 맞힐 수 없는 무작위 글자(256비트). 책장 링크에 들어간다. */
 export const newMailboxToken = (): string => newInviteToken();
 /** 엽서 주소이자 사진 폴더 이름. 사용자 id 가 드러나지 않는다. */
 export const newPostcardId = (): string => newInviteToken();
@@ -54,7 +54,7 @@ export const postcardUrl = (origin: string, token: string, postcardId: string): 
 
 /*
   미리보기 — 보내는 사람이 부모님 화면을 미리 보는 길. 같은 화면이지만 "열어 봤다"는 표시도, 답장도, 하트도
-  가지 않는다. 주소 끝에 ?preview=1 이 붙고, 화면 안의 길(엽서·우편함)에도 그 표시가 이어진다.
+  가지 않는다. 주소 끝에 ?preview=1 이 붙고, 화면 안의 길(엽서·책장)에도 그 표시가 이어진다.
   이 표시는 화면이 무엇을 보낼지만 정한다 — 미리보기 주소로 와도 부모님이 볼 수 있는 것 외에는 더 보이지 않는다.
 */
 /**
@@ -63,7 +63,7 @@ export const postcardUrl = (origin: string, token: string, postcardId: string): 
  */
 export type PreviewMode = boolean | "all";
 const previewSuffix = (preview: PreviewMode): string => (preview === "all" ? "?preview=all" : preview ? "?preview=1" : "");
-/** 받는 쪽 우편함 첫 화면의 길. 같은 서비스 안의 길이라 origin 은 붙이지 않는다. */
+/** 받는 쪽 책장 첫 화면의 길. 같은 서비스 안의 길이라 origin 은 붙이지 않는다. */
 export const mailboxPath = (token: string, preview: PreviewMode = false): string => `/m/${token}${previewSuffix(preview)}`;
 /** 받는 쪽 엽서 한 장의 길. */
 export const postcardPath = (token: string, postcardId: string, preview: PreviewMode = false): string =>
@@ -110,7 +110,7 @@ export function composeGreeting(target: GreetingTarget, body: string): string {
 
 export interface GreetingRow {
   mailboxId: string;
-  /** 이 우편함의 본문(복사했거나 직접 고쳤거나). */
+  /** 이 책장의 본문(복사했거나 직접 고쳤거나). */
   body: string;
   /** 직접 고친 본문인가. 아니면 처음 쓴 것을 따라간다. */
   edited: boolean;
@@ -119,8 +119,8 @@ export interface GreetingRow {
 }
 
 /**
- * 복사 후 수정. 처음 쓴 본문을 모든 우편함에 복사하고, 호칭만 우편함 것을 붙인다.
- * overrides 에 있는 우편함(직접 고친 것)은 그 글을 쓰고 "고쳤다"고 표시한다. 비우면 다시 따라간다.
+ * 복사 후 수정. 처음 쓴 본문을 모든 책장에 복사하고, 호칭만 책장 것을 붙인다.
+ * overrides 에 있는 책장(직접 고친 것)은 그 글을 쓰고 "고쳤다"고 표시한다. 비우면 다시 따라간다.
  */
 export function greetingsFor(
   body: string,

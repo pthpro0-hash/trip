@@ -9,9 +9,9 @@ import { isMailboxToken, isPreview } from "@/lib/mailbox";
 import { YearBookView } from "@/components/mailbox/receive/YearBookView";
 
 /*
-  가족 우편함 · 올해의 책. 열어 본 엽서들에서 그해를 한 권으로 묶어 보여 준다(저장하지 않고 그때그때 만든다).
+  가족 책장 · 올해의 책. 열어 본 엽서들에서 그해를 한 권으로 묶어 보여 준다(저장하지 않고 그때그때 만든다).
 
-  우편함 목록(mailbox_view)을 읽어 계산한다 — 링크가 새로 만들어졌거나 우편함이 닫혔으면 곧바로 열리지 않아야
+  책장 목록(mailbox_view)을 읽어 계산한다 — 링크가 새로 만들어졌거나 책장이 닫혔으면 곧바로 열리지 않아야
   하므로 요청마다 새로 읽는다. 검색에는 나오지 않게 한다.
 */
 

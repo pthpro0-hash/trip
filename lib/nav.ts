@@ -27,8 +27,8 @@ export const ADD_HREF = "/trips/new";
 export const SPOTS_HREF = startHref("spots");
 
 /**
- * 내 정보 — 가족 공유·가족 우편함·보관함 정리·도움말·약관·로그아웃이 모인 곳.
- * 예전에는 위 띠의 이름을 눌러야 가족 공유가 열렸고, 우편함은 그 맨 아래 링크로만 갈 수 있었다.
+ * 내 정보 — 가족 공유·가족 책장·보관함 정리·도움말·약관·로그아웃이 모인 곳.
+ * 예전에는 위 띠의 이름을 눌러야 가족 공유가 열렸고, 책장은 그 맨 아래 링크로만 갈 수 있었다.
  */
 export const ME_HREF = "/me";
 
@@ -60,7 +60,7 @@ export function activeNav(pathname: string, start: Start | null): NavId | null {
   if (under(pathname, "/sketch")) return "sketch";
   if (under(pathname, "/trips") || under(pathname, "/places")) return "trips";
   if (["/spots", "/regions", "/course"].some((segment) => under(pathname, segment))) return "spots";
-  // 내 정보와 그 한 칸인 가족 공유·가족 우편함(부모님이 보는 /m 은 따로 — 거기엔 이 띠가 없다).
+  // 내 정보와 그 한 칸인 가족 공유·가족 책장(부모님이 보는 /m 은 따로 — 거기엔 이 띠가 없다).
   if (["/me", "/family", "/mailboxes"].some((segment) => under(pathname, segment))) return "me";
   return null;
 }
@@ -92,7 +92,7 @@ export function showsBottomNav(pathname: string): boolean {
 }
 
 /**
- * 가족 우편함의 받는 쪽(/m/…)인가. 부모님이 링크 하나로 들어오는 화면이라, 위 띠·하단 탭·처음 온
+ * 가족 책장의 받는 쪽(/m/…)인가. 부모님이 링크 하나로 들어오는 화면이라, 위 띠·하단 탭·처음 온
  * 사람 안내창을 모두 걷어 엽서와 답장 단추만 남긴다. 보내는 쪽(/mailboxes)은 평소 화면이다.
  */
 export const isReceiverPath = (pathname: string): boolean => under(pathname, "/m");

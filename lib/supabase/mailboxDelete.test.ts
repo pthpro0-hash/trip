@@ -34,11 +34,11 @@ beforeEach(() => {
 });
 
 /*
-  우편함을 지우는 순서 — 지울 엽서를 알아내고, 그 사진 파일을 먼저 지우고, 그다음에 줄을 지운다. 줄이 먼저 사라지면
-  폴더의 주인을 밝힐 길이 없어 사진이 공개 보관함에 영영 남는다. 파일을 못 지웠으면 우편함도 지우지 않는다.
+  책장을 지우는 순서 — 지울 엽서를 알아내고, 그 사진 파일을 먼저 지우고, 그다음에 줄을 지운다. 줄이 먼저 사라지면
+  폴더의 주인을 밝힐 길이 없어 사진이 공개 보관함에 영영 남는다. 파일을 못 지웠으면 책장도 지우지 않는다.
 */
 describe("planMailboxDelete · 무엇이 지워지나", () => {
-  it("이 우편함에만 간 엽서와, 다른 우편함에도 가서 남을 엽서 수를 읽는다", async () => {
+  it("이 책장에만 간 엽서와, 다른 책장에도 가서 남을 엽서 수를 읽는다", async () => {
     const { client, calls } = fake({ mailbox_delete_plan: { data: { sole: [P1, P2], kept: 3 } } });
     expect(await planMailboxDelete(client, "m1")).toEqual({ sole: [P1, P2], kept: 3 });
     expect(calls[0]).toEqual({ name: "mailbox_delete_plan", args: { box: "m1" } });
@@ -49,7 +49,7 @@ describe("planMailboxDelete · 무엇이 지워지나", () => {
     expect(await planMailboxDelete(client, "m1")).toEqual({ sole: [], kept: 0 });
   });
 
-  it("내 우편함이 아니거나(null) 오류면 null — 지울 수 없다", async () => {
+  it("내 책장이 아니거나(null) 오류면 null — 지울 수 없다", async () => {
     expect(await planMailboxDelete(fake({ mailbox_delete_plan: { data: null } }).client, "m1")).toBeNull();
     expect(await planMailboxDelete(fake({ mailbox_delete_plan: { error: { message: "mailbox: 먼저 닫아야 지울 수 있다" } } }).client, "m1")).toBeNull();
   });
@@ -66,7 +66,7 @@ describe("planMailboxDelete · 무엇이 지워지나", () => {
 });
 
 describe("deleteMailbox · 지우기", () => {
-  it("지울 엽서의 사진 폴더를 모두 치운 뒤에 우편함을 지운다 — 이 차례로", async () => {
+  it("지울 엽서의 사진 폴더를 모두 치운 뒤에 책장을 지운다 — 이 차례로", async () => {
     const { client, calls } = fake({
       mailbox_delete_plan: { data: { sole: [P1, P2, P3], kept: 0 } },
       mailbox_delete: { data: true },
@@ -77,14 +77,14 @@ describe("deleteMailbox · 지우기", () => {
     expect(calls[1].args).toEqual({ box: "m1" });
   });
 
-  it("지울 엽서가 없으면 파일은 건드리지 않고 우편함만 지운다", async () => {
+  it("지울 엽서가 없으면 파일은 건드리지 않고 책장만 지운다", async () => {
     const { client, calls } = fake({ mailbox_delete_plan: { data: { sole: [], kept: 2 } }, mailbox_delete: { data: true } });
     expect(await deleteMailbox(client, "m1")).toBe("ok");
     expect(sweep.calls).toEqual([]);
     expect(calls.map((call) => call.name)).toEqual(["mailbox_delete_plan", "mailbox_delete"]);
   });
 
-  it("사진 폴더 하나라도 못 치우면 거기서 멈춘다 — 우편함도 줄도 지우지 않는다", async () => {
+  it("사진 폴더 하나라도 못 치우면 거기서 멈춘다 — 책장도 줄도 지우지 않는다", async () => {
     sweep.fail.add(P2);
     const { client, calls } = fake({ mailbox_delete_plan: { data: { sole: [P1, P2, P3], kept: 0 } }, mailbox_delete: { data: true } });
     expect(await deleteMailbox(client, "m1")).toBe("files");
@@ -99,7 +99,7 @@ describe("deleteMailbox · 지우기", () => {
     expect(calls.map((call) => call.name)).toEqual(["mailbox_delete_plan"]);
   });
 
-  it("지우는 함수가 false(내 우편함이 아님)나 오류를 주면 failed", async () => {
+  it("지우는 함수가 false(내 책장이 아님)나 오류를 주면 failed", async () => {
     const plan = { mailbox_delete_plan: { data: { sole: [], kept: 0 } } };
     expect(await deleteMailbox(fake({ ...plan, mailbox_delete: { data: false } }).client, "m1")).toBe("failed");
     expect(await deleteMailbox(fake({ ...plan, mailbox_delete: { error: { message: "mailbox: 먼저 닫아야 지울 수 있다" } } }).client, "m1")).toBe("failed");

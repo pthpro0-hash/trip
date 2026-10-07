@@ -29,12 +29,12 @@ describe("개인정보처리방침 · 가족 공유", () => {
   });
 });
 
-describe("개인정보처리방침 · 가족 우편함", () => {
+describe("개인정보처리방침 · 가족 책장", () => {
   const text = () => render(<PrivacyPage />).container.textContent ?? "";
 
-  it("무엇이 모이는지에 우편함·엽서·답장이 있다", () => {
+  it("무엇이 모이는지에 책장·엽서·답장이 있다", () => {
     const t = text();
-    expect(t).toContain("가족 우편함을 쓰실 때");
+    expect(t).toContain("가족 책장을 쓰실 때");
     expect(t).toContain("받는 분의 답장");
     expect(t).toContain("하트");
   });
@@ -47,16 +47,22 @@ describe("개인정보처리방침 · 가족 우편함", () => {
     expect(t).toContain("약 1km");
   });
 
-  it("엽서의 사진은 책장 설정에 따라 최대 20장이고, 설정이 우편함 단위라고 적는다", () => {
+  it("엽서의 사진은 책장 설정에 따라 최대 20장이고, 설정이 책장 단위라고 적는다", () => {
     const t = text();
     expect(t).toContain("최대 20장");
     expect(t).toContain("책장 설정");
   });
 
-  it("우편함을 지우면 이 우편함에만 보낸 엽서와 사진 복사본이 함께 지워진다고 적는다", () => {
+  it("책장을 지우면 이 책장에만 보낸 엽서와 사진 복사본이 함께 지워진다고 적는다", () => {
     const t = text();
-    expect(t).toContain("우편함을 지우면");
-    expect(t).toContain("이 우편함에만 보낸 엽서");
+    expect(t).toContain("책장을 지우면");
+    expect(t).toContain("이 책장에만 보낸 엽서");
+  });
+
+  it("오래된 책의 사진 줄이기는 주인이 눌러야 하고 표지와 하트 받은 사진은 남는다고 적는다", () => {
+    const t = text();
+    expect(t).toContain("사진 줄이기");
+    expect(t).toContain("표지와 하트를 받은 사진은 남습니다");
   });
 
   it("받는 분에게서는 계정 정보를 받지 않는다고 적는다", () => {
@@ -85,12 +91,12 @@ describe("시행일", () => {
   });
 });
 
-describe("이용약관 · 가족 우편함", () => {
+describe("이용약관 · 가족 책장", () => {
   const text = () => render(<TermsPage />).container.textContent ?? "";
 
   it("엽서를 보내는 회원이 받는 분과 내용에 책임을 진다", () => {
     const t = text();
-    expect(t).toContain("가족 우편함");
+    expect(t).toContain("가족 책장");
     expect(t).toContain("엽서에 담는 사진·글에 대한 책임은 보내는 회원에게 있고");
   });
 

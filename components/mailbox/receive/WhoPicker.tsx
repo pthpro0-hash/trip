@@ -3,8 +3,8 @@
 import { keepWho, useWho } from "@/lib/mailboxWho";
 
 /*
-  "누가 보시나요?" — 우편함을 같이 쓰는 분들 중 한 분을 고른다. 처음 한 번이면 이 폰이 기억한다.
-  받는 분 이름이 정해져 있지 않은 우편함(members 가 빔)에서는 그리지 않는다.
+  "누가 보시나요?" — 책장을 같이 쓰는 분들 중 한 분을 고른다. 처음 한 번이면 이 폰이 기억한다.
+  받는 분 이름이 정해져 있지 않은 책장(members 가 빔)에서는 그리지 않는다.
 */
 export function WhoPicker({ token, members, compact = false }: { token: string; members: string[]; compact?: boolean }) {
   const who = useWho(token);

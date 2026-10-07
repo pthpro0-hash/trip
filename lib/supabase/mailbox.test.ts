@@ -135,7 +135,7 @@ describe("fetchMailboxes", () => {
 });
 
 describe("책장 설정 읽고 쓰기", () => {
-  it("우편함에 설정이 없으면 권장값으로 읽는다", async () => {
+  it("책장에 설정이 없으면 권장값으로 읽는다", async () => {
     const { client } = fake({ mailboxes: [row()], senders: [] });
     const result = await fetchMailboxes(client, "me");
     if (result === "failed") throw new Error("failed");
@@ -150,7 +150,7 @@ describe("책장 설정 읽고 쓰기", () => {
     expect(result.owned[0].settings.words[0]).toBe("고맙다");
   });
 
-  it("설정을 저장한다 — 그 우편함 한 줄에만, 다듬은 값 전체를", async () => {
+  it("설정을 저장한다 — 그 책장 한 줄에만, 다듬은 값 전체를", async () => {
     const { client, calls } = fake();
     const result = await updateMailboxSettings(client, "m1", { ...RECOMMENDED, photos: 12, words: ["  고맙다 ", "또 가자", "잘했다"] });
     expect(result).toEqual({ ok: true });
@@ -215,8 +215,8 @@ describe("createMailbox", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("우편함 3개를 넘으면 limit", async () => {
-    const { client } = fake({ insertError: { message: "mailboxes: 우편함은 3개까지 만들 수 있다" } });
+  it("책장 3개를 넘으면 limit", async () => {
+    const { client } = fake({ insertError: { message: "mailboxes: 책장은 3개까지 만들 수 있다" } });
     expect(await createMailbox(client, "me", input)).toEqual({ ok: false, reason: "limit" });
   });
 
@@ -227,7 +227,7 @@ describe("createMailbox", () => {
 });
 
 describe("updateMailbox · rotate · close · leave", () => {
-  it("고친 값을 그 우편함 한 줄에만", async () => {
+  it("고친 값을 그 책장 한 줄에만", async () => {
     const { client, calls } = fake();
     expect(await updateMailbox(client, "m1", { name: "장모님", greetingName: "장모님", useGreeting: false, tone: "polite", members: "장인, 장모" })).toEqual({ ok: true });
     expect(calls[0]).toMatchObject({
@@ -265,8 +265,8 @@ describe("updateMailbox · rotate · close · leave", () => {
     expect(opening.calls[0].value).toEqual({ closed_at: null });
   });
 
-  it("다시 열 때 열린 우편함이 3개면 limit", async () => {
-    const { client } = fake({ updateError: { message: "mailboxes: 우편함은 3개까지 열어 둘 수 있다" } });
+  it("다시 열 때 열린 책장이 3개면 limit", async () => {
+    const { client } = fake({ updateError: { message: "mailboxes: 책장은 3개까지 열어 둘 수 있다" } });
     expect(await setMailboxClosed(client, "m1", false)).toEqual({ ok: false, reason: "limit" });
   });
 
@@ -278,7 +278,7 @@ describe("updateMailbox · rotate · close · leave", () => {
 });
 
 describe("보내는 사람 초대", () => {
-  it("우편함·만든 사람·7일 만료로 만든다", async () => {
+  it("책장·만든 사람·7일 만료로 만든다", async () => {
     const { client, calls } = fake();
     const token = await createMailboxInvite(client, "m1", "me", new Date("2026-10-01T00:00:00Z"));
     expect(token).toMatch(/^[A-Za-z0-9_-]{32,64}$/);
@@ -305,7 +305,7 @@ describe("보내는 사람 초대", () => {
     expect(calls[0]).toMatchObject({ op: "delete", table: "mailbox_invites", eq: [["token", "t".repeat(40)]] });
   });
 
-  it("수락하면 우편함 id 를 돌려준다", async () => {
+  it("수락하면 책장 id 를 돌려준다", async () => {
     const { client, calls } = fake({ rpc: { accept_mailbox_invite: { data: "m9" } } });
     expect(await acceptMailboxInvite(client, "a".repeat(43))).toEqual({ ok: true, mailboxId: "m9" });
     expect(calls[0]).toMatchObject({ op: "rpc", table: "accept_mailbox_invite", value: { invite_token: "a".repeat(43) } });
@@ -315,7 +315,7 @@ describe("보내는 사람 초대", () => {
     ["mailbox: 없는 초대다", "missing"],
     ["mailbox: 이미 쓴 초대다", "used"],
     ["mailbox: 만료된 초대다", "expired"],
-    ["mailbox: 닫힌 우편함이다", "closed"],
+    ["mailbox: 닫힌 책장이다", "closed"],
     ["mailbox_senders: 보내는 사람은 8명까지 들일 수 있다", "full"],
     ["mailbox: 로그인이 필요하다", "login"],
     ["boom", "failed"],
