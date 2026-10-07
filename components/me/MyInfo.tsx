@@ -5,7 +5,7 @@ import Link from "next/link";
 import { accountOf, type Account } from "@/lib/account";
 import { signOutAndReload } from "@/lib/signOut";
 import { getBrowserClient } from "@/lib/supabase/client";
-import { fetchUnreadHeartCount, fetchUnreadReplyCount } from "@/lib/supabase/postcards";
+import { fetchUnreadHeartCount, fetchUnreadReplyCount, fetchUnreadWishCount } from "@/lib/supabase/postcards";
 
 /*
   내 정보 — 흩어져 있던 것들이 한 곳에 모인 메뉴.
@@ -146,8 +146,12 @@ export function MyInfo() {
         if (!data.user) return setState("login");
         setState(accountOf(data.user));
         // 새 소식은 곁다리다. 못 세면 숫자 없이 조용히 둔다(두 함수 모두 실패하면 0 을 준다).
-        const [replies, hearts] = await Promise.all([fetchUnreadReplyCount(supabase), fetchUnreadHeartCount(supabase)]);
-        setUnread(replies + hearts);
+        const [replies, hearts, wishes] = await Promise.all([
+          fetchUnreadReplyCount(supabase),
+          fetchUnreadHeartCount(supabase),
+          fetchUnreadWishCount(supabase),
+        ]);
+        setUnread(replies + hearts + wishes);
       } catch {
         setState((current) => (current === "loading" ? "login" : current));
       }

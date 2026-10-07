@@ -21,7 +21,7 @@ import {
 /*
   책장 설정 — 권장값이 기본이고, 바꾼 것은 "권장" 표시가 사라져 한눈에 보인다.
 
-  지금 쓰이는 설정만 보인다: 책 한 권 사진 수·크기(새로 꽂는 책부터), 부모님 화면 글씨·답장 문구·하트·작년 오늘·올해의 책(바로).
+  지금 쓰이는 설정만 보인다: 책 한 권 사진 수·크기(새로 꽂는 책부터), 부모님 화면 글씨·답장 문구·하트·작년 오늘·올해의 책·가고 싶은 곳 받기(바로).
   보관 권수는 책장 주인이 [사진 줄이기]를 누를 때 쓰인다(저절로 지우지 않는다). 값은 지금도 지켜서 저장한다
   (설정을 저장한다고 아직 안 보이는 칸이 권장으로 덮이지 않게).
 */
@@ -34,7 +34,7 @@ interface Props {
 }
 
 /** 화면에 내는 칸들. 권장과 다른지 셀 때도 이것만 본다. */
-const SHOWN: SettingKey[] = ["photos", "size", "font", "words", "heart", "past", "year", "keep"];
+const SHOWN: SettingKey[] = ["photos", "size", "font", "words", "heart", "past", "year", "wish", "keep"];
 
 function Rec({ show }: { show: boolean }) {
   return show ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">권장</span> : null;
@@ -225,6 +225,24 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
           />
           <p className="text-[12px] leading-relaxed text-text-faint">
             오늘 즈음(앞뒤 3일) 다녀온 지난 해의 책을 책장 맨 위에 보여 줘요. 해당하는 책이 없으면 아무것도 나오지 않고, 바꾸면 바로 적용돼요.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <p className="flex items-center gap-1.5 text-[14px] text-text">
+            가고 싶은 곳 받기 <Rec show={!differs("wish")} />
+          </p>
+          <Segment
+            label="가고 싶은 곳 받기"
+            value={draft.wish ? "on" : "off"}
+            options={[
+              { value: "on", text: "받기" },
+              { value: "off", text: "안 받기" },
+            ]}
+            onChange={(value) => set("wish", value === "on")}
+          />
+          <p className="text-[12px] leading-relaxed text-text-faint">
+            부모님 화면에 [가고 싶은 곳 보내기]가 생겨요. 여행 100선에서 고른 곳이 여기로 오고, 책장 카드에서 내 찜에 담을 수 있어요. 끄면 단추가
+            사라지고, 이미 받은 곳은 그대로 남아요. 바꾸면 바로 적용돼요.
           </p>
         </div>
         <div className="flex flex-col gap-1.5">

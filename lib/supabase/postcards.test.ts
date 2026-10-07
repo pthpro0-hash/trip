@@ -16,7 +16,10 @@ const {
   fetchSentPostcards,
   fetchUnreadHeartCount,
   fetchUnreadReplyCount,
+  fetchUnreadWishCount,
+  fetchWishes,
   markHeartsSeen,
+  markWishesSeen,
   markRepliesSeen,
   removeCopiesOfPhoto,
   removeCopiesOfTrip,
@@ -72,6 +75,7 @@ interface Options {
   deliveryRows?: unknown[];
   replyRows?: unknown[];
   heartRows?: unknown[];
+  wishRows?: unknown[];
   unread?: number;
   failUpdate?: boolean;
 }
@@ -88,6 +92,7 @@ function fake(options: Options = {}) {
     if (name === "postcard_deliveries") return options.deliveryRows ?? [];
     if (name === "postcard_replies") return options.replyRows ?? [];
     if (name === "postcard_hearts") return options.heartRows ?? [];
+    if (name === "mailbox_wishes") return options.wishRows ?? [];
     if (name === "postcards" && columns === "id") return options.postcardsOfTrip ?? [];
     if (name === "postcards") return options.countRows ?? [];
     if (name === "postcard_photos" && columns.includes("postcard_id")) return options.photoRows ?? [];
@@ -584,5 +589,54 @@ describe("하트 알림 · 보낸 사람이 받는 소식", () => {
     expect(await markHeartsSeen(f.supabase, [])).toBe(true);
     expect(f.log).toHaveLength(0);
     expect(await markHeartsSeen(fake({ failUpdate: true }).supabase, ["h1"])).toBe(false);
+  });
+});
+
+describe("가고 싶은 곳 알림 · 보내는 사람이 받는 소식", () => {
+  const row = (id: string, who: string, spot: string, over: Record<string, unknown> = {}) => ({
+    id,
+    mailbox_id: "m1",
+    who,
+    spot_id: spot,
+    created_at: "2026-10-03T00:00:00Z",
+    seen_at: null,
+    ...over,
+  });
+
+  it("책장에 든 가고 싶은 곳을 받은 차례로 읽는다 — 봤는지까지", async () => {
+    const f = fake({ wishRows: [row("w1", "엄마", "경복궁", { seen_at: "2026-10-04T00:00:00Z" }), row("w2", "아빠", "경주")] });
+    expect(await fetchWishes(f.supabase)).toEqual([
+      { id: "w1", mailboxId: "m1", who: "엄마", spot: "경복궁", at: "2026-10-03T00:00:00Z", seen: true },
+      { id: "w2", mailboxId: "m1", who: "아빠", spot: "경주", at: "2026-10-03T00:00:00Z", seen: false },
+    ]);
+  });
+
+  it("못 읽으면(표가 아직 없을 때도) 빈 목록 — 책장 관리는 그대로 된다", async () => {
+    expect(await fetchWishes(fake({ selectError: "42P01" }).supabase)).toEqual([]);
+  });
+
+  it("못 본 소식의 수는 (책장, 이름)마다 하나로 센다 — 한 분이 여러 곳을 골라도 한 소식", async () => {
+    const f = fake({ wishRows: [row("1", "엄마", "경복궁"), row("2", "엄마", "경주"), row("3", "아빠", "경주"), row("4", "엄마", "제주", { mailbox_id: "m2" })] });
+    expect(await fetchUnreadWishCount(f.supabase)).toBe(3);
+    expect(await fetchUnreadWishCount(fake().supabase)).toBe(0);
+  });
+
+  it("수를 못 세면 0 — 알림이 없는 것처럼 조용히", async () => {
+    expect(await fetchUnreadWishCount(fake({ selectError: "500" }).supabase)).toBe(0);
+  });
+
+  it("봤다고 표시한다 — 그 줄들에만", async () => {
+    const f = fake();
+    expect(await markWishesSeen(f.supabase, ["w1", "w2"])).toBe(true);
+    expect(f.updated[0].table).toBe("mailbox_wishes");
+    expect(f.updated[0].ids).toEqual(["w1", "w2"]);
+    expect(f.updated[0].patch.seen_at).toEqual(expect.any(String));
+  });
+
+  it("표시할 것이 없으면 묻지 않고, 실패하면 false", async () => {
+    const f = fake();
+    expect(await markWishesSeen(f.supabase, [])).toBe(true);
+    expect(f.log).toHaveLength(0);
+    expect(await markWishesSeen(fake({ failUpdate: true }).supabase, ["w1"])).toBe(false);
   });
 });

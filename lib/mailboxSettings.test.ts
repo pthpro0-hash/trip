@@ -21,7 +21,7 @@ import {
 */
 
 describe("권장값", () => {
-  it("사진 20장·640px·글씨 크게·하트 사진마다·최근 10권·작년 오늘 켬·올해의 책 켬", () => {
+  it("사진 20장·640px·글씨 크게·하트 사진마다·최근 10권·작년 오늘 켬·올해의 책 켬·가고 싶은 곳 받기 켬", () => {
     expect(RECOMMENDED).toEqual({
       photos: 20,
       size: 640,
@@ -31,6 +31,7 @@ describe("권장값", () => {
       keep: 10,
       past: true,
       year: true,
+      wish: true,
     });
   });
 
@@ -58,12 +59,13 @@ describe("resolveSettings · 저장된 값을 읽는다", () => {
       keep: "all",
       past: false,
       year: false,
+      wish: false,
     };
     expect(resolveSettings(stored)).toEqual(stored);
   });
 
   it("범위를 벗어난 칸만 권장으로 되돌린다 — 나머지는 살린다", () => {
-    const result = resolveSettings({ photos: 7, size: 800, font: "huge", heart: "all", keep: 5, past: "yes", year: false });
+    const result = resolveSettings({ photos: 7, size: 800, font: "huge", heart: "all", keep: 5, past: "yes", year: false, wish: "yes" });
     expect(result.photos).toBe(20);
     expect(result.size).toBe(640);
     expect(result.font).toBe("large");
@@ -71,6 +73,7 @@ describe("resolveSettings · 저장된 값을 읽는다", () => {
     expect(result.keep).toBe(10);
     expect(result.past).toBe(true);
     expect(result.year).toBe(false);
+    expect(result.wish).toBe(true);
   });
 
   it("답장 문구는 칸마다 다듬는다 — 앞뒤 공백, 15자, 비면 그 칸만 권장", () => {
@@ -96,9 +99,9 @@ describe("resolveSettings · 저장된 값을 읽는다", () => {
 
 describe("receiverSettings · 받는 쪽에 내려가는 것", () => {
   it("부모님 화면에 필요한 것만 — 사진 수·크기·보관 권수는 내려가지 않는다", () => {
-    const sent = receiverSettings(resolveSettings({ photos: 6, size: 960, keep: "all", font: "xlarge", heart: "book", past: false, year: false }));
-    expect(Object.keys(sent).sort()).toEqual(["font", "heart", "past", "words", "year"]);
-    expect(sent).toMatchObject({ font: "xlarge", heart: "book", past: false, year: false });
+    const sent = receiverSettings(resolveSettings({ photos: 6, size: 960, keep: "all", font: "xlarge", heart: "book", past: false, year: false, wish: false }));
+    expect(Object.keys(sent).sort()).toEqual(["font", "heart", "past", "wish", "words", "year"]);
+    expect(sent).toMatchObject({ font: "xlarge", heart: "book", past: false, year: false, wish: false });
   });
 });
 

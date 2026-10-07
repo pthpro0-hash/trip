@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
-import { fetchUnreadHeartCount, fetchUnreadReplyCount } from "@/lib/supabase/postcards";
+import { fetchUnreadHeartCount, fetchUnreadReplyCount, fetchUnreadWishCount } from "@/lib/supabase/postcards";
 
 /** 책장 화면이 답장·하트를 "봤다"고 표시했음을 위 띠에 알리는 신호. */
 export const REPLIES_SEEN = "postcard-replies-seen";
 
 /*
-  새 소식(답장·하트)이 왔을 때만 위 띠에 나타나는 편지 표시.
+  새 소식(답장·하트·가고 싶은 곳)이 왔을 때만 위 띠에 나타나는 편지 표시.
 
   평소에는 아무것도 그리지 않는다 — 위 띠는 폰에서 이미 빠듯하고, 책장을 안 쓰는 사람에게는 없는 것이
   맞다. 부모님이 답장하거나 하트를 누르면 이 표시가 숫자와 함께 뜨고, 누르면 책장 화면(보낸 엽서)으로
@@ -31,8 +31,12 @@ export function MailboxBell() {
           if (active) setCount(0);
           return;
         }
-        const [replies, hearts] = await Promise.all([fetchUnreadReplyCount(supabase), fetchUnreadHeartCount(supabase)]);
-        if (active) setCount(replies + hearts);
+        const [replies, hearts, wishes] = await Promise.all([
+          fetchUnreadReplyCount(supabase),
+          fetchUnreadHeartCount(supabase),
+          fetchUnreadWishCount(supabase),
+        ]);
+        if (active) setCount(replies + hearts + wishes);
       } catch {
         // 알림을 못 세면 없는 것처럼 둔다.
       }

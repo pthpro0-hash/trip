@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 
-const state = vi.hoisted(() => ({ user: { id: "me" } as { id: string } | null, unread: 0, hearts: 0 }));
+const state = vi.hoisted(() => ({ user: { id: "me" } as { id: string } | null, unread: 0, hearts: 0, wishes: 0 }));
 vi.mock("@/lib/supabase/client", () => ({
   getBrowserClient: () => ({ auth: { getUser: async () => ({ data: { user: state.user } }) } }),
 }));
 vi.mock("@/lib/supabase/postcards", () => ({
   fetchUnreadReplyCount: async () => state.unread,
   fetchUnreadHeartCount: async () => state.hearts,
+  fetchUnreadWishCount: async () => state.wishes,
 }));
 
 const { MailboxBell, REPLIES_SEEN } = await import("./MailboxBell");
@@ -17,6 +18,7 @@ describe("MailboxBell · 새 소식(답장·하트) 알림", () => {
     state.user = { id: "me" };
     state.unread = 0;
     state.hearts = 0;
+    state.wishes = 0;
   });
 
   it("새 소식이 없으면 아무것도 그리지 않는다 — 위 띠는 폰에서 이미 빠듯하다", async () => {
@@ -39,11 +41,18 @@ describe("MailboxBell · 새 소식(답장·하트) 알림", () => {
     expect(await screen.findByRole("link", { name: "가족 책장 새 소식 14개" })).toHaveTextContent("9+");
   });
 
-  it("답장과 하트를 더해 센다", async () => {
+  it("답장·하트·가고 싶은 곳을 더해 센다", async () => {
     state.unread = 1;
     state.hearts = 2;
+    state.wishes = 4;
     render(<MailboxBell />);
-    expect(await screen.findByRole("link", { name: "가족 책장 새 소식 3개" })).toHaveTextContent("3");
+    expect(await screen.findByRole("link", { name: "가족 책장 새 소식 7개" })).toHaveTextContent("7");
+  });
+
+  it("가고 싶은 곳만 와도 나타난다", async () => {
+    state.wishes = 1;
+    render(<MailboxBell />);
+    expect(await screen.findByRole("link", { name: "가족 책장 새 소식 1개" })).toBeTruthy();
   });
 
   it("하트만 와도 나타난다", async () => {

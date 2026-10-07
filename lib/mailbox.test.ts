@@ -26,6 +26,7 @@ import {
   type PostcardPhotoCandidate,
   isPreview,
   mailboxPath,
+  wishPath,
   yearBookPath,
   postcardPath,
 } from "./mailbox";
@@ -377,5 +378,15 @@ describe("올해의 책 길", () => {
   it("/m/<링크>/year/<해> — 미리보기면 표시가 이어진다", () => {
     expect(yearBookPath(TOKEN, "2026")).toBe(`/m/${TOKEN}/year/2026`);
     expect(yearBookPath(TOKEN, "2026", true)).toBe(`/m/${TOKEN}/year/2026?preview=1`);
+  });
+});
+
+describe("가고 싶은 곳 길", () => {
+  const TOKEN = "T".repeat(43);
+
+  it("/m/<링크>/wish — 미리보기 방식이 이어진다", () => {
+    expect(wishPath(TOKEN)).toBe(`/m/${TOKEN}/wish`);
+    expect(wishPath(TOKEN, true)).toBe(`/m/${TOKEN}/wish?preview=1`);
+    expect(wishPath(TOKEN, "all")).toBe(`/m/${TOKEN}/wish?preview=all`);
   });
 });

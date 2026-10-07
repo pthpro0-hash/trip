@@ -10,6 +10,7 @@ import {
   postcardFileUrl,
   replyToPostcard,
   toggleHeart,
+  toggleWish,
 } from "./mailboxPublic";
 
 /*
@@ -425,5 +426,73 @@ describe("asOpened · 미리보기에서 모든 엽서를 열어 본 것처럼",
     const view = await fetchMailboxView(fake({ mailbox_view: { data: { ...base, postcards: [{ ...raw, openedAt: null }] } } }).client, TOKEN);
     asOpened(view!);
     expect(view?.postcards[0].opened).toBe(false);
+  });
+});
+
+describe("가고 싶은 곳 · 받는 쪽", () => {
+  const base = { name: "x", tone: "casual", members: ["엄마"], postcards: [] };
+
+  it("책장에 든 가고 싶은 곳(누가 어느 곳)을 읽는다 — 옛 SQL 이면 빈 목록", async () => {
+    const view = await fetchMailboxView(
+      fake({ mailbox_view: { data: { ...base, wishes: [{ who: "엄마", spot: "경복궁" }, { who: "아빠", spot: "창덕궁과-후원" }] } } }).client,
+      TOKEN,
+    );
+    expect(view?.wishes).toEqual([
+      { who: "엄마", spot: "경복궁" },
+      { who: "아빠", spot: "창덕궁과-후원" },
+    ]);
+    expect((await fetchMailboxView(fake({ mailbox_view: { data: base } }).client, TOKEN))?.wishes).toEqual([]);
+  });
+
+  it("모양이 틀린 줄만 버린다 — 이름이 비었거나, 곳에 슬래시·공백이 있거나, 글자가 아닌 것", async () => {
+    const view = await fetchMailboxView(
+      fake({
+        mailbox_view: {
+          data: { ...base, wishes: [{ who: "", spot: "경복궁" }, { who: "엄마", spot: "a/b" }, { who: "엄마", spot: "a b" }, { who: 3, spot: "경복궁" }, "x", null, { who: "아빠", spot: "경주" }] },
+        },
+      }).client,
+      TOKEN,
+    );
+    expect(view?.wishes).toEqual([{ who: "아빠", spot: "경주" }]);
+  });
+
+  it("가고 싶은 곳 받기 설정(wish)도 읽는다 — 없으면 권장(켬)", async () => {
+    expect((await fetchMailboxView(fake({ mailbox_view: { data: base } }).client, TOKEN))?.settings.wish).toBe(true);
+    expect((await fetchMailboxView(fake({ mailbox_view: { data: { ...base, settings: { wish: false } } } }).client, TOKEN))?.settings.wish).toBe(false);
+  });
+
+  it("켠다 — 이름·곳·켬 여부를 함수에 넘긴다", async () => {
+    const { client, calls } = fake({ mailbox_wish: { data: true } });
+    expect(await toggleWish(client, TOKEN, "엄마", "경복궁", true)).toEqual({ ok: true });
+    expect(calls[0]).toEqual({ name: "mailbox_wish", args: { box_token: TOKEN, wish_who: "엄마", wish_spot: "경복궁", wish_on: true } });
+  });
+
+  it("끄기도 같은 길", async () => {
+    const { client, calls } = fake({ mailbox_wish: { data: true } });
+    expect(await toggleWish(client, TOKEN, "엄마", "경복궁", false)).toEqual({ ok: true });
+    expect(calls[0].args).toMatchObject({ wish_on: false });
+  });
+
+  it("너무 잦으면 often, 가득 차면 full, 설정에서 껐으면 off, 링크가 닫혔으면 closed, 그 밖은 failed", async () => {
+    const reason = async (rpc: Parameters<typeof fake>[0]) => toggleWish(fake(rpc).client, TOKEN, "엄마", "경복궁", true);
+    expect(await reason({ mailbox_wish: { error: { message: "mailbox: 가고 싶은 곳이 너무 잦다" } } })).toEqual({ ok: false, reason: "often" });
+    expect(await reason({ mailbox_wish: { error: { message: "mailbox: 가고 싶은 곳이 가득 찼다" } } })).toEqual({ ok: false, reason: "full" });
+    expect(await reason({ mailbox_wish: { error: { message: "mailbox: 가고 싶은 곳 받기를 쓰지 않는다" } } })).toEqual({ ok: false, reason: "off" });
+    expect(await reason({ mailbox_wish: { data: false } })).toEqual({ ok: false, reason: "closed" });
+    expect(await reason({ mailbox_wish: { error: { message: "boom" } } })).toEqual({ ok: false, reason: "failed" });
+  });
+
+  it("묻기 전에 걸러낸다 — 이름·곳·링크 글자가 틀리면 묻지도 않는다", async () => {
+    const { client, calls } = fake({});
+    expect(await toggleWish(client, TOKEN, "", "경복궁", true)).toEqual({ ok: false, reason: "invalid" });
+    expect(await toggleWish(client, TOKEN, "가".repeat(11), "경복궁", true)).toEqual({ ok: false, reason: "invalid" });
+    expect(await toggleWish(client, TOKEN, "엄마", "a/b", true)).toEqual({ ok: false, reason: "invalid" });
+    expect(await toggleWish(client, "짧음", "엄마", "경복궁", true)).toEqual({ ok: false, reason: "invalid" });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("던져도 failed", async () => {
+    const throwing = { rpc: async () => { throw new Error("offline"); } } as unknown as SupabaseClient;
+    expect(await toggleWish(throwing, TOKEN, "엄마", "경복궁", true)).toEqual({ ok: false, reason: "failed" });
   });
 });

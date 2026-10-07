@@ -14,6 +14,8 @@ const postcards = vi.hoisted(() => ({
   withdrawPostcard: vi.fn(),
   markRepliesSeen: vi.fn(),
   markHeartsSeen: vi.fn(),
+  markWishesSeen: vi.fn(),
+  wishes: [] as unknown[],
 }));
 const api = vi.hoisted(() => ({
   createMailbox: vi.fn(),
@@ -45,6 +47,8 @@ vi.mock("@/lib/supabase/postcards", () => ({
   withdrawPostcard: postcards.withdrawPostcard,
   markRepliesSeen: postcards.markRepliesSeen,
   markHeartsSeen: postcards.markHeartsSeen,
+  fetchWishes: async () => postcards.wishes,
+  markWishesSeen: postcards.markWishesSeen,
 }));
 
 const { MailboxPanel } = await import("./MailboxPanel");
@@ -91,6 +95,9 @@ describe("MailboxPanel", () => {
     postcards.markRepliesSeen.mockResolvedValue(true);
     postcards.markHeartsSeen.mockReset();
     postcards.markHeartsSeen.mockResolvedValue(true);
+    postcards.markWishesSeen.mockReset();
+    postcards.markWishesSeen.mockResolvedValue(true);
+    postcards.wishes = [];
     copied.mockClear();
     Object.defineProperty(navigator, "clipboard", { value: { writeText: copied }, configurable: true });
   });
@@ -438,6 +445,60 @@ describe("MailboxPanel", () => {
     fireEvent.click(await screen.findByRole("button", { name: "책장 지우기" }));
     const status = await screen.findByRole("status");
     expect(status.className).toContain("sticky");
+  });
+
+  describe("가고 싶은 곳(부모님이 보낸)", () => {
+    const wish = (id: string, mailboxId: string, who: string, spot: string, seen = true) => ({
+      id,
+      mailboxId,
+      who,
+      spot,
+      at: "2026-10-03T00:00:00Z",
+      seen,
+    });
+
+    it("책장 카드 안에 누가 어느 곳을 골랐는지 보인다 — 다른 책장의 것은 섞이지 않는다", async () => {
+      state.list = { owned: [box({ id: "m1", name: "엄마 아빠" }), box({ id: "m2", name: "장모님" })], joined: [] };
+      postcards.wishes = [wish("w1", "m1", "엄마", "경복궁"), wish("w2", "m2", "장모님", "경주")];
+      render(<MailboxPanel />);
+      const mine = await screen.findByRole("list", { name: "엄마 아빠 가고 싶은 곳" });
+      expect(mine).toHaveTextContent("엄마: 경복궁");
+      expect(mine).not.toHaveTextContent("경주");
+      expect(screen.getByRole("list", { name: "장모님 가고 싶은 곳" })).toHaveTextContent("장모님: 경주");
+    });
+
+    it("처음 본 것은 '새' 표시가 붙고, 봤다고 적는다 — 이미 본 것만이면 적지 않는다", async () => {
+      state.list = { owned: [box({ id: "m1", name: "엄마 아빠" })], joined: [] };
+      postcards.wishes = [wish("w1", "m1", "엄마", "경복궁", true), wish("w2", "m1", "아빠", "경주", false)];
+      render(<MailboxPanel />);
+      await screen.findByRole("list", { name: "엄마 아빠 가고 싶은 곳" });
+      await waitFor(() => expect(postcards.markWishesSeen).toHaveBeenCalledWith(expect.anything(), ["w2"]));
+      const items = within(screen.getByRole("list", { name: "엄마 아빠 가고 싶은 곳" })).getAllByRole("listitem");
+      expect(items[0]).not.toHaveTextContent("새");
+      expect(items[1]).toHaveTextContent("새");
+    });
+
+    it("이미 본 것만 있으면 봤다는 표시 호출이 없다", async () => {
+      state.list = { owned: [box({ id: "m1", name: "엄마 아빠" })], joined: [] };
+      postcards.wishes = [wish("w1", "m1", "엄마", "경복궁", true)];
+      render(<MailboxPanel />);
+      await screen.findByRole("list", { name: "엄마 아빠 가고 싶은 곳" });
+      expect(postcards.markWishesSeen).not.toHaveBeenCalled();
+    });
+
+    it("받은 것이 없으면 목록이 없다", async () => {
+      state.list = { owned: [box({ id: "m1", name: "엄마 아빠" })], joined: [] };
+      render(<MailboxPanel />);
+      await screen.findByRole("button", { name: "책장 닫기" });
+      expect(screen.queryByRole("list", { name: /가고 싶은 곳/ })).toBeNull();
+    });
+
+    it("보내는 사람으로 들어간 책장에서도 보인다", async () => {
+      state.list = { owned: [], joined: [box({ id: "j1", ownerId: "other", name: "남의 곳" })] };
+      postcards.wishes = [wish("w1", "j1", "엄마", "경복궁")];
+      render(<MailboxPanel />);
+      expect(await screen.findByRole("list", { name: "남의 곳 가고 싶은 곳" })).toHaveTextContent("엄마: 경복궁");
+    });
   });
 
   describe("오래된 책의 사진 줄이기", () => {

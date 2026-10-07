@@ -24,7 +24,9 @@ import {
   type MailboxTrimPlan,
   type PendingMailboxInvite,
 } from "@/lib/supabase/mailbox";
-import { fetchSentPostcards, markHeartsSeen, markRepliesSeen, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
+import { fetchSentPostcards, fetchWishes, markHeartsSeen, markRepliesSeen, markWishesSeen, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
+import { groupWishes, type SentWish } from "@/lib/mailboxWishes";
+import { WishList } from "./WishList";
 import { summarizeHearts, type HeartLine } from "@/lib/mailboxHearts";
 import { attachParticle } from "@/lib/korean";
 import type { MailboxSettings } from "@/lib/mailboxSettings";
@@ -50,6 +52,8 @@ type Loaded = {
   invites: PendingMailboxInvite[];
   sent: SentPostcard[];
   trims: Record<string, MailboxTrimPlan>;
+  /** 부모님이 가고 싶다고 보낸 곳(받은 차례). */
+  wishes: SentWish[];
 };
 
 const TONE_LABEL = { casual: "편하게", polite: "존댓말" } as const;
@@ -123,11 +127,12 @@ export function MailboxPanel() {
     if (!supabase) return setState("failed");
     const { data } = await supabase.auth.getUser();
     if (!data.user) return setState("login");
-    const [list, invites, sent] = await Promise.all([
+    const [list, invites, sent, wishes] = await Promise.all([
       fetchMailboxes(supabase, data.user.id),
       fetchMailboxInvites(supabase, data.user.id),
-      // 보낸 엽서는 곁다리다. 못 읽어도 책장 관리는 된다.
+      // 보낸 엽서와 부모님이 보낸 가고 싶은 곳은 곁다리다. 못 읽어도 책장 관리는 된다.
       fetchSentPostcards(supabase, data.user.id).catch(() => []),
+      fetchWishes(supabase),
     ]);
     if (list === "failed" || invites === "failed") return setState("failed");
     // 오래된 책의 사진 줄이기는 곁다리다. 못 읽으면(서버 설정 전) 그 칸만 없다. 열려 있고 보관을 '전부'로 안 둔 곳만 묻는다.
@@ -140,16 +145,18 @@ export function MailboxPanel() {
           if (plan && plan.books.length > 0) trims[box.id] = plan;
         }),
     );
-    setState({ userId: data.user.id, list, invites, sent, trims });
+    setState({ userId: data.user.id, list, invites, sent, trims, wishes });
 
     // 아직 못 본 답장·하트는 이 화면이 보여 주는 순간 "봤다"고 적는다. 위 띠의 새 소식 표시도 따라 사라진다.
     const unseen = sent.flatMap((card) => card.replies.filter((reply) => !reply.seen).map((reply) => reply.id));
     const unseenHearts = sent.flatMap((card) => card.hearts.filter((heart) => !heart.seen).map((heart) => heart.id));
-    if (unseen.length > 0 || unseenHearts.length > 0) {
-      setFresh((current) => new Set([...current, ...unseen, ...unseenHearts]));
+    const unseenWishes = wishes.filter((wish) => !wish.seen).map((wish) => wish.id);
+    if (unseen.length > 0 || unseenHearts.length > 0 || unseenWishes.length > 0) {
+      setFresh((current) => new Set([...current, ...unseen, ...unseenHearts, ...unseenWishes]));
       void Promise.all([
         unseen.length > 0 ? markRepliesSeen(supabase, unseen) : true,
         unseenHearts.length > 0 ? markHeartsSeen(supabase, unseenHearts) : true,
+        unseenWishes.length > 0 ? markWishesSeen(supabase, unseenWishes) : true,
       ])
         .then(() => window.dispatchEvent(new Event(REPLIES_SEEN)))
         .catch(() => undefined);
@@ -184,7 +191,8 @@ export function MailboxPanel() {
     );
   }
 
-  const { userId, list, invites, sent, trims } = state;
+  const { userId, list, invites, sent, trims, wishes } = state;
+  const wishesByBox = groupWishes(wishes);
   const nameOf = new Map([...list.owned, ...list.joined].map((box) => [box.id, box.name]));
   const openCount = list.owned.filter((box) => !box.closed).length;
   const full = openCount >= MAILBOX_LIMIT;
@@ -414,6 +422,8 @@ export function MailboxPanel() {
                 <br />
                 보내는 사람 {box.senderCount}명 · 책 한 권 사진 {box.settings.photos}장
               </p>
+
+              <WishList boxName={box.name} wishes={wishesByBox.get(box.id) ?? []} fresh={fresh} />
 
               {trims[box.id] && (
                 <div className="flex flex-col gap-2 rounded-lg bg-accent-soft p-3 text-[13px] leading-relaxed">
@@ -681,6 +691,7 @@ export function MailboxPanel() {
                   {box.closed && <span className="rounded-full bg-bg-subtle px-2.5 py-0.5 text-[12px] text-text-muted">닫혀 있어요</span>}
                 </div>
                 <p className="text-[13px] text-text-muted">받는 분 {box.members.join(" · ") || "—"} · 보내는 사람 {box.senderCount}명</p>
+                <WishList boxName={box.name} wishes={wishesByBox.get(box.id) ?? []} fresh={fresh} />
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" className={pill} disabled={box.closed} onClick={() => void copy(mailboxUrl(window.location.origin, box.token), "책장 링크를 복사했어요.")}>
                     링크 복사

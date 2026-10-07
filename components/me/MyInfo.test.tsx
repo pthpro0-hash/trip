@@ -6,6 +6,7 @@ const state = vi.hoisted(() => ({
   user: null as null | { user_metadata?: Record<string, unknown>; email?: string },
   replies: 0,
   hearts: 0,
+  wishes: 0,
   signOut: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock("@/lib/supabase/client", () => ({
 vi.mock("@/lib/supabase/postcards", () => ({
   fetchUnreadReplyCount: async () => state.replies,
   fetchUnreadHeartCount: async () => state.hearts,
+  fetchUnreadWishCount: async () => state.wishes,
 }));
 vi.mock("@/lib/signOut", () => ({ signOutAndReload: state.signOut }));
 
@@ -28,6 +30,7 @@ describe("MyInfo · 내 정보 메뉴", () => {
     state.user = { user_metadata: { full_name: "김지민", avatar_url: "https://img.example/a.png" }, email: "jimin@example.com" };
     state.replies = 0;
     state.hearts = 0;
+    state.wishes = 0;
     state.signOut.mockReset();
   });
 
@@ -68,12 +71,13 @@ describe("MyInfo · 내 정보 메뉴", () => {
       expect(screen.queryByText(/새 소식/)).toBeNull();
     });
 
-    it("새 답장과 새 하트를 더해 책장 줄에 알린다", async () => {
+    it("새 답장·하트·가고 싶은 곳을 더해 책장 줄에 알린다", async () => {
       state.replies = 1;
       state.hearts = 2;
+      state.wishes = 1;
       render(<MyInfo />);
       const row = await screen.findByRole("link", { name: /^가족 책장/ });
-      await waitFor(() => expect(within(row).getByText("새 소식 3")).toBeTruthy());
+      await waitFor(() => expect(within(row).getByText("새 소식 4")).toBeTruthy());
     });
 
     it("로그아웃을 누르면 로그아웃한다", async () => {

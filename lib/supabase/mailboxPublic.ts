@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isHeartFile, type Heart } from "@/lib/mailboxHearts";
+import { isWishSpot, type Wish } from "@/lib/mailboxWishes";
 import { resolveSettings, type MailboxSettings } from "@/lib/mailboxSettings";
 import { isMailboxToken, isPostcardId, isPostcardSnapshot, type PostcardSnapshot, type Tone } from "@/lib/mailbox";
 import { SUPABASE_URL } from "./config";
@@ -69,6 +70,8 @@ export interface MailboxView {
   settings: MailboxSettings;
   /** 받는 분 이름들("엄마", "아빠"). */
   members: string[];
+  /** 이 책장에서 누가 어느 곳(여행 100선 id)에 가고 싶다고 했나. */
+  wishes: Wish[];
   postcards: InboxCard[];
 }
 
@@ -131,6 +134,14 @@ function placesOf(value: unknown): InboxPlace[] {
   });
 }
 
+/** 가고 싶은 곳 목록. 모양이 틀린 줄만 버린다(옛 SQL 이면 빈 목록). */
+function wishesOf(value: unknown): Wish[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) =>
+    isRecord(raw) && isString(raw.who) && raw.who.length > 0 && isString(raw.spot) && isWishSpot(raw.spot) ? [{ who: raw.who, spot: raw.spot }] : [],
+  );
+}
+
 /** 사진별 하트 수. 모양이 틀린 줄만 버리고, 수가 1 이상인 것만 남긴다(옛 SQL 이면 빈 목록). */
 function heartCountsOf(value: unknown): HeartCount[] {
   if (!Array.isArray(value)) return [];
@@ -167,7 +178,13 @@ export async function fetchMailboxView(supabase: SupabaseClient, token: string):
   const { data, error } = await supabase.rpc("mailbox_view", { box_token: token });
   if (error || !isRecord(data)) return null;
   const cards = Array.isArray(data.postcards) ? data.postcards.map(cardOf).filter((card): card is InboxCard => card !== null) : [];
-  return { tone: toneOf(data.tone), settings: resolveSettings(data.settings), members: strings(data.members), postcards: cards };
+  return {
+    tone: toneOf(data.tone),
+    settings: resolveSettings(data.settings),
+    members: strings(data.members),
+    wishes: wishesOf(data.wishes),
+    postcards: cards,
+  };
 }
 
 /** 엽서 한 장. 그 책장에 없는 엽서·모양이 틀린 스냅샷이면 null. */
@@ -213,6 +230,36 @@ export async function markPostcardOpened(supabase: SupabaseClient, token: string
     await supabase.rpc("mailbox_open", { box_token: token, card_id: postcardId });
   } catch {
     // 열어 본 표시가 안 찍혀도 엽서는 보인다.
+  }
+}
+
+export type WishResult = { ok: true } | { ok: false; reason: "invalid" | "closed" | "often" | "full" | "off" | "failed" };
+
+/**
+ * 가고 싶은 곳을 켜거나 끈다. 곳은 여행 100선의 id. 너무 잦으면 often, 책장에 100곳이 차면 full, 설정에서 껐으면
+ * off, 링크가 닫혔으면 closed.
+ */
+export async function toggleWish(
+  supabase: SupabaseClient,
+  token: string,
+  who: string,
+  spot: string,
+  on: boolean,
+): Promise<WishResult> {
+  if (!isMailboxToken(token)) return { ok: false, reason: "invalid" };
+  if (who.length < 1 || who.length > 10 || !isWishSpot(spot)) return { ok: false, reason: "invalid" };
+  try {
+    const { data, error } = await supabase.rpc("mailbox_wish", { box_token: token, wish_who: who, wish_spot: spot, wish_on: on });
+    if (error) {
+      const message = error.message;
+      return {
+        ok: false,
+        reason: message.includes("잦다") ? "often" : message.includes("가득") ? "full" : message.includes("쓰지 않는다") ? "off" : "failed",
+      };
+    }
+    return data === true ? { ok: true } : { ok: false, reason: "closed" };
+  } catch {
+    return { ok: false, reason: "failed" };
   }
 }
 

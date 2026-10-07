@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SentWish } from "@/lib/mailboxWishes";
 import { POSTCARD_PHOTOS_MAX, buildPostcardSnapshot, newPostcardId } from "@/lib/mailbox";
 import { postcardFromBlob } from "@/lib/photo/resize";
 import { thumbUrls } from "./photos";
@@ -305,6 +306,44 @@ export async function fetchUnreadHeartCount(supabase: SupabaseClient): Promise<n
 export async function markHeartsSeen(supabase: SupabaseClient, ids: string[]): Promise<boolean> {
   if (ids.length === 0) return true;
   const { error } = await supabase.from("postcard_hearts").update({ seen_at: new Date().toISOString() }).in("id", ids);
+  return !error;
+}
+
+/**
+ * 책장에 든 가고 싶은 곳(부모님이 여행 100선에서 골라 보낸 것)을 받은 차례로 읽는다. 그 책장의 보내는 사람이면 누구나 읽는다.
+ * 못 읽으면(표가 아직 없을 때도) 빈 목록 — 책장 관리는 그대로 된다.
+ */
+export async function fetchWishes(supabase: SupabaseClient): Promise<SentWish[]> {
+  try {
+    const { data, error } = await supabase
+      .from("mailbox_wishes")
+      .select("id,mailbox_id,who,spot_id,created_at,seen_at")
+      .order("created_at", { ascending: true });
+    if (error || !Array.isArray(data)) return [];
+    return (data as { id: string; mailbox_id: string; who: string; spot_id: string; created_at: string; seen_at: string | null }[]).map((row) => ({
+      id: row.id,
+      mailboxId: row.mailbox_id,
+      who: row.who,
+      spot: row.spot_id,
+      at: row.created_at,
+      seen: row.seen_at != null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** 아직 못 본 가고 싶은 곳 소식의 수. 한 분이 여러 곳을 골라도 소식 하나다 — (책장, 이름)마다 하나. 못 세면 0. */
+export async function fetchUnreadWishCount(supabase: SupabaseClient): Promise<number> {
+  const { data, error } = await supabase.from("mailbox_wishes").select("mailbox_id,who").is("seen_at", null).limit(1000);
+  if (error || !Array.isArray(data)) return 0;
+  return new Set((data as { mailbox_id: string; who: string }[]).map((row) => `${row.mailbox_id}|${row.who}`)).size;
+}
+
+/** 가고 싶은 곳을 봤다고 표시한다(DB 가 seen_at 말고는 못 고치게 막아 둔다). */
+export async function markWishesSeen(supabase: SupabaseClient, ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const { error } = await supabase.from("mailbox_wishes").update({ seen_at: new Date().toISOString() }).in("id", ids);
   return !error;
 }
 

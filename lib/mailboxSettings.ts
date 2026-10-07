@@ -6,7 +6,7 @@
 
   어느 설정이 어디에 쓰이나:
     photos·size   엽서를 보낼 때(새로 꽂는 책부터). 이미 보낸 엽서는 보낸 순간 그대로다.
-    font·words·heart·past·year  부모님 화면(바로 바뀐다). 하트는 사진마다 / 책마다, past 는 '작년 오늘', year 는 '올해의 책'을 보일지.
+    font·words·heart·past·year·wish  부모님 화면(바로 바뀐다). 하트는 사진마다 / 책마다, past 는 '작년 오늘', year 는 '올해의 책', wish 는 '가고 싶은 곳 보내기'를 둘지.
     keep  오래된 책의 사진 줄이기(책장 주인이 단추로). 최근 10권만 사진까지, 나머지는 표지·하트 받은 사진만.
 */
 
@@ -29,6 +29,8 @@ export interface MailboxSettings {
   past: boolean;
   /** 연말에 "올해의 책"을 저절로 만들지. */
   year: boolean;
+  /** 부모님 화면에 '가고 싶은 곳 보내기'를 둘지. */
+  wish: boolean;
 }
 
 export const RECOMMENDED: MailboxSettings = {
@@ -40,6 +42,7 @@ export const RECOMMENDED: MailboxSettings = {
   keep: 10,
   past: true,
   year: true,
+  wish: true,
 };
 
 export const PHOTO_CHOICES = [6, 12, 20] as const;
@@ -89,6 +92,7 @@ export function resolveSettings(raw: unknown): MailboxSettings {
     keep: pick(source.keep, KEEP_CHOICES, RECOMMENDED.keep),
     past: bool(source.past, RECOMMENDED.past),
     year: bool(source.year, RECOMMENDED.year),
+    wish: bool(source.wish, RECOMMENDED.wish),
   };
 }
 
@@ -98,11 +102,19 @@ export interface ReceiverSettings {
   words: [string, string, string];
   past: boolean;
   year: boolean;
+  wish: boolean;
 }
 
 /** 부모님 화면에 내려가는 것. 사진 수·크기·보관 권수는 보내는 쪽 일이라 내려가지 않는다. */
 export function receiverSettings(settings: MailboxSettings): ReceiverSettings {
-  return { font: settings.font, heart: settings.heart, words: settings.words, past: settings.past, year: settings.year };
+  return {
+    font: settings.font,
+    heart: settings.heart,
+    words: settings.words,
+    past: settings.past,
+    year: settings.year,
+    wish: settings.wish,
+  };
 }
 
 /**

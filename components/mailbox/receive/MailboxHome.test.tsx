@@ -45,7 +45,7 @@ const card = (over: Partial<MailboxView["postcards"][number]> = {}) => ({
 });
 const idOf = (letter: string) => letter.repeat(43);
 const place = (placeName: string, day: string) => ({ placeName, lat: 35, lng: 127, day, photoCount: 1, photo: "a.webp" });
-const view = (over: Partial<MailboxView> = {}): MailboxView => ({ tone: "casual", settings: RECOMMENDED, members: ["엄마", "아빠"], postcards: [card()], ...over });
+const view = (over: Partial<MailboxView> = {}): MailboxView => ({ tone: "casual", settings: RECOMMENDED, members: ["엄마", "아빠"], wishes: [], postcards: [card()], ...over });
 
 describe("MailboxHome · 부모님이 보는 책장", () => {
   beforeEach(() => window.localStorage.clear());
@@ -415,5 +415,34 @@ describe("MailboxHome · 미리보기 방식(모두 열어 본 것처럼 / 지�
     const book = screen.getAllByRole("link").map((link) => link.getAttribute("href") ?? "").filter((href) => href.includes("/p/"));
     expect(book.length).toBeGreaterThan(0);
     for (const href of book) expect(href).toMatch(/\?preview=all$/);
+  });
+});
+
+describe("MailboxHome · 가고 싶은 곳 보내기", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("책장 맨 아래에 큰 단추가 있고, 누르면 가고 싶은 곳 보내는 화면으로 간다", () => {
+    render(<MailboxHome token={TOKEN} view={view()} />);
+    expect(screen.getByRole("link", { name: /가고 싶은 곳 보내기/ })).toHaveAttribute("href", `/m/${TOKEN}/wish`);
+  });
+
+  it("이미 보낸 곳이 있으면 몇 곳인지 알린다", () => {
+    render(<MailboxHome token={TOKEN} view={view({ wishes: [{ who: "엄마", spot: "경복궁" }, { who: "아빠", spot: "경주" }] })} />);
+    expect(screen.getByRole("link", { name: /가고 싶은 곳 보내기/ })).toHaveTextContent("2곳 보냈어요");
+  });
+
+  it("보낸 곳이 없으면 숫자를 말하지 않는다", () => {
+    render(<MailboxHome token={TOKEN} view={view()} />);
+    expect(screen.getByRole("link", { name: /가고 싶은 곳 보내기/ })).not.toHaveTextContent("보냈어요");
+  });
+
+  it("설정에서 끄면 단추가 없다", () => {
+    render(<MailboxHome token={TOKEN} view={view({ settings: { ...RECOMMENDED, wish: false } })} />);
+    expect(screen.queryByRole("link", { name: /가고 싶은 곳 보내기/ })).toBeNull();
+  });
+
+  it("미리보기 방식이 길에 이어진다", () => {
+    render(<MailboxHome token={TOKEN} view={view()} preview="all" />);
+    expect(screen.getByRole("link", { name: /가고 싶은 곳 보내기/ })).toHaveAttribute("href", `/m/${TOKEN}/wish?preview=all`);
   });
 });

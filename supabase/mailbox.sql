@@ -153,6 +153,21 @@ create table if not exists public.postcard_hearts (
 
 create index if not exists postcard_hearts_postcard_idx on public.postcard_hearts (postcard_id, created_at);
 
+-- 부모님이 보낸 '가고 싶은 곳'. 곳은 여행 100선의 id(spot_id)다 — 앱이 아는 목록에서만 고르게 하고, DB 는 길이와 모양만 본다.
+-- 함수(mailbox_wish)로만 켜고 끈다(누르면 켜지고 한 번 더 누르면 꺼진다). 책장을 지우면 함께 지워진다.
+create table if not exists public.mailbox_wishes (
+  id         uuid        primary key default gen_random_uuid(),
+  mailbox_id uuid        not null references public.mailboxes (id) on delete cascade,
+  who        text        not null check (length(who) between 1 and 10),
+  spot_id    text        not null check (spot_id ~ '^[^/[:space:]]{1,60}$'),
+  created_at timestamptz not null default now(),
+  -- 보내는 사람이 봤으면 그 시각(책장의 보내는 사람 누구든 먼저 본 사람이 적는다).
+  seen_at    timestamptz,
+  unique (mailbox_id, who, spot_id)
+);
+
+create index if not exists mailbox_wishes_mailbox_idx on public.mailbox_wishes (mailbox_id, created_at);
+
 alter table public.mailboxes enable row level security;
 alter table public.mailbox_senders enable row level security;
 alter table public.mailbox_invites enable row level security;
@@ -162,13 +177,14 @@ alter table public.postcard_photos enable row level security;
 alter table public.postcard_deliveries enable row level security;
 alter table public.postcard_replies enable row level security;
 alter table public.postcard_hearts enable row level security;
+alter table public.mailbox_wishes enable row level security;
 -- postcard_ids 에는 정책을 두지 않는다 — 아무도 직접 읽거나 쓰지 못하고, 아래 트리거만 적는다.
 
 -- 로그인하지 않은 사람(anon)은 표에 직접 닿지 못한다. 받는 쪽은 아래 함수(RPC)로만 읽는다.
 -- 정책이 이미 막지만(anon 에게 연 정책이 없다) 한 겹 더 닫아 둔다.
 revoke all on table
   public.mailboxes, public.mailbox_senders, public.mailbox_invites, public.postcard_ids,
-  public.postcards, public.postcard_photos, public.postcard_deliveries, public.postcard_replies, public.postcard_hearts
+  public.postcards, public.postcard_photos, public.postcard_deliveries, public.postcard_replies, public.postcard_hearts, public.mailbox_wishes
 from anon;
 
 -- ═══════════════════════════════════════════════
@@ -347,6 +363,25 @@ begin
 end;
 $$;
 
+-- 가고 싶은 곳에서 고칠 수 있는 것도 "봤다"는 표시(seen_at) 하나뿐이다.
+create or replace function public.mailbox_wishes_only_seen()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.id is distinct from old.id
+     or new.mailbox_id is distinct from old.mailbox_id
+     or new.who is distinct from old.who
+     or new.spot_id is distinct from old.spot_id
+     or new.created_at is distinct from old.created_at then
+    raise exception 'mailbox_wishes: 가고 싶은 곳은 고칠 수 없고 seen_at 만 바꿀 수 있다';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.mailbox_wishes_only_seen() from public;
 revoke all on function public.postcard_hearts_only_seen() from public;
 revoke all on function public.mailboxes_limit() from public;
 revoke all on function public.mailbox_senders_limit() from public;
@@ -383,6 +418,10 @@ create trigger postcards_keep before update on public.postcards
 drop trigger if exists postcard_replies_only_seen on public.postcard_replies;
 create trigger postcard_replies_only_seen before update on public.postcard_replies
   for each row execute function public.postcard_replies_only_seen();
+
+drop trigger if exists mailbox_wishes_only_seen on public.mailbox_wishes;
+create trigger mailbox_wishes_only_seen before update on public.mailbox_wishes
+  for each row execute function public.mailbox_wishes_only_seen();
 
 drop trigger if exists postcard_hearts_only_seen on public.postcard_hearts;
 create trigger postcard_hearts_only_seen before update on public.postcard_hearts
@@ -587,6 +626,15 @@ $$;
 
 revoke all on function public.postcard_live_files(text, jsonb) from public;
 
+-- 가고 싶은 곳: 그 책장의 보내는 사람들(주인 포함)이 읽고 "봤다"고 표시한다. 넣고 지우는 길은 없다(함수로만).
+drop policy if exists "mailbox_wishes_select" on public.mailbox_wishes;
+drop policy if exists "mailbox_wishes_update" on public.mailbox_wishes;
+
+create policy "mailbox_wishes_select" on public.mailbox_wishes
+  for select using (public.is_mailbox_sender(mailbox_id));
+create policy "mailbox_wishes_update" on public.mailbox_wishes
+  for update using (public.is_mailbox_sender(mailbox_id)) with check (public.is_mailbox_sender(mailbox_id));
+
 -- ═══════════════════════════════════════════════
 -- 받는 쪽(로그인 없음) — 링크를 정확히 아는 사람에게만, 그 우편함 것만.
 --
@@ -613,8 +661,15 @@ as $$
       'heart', m.settings -> 'heart',
       'words', m.settings -> 'words',
       'past', m.settings -> 'past',
-      'year', m.settings -> 'year'
+      'year', m.settings -> 'year',
+      'wish', m.settings -> 'wish'
     ),
+    -- 이 우편함에서 누가 어느 곳(여행 100선 id)에 가고 싶다고 했나.
+    'wishes', coalesce((
+      select jsonb_agg(jsonb_build_object('who', w.who, 'spot', w.spot_id) order by w.created_at)
+      from public.mailbox_wishes w
+      where w.mailbox_id = m.id
+    ), '[]'::jsonb),
     'postcards', coalesce((
       select jsonb_agg(
         jsonb_build_object(
@@ -707,7 +762,8 @@ begin
         'heart', box.settings -> 'heart',
         'words', box.settings -> 'words',
         'past', box.settings -> 'past',
-        'year', box.settings -> 'year'
+        'year', box.settings -> 'year',
+        'wish', box.settings -> 'wish'
       )
     ),
     'replies', coalesce((
@@ -856,16 +912,65 @@ begin
 end;
 $$;
 
+-- 가고 싶은 곳 켜기·끄기. 이미 켠 곳을 또 켜도, 없는 곳을 끄려 해도 조용히 넘어간다(두 번 눌러도 탈이 없게).
+-- 열린 우편함에만, 설정(wish)에서 끄지 않았을 때만. 한 우편함에 한 시간 60번·모두 100곳까지.
+create or replace function public.mailbox_wish(box_token text, wish_who text, wish_spot text, wish_on boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  box public.mailboxes%rowtype;
+begin
+  if length(coalesce(wish_who, '')) not between 1 and 10 then
+    raise exception 'mailbox: 이름은 1~10자';
+  end if;
+  if coalesce(wish_spot, '') !~ '^[^/[:space:]]{1,60}$' then
+    raise exception 'mailbox: 곳 이름이 이상하다';
+  end if;
+
+  select * into box from public.mailboxes where token = box_token and closed_at is null;
+  if not found then
+    return false;
+  end if;
+  if coalesce(box.settings ->> 'wish', 'true') = 'false' then
+    raise exception 'mailbox: 가고 싶은 곳 받기를 쓰지 않는다';
+  end if;
+
+  if coalesce(wish_on, true) then
+    if (
+      select count(*) from public.mailbox_wishes w
+      where w.mailbox_id = box.id and w.created_at > now() - interval '1 hour'
+    ) >= 60 then
+      raise exception 'mailbox: 가고 싶은 곳이 너무 잦다';
+    end if;
+    if (select count(*) from public.mailbox_wishes w where w.mailbox_id = box.id) >= 100 then
+      raise exception 'mailbox: 가고 싶은 곳이 가득 찼다';
+    end if;
+    insert into public.mailbox_wishes (mailbox_id, who, spot_id)
+      values (box.id, wish_who, wish_spot)
+      on conflict (mailbox_id, who, spot_id) do nothing;
+  else
+    delete from public.mailbox_wishes w
+      where w.mailbox_id = box.id and w.who = wish_who and w.spot_id = wish_spot;
+  end if;
+  return true;
+end;
+$$;
+
 revoke all on function public.mailbox_view(text) from public;
 revoke all on function public.mailbox_postcard(text, text) from public;
 revoke all on function public.mailbox_open(text, text) from public;
 revoke all on function public.mailbox_reply(text, text, text, text) from public;
 revoke all on function public.mailbox_heart(text, text, text, text, boolean) from public;
+revoke all on function public.mailbox_wish(text, text, text, boolean) from public;
 grant execute on function public.mailbox_view(text) to anon, authenticated;
 grant execute on function public.mailbox_postcard(text, text) to anon, authenticated;
 grant execute on function public.mailbox_open(text, text) to anon, authenticated;
 grant execute on function public.mailbox_reply(text, text, text, text) to anon, authenticated;
 grant execute on function public.mailbox_heart(text, text, text, text, boolean) to anon, authenticated;
+grant execute on function public.mailbox_wish(text, text, text, boolean) to anon, authenticated;
 
 -- ═══════════════════════════════════════════════
 -- 우편함 지우기

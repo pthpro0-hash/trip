@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import type { InboxCard, MailboxView } from "@/lib/supabase/mailboxPublic";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
-import { mailboxPath, postcardPath, yearBookPath, type PreviewMode } from "@/lib/mailbox";
+import { mailboxPath, postcardPath, wishPath, yearBookPath, type PreviewMode } from "@/lib/mailbox";
 import { lastYearLabel, lastYearToday, shelfYears, yearTitle, type ShelfYear } from "@/lib/mailboxShelf";
 import { yearBookSeason } from "@/lib/mailboxYearBook";
 import { useWho } from "@/lib/mailboxWho";
@@ -240,6 +240,16 @@ export function MailboxHome({ token, view, today, preview = false }: { token: st
       {years.map((entry, index) => (
         <Year key={entry.year} token={token} entry={entry} defaultOpen={index === 0} preview={preview} showBook={view.settings.year} />
       ))}
+
+      {view.settings.wish && (
+        <Link
+          href={wishPath(token, preview)}
+          className="flex min-h-16 flex-col items-center justify-center gap-0.5 rounded-2xl bg-accent px-5 py-3 text-on-accent transition active:scale-[0.99]"
+        >
+          <span className="rs-22 font-bold">♡ 가고 싶은 곳 보내기</span>
+          {view.wishes.length > 0 && <span className="rs-16 opacity-90">{view.wishes.length}곳 보냈어요</span>}
+        </Link>
+      )}
 
       <section className="mt-auto rounded-2xl bg-bg-subtle p-5 rs-16 leading-relaxed text-text-muted">
         <p className="font-semibold text-text">홈 화면에 두면 편해요</p>

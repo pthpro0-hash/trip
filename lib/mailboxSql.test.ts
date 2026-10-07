@@ -33,6 +33,7 @@ describe("mailbox.sql · 표", () => {
     "postcard_deliveries",
     "postcard_replies",
     "postcard_hearts",
+    "mailbox_wishes",
     "postcard_ids",
   ];
 
@@ -75,11 +76,11 @@ describe("mailbox.sql · 책장 설정", () => {
     expect(sql).toMatch(/octet_length\(settings::text\) < 2000/);
   });
 
-  it("받는 쪽에는 부모님 화면에 필요한 다섯 칸만 내려간다 — 사진 수·크기·보관 권수는 안 나간다", () => {
+  it("받는 쪽에는 부모님 화면에 필요한 여섯 칸만 내려간다 — 사진 수·크기·보관 권수는 안 나간다", () => {
     for (const name of ["mailbox_view", "mailbox_postcard"]) {
       const body = fn(name);
       expect(body, name).toContain("'settings'");
-      for (const key of ["font", "heart", "words", "past", "year"]) expect(body, `${name} ${key}`).toContain(`settings -> '${key}'`);
+      for (const key of ["font", "heart", "words", "past", "year", "wish"]) expect(body, `${name} ${key}`).toContain(`settings -> '${key}'`);
       for (const key of ["photos", "size", "keep"]) expect(body, `${name} ${key}`).not.toContain(`settings -> '${key}'`);
     }
   });
@@ -199,7 +200,7 @@ describe("mailbox.sql · 보내는 사람의 권한", () => {
 });
 
 describe("mailbox.sql · 받는 쪽(로그인 없음)", () => {
-  const RPCS = ["mailbox_view", "mailbox_postcard", "mailbox_open", "mailbox_reply", "mailbox_heart"];
+  const RPCS = ["mailbox_view", "mailbox_postcard", "mailbox_open", "mailbox_reply", "mailbox_heart", "mailbox_wish"];
 
   it.each(RPCS)("%s 는 security definer 이고 로그인 없는 사람에게 열려 있다", (name) => {
     expect(fn(name)).toContain("security definer");
@@ -482,5 +483,55 @@ describe("mailbox.sql · 오래된 책의 사진 줄이기", () => {
     const body = fn("postcard_live_files");
     expect(body).toContain("public.postcard_photos");
     expect(body).toMatch(/coalesce\(snap -> 'files'/);
+  });
+});
+
+describe("mailbox.sql · 가고 싶은 곳 보내기", () => {
+  it("한 사람이 한 곳에는 하나다 — 같은 곳을 두 번 보내도 겹치지 않는다", () => {
+    expect(sql).toMatch(/unique \(mailbox_id, who, spot_id\)/);
+  });
+
+  it("곳 이름(spot_id)은 길이와 모양을 DB 가 막는다 — 길이 1~60, 슬래시·공백 없음", () => {
+    expect(sql).toMatch(/spot_id\s+text\s+not null check \(spot_id ~ '\^\[\^\/\[:space:\]\]\{1,60\}\$'\)/);
+    expect(sql).toMatch(/who\s+text\s+not null check \(length\(who\) between 1 and 10\)/);
+  });
+
+  it("책장을 지우면 함께 지워진다", () => {
+    expect(sql).toMatch(/mailbox_id\s+uuid\s+not null references public\.mailboxes \(id\) on delete cascade,\s+who\s+text\s+not null check \(length\(who\) between 1 and 10\),\s+spot_id/);
+  });
+
+  it("그 책장의 보내는 사람들이 읽고 '봤다'고 표시한다 — 직접 넣고 지우는 길은 없다", () => {
+    expect(policy("mailbox_wishes_select")).toContain("is_mailbox_sender(mailbox_id)");
+    expect(policy("mailbox_wishes_update")).toContain("is_mailbox_sender(mailbox_id)");
+    expect(sql).not.toMatch(/policy "mailbox_wishes_insert/);
+    expect(sql).not.toMatch(/policy "mailbox_wishes_delete/);
+  });
+
+  it("고칠 수 있는 것은 seen_at 하나뿐이다", () => {
+    expect(fn("mailbox_wishes_only_seen")).toContain("seen_at");
+    expect(sql).toMatch(/before update on public\.mailbox_wishes/);
+  });
+
+  it("로그인 없는 사람은 표에 직접 닿지 못한다", () => {
+    expect(sql).toMatch(/revoke all on table[^;]*public\.mailbox_wishes[^;]*from anon/);
+  });
+
+  it("보내기는 열린 책장에만, 설정에서 끄지 않았을 때만 — 켜고 끄기(토글), 너무 잦거나 가득 차면 막는다", () => {
+    const body = fn("mailbox_wish");
+    expect(body).toContain("closed_at is null");
+    expect(body).toContain("settings ->> 'wish'");
+    expect(body).toContain("insert into public.mailbox_wishes");
+    expect(body).toContain("on conflict");
+    expect(body).toContain("delete from public.mailbox_wishes");
+    expect(body).toContain("interval");
+    expect(body).toMatch(/>= 60/);
+    expect(body).toMatch(/>= 100/);
+  });
+
+  it("받는 쪽 목록에 이 책장의 가고 싶은 곳(누가 어느 곳)이 내려간다", () => {
+    const body = fn("mailbox_view");
+    expect(body).toContain("'wishes'");
+    expect(body).toContain("mailbox_wishes");
+    expect(body).toContain("'spot', w.spot_id");
   });
 });
