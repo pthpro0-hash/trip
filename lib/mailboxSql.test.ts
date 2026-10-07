@@ -103,6 +103,14 @@ describe("mailbox.sql · 책장 설정", () => {
     expect(body).toMatch(/jsonb_typeof\(v -> 'photos'\) = 'array'/);
   });
 
+  it("목록에는 엽서마다 하트 수(heartCounts: 사진별, 책 하트는 빈 글자)가 있다 — 올해의 책의 재료", () => {
+    const body = fn("mailbox_view");
+    expect(body).toContain("'heartCounts'");
+    expect(body).toContain("postcard_hearts");
+    expect(body).toMatch(/group by h\.file/);
+    expect(body).toMatch(/h\.mailbox_id = m\.id/);
+  });
+
   it("목록에는 엽서의 스냅샷 통째가 내려가지 않는다 — 곳마다 필요한 칸만", () => {
     expect(fn("mailbox_view")).not.toMatch(/'snapshot',\s*p\.snapshot/);
   });
@@ -135,7 +143,9 @@ describe("mailbox.sql · 보내는 사람의 권한", () => {
   it("우편함은 주인과 보내는 사람만 읽고, 고치고 닫는 것은 주인만", () => {
     expect(policy("mailboxes_select")).toContain("is_mailbox_sender(id)");
     expect(policy("mailboxes_update")).toMatch(/auth\.uid\(\) = owner_id/);
-    expect(policy("mailboxes_delete")).toMatch(/auth\.uid\(\) = owner_id/);
+    // 우편함을 직접 지우는 길은 없다 — 엽서 사진 복사본이 걸린 곳 없이 남기 때문에 함수(mailbox_delete)로만 지운다.
+    expect(sql).not.toMatch(/create policy "mailboxes_delete"/);
+    expect(sql).toMatch(/drop policy if exists "mailboxes_delete"/);
   });
 
   it("권한 확인 함수는 security definer — 정책끼리 서로를 부르는 재귀가 없다", () => {
@@ -366,5 +376,52 @@ describe("mailbox.sql · 가족 공유와의 만남", () => {
 
   it("가족 공유를 아직 안 만들었어도 실행되도록 있는지 보고 건다", () => {
     expect(sql).toMatch(/to_regclass\('public\.family_links'\)/);
+  });
+});
+
+describe("mailbox.sql · 우편함 지우기", () => {
+  it("지우는 길은 함수 둘뿐이다 — 계획(지울 엽서 보기)과 지우기, 로그인한 사람만", () => {
+    for (const name of ["mailbox_delete_plan", "mailbox_delete"]) {
+      expect(fn(name), name).toContain("security definer");
+      expect(sql).toMatch(new RegExp(`revoke all on function public\\.${name}\\([^)]*\\) from public`));
+      expect(sql).toMatch(new RegExp(`grant execute on function public\\.${name}\\([^)]*\\) to authenticated`));
+      expect(sql, name).not.toMatch(new RegExp(`grant execute on function public\\.${name}\\([^)]*\\) to[^;]*anon`));
+    }
+  });
+
+  it("주인만, 그리고 닫은 우편함만 — 닫기와 지우기 두 단계", () => {
+    for (const name of ["mailbox_delete_plan", "mailbox_delete"]) {
+      const body = fn(name);
+      expect(body, name).toMatch(/owner_id = auth\.uid\(\)/);
+      expect(body, name).toContain("closed_at is null");
+    }
+  });
+
+  it("이 우편함에만 간 엽서(다른 우편함에는 안 간 것)를 따로 센다 — 나머지는 그쪽에 남는다", () => {
+    for (const name of ["mailbox_delete_plan", "mailbox_delete"]) {
+      const body = fn(name);
+      expect(body, name).toMatch(/o\.postcard_id = d\.postcard_id and o\.mailbox_id <> box/);
+    }
+  });
+
+  it("지울 때는 그 엽서 줄을 먼저 지우고(답장·하트·복사본 기록이 따라 지워진다) 우편함을 지운다", () => {
+    const body = fn("mailbox_delete");
+    const cards = body.indexOf("delete from public.postcards");
+    const box = body.indexOf("delete from public.mailboxes");
+    expect(cards).toBeGreaterThan(-1);
+    expect(box).toBeGreaterThan(cards);
+  });
+
+  it("다른 가족이 보낸 엽서도 주인이 사진을 치울 수 있다 — 배달된 우편함이 모두 내 것일 때만", () => {
+    const body = fn("owns_all_deliveries");
+    expect(body).toContain("security definer");
+    expect(body).toMatch(/m\.owner_id is distinct from auth\.uid\(\)/);
+    for (const verb of ["list", "delete"]) {
+      expect(policy(`postcards_files_${verb}_own`)).toContain("owns_all_deliveries");
+    }
+  });
+
+  it("올리고 고치는 것은 여전히 보낸 사람만 — 주인에게 넓힌 것은 목록과 지우기뿐", () => {
+    for (const verb of ["insert", "update"]) expect(policy(`postcards_files_${verb}_own`)).not.toContain("owns_all_deliveries");
   });
 });

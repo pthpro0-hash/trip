@@ -26,6 +26,7 @@ import {
   type PostcardPhotoCandidate,
   isPreview,
   mailboxPath,
+  yearBookPath,
   postcardPath,
 } from "./mailbox";
 import type { TripDetail } from "./supabase/tripDetail";
@@ -360,5 +361,14 @@ describe("미리보기 주소", () => {
   it("preview=1 일 때만 미리보기다 — 다른 값·여러 값·없음은 평소 화면", () => {
     expect(isPreview("1")).toBe(true);
     for (const value of [undefined, "", "0", "true", "yes", ["1", "1"]]) expect(isPreview(value)).toBe(false);
+  });
+});
+
+describe("올해의 책 길", () => {
+  const TOKEN = "T".repeat(43);
+
+  it("/m/<링크>/year/<해> — 미리보기면 표시가 이어진다", () => {
+    expect(yearBookPath(TOKEN, "2026")).toBe(`/m/${TOKEN}/year/2026`);
+    expect(yearBookPath(TOKEN, "2026", true)).toBe(`/m/${TOKEN}/year/2026?preview=1`);
   });
 });

@@ -404,8 +404,8 @@ create policy "mailboxes_insert" on public.mailboxes
   for insert with check (auth.uid() = owner_id);
 create policy "mailboxes_update" on public.mailboxes
   for update using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
-create policy "mailboxes_delete" on public.mailboxes
-  for delete using (auth.uid() = owner_id);
+-- 우편함을 지우는 정책은 없다. 직접 지우면 이 우편함에만 보낸 엽서의 사진 복사본이 어디에도 안 걸려 공개
+-- 보관함에 남는다. 아래 mailbox_delete 함수로만 지운다(앱이 사진 파일을 먼저 치운 뒤에 부른다).
 
 -- 보내는 사람: 같은 우편함 사람끼리 보고, 주인은 내보내고, 본인은 나갈 수 있다(주인 자신은 못 나간다).
 -- 넣는 길은 없다 — 초대 수락 함수로만 들어온다.
@@ -616,6 +616,16 @@ as $$
             from jsonb_array_elements(
               case when jsonb_typeof(p.snapshot -> 'visits') = 'array' then p.snapshot -> 'visits' else '[]'::jsonb end
             ) as v
+          ), '[]'::jsonb),
+          -- 올해의 책이 쓰는 하트 수. 사진마다(file 이 사진 이름) 몇 명이 눌렀나, 책 하트는 file 이 빈 글자다.
+          'heartCounts', coalesce((
+            select jsonb_agg(jsonb_build_object('file', g.file, 'n', g.n))
+            from (
+              select h.file, count(*)::int as n
+              from public.postcard_hearts h
+              where h.postcard_id = p.id and h.mailbox_id = m.id
+              group by h.file
+            ) g
           ), '[]'::jsonb),
           'greeting', d.greeting,
           'sentAt', d.delivered_at,
@@ -834,6 +844,111 @@ grant execute on function public.mailbox_reply(text, text, text, text) to anon, 
 grant execute on function public.mailbox_heart(text, text, text, text, boolean) to anon, authenticated;
 
 -- ═══════════════════════════════════════════════
+-- 우편함 지우기
+--
+-- 순서(앱이 지킨다): 닫은 우편함에서 mailbox_delete_plan 으로 이 우편함에만 간 엽서를 알아내고 → 그 엽서들의 사진 파일을
+-- 모두 지운 뒤(하나라도 못 지우면 여기서 멈춘다) → mailbox_delete 로 줄을 지운다. 줄이 먼저 사라지면 폴더의 주인을 밝힐 길이
+-- 없어 사진이 영영 남는다.
+--
+-- '이 우편함에만 간 엽서'는 다른 가족이 보낸 것도 포함한다 — 그 사진은 보낸 사람만 지울 수 있으니, 배달된 우편함이 모두 내
+-- 것인 엽서에 한해 주인에게 사진 목록·삭제 권한을 연다(owns_all_deliveries). 올리고 고치는 권한은 넓히지 않는다.
+-- 다른 우편함에도 간 엽서는 지우지 않고 그 우편함에서의 배달만 사라진다.
+-- ═══════════════════════════════════════════════
+
+-- 이 엽서가 배달된 우편함이 하나 이상이고, 모두 내 것인가.
+create or replace function public.owns_all_deliveries(card text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.postcard_deliveries d where d.postcard_id = card)
+    and not exists (
+      select 1
+      from public.postcard_deliveries d
+      join public.mailboxes m on m.id = d.mailbox_id
+      where d.postcard_id = card and m.owner_id is distinct from auth.uid()
+    );
+$$;
+
+revoke all on function public.owns_all_deliveries(text) from public;
+grant execute on function public.owns_all_deliveries(text) to anon, authenticated;
+
+-- 지울 계획: 이 우편함에만 간 엽서(sole)와, 다른 우편함에도 가서 남을 엽서의 수(kept).
+-- 내 우편함이 아니면 null, 열려 있으면 오류(먼저 닫아야 한다).
+create or replace function public.mailbox_delete_plan(box uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  found_box public.mailboxes%rowtype;
+begin
+  select * into found_box from public.mailboxes where id = box and owner_id = auth.uid();
+  if not found then
+    return null;
+  end if;
+  if found_box.closed_at is null then
+    raise exception 'mailbox: 먼저 닫아야 지울 수 있다';
+  end if;
+
+  return jsonb_build_object(
+    'sole', coalesce((
+      select jsonb_agg(d.postcard_id order by d.postcard_id)
+      from public.postcard_deliveries d
+      where d.mailbox_id = box
+        and not exists (select 1 from public.postcard_deliveries o where o.postcard_id = d.postcard_id and o.mailbox_id <> box)
+    ), '[]'::jsonb),
+    'kept', (
+      select count(*)::int
+      from public.postcard_deliveries d
+      where d.mailbox_id = box
+        and exists (select 1 from public.postcard_deliveries o where o.postcard_id = d.postcard_id and o.mailbox_id <> box)
+    )
+  );
+end;
+$$;
+
+-- 우편함을 지운다. 이 우편함에만 간 엽서 줄을 먼저 지우고(답장·하트·복사본 기록이 따라 지워진다) 우편함을 지운다
+-- (보내는 사람·초대·배달이 따라 지워진다). 사진 파일은 앱이 이미 치웠어야 한다.
+create or replace function public.mailbox_delete(box uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  found_box public.mailboxes%rowtype;
+begin
+  select * into found_box from public.mailboxes where id = box and owner_id = auth.uid();
+  if not found then
+    return false;
+  end if;
+  if found_box.closed_at is null then
+    raise exception 'mailbox: 먼저 닫아야 지울 수 있다';
+  end if;
+
+  delete from public.postcards p
+  where p.id in (
+    select d.postcard_id
+    from public.postcard_deliveries d
+    where d.mailbox_id = box
+      and not exists (select 1 from public.postcard_deliveries o where o.postcard_id = d.postcard_id and o.mailbox_id <> box)
+  );
+  delete from public.mailboxes where id = box;
+  return true;
+end;
+$$;
+
+revoke all on function public.mailbox_delete_plan(uuid) from public;
+revoke all on function public.mailbox_delete(uuid) from public;
+grant execute on function public.mailbox_delete_plan(uuid) to authenticated;
+grant execute on function public.mailbox_delete(uuid) to authenticated;
+
+-- ═══════════════════════════════════════════════
 -- 사진 보관함(postcards 버킷, 공개)
 --
 --   postcards/<엽서 주소>/<파일>
@@ -851,7 +966,10 @@ drop policy if exists "postcards_files_delete_own" on storage.objects;
 create policy "postcards_files_list_own" on storage.objects
   for select using (
     bucket_id = 'postcards'
-    and (storage.foldername(name))[1] in (select id from public.postcards where sender_id = auth.uid())
+    and (
+      (storage.foldername(name))[1] in (select id from public.postcards where sender_id = auth.uid())
+      or public.owns_all_deliveries((storage.foldername(name))[1])
+    )
   );
 
 create policy "postcards_files_insert_own" on storage.objects
@@ -869,7 +987,10 @@ create policy "postcards_files_update_own" on storage.objects
 create policy "postcards_files_delete_own" on storage.objects
   for delete using (
     bucket_id = 'postcards'
-    and (storage.foldername(name))[1] in (select id from public.postcards where sender_id = auth.uid())
+    and (
+      (storage.foldername(name))[1] in (select id from public.postcards where sender_id = auth.uid())
+      or public.owns_all_deliveries((storage.foldername(name))[1])
+    )
   );
 
 -- ═══════════════════════════════════════════════

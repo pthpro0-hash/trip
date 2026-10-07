@@ -24,6 +24,8 @@ const api = vi.hoisted(() => ({
   createMailboxInvite: vi.fn(),
   cancelMailboxInvite: vi.fn(),
   leaveMailbox: vi.fn(),
+  planMailboxDelete: vi.fn(),
+  deleteMailbox: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -76,6 +78,8 @@ describe("MailboxPanel", () => {
     api.createMailboxInvite.mockResolvedValue("I".repeat(43));
     api.cancelMailboxInvite.mockResolvedValue(true);
     api.leaveMailbox.mockResolvedValue(true);
+    api.planMailboxDelete.mockResolvedValue({ sole: ["a".repeat(43), "b".repeat(43), "c".repeat(43)], kept: 2 });
+    api.deleteMailbox.mockResolvedValue("ok");
     postcards.sent = [];
     postcards.withdrawPostcard.mockReset();
     postcards.withdrawPostcard.mockResolvedValue(true);
@@ -421,6 +425,97 @@ describe("MailboxPanel", () => {
     render(<MailboxPanel />);
     await screen.findByText("장모님");
     expect(screen.queryByRole("button", { name: "설정" })).toBeNull();
+  });
+
+  describe("우편함 지우기", () => {
+    const closedBox = () => box({ id: "m1", name: "우리 엄마 아빠", closed: true });
+
+    it("열려 있는 우편함에는 지우기가 없다 — 먼저 닫아야 한다", async () => {
+      state.list = { owned: [box()], joined: [] };
+      render(<MailboxPanel />);
+      await screen.findByRole("button", { name: "우편함 닫기" });
+      expect(screen.queryByRole("button", { name: "우편함 지우기" })).toBeNull();
+    });
+
+    it("닫은 우편함에는 '다시 열기'와 함께 '우편함 지우기'가 있다", async () => {
+      state.list = { owned: [closedBox()], joined: [] };
+      render(<MailboxPanel />);
+      expect(await screen.findByRole("button", { name: "다시 열기" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "우편함 지우기" })).toBeTruthy();
+    });
+
+    it("누르면 무엇이 지워지는지 숫자로 말하고 한 번 더 묻는다 — 아직 지우지 않는다", async () => {
+      state.list = { owned: [closedBox()], joined: [] };
+      render(<MailboxPanel />);
+      fireEvent.click(await screen.findByRole("button", { name: "우편함 지우기" }));
+      expect(await screen.findByText(/‘우리 엄마 아빠’ 우편함을 지울까요\?/)).toBeTruthy();
+      expect(screen.getByText(/이 우편함에만 보낸 엽서 3장과 그 사진 복사본·답장·하트가 모두 지워지고 되돌릴 수 없어요/)).toBeTruthy();
+      expect(screen.getByText(/다른 우편함에도 보낸 엽서 2장은 그쪽에 그대로 남아요/)).toBeTruthy();
+      expect(screen.getByText(/내 여행과 원본 사진은 그대로예요/)).toBeTruthy();
+      expect(api.planMailboxDelete).toHaveBeenCalledWith(expect.anything(), "m1");
+      expect(api.deleteMailbox).not.toHaveBeenCalled();
+    });
+
+    it("남는 엽서가 없으면 그 줄을 말하지 않고, 지울 엽서가 없으면 그렇게 말한다", async () => {
+      api.planMailboxDelete.mockResolvedValue({ sole: [], kept: 0 });
+      state.list = { owned: [closedBox()], joined: [] };
+      render(<MailboxPanel />);
+      fireEvent.click(await screen.findByRole("button", { name: "우편함 지우기" }));
+      expect(await screen.findByText(/이 우편함에만 보낸 엽서는 없어요/)).toBeTruthy();
+      expect(screen.queryByText(/그쪽에 그대로 남아요/)).toBeNull();
+    });
+
+    it("[그만두기]는 아무것도 지우지 않고 닫는다", async () => {
+      state.list = { owned: [closedBox()], joined: [] };
+      render(<MailboxPanel />);
+      fireEvent.click(await screen.findByRole("button", { name: "우편함 지우기" }));
+      fireEvent.click(await screen.findByRole("button", { name: "그만두기" }));
+      expect(screen.queryByText(/지울까요/)).toBeNull();
+      expect(api.deleteMailbox).not.toHaveBeenCalled();
+    });
+
+    it("[지우기]를 누르면 지우고, 지웠다고 말한다", async () => {
+      state.list = { owned: [closedBox()], joined: [] };
+      render(<MailboxPanel />);
+      fireEvent.click(await screen.findByRole("button", { name: "우편함 지우기" }));
+      fireEvent.click(await screen.findByRole("button", { name: "지우기" }));
+      await waitFor(() => expect(api.deleteMailbox).toHaveBeenCalledWith(expect.anything(), "m1"));
+      expect(await screen.findByRole("status")).toHaveTextContent("우편함을 지웠어요");
+    });
+
+    it("사진 파일을 다 못 치웠으면 우편함은 그대로라고 알리고 다시 하라고 한다", async () => {
+      api.deleteMailbox.mockResolvedValue("files");
+      state.list = { owned: [closedBox()], joined: [] };
+      render(<MailboxPanel />);
+      fireEvent.click(await screen.findByRole("button", { name: "우편함 지우기" }));
+      fireEvent.click(await screen.findByRole("button", { name: "지우기" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("사진을 모두 지우지 못했어요. 우편함은 그대로 있어요");
+    });
+
+    it("그 밖의 실패도 말로 알린다", async () => {
+      api.deleteMailbox.mockResolvedValue("failed");
+      state.list = { owned: [closedBox()], joined: [] };
+      render(<MailboxPanel />);
+      fireEvent.click(await screen.findByRole("button", { name: "우편함 지우기" }));
+      fireEvent.click(await screen.findByRole("button", { name: "지우기" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("우편함을 지우지 못했어요");
+    });
+
+    it("지울 내용을 못 읽으면 확인 창을 띄우지 않고 알린다 — 모르는 채로 지우게 하지 않는다", async () => {
+      api.planMailboxDelete.mockResolvedValue(null);
+      state.list = { owned: [closedBox()], joined: [] };
+      render(<MailboxPanel />);
+      fireEvent.click(await screen.findByRole("button", { name: "우편함 지우기" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("지울 내용을 읽지 못했어요");
+      expect(screen.queryByText(/지울까요/)).toBeNull();
+    });
+
+    it("보내는 사람으로 들어간 우편함에는 지우기가 없다 — 나가기만", async () => {
+      state.list = { owned: [], joined: [box({ id: "j1", ownerId: "other", name: "남의 곳", closed: true })] };
+      render(<MailboxPanel />);
+      await screen.findByText("남의 곳");
+      expect(screen.queryByRole("button", { name: "우편함 지우기" })).toBeNull();
+    });
   });
 
   describe("부모님 화면 보기(미리보기)", () => {

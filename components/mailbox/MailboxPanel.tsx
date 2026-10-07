@@ -7,9 +7,11 @@ import {
   cancelMailboxInvite,
   createMailbox,
   createMailboxInvite,
+  deleteMailbox,
   fetchMailboxInvites,
   fetchMailboxes,
   leaveMailbox,
+  planMailboxDelete,
   rotateMailboxToken,
   setMailboxClosed,
   updateMailbox,
@@ -32,8 +34,9 @@ import { MailboxSettingsEditor } from "./MailboxSettingsEditor";
 /*
   내 우편함 — 집 한 곳당 하나. 부모님 두 분은 한 우편함에서 같이 받는다.
 
-  위에서부터: 내가 만든 우편함(만들기·고치기·링크·보내는 사람 초대·닫기) → 보내는 사람으로 들어간 우편함.
-  되돌릴 수 없는 일(링크 새로 만들기, 닫기, 나가기)은 한 번 더 묻는다.
+  위에서부터: 내가 만든 우편함(만들기·고치기·링크·보내는 사람 초대·닫기·지우기) → 보내는 사람으로 들어간 우편함.
+  되돌릴 수 없는 일(링크 새로 만들기, 닫기, 지우기, 나가기)은 한 번 더 묻는다. 지우기는 닫은 우편함에만 있다 —
+  닫기(되돌릴 수 있다) → 지우기(되돌릴 수 없다) 두 단계라 실수로 지우기 어렵다.
 */
 
 type Loaded = { userId: string; list: MailboxList; invites: PendingMailboxInvite[]; sent: SentPostcard[] };
@@ -92,6 +95,8 @@ export function MailboxPanel() {
   const [configuring, setConfiguring] = useState<string | null>(null);
   /** 한 번 더 묻는 중인 일("rotate-<id>", "close-<id>", "leave-<id>"). */
   const [asking, setAsking] = useState<string | null>(null);
+  /** 지우기 확인 창이 말할 숫자 — 이 우편함에만 보낸 엽서(지워진다)와 다른 우편함에도 가서 남는 엽서. */
+  const [deletePlan, setDeletePlan] = useState<{ id: string; sole: number; kept: number } | null>(null);
   /** 방금 만든 보내는 사람 초대의 글자(바로 복사할 수 있게 크게 보여 준다). */
   const [freshInvite, setFreshInvite] = useState<string | null>(null);
   /*
@@ -242,6 +247,34 @@ export function MailboxPanel() {
         : "바꾸지 못했어요.";
     });
 
+  /** 지우기 전에 무엇이 지워지는지 읽어 와 한 번 더 묻는다. 못 읽으면 모르는 채로 지우게 하지 않는다. */
+  const askDelete = (box: MailboxItem) =>
+    run(async () => {
+      const supabase = getBrowserClient();
+      if (!supabase) return "지금은 쓸 수 없어요.";
+      const plan = await planMailboxDelete(supabase, box.id);
+      if (!plan) return "지울 내용을 읽지 못했어요. 잠시 뒤 다시 해 주세요.";
+      setDeletePlan({ id: box.id, sole: plan.sole.length, kept: plan.kept });
+      setAsking(`delete-${box.id}`);
+      return null;
+    });
+
+  const removeBox = (box: MailboxItem) =>
+    run(async () => {
+      const supabase = getBrowserClient();
+      if (!supabase) return "지금은 쓸 수 없어요.";
+      const result = await deleteMailbox(supabase, box.id);
+      if (result === "ok") {
+        setAsking(null);
+        setDeletePlan(null);
+        return "우편함을 지웠어요.";
+      }
+      // 못 지웠으면 확인 창을 그대로 둔다 — 다시 누르면 된다.
+      return result === "files"
+        ? "사진을 모두 지우지 못했어요. 우편함은 그대로 있어요. 잠시 뒤 다시 해 주세요."
+        : "우편함을 지우지 못했어요. 잠시 뒤 다시 해 주세요.";
+    });
+
   const invite = (box: MailboxItem) =>
     run(async () => {
       const supabase = getBrowserClient();
@@ -379,15 +412,39 @@ export function MailboxPanel() {
                     그만두기
                   </button>
                 </div>
+              ) : asking === `delete-${box.id}` && deletePlan?.id === box.id ? (
+                <div className="flex flex-col gap-2 rounded-lg bg-bg-subtle p-3 text-[13px] leading-relaxed">
+                  <p className="font-medium text-text">
+                    ‘{box.name}’ 우편함을 지울까요?{" "}
+                    {deletePlan.sole > 0
+                      ? `이 우편함에만 보낸 엽서 ${deletePlan.sole}장과 그 사진 복사본·답장·하트가 모두 지워지고 되돌릴 수 없어요.`
+                      : "이 우편함에만 보낸 엽서는 없어요. 받은 답장·하트와 보내는 사람 초대가 지워지고 되돌릴 수 없어요."}
+                  </p>
+                  {deletePlan.kept > 0 && <p className="text-text-muted">다른 우편함에도 보낸 엽서 {deletePlan.kept}장은 그쪽에 그대로 남아요.</p>}
+                  <p className="text-text-muted">내 여행과 원본 사진은 그대로예요. 받는 분의 링크는 다시 열리지 않아요.</p>
+                  <div className="flex items-center gap-2">
+                    <button type="button" disabled={busy} onClick={() => void removeBox(box)} className="rounded-full bg-[#d70015] px-3.5 py-1.5 font-medium text-white disabled:opacity-60">
+                      지우기
+                    </button>
+                    <button type="button" onClick={() => { setAsking(null); setDeletePlan(null); }} className="text-text-muted">
+                      그만두기
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="flex flex-wrap gap-3 text-[13px] font-medium text-text-muted">
                   <button type="button" disabled={box.closed} onClick={() => setAsking(`rotate-${box.id}`)} className="hover:text-text disabled:opacity-50">
                     링크 새로 만들기
                   </button>
                   {box.closed ? (
-                    <button type="button" disabled={busy} onClick={() => void toggleClosed(box)} className="hover:text-text">
-                      다시 열기
-                    </button>
+                    <>
+                      <button type="button" disabled={busy} onClick={() => void toggleClosed(box)} className="hover:text-text">
+                        다시 열기
+                      </button>
+                      <button type="button" disabled={busy} onClick={() => void askDelete(box)} className="text-[#d70015] hover:opacity-80">
+                        우편함 지우기
+                      </button>
+                    </>
                   ) : (
                     <button type="button" onClick={() => setAsking(`close-${box.id}`)} className="hover:text-text">
                       우편함 닫기

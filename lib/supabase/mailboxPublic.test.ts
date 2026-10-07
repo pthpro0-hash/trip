@@ -243,6 +243,45 @@ describe("책꽂이 재료 · 끝난 날과 곳 목록", () => {
   });
 });
 
+describe("올해의 책 재료 · 사진별 하트 수", () => {
+  const base = { name: "x", tone: "casual", members: [], postcards: [] };
+  const raw = { id: CARD, senderName: "지민", title: "여수", startedOn: "2025-10-05", cover: "a.webp", greeting: "", sentAt: "", openedAt: null, replies: [] };
+  const read = async (over: Record<string, unknown>) =>
+    (await fetchMailboxView(fake({ mailbox_view: { data: { ...base, postcards: [{ ...raw, ...over }] } } }).client, TOKEN))?.postcards[0];
+
+  it("사진별 하트 수를 읽는다 — 책 하트는 사진이 빈 글자", async () => {
+    const card = await read({
+      heartCounts: [
+        { file: "a.webp", n: 3 },
+        { file: "", n: 1 },
+      ],
+    });
+    expect(card?.heartCounts).toEqual([
+      { file: "a.webp", n: 3 },
+      { file: "", n: 1 },
+    ]);
+  });
+
+  it("옛 SQL 이라 없으면 빈 목록", async () => {
+    expect((await read({}))?.heartCounts).toEqual([]);
+  });
+
+  it("모양이 틀린 줄만 버린다 — 파일 이름에 ../, 수가 글자·0 이하, 소수는 내림", async () => {
+    const card = await read({
+      heartCounts: [
+        { file: "../x", n: 2 },
+        { file: "a.webp", n: "많이" },
+        { file: "b.webp", n: 0 },
+        { file: "c.webp", n: -1 },
+        { file: "d.webp", n: 2.9 },
+        "x",
+        null,
+      ],
+    });
+    expect(card?.heartCounts).toEqual([{ file: "d.webp", n: 2 }]);
+  });
+});
+
 describe("하트 · 받는 쪽", () => {
   const card = {
     id: CARD,

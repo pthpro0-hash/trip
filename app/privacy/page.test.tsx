@@ -53,6 +53,12 @@ describe("개인정보처리방침 · 가족 우편함", () => {
     expect(t).toContain("책장 설정");
   });
 
+  it("우편함을 지우면 이 우편함에만 보낸 엽서와 사진 복사본이 함께 지워진다고 적는다", () => {
+    const t = text();
+    expect(t).toContain("우편함을 지우면");
+    expect(t).toContain("이 우편함에만 보낸 엽서");
+  });
+
   it("받는 분에게서는 계정 정보를 받지 않는다고 적는다", () => {
     expect(text()).toContain("받는 분의 이메일·전화번호는 받지 않습니다");
   });

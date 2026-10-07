@@ -5,10 +5,12 @@ import {
   GREETING_NAME_MAX,
   NAME_MAX,
   isMailboxToken,
+  isPostcardId,
   newMailboxToken,
   normalizeMembers,
   type Tone,
 } from "@/lib/mailbox";
+import { sweepPostcardFolder } from "./postcardCleanup";
 
 /*
   가족 우편함 — 만들고, 고치고, 링크를 바꾸고, 보내는 사람을 들인다.
@@ -18,8 +20,9 @@ import {
     - 우편함은 만든 사람(주인)만 고치고 닫는다. 보내는 사람으로 들어온 사람은 읽기만 한다
       (엽서 링크를 만들려면 우편함 링크가 필요해서 읽을 수는 있다).
     - 보내는 사람 표에 직접 넣는 길은 없다 — 초대 수락 함수(accept_mailbox_invite)로만 들어온다.
-    - 우편함을 지우는 기능은 아직 없다(닫기만). 지우면 엽서 사진 복사본이 어디에도 안 걸려 남을 수 있어
-      엽서 삭제 규칙(4단계)과 함께 만든다.
+    - 우편함을 지우려면 먼저 닫아야 한다(닫기 → 지우기). 지울 때는 이 우편함에만 보낸 엽서의 사진 파일을 먼저 모두
+      치우고 줄은 나중에 지운다(deleteMailbox). 표에서 직접 지우는 길은 DB 가 막아 두었다 — 그러면 사진 복사본이
+      어디에도 안 걸려 공개 보관함에 영영 남는다.
 */
 
 export interface MailboxItem {
@@ -175,6 +178,52 @@ export async function setMailboxClosed(
     .eq("id", id);
   if (!error) return { ok: true };
   return { ok: false, reason: /3개/.test(error.message) ? "limit" : "failed" };
+}
+
+/** 지우면 무엇이 되나. sole 은 이 우편함에만 보낸 엽서(지워진다), kept 는 다른 우편함에도 보내서 남는 엽서의 수. */
+export interface MailboxDeletePlan {
+  sole: string[];
+  kept: number;
+}
+
+/**
+ * 지울 계획을 읽는다. 내 우편함이 아니거나 닫혀 있지 않으면, 읽지 못했어도 null — 지울 수 없다.
+ * 확인 창이 "엽서 N장이 지워져요"를 말하는 데 쓴다.
+ */
+export async function planMailboxDelete(supabase: SupabaseClient, id: string): Promise<MailboxDeletePlan | null> {
+  try {
+    const { data, error } = await supabase.rpc("mailbox_delete_plan", { box: id });
+    if (error || !data || typeof data !== "object") return null;
+    const raw = data as { sole?: unknown; kept?: unknown };
+    return {
+      sole: Array.isArray(raw.sole) ? raw.sole.filter((entry): entry is string => typeof entry === "string" && isPostcardId(entry)) : [],
+      kept: typeof raw.kept === "number" && raw.kept >= 0 ? Math.floor(raw.kept) : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** "files" 는 사진 파일을 다 못 치워 멈춘 것(우편함은 그대로), "failed" 는 그 밖의 실패. */
+export type DeleteMailboxResult = "ok" | "files" | "failed";
+
+/**
+ * 닫은 우편함을 지운다. 순서는 늘 같다 — 이 우편함에만 보낸 엽서의 사진 파일을 먼저 모두 치우고, 줄은 나중에 지운다.
+ * 줄이 먼저 사라지면 폴더의 주인을 밝힐 길이 없어 사진이 공개 보관함에 영영 남는다. 파일을 하나라도 못 치우면 거기서
+ * 멈춘다(우편함도 엽서 줄도 그대로 — 다시 하면 된다).
+ */
+export async function deleteMailbox(supabase: SupabaseClient, id: string): Promise<DeleteMailboxResult> {
+  const plan = await planMailboxDelete(supabase, id);
+  if (!plan) return "failed";
+  for (const postcardId of plan.sole) {
+    if (!(await sweepPostcardFolder(supabase, postcardId))) return "files";
+  }
+  try {
+    const { data, error } = await supabase.rpc("mailbox_delete", { box: id });
+    return !error && data === true ? "ok" : "failed";
+  } catch {
+    return "failed";
+  }
 }
 
 /** 보내는 사람으로 들어간 우편함에서 나간다(내 줄 하나만). */

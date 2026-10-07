@@ -20,8 +20,8 @@ import {
 /*
   책장 설정 — 권장값이 기본이고, 바꾼 것은 "권장" 표시가 사라져 한눈에 보인다.
 
-  지금 쓰이는 설정만 보인다: 책 한 권 사진 수·크기(새로 꽂는 책부터), 부모님 화면 글씨·답장 문구·하트·작년 오늘(바로).
-  보관 권수·올해의 책은 그 기능이 생길 때 이 화면에 더해진다. 값은 지금도 지켜서 저장한다
+  지금 쓰이는 설정만 보인다: 책 한 권 사진 수·크기(새로 꽂는 책부터), 부모님 화면 글씨·답장 문구·하트·작년 오늘·올해의 책(바로).
+  보관 권수는 그 기능이 생길 때 이 화면에 더해진다. 값은 지금도 지켜서 저장한다
   (설정을 저장한다고 아직 안 보이는 칸이 권장으로 덮이지 않게).
 */
 
@@ -33,7 +33,7 @@ interface Props {
 }
 
 /** 화면에 내는 칸들. 권장과 다른지 셀 때도 이것만 본다. */
-const SHOWN: SettingKey[] = ["photos", "size", "font", "words", "heart", "past"];
+const SHOWN: SettingKey[] = ["photos", "size", "font", "words", "heart", "past", "year"];
 
 function Rec({ show }: { show: boolean }) {
   return show ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">권장</span> : null;
@@ -205,6 +205,24 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
           />
           <p className="text-[12px] leading-relaxed text-text-faint">
             오늘 즈음(앞뒤 3일) 다녀온 지난 해의 책을 우편함 맨 위에 보여 줘요. 해당하는 책이 없으면 아무것도 나오지 않고, 바꾸면 바로 적용돼요.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <p className="flex items-center gap-1.5 text-[14px] text-text">
+            올해의 책 <Rec show={!differs("year")} />
+          </p>
+          <Segment
+            label="올해의 책"
+            value={draft.year ? "on" : "off"}
+            options={[
+              { value: "on", text: "보여 주기" },
+              { value: "off", text: "안 보여 주기" },
+            ]}
+            onChange={(value) => set("year", value === "on")}
+          />
+          <p className="text-[12px] leading-relaxed text-text-faint">
+            그해 열어 본 엽서를 한 권으로 묶어 보여 줘요(표지·가장 사랑받은 사진과 책·한 해 지도). 12월부터 2월까지 우편함 맨 위에 알려 주고,
+            책꽂이의 해마다 단추로도 볼 수 있어요. 끄면 둘 다 안 보이고, 바꾸면 바로 적용돼요.
           </p>
         </div>
       </section>

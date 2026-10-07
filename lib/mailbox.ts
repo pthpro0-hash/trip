@@ -63,6 +63,9 @@ export const mailboxPath = (token: string, preview = false): string => `/m/${tok
 /** 받는 쪽 엽서 한 장의 길. */
 export const postcardPath = (token: string, postcardId: string, preview = false): string =>
   `/m/${token}/p/${postcardId}${preview ? PREVIEW : ""}`;
+/** 받는 쪽 올해의 책의 길. */
+export const yearBookPath = (token: string, year: string, preview = false): string =>
+  `/m/${token}/year/${year}${preview ? PREVIEW : ""}`;
 /** 주소의 ?preview= 값이 미리보기인가. 1 일 때만 그렇다. */
 export const isPreview = (value: string | string[] | undefined): boolean => value === "1";
 

@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useSyncExternalStore, type CSSProperties } from "react";
-import dynamic from "next/dynamic";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import type { InboxCard, MailboxView } from "@/lib/supabase/mailboxPublic";
-import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
-import { postcardPath } from "@/lib/mailbox";
+import { postcardPath, yearBookPath } from "@/lib/mailbox";
 import { lastYearLabel, lastYearToday, shelfYears, yearTitle, type ShelfYear } from "@/lib/mailboxShelf";
+import { yearBookSeason } from "@/lib/mailboxYearBook";
 import { useWho } from "@/lib/mailboxWho";
 import { PreviewBanner } from "./PreviewBanner";
+import { Cover, YearMap, sentDay, tripDay, useToday } from "./shelfParts";
 import { WhoPicker } from "./WhoPicker";
 
 /*
@@ -17,58 +17,10 @@ import { WhoPicker } from "./WhoPicker";
 
   글씨는 크게(본문 18px 이상), 단추는 손가락 하나 크기로. 할 수 있는 일은 "열어 보기"뿐이다. 설정·메뉴·계정은 없다.
 
-  위에서 아래로: 새로 온 엽서(큰 카드 — 안 열어 본 것) → 작년 오늘(오늘 즈음 다녀온 책, 있을 때만) → 책꽂이
-  (열어 본 책을 해마다 꽂아 둔다. 가장 새 해만 펼쳐 있고, 해마다 그해 다녀온 곳을 지도로 볼 수 있다).
-  열어 보면 큰 카드에서 책꽂이로 내려간다 — 새 엽서가 책꽂이에 묻히지 않는다.
+  위에서 아래로: 새로 온 엽서(큰 카드 — 안 열어 본 것) → 올해의 책(12월~2월에만) → 작년 오늘(오늘 즈음 다녀온 책,
+  있을 때만) → 책꽂이(열어 본 책을 해마다 꽂아 둔다. 가장 새 해만 펼쳐 있고, 해마다 그해 다녀온 곳을 지도로,
+  그해를 한 권으로 볼 수 있다). 열어 보면 큰 카드에서 책꽂이로 내려간다 — 새 엽서가 책꽂이에 묻히지 않는다.
 */
-
-/** 지도는 무거워서 단추를 눌렀을 때만 불러온다. 부모님 폰의 데이터를 아낀다. */
-const YearMap = dynamic(() => import("./YearMap").then((module) => module.YearMap), {
-  ssr: false,
-  loading: () => <p className="rs-18 text-text-muted">지도를 불러오는 중…</p>,
-});
-
-const pad = (n: number) => String(n).padStart(2, "0");
-
-/** 이 폰의 오늘("2026-10-07"). 서버가 그린 첫 그림에서는 모른다("") — 서버의 날짜와 폰의 날짜가 다를 수 있어서다. */
-const noSubscribe = () => () => undefined;
-const todayKey = () => {
-  const now = new Date();
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-};
-function useToday(): string {
-  return useSyncExternalStore(noSubscribe, todayKey, () => "");
-}
-
-/** 보낸 때를 "10월 2일"로. */
-const sentDay = (iso: string) => {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "" : `${date.getMonth() + 1}월 ${date.getDate()}일`;
-};
-
-/** 다녀온 날("2026-09-13")을 글자 그대로 읽는다. new Date 로 읽으면 시간대에 따라 하루가 밀린다. */
-const tripDay = (day: string, withYear = false) => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
-  if (!match) return "";
-  const text = `${Number(match[2])}월 ${Number(match[3])}일`;
-  return withYear ? `${match[1]}년 ${text}` : text;
-};
-
-function Cover({ card, className }: { card: InboxCard; className: string }) {
-  return (
-    <span className={`relative grid place-items-center overflow-hidden bg-bg-subtle ${className}`}>
-      {card.cover ? (
-        // 우리 엽서 보관함의 공개 주소라 next/image 로 미리 최적화할 수 없다. 보일 때만 불러온다(책이 많아도 가볍게).
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={postcardFileUrl(card.id, card.cover)} alt="" loading="lazy" className="h-full w-full object-cover" />
-      ) : (
-        <span aria-hidden="true" className="rs-28">
-          ✉️
-        </span>
-      )}
-    </span>
-  );
-}
 
 /** 안 열어 본 엽서 — 큰 카드. */
 function Card({ token, card, preview }: { token: string; card: InboxCard; preview: boolean }) {
@@ -125,7 +77,19 @@ function Book({ token, card, preview }: { token: string; card: InboxCard; previe
 }
 
 /** 한 해의 책꽂이. 접었다 펼 수 있고, 펼치면 표지와 그해 지도 단추가 나온다. */
-function Year({ token, entry, defaultOpen, preview }: { token: string; entry: ShelfYear; defaultOpen: boolean; preview: boolean }) {
+function Year({
+  token,
+  entry,
+  defaultOpen,
+  preview,
+  showBook,
+}: {
+  token: string;
+  entry: ShelfYear;
+  defaultOpen: boolean;
+  preview: boolean;
+  showBook: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   const [mapOpen, setMapOpen] = useState(false);
   const title = yearTitle(entry.year, entry.cards.length);
@@ -156,6 +120,15 @@ function Year({ token, entry, defaultOpen, preview }: { token: string; entry: Sh
             ))}
           </ul>
 
+          {showBook && entry.year !== "" && (
+            <Link
+              href={yearBookPath(token, entry.year, preview)}
+              className="flex min-h-14 items-center justify-center rounded-2xl bg-accent px-5 rs-18 font-semibold text-on-accent transition active:scale-[0.99]"
+            >
+              {label} 올해의 책 보기
+            </Link>
+          )}
+
           {hasPlaces && (
             <>
               <button
@@ -171,6 +144,27 @@ function Year({ token, entry, defaultOpen, preview }: { token: string; entry: Sh
         </>
       )}
     </section>
+  );
+}
+
+/** 올해의 책이 만들어졌다는 알림(12월~2월). */
+function YearBookNotice({ token, year, preview }: { token: string; year: string; preview: boolean }) {
+  return (
+    <Link
+      href={yearBookPath(token, year, preview)}
+      className="flex items-center gap-4 rounded-3xl bg-accent p-4 text-on-accent transition active:scale-[0.99]"
+    >
+      <span aria-hidden="true" className="rs-32">
+        📖
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="rs-22 font-bold leading-snug">{year}년 올해의 책이 만들어졌어요</span>
+        <span className="rs-16 opacity-90">한 해를 한 권으로 모아 봤어요</span>
+      </span>
+      <span aria-hidden="true" className="rs-24">
+        ›
+      </span>
+    </Link>
   );
 }
 
@@ -206,7 +200,9 @@ export function MailboxHome({ token, view, today, preview = false }: { token: st
   const phoneToday = useToday();
   const fresh = view.postcards.filter((card) => !card.opened);
   const years = shelfYears(view.postcards);
-  const past = view.settings.past ? lastYearToday(view.postcards.filter((card) => card.opened), today ?? phoneToday) : null;
+  const now = today ?? phoneToday;
+  const past = view.settings.past ? lastYearToday(view.postcards.filter((card) => card.opened), now) : null;
+  const seasonYear = view.settings.year ? yearBookSeason(view.postcards, now) : null;
 
   return (
     <main
@@ -237,10 +233,12 @@ export function MailboxHome({ token, view, today, preview = false }: { token: st
         </ul>
       )}
 
+      {seasonYear && <YearBookNotice token={token} year={seasonYear} preview={preview} />}
+
       {past && <LastYear token={token} card={past.card} yearsAgo={past.yearsAgo} preview={preview} />}
 
       {years.map((entry, index) => (
-        <Year key={entry.year} token={token} entry={entry} defaultOpen={index === 0} preview={preview} />
+        <Year key={entry.year} token={token} entry={entry} defaultOpen={index === 0} preview={preview} showBook={view.settings.year} />
       ))}
 
       <section className="mt-auto rounded-2xl bg-bg-subtle p-5 rs-16 leading-relaxed text-text-muted">

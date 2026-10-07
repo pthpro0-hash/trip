@@ -10,6 +10,7 @@ const card = (id: string, over: Partial<InboxCard> = {}): InboxCard => ({
   startedOn: "2026-09-13",
   endedOn: "2026-09-14",
   places: [],
+  heartCounts: [],
   cover: null,
   photoCount: 0,
   greeting: "",

@@ -35,6 +35,12 @@ export interface InboxPlace {
   photo: string | null;
 }
 
+/** 사진 하나에(file 이 빈 글자면 책 하나에) 하트를 단 사람 수. */
+export interface HeartCount {
+  file: string;
+  n: number;
+}
+
 export interface InboxCard {
   id: string;
   senderName: string;
@@ -44,6 +50,8 @@ export interface InboxCard {
   endedOn: string;
   /** 다녀온 곳들(들른 차례). */
   places: InboxPlace[];
+  /** 사진별 하트 수(올해의 책이 쓴다). 하트가 없으면 빈 목록. */
+  heartCounts: HeartCount[];
   /** 첫 사진 파일 이름. 사진이 없으면 null. */
   cover: string | null;
   /** 책(엽서)에 든 사진 수. */
@@ -123,6 +131,16 @@ function placesOf(value: unknown): InboxPlace[] {
   });
 }
 
+/** 사진별 하트 수. 모양이 틀린 줄만 버리고, 수가 1 이상인 것만 남긴다(옛 SQL 이면 빈 목록). */
+function heartCountsOf(value: unknown): HeartCount[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    if (!isRecord(raw) || !isString(raw.file) || !isHeartFile(raw.file)) return [];
+    if (typeof raw.n !== "number" || !Number.isFinite(raw.n) || Math.floor(raw.n) < 1) return [];
+    return [{ file: raw.file, n: Math.floor(raw.n) }];
+  });
+}
+
 function cardOf(raw: unknown): InboxCard | null {
   if (!isRecord(raw) || !isString(raw.id) || !isPostcardId(raw.id) || !isString(raw.senderName)) return null;
   return {
@@ -132,6 +150,7 @@ function cardOf(raw: unknown): InboxCard | null {
     startedOn: isString(raw.startedOn) ? raw.startedOn : "",
     endedOn: isDay(raw.endedOn) ? raw.endedOn : isString(raw.startedOn) ? raw.startedOn : "",
     places: placesOf(raw.places),
+    heartCounts: heartCountsOf(raw.heartCounts),
     cover: isString(raw.cover) && /^[A-Za-z0-9._-]{1,80}$/.test(raw.cover) ? raw.cover : null,
     // 사진 수를 못 받았으면(옛 SQL) 대표 사진이 있으면 1장으로 본다.
     photoCount: typeof raw.photoCount === "number" && raw.photoCount >= 0 ? Math.floor(raw.photoCount) : isString(raw.cover) ? 1 : 0,
