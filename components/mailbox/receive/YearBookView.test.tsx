@@ -185,3 +185,23 @@ describe("YearBookView · 미리보기 방식", () => {
     expect(within(note).getByRole("link", { name: /모든 엽서를 열어 본 것처럼 보기/ })).toHaveAttribute("href", `/m/${TOKEN}/year/2026?preview=all`);
   });
 });
+
+describe("YearBookView · 책으로 저장(PDF)", () => {
+  it("맨 아래에 '책으로 저장(PDF)'이 있고, 인쇄용 책 화면으로 간다", () => {
+    render(<YearBookView token={TOKEN} view={view(books)} year="2026" />);
+    expect(screen.getByRole("link", { name: "책으로 저장(PDF)" })).toHaveAttribute("href", `/m/${TOKEN}/year/2026/book`);
+  });
+
+  it("미리보기 방식이 이어진다", () => {
+    render(<YearBookView token={TOKEN} view={view(books)} year="2026" preview="all" />);
+    expect(screen.getByRole("link", { name: "책으로 저장(PDF)" })).toHaveAttribute("href", `/m/${TOKEN}/year/2026/book?preview=all`);
+  });
+
+  it("그해의 책이 없거나 설정에서 끈 책장에는 없다", () => {
+    const { unmount } = render(<YearBookView token={TOKEN} view={view(books)} year="2024" />);
+    expect(screen.queryByRole("link", { name: "책으로 저장(PDF)" })).toBeNull();
+    unmount();
+    render(<YearBookView token={TOKEN} view={view(books, { settings: { ...RECOMMENDED, year: false } })} year="2026" />);
+    expect(screen.queryByRole("link", { name: "책으로 저장(PDF)" })).toBeNull();
+  });
+});

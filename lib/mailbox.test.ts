@@ -29,6 +29,7 @@ import {
   wishPath,
   yearBookPath,
   postcardPath,
+  yearBookPrintPath,
 } from "./mailbox";
 import type { TripDetail } from "./supabase/tripDetail";
 import type { PostcardSnapshot as PostcardSnapshotLike } from "./mailbox";
@@ -388,5 +389,15 @@ describe("가고 싶은 곳 길", () => {
     expect(wishPath(TOKEN)).toBe(`/m/${TOKEN}/wish`);
     expect(wishPath(TOKEN, true)).toBe(`/m/${TOKEN}/wish?preview=1`);
     expect(wishPath(TOKEN, "all")).toBe(`/m/${TOKEN}/wish?preview=all`);
+  });
+});
+
+describe("올해의 책 인쇄 길", () => {
+  const TOKEN = "T".repeat(43);
+
+  it("/m/<링크>/year/<해>/book — 미리보기 방식이 이어진다", () => {
+    expect(yearBookPrintPath(TOKEN, "2026")).toBe(`/m/${TOKEN}/year/2026/book`);
+    expect(yearBookPrintPath(TOKEN, "2026", true)).toBe(`/m/${TOKEN}/year/2026/book?preview=1`);
+    expect(yearBookPrintPath(TOKEN, "2026", "all")).toBe(`/m/${TOKEN}/year/2026/book?preview=all`);
   });
 });

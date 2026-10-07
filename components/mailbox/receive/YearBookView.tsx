@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import type { MailboxView } from "@/lib/supabase/mailboxPublic";
 import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
-import { mailboxPath, postcardPath, yearBookPath, type PreviewMode } from "@/lib/mailbox";
+import { mailboxPath, postcardPath, yearBookPath, yearBookPrintPath, type PreviewMode } from "@/lib/mailbox";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
 import { yearBook } from "@/lib/mailboxYearBook";
 import { PreviewBanner } from "./PreviewBanner";
@@ -151,6 +151,13 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
           ))}
         </ol>
       </section>
+
+      <Link
+        href={yearBookPrintPath(token, year, preview)}
+        className="flex min-h-14 items-center justify-center rounded-2xl bg-accent-soft rs-20 font-semibold text-accent"
+      >
+        책으로 저장(PDF)
+      </Link>
 
       <Link href={back} className="flex min-h-14 items-center justify-center rounded-2xl bg-bg-subtle rs-20 font-semibold text-text">
         책장으로 가기
