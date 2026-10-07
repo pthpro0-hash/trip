@@ -13,6 +13,7 @@ const postcards = vi.hoisted(() => ({
   sent: [] as unknown[],
   withdrawPostcard: vi.fn(),
   markRepliesSeen: vi.fn(),
+  markHeartsSeen: vi.fn(),
 }));
 const api = vi.hoisted(() => ({
   createMailbox: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock("@/lib/supabase/postcards", () => ({
   fetchSentPostcards: async () => postcards.sent,
   withdrawPostcard: postcards.withdrawPostcard,
   markRepliesSeen: postcards.markRepliesSeen,
+  markHeartsSeen: postcards.markHeartsSeen,
 }));
 
 const { MailboxPanel } = await import("./MailboxPanel");
@@ -79,6 +81,8 @@ describe("MailboxPanel", () => {
     postcards.withdrawPostcard.mockResolvedValue(true);
     postcards.markRepliesSeen.mockReset();
     postcards.markRepliesSeen.mockResolvedValue(true);
+    postcards.markHeartsSeen.mockReset();
+    postcards.markHeartsSeen.mockResolvedValue(true);
     copied.mockClear();
     Object.defineProperty(navigator, "clipboard", { value: { writeText: copied }, configurable: true });
   });
@@ -219,7 +223,7 @@ describe("MailboxPanel", () => {
           { mailboxId: "m2", opened: false },
         ],
         replies: [],
-        unread: 0,
+        hearts: [], unread: 0,
       },
     ];
     render(<MailboxPanel />);
@@ -249,7 +253,7 @@ describe("MailboxPanel", () => {
           { id: "r1", mailboxId: "m1", who: "엄마", reaction: "좋구나", at: "2026-10-03T00:00:00Z", seen: true },
           { id: "r2", mailboxId: "m2", who: "장모님", reaction: "잘 다녀왔니", at: "2026-10-04T00:00:00Z", seen: false },
         ],
-        unread: 1,
+        hearts: [], unread: 1,
       },
     ];
     render(<MailboxPanel />);
@@ -267,7 +271,7 @@ describe("MailboxPanel", () => {
     postcards.sent = [
       {
         id: "pc1", tripId: "t1", title: "강릉 바다", startedOn: "", sentAt: "", deliveries: [{ mailboxId: "m1", opened: true }],
-        replies: [{ id: "r1", mailboxId: "m1", who: "아빠", reaction: "좋구나", at: "", seen: true }], unread: 0,
+        replies: [{ id: "r1", mailboxId: "m1", who: "아빠", reaction: "좋구나", at: "", seen: true }], hearts: [], unread: 0,
       },
     ];
     render(<MailboxPanel />);
@@ -276,9 +280,83 @@ describe("MailboxPanel", () => {
     expect(postcards.markRepliesSeen).not.toHaveBeenCalled();
   });
 
+  describe("하트", () => {
+    const sentWith = (hearts: unknown[], deliveries = [{ mailboxId: "m1", opened: true }]) => [
+      { id: "pc1", tripId: "t1", title: "강릉 바다", startedOn: "", sentAt: "", deliveries, replies: [], hearts, unread: 0 },
+    ];
+
+    it("부모님이 사진에 하트를 누르면 '엄마가 사진 2장에 하트를 눌렀어요'로 모아 보이고, 새 하트는 표시되며, 봤다고 적는다", async () => {
+      state.list = { owned: [box({ id: "m1", name: "엄마 아빠" })], joined: [] };
+      postcards.sent = sentWith([
+        { id: "h1", mailboxId: "m1", who: "엄마", file: "a.webp", seen: true },
+        { id: "h2", mailboxId: "m1", who: "엄마", file: "b.webp", seen: false },
+        { id: "h3", mailboxId: "m1", who: "아빠", file: "a.webp", seen: false },
+      ]);
+      render(<MailboxPanel />);
+      const list = await screen.findByRole("list", { name: "강릉 바다 하트" });
+      expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+      expect(list).toHaveTextContent("엄마가 사진 2장에 하트를 눌렀어요");
+      expect(list).toHaveTextContent("아빠가 사진 1장에 하트를 눌렀어요");
+      // 못 본 하트가 든 줄에만 '새 하트'.
+      expect(screen.getAllByText("새 하트")).toHaveLength(2);
+      await waitFor(() => expect(postcards.markHeartsSeen).toHaveBeenCalledWith(expect.anything(), ["h2", "h3"]));
+    });
+
+    it("책 하트는 '이 여행에', 둘 다 있으면 '이 여행과 사진 N장에'", async () => {
+      state.list = { owned: [box({ id: "m1" })], joined: [] };
+      postcards.sent = sentWith([
+        { id: "h1", mailboxId: "m1", who: "엄마", file: "", seen: true },
+        { id: "h2", mailboxId: "m1", who: "아빠", file: "", seen: true },
+        { id: "h3", mailboxId: "m1", who: "아빠", file: "a.webp", seen: true },
+      ]);
+      render(<MailboxPanel />);
+      const list = await screen.findByRole("list", { name: "강릉 바다 하트" });
+      expect(list).toHaveTextContent("엄마가 이 여행에 하트를 눌렀어요");
+      expect(list).toHaveTextContent("아빠가 이 여행과 사진 1장에 하트를 눌렀어요");
+    });
+
+    it("우편함이 둘 이상이면 어느 우편함의 하트인지 알려 준다", async () => {
+      state.list = { owned: [box({ id: "m1", name: "엄마 아빠" }), box({ id: "m2", name: "장모님" })], joined: [] };
+      postcards.sent = sentWith(
+        [{ id: "h1", mailboxId: "m2", who: "장모님", file: "a.webp", seen: true }],
+        [
+          { mailboxId: "m1", opened: true },
+          { mailboxId: "m2", opened: true },
+        ],
+      );
+      render(<MailboxPanel />);
+      const list = await screen.findByRole("list", { name: "강릉 바다 하트" });
+      expect(list).toHaveTextContent("· 장모님");
+    });
+
+    it("이미 본 하트만 있으면 새 하트 표시도, 봤다는 표시 호출도 없다", async () => {
+      postcards.sent = sentWith([{ id: "h1", mailboxId: "m1", who: "엄마", file: "a.webp", seen: true }]);
+      render(<MailboxPanel />);
+      expect(await screen.findByRole("list", { name: "강릉 바다 하트" })).toHaveTextContent("엄마가 사진 1장에 하트를 눌렀어요");
+      expect(screen.queryByText("새 하트")).toBeNull();
+      expect(postcards.markHeartsSeen).not.toHaveBeenCalled();
+    });
+
+    it("하트가 없으면 하트 목록이 없다", async () => {
+      postcards.sent = sentWith([]);
+      render(<MailboxPanel />);
+      await screen.findByRole("heading", { name: "보낸 엽서 1장" });
+      expect(screen.queryByRole("list", { name: "강릉 바다 하트" })).toBeNull();
+    });
+
+    it("하트를 봤다고 적으면 위 띠의 새 소식 표시도 따라 사라지게 알린다", async () => {
+      const seen = vi.fn();
+      window.addEventListener("postcard-replies-seen", seen);
+      postcards.sent = sentWith([{ id: "h1", mailboxId: "m1", who: "엄마", file: "a.webp", seen: false }]);
+      render(<MailboxPanel />);
+      await waitFor(() => expect(seen).toHaveBeenCalled());
+      window.removeEventListener("postcard-replies-seen", seen);
+    });
+  });
+
   it("엽서를 거두지 못하면 다시 누르라고 알린다", async () => {
     postcards.withdrawPostcard.mockResolvedValue(false);
-    postcards.sent = [{ id: "pc1", tripId: "t1", title: null, startedOn: "", sentAt: "", deliveries: [], replies: [], unread: 0 }];
+    postcards.sent = [{ id: "pc1", tripId: "t1", title: null, startedOn: "", sentAt: "", deliveries: [], replies: [], hearts: [], unread: 0 }];
     render(<MailboxPanel />);
     fireEvent.click(await screen.findByRole("button", { name: "엽서 거두기" }));
     fireEvent.click(screen.getByRole("button", { name: "거두기" }));

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isHeartFile, type Heart } from "@/lib/mailboxHearts";
 import { resolveSettings, type MailboxSettings } from "@/lib/mailboxSettings";
 import { isMailboxToken, isPostcardId, isPostcardSnapshot, type PostcardSnapshot, type Tone } from "@/lib/mailbox";
 import { SUPABASE_URL } from "./config";
@@ -57,6 +58,8 @@ export interface ReceivedPostcard {
   settings: MailboxSettings;
   members: string[];
   replies: Reply[];
+  /** 이 우편함에서 누가 어느 사진(책 하트면 빈 글자)에 하트를 달았나. */
+  hearts: Heart[];
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value);
@@ -68,6 +71,16 @@ function repliesOf(value: unknown): Reply[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((raw) =>
     isRecord(raw) && isString(raw.who) && isString(raw.reaction) ? [{ who: raw.who, reaction: raw.reaction }] : [],
+  );
+}
+
+/** 하트 목록. 이름이 글자가 아니거나 파일 이름 모양이 틀린 줄만 버린다(옛 SQL 이면 빈 목록). */
+function heartsOf(value: unknown): Heart[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) =>
+    isRecord(raw) && isString(raw.who) && raw.who.length > 0 && isString(raw.file) && isHeartFile(raw.file)
+      ? [{ who: raw.who, file: raw.file }]
+      : [],
   );
 }
 
@@ -118,6 +131,7 @@ export async function fetchMailboxPostcard(
     settings: resolveSettings(mailbox.settings),
     members: strings(mailbox.members),
     replies: repliesOf(data.replies),
+    hearts: heartsOf(data.hearts),
   };
 }
 
@@ -128,6 +142,39 @@ export async function markPostcardOpened(supabase: SupabaseClient, token: string
     await supabase.rpc("mailbox_open", { box_token: token, card_id: postcardId });
   } catch {
     // 열어 본 표시가 안 찍혀도 엽서는 보인다.
+  }
+}
+
+export type HeartResult = { ok: true } | { ok: false; reason: "invalid" | "closed" | "often" | "changed" | "failed" };
+
+/**
+ * 하트를 켜거나 끈다. 사진 하트는 파일 이름, 책 하트는 빈 글자. 서버가 우편함 설정(사진마다·책마다)과 맞지
+ * 않으면 거절한다 — 그때는 "하트 방식이 바뀌었어요"(changed)로 알려 화면을 다시 열게 한다.
+ */
+export async function toggleHeart(
+  supabase: SupabaseClient,
+  token: string,
+  postcardId: string,
+  who: string,
+  file: string,
+  on: boolean,
+): Promise<HeartResult> {
+  if (!isMailboxToken(token) || !isPostcardId(postcardId)) return { ok: false, reason: "invalid" };
+  if (who.length < 1 || who.length > 10 || !isHeartFile(file)) return { ok: false, reason: "invalid" };
+  try {
+    const { data, error } = await supabase.rpc("mailbox_heart", {
+      box_token: token,
+      card_id: postcardId,
+      heart_who: who,
+      heart_file: file,
+      heart_on: on,
+    });
+    if (error) {
+      return { ok: false, reason: error.message.includes("잦다") ? "often" : error.message.includes("방식") ? "changed" : "failed" };
+    }
+    return data === true ? { ok: true } : { ok: false, reason: "closed" };
+  } catch {
+    return { ok: false, reason: "failed" };
   }
 }
 

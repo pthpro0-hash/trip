@@ -3,12 +3,13 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import type { ReceivedPostcard } from "@/lib/supabase/mailboxPublic";
 import { RECOMMENDED } from "@/lib/mailboxSettings";
 
-const calls = vi.hoisted(() => ({ opened: vi.fn(async () => undefined), reply: vi.fn() }));
+const calls = vi.hoisted(() => ({ opened: vi.fn(async () => undefined), reply: vi.fn(), heart: vi.fn() }));
 vi.mock("@/lib/supabase/client", () => ({ getBrowserClient: () => ({}) }));
 vi.mock("@/lib/supabase/mailboxPublic", async () => ({
   ...(await vi.importActual<object>("@/lib/supabase/mailboxPublic")),
   markPostcardOpened: calls.opened,
   replyToPostcard: calls.reply,
+  toggleHeart: calls.heart,
 }));
 // 지도 그림은 시험 안에서 잴 것이 아니다.
 vi.mock("@/components/sketch/FootprintPlayer", () => ({
@@ -41,6 +42,7 @@ const card = (over: Partial<ReceivedPostcard> = {}): ReceivedPostcard => ({
   settings: RECOMMENDED,
   members: ["엄마", "아빠"],
   replies: [],
+  hearts: [],
   ...over,
 });
 
@@ -50,6 +52,8 @@ describe("ReceivedPostcardView · 부모님이 보는 엽서", () => {
     calls.opened.mockClear();
     calls.reply.mockReset();
     calls.reply.mockResolvedValue({ ok: true });
+    calls.heart.mockReset();
+    calls.heart.mockResolvedValue({ ok: true });
   });
 
   it("누가 보낸 엽서인지, 제목·기간·인사말이 크게 보인다", () => {
@@ -156,5 +160,122 @@ describe("ReceivedPostcardView · 부모님이 보는 엽서", () => {
   it("설정의 글씨 크기가 배율로 내려온다", () => {
     const { container } = render(<ReceivedPostcardView token={TOKEN} card={card({ settings: { ...RECOMMENDED, font: "xlarge" } })} />);
     expect((container.querySelector("main") as HTMLElement).style.getPropertyValue("--rs")).toBe("1.2");
+  });
+});
+
+describe("ReceivedPostcardView · 하트", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    calls.heart.mockReset();
+    calls.heart.mockResolvedValue({ ok: true });
+  });
+
+  const asMom = () => window.localStorage.setItem(whoKey, "엄마");
+
+  it("사진마다 하트(권장) — 보이는 사진에 누르면 고른 이름으로 켜고, 바로 눌린 모양이 된다", async () => {
+    asMom();
+    render(<ReceivedPostcardView token={TOKEN} card={card()} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 사진에 하트" }));
+    expect(screen.getByRole("button", { name: "이 사진 하트 빼기" })).toBeTruthy();
+    await waitFor(() => expect(calls.heart).toHaveBeenCalledWith(expect.anything(), TOKEN, PID, "엄마", "a.webp", true));
+  });
+
+  it("다시 누르면 하트를 끈다", async () => {
+    asMom();
+    render(<ReceivedPostcardView token={TOKEN} card={card({ hearts: [{ who: "엄마", file: "a.webp" }] })} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 사진 하트 빼기" }));
+    expect(screen.getByRole("button", { name: "이 사진에 하트" })).toBeTruthy();
+    await waitFor(() => expect(calls.heart).toHaveBeenCalledWith(expect.anything(), TOKEN, PID, "엄마", "a.webp", false));
+  });
+
+  it("이미 달린 하트가 보인다 — 아빠가 단 것은 숫자로, 내 것은 눌린 모양으로", () => {
+    asMom();
+    render(
+      <ReceivedPostcardView
+        token={TOKEN}
+        card={card({ hearts: [{ who: "엄마", file: "a.webp" }, { who: "아빠", file: "a.webp" }, { who: "아빠", file: "b.webp" }] })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "이 사진 하트 빼기" })).toBeTruthy();
+    expect(screen.getByTestId("heart-count").textContent).toBe("2");
+    fireEvent.click(screen.getByRole("button", { name: "다음 사진" }));
+    expect(screen.getByRole("button", { name: "이 사진에 하트" })).toBeTruthy();
+    expect(screen.getByTestId("heart-count").textContent).toBe("1");
+  });
+
+  it("누구인지 모르면 하트를 보내지 않고, 먼저 고르라고 말한다", () => {
+    render(<ReceivedPostcardView token={TOKEN} card={card()} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 사진에 하트" }));
+    expect(calls.heart).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("누구신지");
+    expect(screen.getByText("누가 보시나요?")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "이 사진에 하트" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("받는 분 이름이 없는 우편함은 '가족'으로 바로 하트를 단다", async () => {
+    render(<ReceivedPostcardView token={TOKEN} card={card({ members: [] })} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 사진에 하트" }));
+    await waitFor(() => expect(calls.heart).toHaveBeenCalledWith(expect.anything(), TOKEN, PID, "가족", "a.webp", true));
+  });
+
+  it.each([
+    ["often", /너무 자주/],
+    ["closed", /닫혀 있어요/],
+    ["changed", /방식이 바뀌었어요/],
+    ["failed", /보내지 못했어요/],
+  ])("하트가 안 되면(%s) 눌린 모양을 되돌리고 이유를 말로 알린다", async (reason, text) => {
+    asMom();
+    calls.heart.mockResolvedValue({ ok: false, reason });
+    render(<ReceivedPostcardView token={TOKEN} card={card()} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 사진에 하트" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(text);
+    expect(screen.getByRole("button", { name: "이 사진에 하트" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("끄다가 안 되면 켜진 모양으로 되돌린다", async () => {
+    asMom();
+    calls.heart.mockResolvedValue({ ok: false, reason: "failed" });
+    render(<ReceivedPostcardView token={TOKEN} card={card({ hearts: [{ who: "엄마", file: "a.webp" }] })} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 사진 하트 빼기" }));
+    expect(await screen.findByRole("status")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "이 사진 하트 빼기" })).toBeTruthy();
+  });
+
+  it("보내는 중에 같은 사진을 또 눌러도 한 번만 보낸다", async () => {
+    asMom();
+    let finish: (value: { ok: true }) => void = () => undefined;
+    calls.heart.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    render(<ReceivedPostcardView token={TOKEN} card={card()} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 사진에 하트" }));
+    fireEvent.click(screen.getByRole("button", { name: "이 사진 하트 빼기" }));
+    expect(calls.heart).toHaveBeenCalledTimes(1);
+    finish({ ok: true });
+    await waitFor(() => expect(screen.getByRole("button", { name: "이 사진 하트 빼기" })).toBeTruthy());
+  });
+
+  it("책마다 하트(설정)면 사진에는 하트가 없고, 책 하나에 한 번 단다", async () => {
+    asMom();
+    render(<ReceivedPostcardView token={TOKEN} card={card({ settings: { ...RECOMMENDED, heart: "book" } })} />);
+    expect(screen.queryByRole("button", { name: "이 사진에 하트" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "이 여행에 하트" }));
+    expect(screen.getByRole("button", { name: "이 여행 하트 빼기" })).toBeTruthy();
+    await waitFor(() => expect(calls.heart).toHaveBeenCalledWith(expect.anything(), TOKEN, PID, "엄마", "", true));
+  });
+
+  it("책 하트는 누가 눌렀는지 이름으로 보인다", () => {
+    asMom();
+    render(
+      <ReceivedPostcardView
+        token={TOKEN}
+        card={card({ settings: { ...RECOMMENDED, heart: "book" }, hearts: [{ who: "아빠", file: "" }, { who: "엄마", file: "" }] })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "이 여행 하트 빼기" })).toBeTruthy();
+    expect(screen.getByText("아빠, 엄마")).toBeTruthy();
+  });
+
+  it("사진이 없는 엽서에는 사진 하트가 없다", () => {
+    render(<ReceivedPostcardView token={TOKEN} card={card({ snapshot: { ...card().snapshot, files: [] } })} />);
+    expect(screen.queryByRole("button", { name: /하트/ })).toBeNull();
   });
 });

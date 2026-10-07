@@ -19,7 +19,8 @@ import {
   type MailboxList,
   type PendingMailboxInvite,
 } from "@/lib/supabase/mailbox";
-import { fetchSentPostcards, markRepliesSeen, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
+import { fetchSentPostcards, markHeartsSeen, markRepliesSeen, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
+import { summarizeHearts, type HeartLine } from "@/lib/mailboxHearts";
 import { attachParticle } from "@/lib/korean";
 import type { MailboxSettings } from "@/lib/mailboxSettings";
 import { REPLIES_SEEN } from "./MailboxBell";
@@ -54,6 +55,13 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 const pill =
   "rounded-full bg-bg-subtle px-3 py-1.5 text-[13px] font-medium text-text transition hover:bg-line disabled:opacity-60";
 
+/** 하트를 어디에 눌렀는지 — "사진 2장에", "이 여행에", "이 여행과 사진 2장에". */
+function heartTarget(line: HeartLine): string {
+  if (line.book && line.photos > 0) return `이 여행과 사진 ${line.photos}장에`;
+  if (line.book) return "이 여행에";
+  return `사진 ${line.photos}장에`;
+}
+
 export function MailboxPanel() {
   const [state, setState] = useState<Loaded | "loading" | "login" | "failed">("loading");
   const [busy, setBusy] = useState(false);
@@ -68,7 +76,7 @@ export function MailboxPanel() {
   /** 방금 만든 보내는 사람 초대의 글자(바로 복사할 수 있게 크게 보여 준다). */
   const [freshInvite, setFreshInvite] = useState<string | null>(null);
   /*
-    이번에 처음 본 답장들. 화면을 열면 답장을 "봤다"고 표시하는데, 그 순간 "새 답장" 표시까지 사라지면
+    이번에 처음 본 답장·하트들. 화면을 열면 답장을 "봤다"고 표시하는데, 그 순간 "새 답장" 표시까지 사라지면
     무엇이 새것인지 알 수 없다. 이 화면에 머무는 동안은 새것으로 남겨 둔다(다른 일로 목록을 다시 받아도).
   */
   const [fresh, setFresh] = useState<Set<string>>(new Set());
@@ -87,11 +95,15 @@ export function MailboxPanel() {
     if (list === "failed" || invites === "failed") return setState("failed");
     setState({ userId: data.user.id, list, invites, sent });
 
-    // 아직 못 본 답장은 이 화면이 보여 주는 순간 "봤다"고 적는다. 위 띠의 새 답장 표시도 따라 사라진다.
+    // 아직 못 본 답장·하트는 이 화면이 보여 주는 순간 "봤다"고 적는다. 위 띠의 새 소식 표시도 따라 사라진다.
     const unseen = sent.flatMap((card) => card.replies.filter((reply) => !reply.seen).map((reply) => reply.id));
-    if (unseen.length > 0) {
-      setFresh((current) => new Set([...current, ...unseen]));
-      void markRepliesSeen(supabase, unseen)
+    const unseenHearts = sent.flatMap((card) => card.hearts.filter((heart) => !heart.seen).map((heart) => heart.id));
+    if (unseen.length > 0 || unseenHearts.length > 0) {
+      setFresh((current) => new Set([...current, ...unseen, ...unseenHearts]));
+      void Promise.all([
+        unseen.length > 0 ? markRepliesSeen(supabase, unseen) : true,
+        unseenHearts.length > 0 ? markHeartsSeen(supabase, unseenHearts) : true,
+      ])
         .then(() => window.dispatchEvent(new Event(REPLIES_SEEN)))
         .catch(() => undefined);
     }
@@ -459,6 +471,26 @@ export function MailboxPanel() {
                         )}
                         {fresh.has(reply.id) && (
                           <span className="rounded-full bg-[#d70015] px-2 py-0.5 text-[11px] font-bold text-white">새 답장</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {card.hearts.length > 0 && (
+                  <ul className="flex flex-col gap-1" aria-label={`${card.title || "여행"} 하트`}>
+                    {summarizeHearts(card.hearts).map((line) => (
+                      <li key={`${line.mailboxId}|${line.who}`} className="flex flex-wrap items-center gap-1.5 text-[14px] text-text">
+                        <span aria-hidden="true" className="text-[#e0245e]">
+                          ♥
+                        </span>
+                        <span>
+                          {attachParticle(line.who, "이", "가")} {heartTarget(line)} 하트를 눌렀어요
+                        </span>
+                        {card.deliveries.length > 1 && (
+                          <span className="text-[12px] text-text-faint">· {nameOf.get(line.mailboxId) ?? "우편함"}</span>
+                        )}
+                        {line.ids.some((id) => fresh.has(id)) && (
+                          <span className="rounded-full bg-[#d70015] px-2 py-0.5 text-[11px] font-bold text-white">새 하트</span>
                         )}
                       </li>
                     ))}

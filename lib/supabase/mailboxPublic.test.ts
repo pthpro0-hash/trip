@@ -8,6 +8,7 @@ import {
   markPostcardOpened,
   postcardFileUrl,
   replyToPostcard,
+  toggleHeart,
 } from "./mailboxPublic";
 
 /*
@@ -180,6 +181,82 @@ describe("fetchMailboxPostcard", () => {
 
   it("그 우편함에 없는 엽서(null)는 null", async () => {
     expect(await fetchMailboxPostcard(fake({ mailbox_postcard: { data: null } }).client, TOKEN, CARD)).toBeNull();
+  });
+});
+
+describe("하트 · 받는 쪽", () => {
+  const card = {
+    id: CARD,
+    senderName: "지민",
+    snapshot,
+    greeting: "",
+    sentAt: "",
+    mailbox: { name: "x", tone: "casual", members: ["엄마", "아빠"] },
+    replies: [],
+  };
+
+  it("엽서 한 장에 누가 어느 사진에 하트를 달았는지 따라온다", async () => {
+    const result = await fetchMailboxPostcard(
+      fake({ mailbox_postcard: { data: { ...card, hearts: [{ who: "엄마", file: "a.webp" }, { who: "아빠", file: "" }] } } }).client,
+      TOKEN,
+      CARD,
+    );
+    expect(result?.hearts).toEqual([
+      { who: "엄마", file: "a.webp" },
+      { who: "아빠", file: "" },
+    ]);
+  });
+
+  it("하트가 없거나(옛 SQL) 모양이 틀리면 빈 목록 — 틀린 줄만 버린다", async () => {
+    expect((await fetchMailboxPostcard(fake({ mailbox_postcard: { data: card } }).client, TOKEN, CARD))?.hearts).toEqual([]);
+    const result = await fetchMailboxPostcard(
+      fake({
+        mailbox_postcard: {
+          data: { ...card, hearts: [{ who: "엄마", file: "../x" }, { who: 3, file: "a.webp" }, "x", { who: "아빠", file: "a.webp" }] },
+        },
+      }).client,
+      TOKEN,
+      CARD,
+    );
+    expect(result?.hearts).toEqual([{ who: "아빠", file: "a.webp" }]);
+  });
+
+  it("하트를 켠다 — 이름·사진·켬 여부를 함수에 넘긴다", async () => {
+    const { client, calls } = fake({ mailbox_heart: { data: true } });
+    expect(await toggleHeart(client, TOKEN, CARD, "엄마", "a.webp", true)).toEqual({ ok: true });
+    expect(calls[0]).toEqual({
+      name: "mailbox_heart",
+      args: { box_token: TOKEN, card_id: CARD, heart_who: "엄마", heart_file: "a.webp", heart_on: true },
+    });
+  });
+
+  it("끄기도 같은 길 — 책 하트는 사진이 빈 글자", async () => {
+    const { client, calls } = fake({ mailbox_heart: { data: true } });
+    expect(await toggleHeart(client, TOKEN, CARD, "엄마", "", false)).toEqual({ ok: true });
+    expect(calls[0].args).toMatchObject({ heart_file: "", heart_on: false });
+  });
+
+  it("너무 잦으면 often, 하트 방식이 바뀌었으면 changed, 링크가 닫혔으면 closed, 그 밖은 failed", async () => {
+    const reason = async (rpc: Parameters<typeof fake>[0]) => toggleHeart(fake(rpc).client, TOKEN, CARD, "엄마", "a.webp", true);
+    expect(await reason({ mailbox_heart: { error: { message: "mailbox: 하트가 너무 잦다" } } })).toEqual({ ok: false, reason: "often" });
+    expect(await reason({ mailbox_heart: { error: { message: "mailbox: 하트 방식이 바뀌었다" } } })).toEqual({ ok: false, reason: "changed" });
+    expect(await reason({ mailbox_heart: { data: false } })).toEqual({ ok: false, reason: "closed" });
+    expect(await reason({ mailbox_heart: { error: { message: "boom" } } })).toEqual({ ok: false, reason: "failed" });
+  });
+
+  it("묻기 전에 걸러낸다 — 이름·파일 이름·링크 글자가 틀리면 묻지도 않는다", async () => {
+    const { client, calls } = fake({});
+    expect(await toggleHeart(client, TOKEN, CARD, "", "a.webp", true)).toEqual({ ok: false, reason: "invalid" });
+    expect(await toggleHeart(client, TOKEN, CARD, "가".repeat(11), "a.webp", true)).toEqual({ ok: false, reason: "invalid" });
+    expect(await toggleHeart(client, TOKEN, CARD, "엄마", "../x", true)).toEqual({ ok: false, reason: "invalid" });
+    expect(await toggleHeart(client, "짧음", CARD, "엄마", "a.webp", true)).toEqual({ ok: false, reason: "invalid" });
+    expect(await toggleHeart(client, TOKEN, "짧음", "엄마", "a.webp", true)).toEqual({ ok: false, reason: "invalid" });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("네트워크가 끊겨 던져도 failed 로 돌려준다", async () => {
+    const throwing = { rpc: async () => { throw new Error("offline"); } } as unknown as SupabaseClient;
+    expect(await toggleHeart(throwing, TOKEN, CARD, "엄마", "a.webp", true)).toEqual({ ok: false, reason: "failed" });
   });
 });
 

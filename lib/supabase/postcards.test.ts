@@ -14,7 +14,9 @@ const {
   fetchPhotosInPostcards,
   fetchPostcardCounts,
   fetchSentPostcards,
+  fetchUnreadHeartCount,
   fetchUnreadReplyCount,
+  markHeartsSeen,
   markRepliesSeen,
   removeCopiesOfPhoto,
   removeCopiesOfTrip,
@@ -69,6 +71,7 @@ interface Options {
   sentRows?: unknown[];
   deliveryRows?: unknown[];
   replyRows?: unknown[];
+  heartRows?: unknown[];
   unread?: number;
   failUpdate?: boolean;
 }
@@ -84,6 +87,7 @@ function fake(options: Options = {}) {
     if (name === "postcards" && columns.includes("snapshot")) return options.sentRows ?? [];
     if (name === "postcard_deliveries") return options.deliveryRows ?? [];
     if (name === "postcard_replies") return options.replyRows ?? [];
+    if (name === "postcard_hearts") return options.heartRows ?? [];
     if (name === "postcards" && columns === "id") return options.postcardsOfTrip ?? [];
     if (name === "postcards") return options.countRows ?? [];
     if (name === "postcard_photos" && columns.includes("postcard_id")) return options.photoRows ?? [];
@@ -464,9 +468,10 @@ describe("fetchSentPostcards · 보낸 엽서 목록", () => {
           { mailboxId: "m2", opened: false },
         ],
         replies: [],
+        hearts: [],
         unread: 0,
       },
-      { id: "pc2", tripId: "t2", title: null, startedOn: "2026-08-01", sentAt: "2026-10-01T00:00:00Z", deliveries: [], replies: [], unread: 0 },
+      { id: "pc2", tripId: "t2", title: null, startedOn: "2026-08-01", sentAt: "2026-10-01T00:00:00Z", deliveries: [], replies: [], hearts: [], unread: 0 },
     ]);
   });
 
@@ -525,5 +530,59 @@ describe("답장 알림 · 보낸 사람이 받는 소식", () => {
     expect(await markRepliesSeen(f.supabase, [])).toBe(true);
     expect(f.log).toHaveLength(0);
     expect(await markRepliesSeen(fake({ failUpdate: true }).supabase, ["r1"])).toBe(false);
+  });
+});
+
+describe("하트 알림 · 보낸 사람이 받는 소식", () => {
+  const cards = [{ id: "pc1", trip_id: "t1", created_at: "2026-10-02T00:00:00Z", snapshot: { title: "강릉 바다", startedOn: "2026-09-13" } }];
+
+  it("엽서마다 하트가 따라온다 — 누가 어느 사진(책 하트는 빈 글자)에, 봤는지까지", async () => {
+    const f = fake({
+      sentRows: cards,
+      heartRows: [
+        { id: "h1", postcard_id: "pc1", mailbox_id: "m1", who: "엄마", file: "a.webp", created_at: "2026-10-03T00:00:00Z", seen_at: "2026-10-03T01:00:00Z" },
+        { id: "h2", postcard_id: "pc1", mailbox_id: "m1", who: "엄마", file: "b.webp", created_at: "2026-10-04T00:00:00Z", seen_at: null },
+        { id: "h3", postcard_id: "other", mailbox_id: "m1", who: "아빠", file: "", created_at: "2026-10-04T00:00:00Z", seen_at: null },
+      ],
+    });
+    const [card] = await fetchSentPostcards(f.supabase, "u");
+    expect(card.hearts).toEqual([
+      { id: "h1", mailboxId: "m1", who: "엄마", file: "a.webp", seen: true },
+      { id: "h2", mailboxId: "m1", who: "엄마", file: "b.webp", seen: false },
+    ]);
+  });
+
+  it("하트 표를 못 읽어도(아직 없을 때도) 엽서 목록은 나온다", async () => {
+    const f = fake({ sentRows: cards });
+    const [card] = await fetchSentPostcards(f.supabase, "u");
+    expect(card.hearts).toEqual([]);
+  });
+
+  it("못 본 하트의 수는 (엽서, 우편함, 이름)마다 하나로 센다 — 사진 스무 장에 눌러도 한 소식", async () => {
+    const row = (id: string, who: string, card = "pc1") => ({ id, postcard_id: card, mailbox_id: "m1", who });
+    const f = fake({ heartRows: [row("1", "엄마"), row("2", "엄마"), row("3", "엄마"), row("4", "아빠"), row("5", "엄마", "pc2")] });
+    expect(await fetchUnreadHeartCount(f.supabase)).toBe(3);
+    expect(await fetchUnreadHeartCount(fake().supabase)).toBe(0);
+  });
+
+  it("수를 못 세면 0 — 알림이 없는 것처럼 조용히", async () => {
+    expect(await fetchUnreadHeartCount(fake({ selectError: "500" }).supabase)).toBe(0);
+    expect(await fetchUnreadHeartCount(fake({ selectError: "42P01" }).supabase)).toBe(0);
+  });
+
+  it("봤다고 표시한다 — 하트 표의 그 줄들에만", async () => {
+    const f = fake();
+    expect(await markHeartsSeen(f.supabase, ["h1", "h2"])).toBe(true);
+    expect(f.updated).toHaveLength(1);
+    expect(f.updated[0].table).toBe("postcard_hearts");
+    expect(f.updated[0].ids).toEqual(["h1", "h2"]);
+    expect(f.updated[0].patch.seen_at).toEqual(expect.any(String));
+  });
+
+  it("표시할 것이 없으면 묻지 않고, 실패하면 false", async () => {
+    const f = fake();
+    expect(await markHeartsSeen(f.supabase, [])).toBe(true);
+    expect(f.log).toHaveLength(0);
+    expect(await markHeartsSeen(fake({ failUpdate: true }).supabase, ["h1"])).toBe(false);
   });
 });

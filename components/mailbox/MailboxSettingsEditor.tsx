@@ -5,6 +5,7 @@ import {
   FONT_CHOICES,
   FONT_LABEL,
   FONT_SCALE,
+  HEART_CHOICES,
   PHOTO_CHOICES,
   RECOMMENDED,
   WORD_MAX,
@@ -19,8 +20,8 @@ import {
 /*
   책장 설정 — 권장값이 기본이고, 바꾼 것은 "권장" 표시가 사라져 한눈에 보인다.
 
-  지금 쓰이는 설정만 보인다: 책 한 권 사진 수·크기(새로 꽂는 책부터), 부모님 화면 글씨·답장 문구(바로).
-  하트·보관 권수·작년 오늘·올해의 책은 그 기능이 생길 때 이 화면에 더해진다. 값은 지금도 지켜서 저장한다
+  지금 쓰이는 설정만 보인다: 책 한 권 사진 수·크기(새로 꽂는 책부터), 부모님 화면 글씨·답장 문구·하트(바로).
+  보관 권수·작년 오늘·올해의 책은 그 기능이 생길 때 이 화면에 더해진다. 값은 지금도 지켜서 저장한다
   (설정을 저장한다고 아직 안 보이는 칸이 권장으로 덮이지 않게).
 */
 
@@ -32,7 +33,7 @@ interface Props {
 }
 
 /** 화면에 내는 칸들. 권장과 다른지 셀 때도 이것만 본다. */
-const SHOWN: SettingKey[] = ["photos", "size", "font", "words"];
+const SHOWN: SettingKey[] = ["photos", "size", "font", "words", "heart"];
 
 function Rec({ show }: { show: boolean }) {
   return show ? <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">권장</span> : null;
@@ -169,6 +170,24 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
           </div>
           <p className="text-[12px] leading-relaxed text-text-faint">
             집마다 말투가 달라서 직접 바꿀 수 있어요. {WORD_MAX}자까지, 비우면 권장 문구가 돼요. 부모님 화면에는 바로 적용돼요.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <p className="flex items-center gap-1.5 text-[14px] text-text">
+            하트 <Rec show={!differs("heart")} />
+          </p>
+          <Segment
+            label="하트 받는 방식"
+            value={draft.heart}
+            options={HEART_CHOICES.map((choice) => ({
+              value: choice,
+              text: choice === "photo" ? "사진마다" : "책마다",
+              hint: choice === "photo" ? "사진 한 장 한 장에" : "여행 한 번에 하나",
+            }))}
+            onChange={(value) => set("heart", value)}
+          />
+          <p className="text-[12px] leading-relaxed text-text-faint">
+            부모님이 누른 하트는 보낸 엽서 목록에 모여 보여요. 바꾸면 바로 적용돼요. 이미 단 하트는 남아 있지만, 화면에는 지금 방식의 하트만 보여요.
           </p>
         </div>
       </section>

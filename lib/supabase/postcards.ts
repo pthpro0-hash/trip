@@ -171,6 +171,16 @@ export interface SentReply {
   seen: boolean;
 }
 
+/** 받는 분이 단 하트 한 개. 사진 하트는 파일 이름, 책 하트는 빈 글자. */
+export interface SentHeart {
+  id: string;
+  mailboxId: string;
+  who: string;
+  file: string;
+  /** 보낸 사람이 이미 봤는가. */
+  seen: boolean;
+}
+
 export interface SentPostcard {
   id: string;
   tripId: string;
@@ -181,12 +191,14 @@ export interface SentPostcard {
   deliveries: { mailboxId: string; opened: boolean }[];
   /** 받는 분들의 답장(오래된 것부터)과 그중 못 본 수. */
   replies: SentReply[];
+  /** 받는 분들이 단 하트(단 차례대로). */
+  hearts: SentHeart[];
   unread: number;
 }
 
 /** 내가 보낸 엽서들(최근 것부터). 못 읽으면 빈 목록. */
 export async function fetchSentPostcards(supabase: SupabaseClient, userId: string): Promise<SentPostcard[]> {
-  const [cards, deliveries, replyRows] = await Promise.all([
+  const [cards, deliveries, replyRows, heartRows] = await Promise.all([
     supabase
       .from("postcards")
       .select("id,trip_id,created_at,snapshot")
@@ -199,6 +211,13 @@ export async function fetchSentPostcards(supabase: SupabaseClient, userId: strin
       supabase
         .from("postcard_replies")
         .select("id,postcard_id,mailbox_id,who,reaction,created_at,seen_at")
+        .order("created_at", { ascending: true }),
+    ).catch(() => ({ data: null, error: { message: "x" } })),
+    // 하트도 곁다리다(표가 아직 없어도 목록은 나온다).
+    Promise.resolve(
+      supabase
+        .from("postcard_hearts")
+        .select("id,postcard_id,mailbox_id,who,file,created_at,seen_at")
         .order("created_at", { ascending: true }),
     ).catch(() => ({ data: null, error: { message: "x" } })),
   ]);
@@ -224,6 +243,22 @@ export async function fetchSentPostcards(supabase: SupabaseClient, userId: strin
       ]);
     }
   }
+  const heartsByCard = new Map<string, SentHeart[]>();
+  if (!heartRows.error && Array.isArray(heartRows.data)) {
+    for (const row of heartRows.data as {
+      id: string;
+      postcard_id: string;
+      mailbox_id: string;
+      who: string;
+      file: string;
+      seen_at: string | null;
+    }[]) {
+      heartsByCard.set(row.postcard_id, [
+        ...(heartsByCard.get(row.postcard_id) ?? []),
+        { id: row.id, mailboxId: row.mailbox_id, who: row.who, file: row.file, seen: row.seen_at != null },
+      ]);
+    }
+  }
   return (cards.data as { id: string; trip_id: string; created_at: string; snapshot: { title?: string | null; startedOn?: string } }[]).map((row) => {
     const replies = repliesByCard.get(row.id) ?? [];
     return {
@@ -234,6 +269,7 @@ export async function fetchSentPostcards(supabase: SupabaseClient, userId: strin
       sentAt: row.created_at,
       deliveries: byCard.get(row.id) ?? [],
       replies,
+      hearts: heartsByCard.get(row.id) ?? [],
       unread: replies.filter((reply) => !reply.seen).length,
     };
   });
@@ -252,6 +288,23 @@ export async function fetchUnreadReplyCount(supabase: SupabaseClient): Promise<n
 export async function markRepliesSeen(supabase: SupabaseClient, ids: string[]): Promise<boolean> {
   if (ids.length === 0) return true;
   const { error } = await supabase.from("postcard_replies").update({ seen_at: new Date().toISOString() }).in("id", ids);
+  return !error;
+}
+
+/**
+ * 아직 못 본 하트 소식의 수. 한 사람이 사진 스무 장에 눌러도 한 소식이다 — (엽서, 우편함, 이름)마다 하나.
+ * 못 세면 0(알림이 없는 것처럼 조용히).
+ */
+export async function fetchUnreadHeartCount(supabase: SupabaseClient): Promise<number> {
+  const { data, error } = await supabase.from("postcard_hearts").select("postcard_id,mailbox_id,who").is("seen_at", null).limit(1000);
+  if (error || !Array.isArray(data)) return 0;
+  return new Set((data as { postcard_id: string; mailbox_id: string; who: string }[]).map((row) => `${row.postcard_id}|${row.mailbox_id}|${row.who}`)).size;
+}
+
+/** 하트를 봤다고 표시한다(보낸 사람만 된다 — DB 가 seen_at 말고는 못 고치게 막아 둔다). */
+export async function markHeartsSeen(supabase: SupabaseClient, ids: string[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const { error } = await supabase.from("postcard_hearts").update({ seen_at: new Date().toISOString() }).in("id", ids);
   return !error;
 }
 

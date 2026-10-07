@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { PhotoAlbum } from "./PhotoAlbum";
 
@@ -76,5 +76,58 @@ describe("PhotoAlbum · 책 한 권의 사진을 한 장씩 넘겨 본다", () =
     fireEvent.click(screen.getByRole("button", { name: "다음 사진" }));
     expect(srcOf(container)).toMatch(/b\.webp$/);
     expect(screen.queryByText("보낸 분이 이 사진을 지웠어요")).toBeNull();
+  });
+});
+
+describe("PhotoAlbum · 사진마다 하트", () => {
+  const make = (mine: string[] = [], counts: Record<string, number> = {}) => ({
+    mine: (file: string) => mine.includes(file),
+    count: (file: string) => counts[file] ?? 0,
+    onToggle: vi.fn(),
+  });
+
+  it("하트 설정이 없으면 하트 단추가 없다", () => {
+    render(<PhotoAlbum postcardId={PID} files={files} />);
+    expect(screen.queryByRole("button", { name: /하트/ })).toBeNull();
+  });
+
+  it("보이는 사진에 하트를 누르면 그 사진의 파일 이름으로 알린다 — 넘기면 다음 사진 것", () => {
+    const hearts = make();
+    render(<PhotoAlbum postcardId={PID} files={files} hearts={hearts} />);
+    fireEvent.click(screen.getByRole("button", { name: "이 사진에 하트" }));
+    expect(hearts.onToggle).toHaveBeenLastCalledWith("a.webp");
+    fireEvent.click(screen.getByRole("button", { name: "다음 사진" }));
+    fireEvent.click(screen.getByRole("button", { name: "이 사진에 하트" }));
+    expect(hearts.onToggle).toHaveBeenLastCalledWith("b.webp");
+  });
+
+  it("내가 단 하트는 눌린 상태로 보이고, 다시 누르면 빼는 것이라고 알린다", () => {
+    render(<PhotoAlbum postcardId={PID} files={files} hearts={make(["a.webp"])} />);
+    const button = screen.getByRole("button", { name: "이 사진 하트 빼기" });
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "다음 사진" }));
+    expect(screen.getByRole("button", { name: "이 사진에 하트" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("그 사진에 하트를 단 사람 수가 보인다 — 없으면 숫자를 내지 않는다", () => {
+    render(<PhotoAlbum postcardId={PID} files={files} hearts={make([], { "a.webp": 2 })} />);
+    expect(screen.getByTestId("heart-count").textContent).toBe("2");
+    fireEvent.click(screen.getByRole("button", { name: "다음 사진" }));
+    expect(screen.queryByTestId("heart-count")).toBeNull();
+  });
+
+  it("지워진 사진에는 하트를 달 수 없다 — 단추가 사라진다", () => {
+    const { container } = render(<PhotoAlbum postcardId={PID} files={files} hearts={make()} />);
+    fireEvent.error(container.querySelector("img")!);
+    expect(screen.queryByRole("button", { name: /하트/ })).toBeNull();
+  });
+
+  it("하트를 눌러도 사진이 넘어가지 않는다 — 짧은 터치는 넘기기가 아니다", () => {
+    const { container } = render(<PhotoAlbum postcardId={PID} files={files} hearts={make()} />);
+    const heart = screen.getByRole("button", { name: "이 사진에 하트" });
+    fireEvent.pointerDown(heart, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerUp(heart, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.click(heart);
+    expect(srcOf(container)).toMatch(/a\.webp$/);
   });
 });

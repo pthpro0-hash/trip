@@ -135,6 +135,24 @@ create table if not exists public.postcard_replies (
 
 create index if not exists postcard_replies_postcard_idx on public.postcard_replies (postcard_id, created_at);
 
+-- 받는 분의 하트. 함수(mailbox_heart)로만 켜고 끈다(누르면 켜지고 한 번 더 누르면 꺼진다).
+-- file 은 하트를 단 사진의 파일 이름이고, 책 전체에 단 하트(우편함 설정이 '책마다')는 빈 글자다.
+create table if not exists public.postcard_hearts (
+  id          uuid        primary key default gen_random_uuid(),
+  postcard_id text        not null,
+  mailbox_id  uuid        not null,
+  who         text        not null check (length(who) between 1 and 10),
+  file        text        not null default '' check (file = '' or file ~ '^[A-Za-z0-9._-]{1,80}$'),
+  created_at  timestamptz not null default now(),
+  -- 보낸 사람이 봤으면 그 시각.
+  seen_at     timestamptz,
+  unique (postcard_id, mailbox_id, who, file),
+  foreign key (postcard_id, mailbox_id)
+    references public.postcard_deliveries (postcard_id, mailbox_id) on delete cascade
+);
+
+create index if not exists postcard_hearts_postcard_idx on public.postcard_hearts (postcard_id, created_at);
+
 alter table public.mailboxes enable row level security;
 alter table public.mailbox_senders enable row level security;
 alter table public.mailbox_invites enable row level security;
@@ -143,13 +161,14 @@ alter table public.postcards enable row level security;
 alter table public.postcard_photos enable row level security;
 alter table public.postcard_deliveries enable row level security;
 alter table public.postcard_replies enable row level security;
+alter table public.postcard_hearts enable row level security;
 -- postcard_ids 에는 정책을 두지 않는다 — 아무도 직접 읽거나 쓰지 못하고, 아래 트리거만 적는다.
 
 -- 로그인하지 않은 사람(anon)은 표에 직접 닿지 못한다. 받는 쪽은 아래 함수(RPC)로만 읽는다.
 -- 정책이 이미 막지만(anon 에게 연 정책이 없다) 한 겹 더 닫아 둔다.
 revoke all on table
   public.mailboxes, public.mailbox_senders, public.mailbox_invites, public.postcard_ids,
-  public.postcards, public.postcard_photos, public.postcard_deliveries, public.postcard_replies
+  public.postcards, public.postcard_photos, public.postcard_deliveries, public.postcard_replies, public.postcard_hearts
 from anon;
 
 -- ═══════════════════════════════════════════════
@@ -309,6 +328,26 @@ begin
 end;
 $$;
 
+-- 하트에서 고칠 수 있는 것도 "봤다"는 표시(seen_at) 하나뿐이다.
+create or replace function public.postcard_hearts_only_seen()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.id is distinct from old.id
+     or new.postcard_id is distinct from old.postcard_id
+     or new.mailbox_id is distinct from old.mailbox_id
+     or new.who is distinct from old.who
+     or new.file is distinct from old.file
+     or new.created_at is distinct from old.created_at then
+    raise exception 'postcard_hearts: 하트는 고칠 수 없고 seen_at 만 바꿀 수 있다';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.postcard_hearts_only_seen() from public;
 revoke all on function public.mailboxes_limit() from public;
 revoke all on function public.mailbox_senders_limit() from public;
 revoke all on function public.mailboxes_add_owner() from public;
@@ -344,6 +383,10 @@ create trigger postcards_keep before update on public.postcards
 drop trigger if exists postcard_replies_only_seen on public.postcard_replies;
 create trigger postcard_replies_only_seen before update on public.postcard_replies
   for each row execute function public.postcard_replies_only_seen();
+
+drop trigger if exists postcard_hearts_only_seen on public.postcard_hearts;
+create trigger postcard_hearts_only_seen before update on public.postcard_hearts
+  for each row execute function public.postcard_hearts_only_seen();
 
 -- ═══════════════════════════════════════════════
 -- 보내는 사람 쪽 정책 — 로그인한 사람이 자기 것만.
@@ -506,6 +549,21 @@ create policy "postcard_replies_update" on public.postcard_replies
     exists (select 1 from public.postcards p where p.id = postcard_id and p.sender_id = auth.uid())
   );
 
+-- 하트: 답장과 같다 — 보낸 사람이 자기 엽서의 하트를 읽고 "봤다"고 표시한다. 넣고 지우는 길은 없다(함수로만).
+drop policy if exists "postcard_hearts_select" on public.postcard_hearts;
+drop policy if exists "postcard_hearts_update" on public.postcard_hearts;
+
+create policy "postcard_hearts_select" on public.postcard_hearts
+  for select using (
+    exists (select 1 from public.postcards p where p.id = postcard_id and p.sender_id = auth.uid())
+  );
+create policy "postcard_hearts_update" on public.postcard_hearts
+  for update using (
+    exists (select 1 from public.postcards p where p.id = postcard_id and p.sender_id = auth.uid())
+  ) with check (
+    exists (select 1 from public.postcards p where p.id = postcard_id and p.sender_id = auth.uid())
+  );
+
 -- ═══════════════════════════════════════════════
 -- 받는 쪽(로그인 없음) — 링크를 정확히 아는 사람에게만, 그 우편함 것만.
 --
@@ -609,6 +667,12 @@ begin
       )
       from public.postcard_replies r
       where r.postcard_id = p.id and r.mailbox_id = box.id
+    ), '[]'::jsonb),
+    -- 이 우편함에서 누가 어느 사진(책 하트면 빈 글자)에 하트를 달았나.
+    'hearts', coalesce((
+      select jsonb_agg(jsonb_build_object('who', h.who, 'file', h.file) order by h.created_at)
+      from public.postcard_hearts h
+      where h.postcard_id = p.id and h.mailbox_id = box.id
     ), '[]'::jsonb)
   ) into found_card
   from public.postcard_deliveries d
@@ -680,14 +744,78 @@ begin
 end;
 $$;
 
+-- 하트 켜기·끄기. 이미 켠 것을 또 켜도, 없는 것을 끄려 해도 조용히 넘어간다(두 번 눌러도 탈이 없게).
+-- 우편함 설정이 'book' 이면 책 전체(빈 글자)에만, 아니면 이 엽서에 든 사진에만 달 수 있다.
+-- 한 엽서·한 우편함에 한 시간 60번까지, 모두 200개까지.
+create or replace function public.mailbox_heart(box_token text, card_id text, heart_who text, heart_file text, heart_on boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  box public.mailboxes%rowtype;
+  card public.postcards%rowtype;
+  target text := coalesce(heart_file, '');
+begin
+  if length(coalesce(heart_who, '')) not between 1 and 10 then
+    raise exception 'mailbox: 이름은 1~10자';
+  end if;
+
+  select * into box from public.mailboxes where token = box_token and closed_at is null;
+  if not found then
+    return false;
+  end if;
+
+  select p.* into card
+    from public.postcards p
+    join public.postcard_deliveries d on d.postcard_id = p.id
+    where p.id = card_id and d.mailbox_id = box.id;
+  if not found then
+    return false;
+  end if;
+
+  if coalesce(box.settings ->> 'heart', 'photo') = 'book' then
+    if target <> '' then
+      raise exception 'mailbox: 하트 방식이 바뀌었다';
+    end if;
+  elsif target = '' or not (card.snapshot -> 'files' ? target) then
+    raise exception 'mailbox: 하트 방식이 바뀌었다';
+  end if;
+
+  if coalesce(heart_on, true) then
+    if (
+      select count(*) from public.postcard_hearts h
+      where h.postcard_id = card_id and h.mailbox_id = box.id and h.created_at > now() - interval '1 hour'
+    ) >= 60 then
+      raise exception 'mailbox: 하트가 너무 잦다';
+    end if;
+    if (
+      select count(*) from public.postcard_hearts h where h.postcard_id = card_id and h.mailbox_id = box.id
+    ) >= 200 then
+      raise exception 'mailbox: 하트가 너무 잦다';
+    end if;
+    insert into public.postcard_hearts (postcard_id, mailbox_id, who, file)
+      values (card_id, box.id, heart_who, target)
+      on conflict (postcard_id, mailbox_id, who, file) do nothing;
+  else
+    delete from public.postcard_hearts h
+      where h.postcard_id = card_id and h.mailbox_id = box.id and h.who = heart_who and h.file = target;
+  end if;
+  return true;
+end;
+$$;
+
 revoke all on function public.mailbox_view(text) from public;
 revoke all on function public.mailbox_postcard(text, text) from public;
 revoke all on function public.mailbox_open(text, text) from public;
 revoke all on function public.mailbox_reply(text, text, text, text) from public;
+revoke all on function public.mailbox_heart(text, text, text, text, boolean) from public;
 grant execute on function public.mailbox_view(text) to anon, authenticated;
 grant execute on function public.mailbox_postcard(text, text) to anon, authenticated;
 grant execute on function public.mailbox_open(text, text) to anon, authenticated;
 grant execute on function public.mailbox_reply(text, text, text, text) to anon, authenticated;
+grant execute on function public.mailbox_heart(text, text, text, text, boolean) to anon, authenticated;
 
 -- ═══════════════════════════════════════════════
 -- 사진 보관함(postcards 버킷, 공개)

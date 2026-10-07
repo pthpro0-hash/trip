@@ -32,6 +32,7 @@ describe("mailbox.sql · 표", () => {
     "postcard_photos",
     "postcard_deliveries",
     "postcard_replies",
+    "postcard_hearts",
     "postcard_ids",
   ];
 
@@ -170,7 +171,7 @@ describe("mailbox.sql · 보내는 사람의 권한", () => {
 });
 
 describe("mailbox.sql · 받는 쪽(로그인 없음)", () => {
-  const RPCS = ["mailbox_view", "mailbox_postcard", "mailbox_open", "mailbox_reply"];
+  const RPCS = ["mailbox_view", "mailbox_postcard", "mailbox_open", "mailbox_reply", "mailbox_heart"];
 
   it.each(RPCS)("%s 는 security definer 이고 로그인 없는 사람에게 열려 있다", (name) => {
     expect(fn(name)).toContain("security definer");
@@ -227,6 +228,68 @@ describe("mailbox.sql · 답장·열어 봄", () => {
   it("답장에서 고칠 수 있는 것은 seen_at 하나뿐이다", () => {
     expect(fn("postcard_replies_only_seen")).toContain("seen_at");
     expect(sql).toMatch(/before update on public\.postcard_replies/);
+  });
+});
+
+describe("mailbox.sql · 하트", () => {
+  it("하트는 배달된 엽서에 걸려 있어, 엽서를 거두거나 우편함에서 빠지면 함께 지워진다", () => {
+    expect(sql).toMatch(
+      /foreign key \(postcard_id, mailbox_id\)\s+references public\.postcard_deliveries \(postcard_id, mailbox_id\) on delete cascade/,
+    );
+  });
+
+  it("한 사람이 한 사진(또는 한 책)에 하트는 하나다 — 같은 곳을 두 번 눌러도 겹치지 않는다", () => {
+    expect(sql).toMatch(/unique \(postcard_id, mailbox_id, who, file\)/);
+  });
+
+  it("사진 칸은 비었으면 책 하트, 아니면 파일 이름 모양이어야 한다", () => {
+    expect(sql).toMatch(/file\s+text\s+not null default '' check \(file = '' or file ~ '\^\[A-Za-z0-9\._-\]\{1,80\}\$'\)/);
+    expect(sql).toMatch(/who\s+text\s+not null check \(length\(who\) between 1 and 10\)/);
+  });
+
+  it("보낸 사람은 자기 엽서의 하트를 읽고 '봤다'고 표시한다 — 직접 넣는 길은 없다", () => {
+    expect(policy("postcard_hearts_select")).toMatch(/p\.sender_id = auth\.uid\(\)/);
+    expect(policy("postcard_hearts_update")).toMatch(/p\.sender_id = auth\.uid\(\)/);
+    expect(sql).not.toMatch(/policy "postcard_hearts_insert/);
+    expect(sql).not.toMatch(/policy "postcard_hearts_delete/);
+  });
+
+  it("하트에서 고칠 수 있는 것은 seen_at 하나뿐이다", () => {
+    expect(fn("postcard_hearts_only_seen")).toContain("seen_at");
+    expect(sql).toMatch(/before update on public\.postcard_hearts/);
+  });
+
+  it("로그인 없는 사람은 하트 표에 직접 닿지 못한다", () => {
+    expect(sql).toMatch(/revoke all on table[^;]*public\.postcard_hearts[^;]*from anon/);
+  });
+
+  it("하트 켜기·끄기는 그 우편함에 배달된 엽서에만 된다", () => {
+    const body = fn("mailbox_heart");
+    expect(body).toContain("postcard_deliveries");
+    expect(body).toContain("insert into public.postcard_hearts");
+    expect(body).toContain("on conflict");
+    expect(body).toContain("delete from public.postcard_hearts");
+  });
+
+  it("우편함 설정이 책마다(book)면 책 하트만, 아니면 엽서에 든 사진에만 누를 수 있다", () => {
+    const body = fn("mailbox_heart");
+    expect(body).toContain("settings ->> 'heart'");
+    expect(body).toContain("'book'");
+    expect(body).toMatch(/snapshot -> 'files' \? /);
+  });
+
+  it("너무 잦거나 너무 많이 쌓이면 막는다", () => {
+    const body = fn("mailbox_heart");
+    expect(body).toContain("interval");
+    expect(body).toMatch(/>= 60/);
+    expect(body).toMatch(/>= 200/);
+  });
+
+  it("받는 쪽 엽서에 하트(누가 어느 사진에)가 내려가지만 보낸 사람의 정보는 아니다", () => {
+    const body = fn("mailbox_postcard");
+    expect(body).toContain("'hearts'");
+    expect(body).toContain("postcard_hearts");
+    expect(body).toContain("'file', h.file");
   });
 });
 

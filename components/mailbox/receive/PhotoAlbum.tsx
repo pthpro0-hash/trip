@@ -14,7 +14,16 @@ import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
 /** 이만큼(px) 가로로 밀면 넘긴다. 세로로 더 많이 움직였으면 화면을 굴리려던 것이라 넘기지 않는다. */
 const SWIPE = 40;
 
-export function PhotoAlbum({ postcardId, files }: { postcardId: string; files: string[] }) {
+/** 사진마다 하트를 받는 책장에서 앨범에 달아 주는 것. 하트를 켜고 끄는 일은 부르는 쪽이 한다. */
+export interface AlbumHearts {
+  /** 내가 이 사진에 하트를 달았나. */
+  mine: (file: string) => boolean;
+  /** 이 사진에 하트를 단 사람 수. */
+  count: (file: string) => number;
+  onToggle: (file: string) => void;
+}
+
+export function PhotoAlbum({ postcardId, files, hearts }: { postcardId: string; files: string[]; hearts?: AlbumHearts }) {
   const [index, setIndex] = useState(0);
   const [gone, setGone] = useState<Set<string>>(new Set());
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -80,6 +89,25 @@ export function PhotoAlbum({ postcardId, files }: { postcardId: string; files: s
             onError={() => setGone((current) => new Set(current).add(file))}
             className="aspect-[4/3] w-full object-cover"
           />
+        )}
+
+        {hearts && !gone.has(file) && (
+          <button
+            type="button"
+            aria-label={hearts.mine(file) ? "이 사진 하트 빼기" : "이 사진에 하트"}
+            aria-pressed={hearts.mine(file)}
+            onClick={() => hearts.onToggle(file)}
+            className={`absolute bottom-3 left-3 flex h-14 items-center gap-1.5 rounded-full px-4 rs-28 leading-none backdrop-blur-sm transition active:scale-95 ${
+              hearts.mine(file) ? "bg-white text-[#e0245e]" : "bg-black/45 text-white"
+            }`}
+          >
+            <span aria-hidden="true">{hearts.mine(file) ? "♥" : "♡"}</span>
+            {hearts.count(file) > 0 && (
+              <span data-testid="heart-count" className="rs-18 font-semibold">
+                {hearts.count(file)}
+              </span>
+            )}
+          </button>
         )}
 
         {files.length > 1 && (

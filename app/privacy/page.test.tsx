@@ -36,6 +36,7 @@ describe("개인정보처리방침 · 가족 우편함", () => {
     const t = text();
     expect(t).toContain("가족 우편함을 쓰실 때");
     expect(t).toContain("받는 분의 답장");
+    expect(t).toContain("하트");
   });
 
   it("엽서를 링크를 아는 누구나 볼 수 있다는 것과 무엇이 실리고 안 실리는지를 적는다", () => {
