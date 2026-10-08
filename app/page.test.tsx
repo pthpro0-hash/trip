@@ -25,6 +25,7 @@ vi.mock("@/components/home/SpotsHome", () => ({
   },
 }));
 vi.mock("@/components/home/StartSwitch", () => ({ StartSwitch: () => null }));
+vi.mock("@/components/home/WelcomeDialog", () => ({ WelcomeDialog: () => <p>환영 팝업</p> }));
 const { default: HomePage } = await import("./page");
 
 const open = async (params: Record<string, string>) => render(await HomePage({ searchParams: Promise.resolve(params) }));
@@ -72,9 +73,9 @@ describe("HomePage · 내 여행의 모습", () => {
   /*
     로그인하지 않은 사람에게 내 여행은 보여 줄 것이 없는 빈 지도다 — 지도가 화면을 다 차지하고 안내는 작은 시트
     하나뿐이다. 지난번에 내 여행을 골랐어도(로그아웃, 세션 만료) 로그인한 사람일 수 없으면 여행 100선 쪽(환영 영역
-    이 맨 위에 있다)을 연다. 탭을 눌러 주소에 갈래가 적혔으면 그것을 따른다.
+    이 뜨는 곳)을 연다. 탭을 눌러 주소에 갈래가 적혔으면 그것을 따른다.
   */
-  it("로그인 쿠키가 없으면 지난번에 골랐던 내 여행을 따르지 않고 여행 100선(환영 영역)을 연다", async () => {
+  it("로그인 쿠키가 없으면 지난번에 골랐던 내 여행을 따르지 않고 여행 100선(환영 팝업이 뜨는 곳)을 연다", async () => {
     remembered = "sketch";
     cookieNames = ["start"];
     await open({});
@@ -125,8 +126,34 @@ describe("HomePage · 로그인 쿠키를 보고 첫 그림을 정한다", () =>
     expect(spotsProps.current?.maybeSignedIn).toBe(false);
   });
 
-  it("안내 창(SketchInvite)은 더 두지 않는다", async () => {
-    const { container } = await open({});
-    expect(container.querySelector("[role='dialog']")).toBeNull();
+});
+
+/*
+  환영 팝업은 로그인 전 첫 방문자에게 여행 100선 첫 화면에서만 뜬다. 내 여행(지도)에는 시트가 이미 같은 말을 하고,
+  다른 화면(상세, 링크로 받은 화면, 부모님 책장)에는 아예 두지 않는다 — 예전 안내 창은 어느 화면에서든 떴다.
+*/
+describe("HomePage · 환영 팝업", () => {
+  beforeEach(() => {
+    remembered = undefined;
+    cookieNames = [];
+    sketchProps.current = null;
+    spotsProps.current = null;
+  });
+
+  it("여행 100선 첫 화면에 둔다 — 뜰지는 팝업이 브라우저에서 정한다", async () => {
+    await open({});
+    expect(screen.getByText("여행 100선 홈")).toBeTruthy();
+    expect(screen.getByText("환영 팝업")).toBeTruthy();
+  });
+
+  it("주소에 v=spots 가 있어도 같다", async () => {
+    await open({ v: "spots" });
+    expect(screen.getByText("환영 팝업")).toBeTruthy();
+  });
+
+  it("내 여행(지도)에는 두지 않는다 — 시트가 이미 같은 말을 한다", async () => {
+    await open({ v: "sketch" });
+    expect(screen.getByText("지도 허브")).toBeTruthy();
+    expect(screen.queryByText("환영 팝업")).toBeNull();
   });
 });

@@ -119,18 +119,10 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
       {/* 폰에서는 접는다 — 큰 갈래는 아래 하단 탭이 이미 하고 있다. */}
       {switcher && <div className="flex justify-center max-sm:hidden">{switcher}</div>}
       {/*
-        맨 위는 이 서비스가 무엇을 해 주는지다 — 처음 온 사람에게는 환영 영역(약속 한 줄, 예시, 단추 하나),
-        기록이 있는 사람에게는 가장 최근 여행 한 줄. 예전에는 이 띠가 큰 제목 아래 있어서, 첫 화면이
-        "관광지 목록"으로 읽혔다.
-      */}
-      <HomeIntro maybeSignedIn={maybeSignedIn} />
-
-      {/*
         머리글은 서비스 이름이 아니라 이 면이 무엇인지를 말한다. 이름은
-        위 띠가 이미 들고 있고, 사람들이 찾는 말은 "한국관광 100선"이다. 이 제목이 검색에 걸리는
-        h1 이라 환영 영역의 제목은 h2 로 두었다. 환영 영역의 "여행 100선 둘러보기"가 여기(#spots)로 내려온다.
+        위 띠가 이미 들고 있고, 사람들이 찾는 말은 "한국관광 100선"이다. 이 제목이 검색에 걸리는 h1 이다.
       */}
-      <header id="spots" className="scroll-mt-20">
+      <header>
         <h1 className="text-[34px] font-bold tracking-tight text-text md:text-[44px]">
           한국관광 100선
         </h1>
@@ -138,6 +130,13 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
           2025~2026년 121곳, 조건으로 찾고 지도로 만나보세요
         </p>
       </header>
+
+      {/*
+        여행을 남긴 사람에게만 가장 최근 여행 한 줄. 기록이 없는 사람에게는 아무것도 그리지 않는다 — 이 서비스가
+        무엇을 해 주는지는 로그인 전 방문자에게 뜨는 환영 팝업(WelcomeDialog)이 말한다. 한때 이 띠가 제목 위에 있어서
+        제목과 100선이 아래로 밀렸다.
+      */}
+      <HomeIntro maybeSignedIn={maybeSignedIn} />
 
       <RegionStrip spots={SPOTS} />
 

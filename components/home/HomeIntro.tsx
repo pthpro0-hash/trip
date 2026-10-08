@@ -7,24 +7,19 @@ import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { thumbUrls } from "@/lib/supabase/photos";
-import { WelcomeHero } from "./WelcomeHero";
 
 /*
-  첫 화면 맨 위. "정보"와 "개인" 중 무엇을 볼지 사람에게 고르게 하지 않는다.
+  첫 화면에서 여행을 남긴 사람에게만 자기 기록을 올린다. "정보"와 "개인" 중 무엇을 볼지 사람에게 고르게 하지 않는다.
 
-  처음 온 사람에게 "내 여행"은 문이 아니라 빈 벽이다 — 눌러 봐야 아무것도
-  없고 로그인부터 하라는 말을 듣는다. 첫 화면의 절반을 "당신에겐 아직
-  아무것도 없습니다"에 쓸 이유가 없다.
+  처음 온 사람에게 "내 여행"은 문이 아니라 빈 벽이다 — 눌러 봐야 아무것도 없고 로그인부터 하라는 말을 듣는다.
+  첫 화면의 절반을 "당신에겐 아직 아무것도 없습니다"에 쓸 이유가 없다. 그래서 기록이 없는 사람(로그인 전이든, 로그인했지만
+  아직 하나도 안 남겼든)에게는 여기에 아무것도 그리지 않는다 — 이 서비스가 무엇을 해 주는지는 로그인 전 방문자에게 뜨는
+  환영 팝업(WelcomeDialog)이 말한다. 한때는 이 자리에 환영 영역을 크게 두었는데, 아래 여행 100선이 밀려 내려가고 영역이
+  구분되지 않아 혼잡해 보였다.
 
-  그래서 기록이 있는 사람에게만 자기 기록을 올린다. 없는 사람(로그인 전이든, 로그인했지만 아직 하나도 안
-  남겼든)에게는 이 서비스가 무엇을 해 주는지를 환영 영역(WelcomeHero)으로 보여 준다 — 약속 한 줄, 예시 한
-  장, 단추 하나.
-
-  번쩍임과 밀림: 화면이 번쩍이거나 아래 내용이 밀리면 누르려던 것이 손가락 밑에서 움직인다. 로그인 전 사람에게
-  처음에 환영 영역을 보였다가 띠로 바꾸면 번쩍이고, 로그인한 사람에게 띠를 보였다가 환영 영역으로 바꾸면 또
-  번쩍인다. 그래서 서버가 로그인 쿠키가 있는지만 보고(app/page, lib/sessionCookie) 첫 그림을 정한다 —
-  maybeSignedIn 이 아니면 곧바로 환영 영역을(기다릴 것이 없다), 맞으면 띠 높이만큼 자리만 비워 두었다가 그
-  사람의 형편이 알려지면 채운다.
+  번쩍임과 밀림: 기록이 있는 사람에게 띠를 늦게 끼워 넣으면 아래 내용이 밀려 누르려던 것이 손가락 밑에서 움직인다. 그래서 서버가
+  로그인 쿠키가 있는지만 보고(app/page, lib/sessionCookie) 첫 그림을 정한다 — maybeSignedIn 이 아니면 곧바로 아무것도 그리지
+  않고(기다릴 것도, 비워 둘 자리도 없다), 맞으면 띠 높이만큼 자리만 비워 두었다가 그 사람의 형편이 알려지면 채운다.
 */
 
 /** 띠에 늘어놓을 사진 수. 더 늘리면 아래 100선 목록을 밀어낸다. */
@@ -39,12 +34,12 @@ function formatSpan(startedOn: string, endedOn: string) {
   return `${short(startedOn)} ~ ${short(endedOn)}`;
 }
 
-/** checking 은 아직 모르는 동안(로그인 쿠키는 있다). */
-type Phase = "checking" | "guest" | "empty" | "trips";
+/** checking 은 아직 모르는 동안(로그인 쿠키는 있다), none 은 그릴 것이 없다(로그인 전이거나 기록이 없다). */
+type Phase = "checking" | "none" | "trips";
 
 export function HomeIntro({ maybeSignedIn = false }: { maybeSignedIn?: boolean }) {
   // 로그인을 쓸 수 없는 곳이거나 로그인 쿠키가 없으면 기다릴 것도 없다. 효과 안에서 setState 하지 않는다.
-  const [phase, setPhase] = useState<Phase>(() => (!isSupabaseConfigured || !maybeSignedIn ? "guest" : "checking"));
+  const [phase, setPhase] = useState<Phase>(() => (!isSupabaseConfigured || !maybeSignedIn ? "none" : "checking"));
   const [trips, setTrips] = useState<SavedTrip[]>([]);
   const [covers, setCovers] = useState<string[]>([]);
 
@@ -56,7 +51,7 @@ export function HomeIntro({ maybeSignedIn = false }: { maybeSignedIn?: boolean }
     supabase.auth.getUser().then(async ({ data }) => {
       if (!active) return;
       if (!data.user) {
-        setPhase("guest");
+        setPhase("none");
         return;
       }
       const rows = (await fetchTrips(supabase, data.user.id)) ?? [];
@@ -69,7 +64,7 @@ export function HomeIntro({ maybeSignedIn = false }: { maybeSignedIn?: boolean }
         선택은 뒤집지 않는다.
       */
       if (rows.length > 0) rememberStartIfUnset("sketch");
-      setPhase(rows.length > 0 ? "trips" : "empty");
+      setPhase(rows.length > 0 ? "trips" : "none");
 
       const paths = rows
         .map((trip) => trip.coverPath)
@@ -94,7 +89,7 @@ export function HomeIntro({ maybeSignedIn = false }: { maybeSignedIn?: boolean }
   */
   if (phase === "checking") return <div aria-hidden="true" className="invisible h-32 sm:h-[84px]" />;
 
-  if (phase === "guest" || phase === "empty") return <WelcomeHero who={phase} />;
+  if (phase === "none") return null;
 
   const latest = trips[0];
 

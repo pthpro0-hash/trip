@@ -125,37 +125,35 @@ describe("HomePage · 폰의 하단 탭과 겹치는 것", { timeout: 20000 }, (
 });
 
 /*
-  첫 화면 맨 위는 이 서비스가 무엇을 해 주는지(환영 영역)다. 큰 제목 "한국관광 100선"은 그 아래 구획의
-  소제목이 되고, 환영 영역의 "여행 100선 둘러보기"가 그 구획으로 내려온다.
+  여행 100선 첫 화면은 큰 제목(한국관광 100선)에서 시작한다. 한때 맨 위에 환영 영역(약속 한 줄·예시 그림)을 넣었더니
+  아래 100선이 밀려 내려가고 영역이 구분되지 않아 혼잡해 보였다. 이 서비스가 무엇을 해 주는지는 로그인 전 방문자에게
+  뜨는 환영 팝업(WelcomeDialog, app/page 가 둔다)이 말한다.
 */
 describe("HomePage · 첫 화면의 순서", { timeout: 20000 }, () => {
-  it("환영 영역이 큰 제목(한국관광 100선)보다 위에 있다", () => {
-    render(<HomePage />);
-    const hero = screen.getByRole("heading", { level: 2, name: /사진만 고르면/ });
-    const title = screen.getByRole("heading", { level: 1, name: "한국관광 100선" });
-    expect(hero.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  it("큰 제목(한국관광 100선)이 맨 위에서 시작한다 — 환영 영역이 밀어 내리지 않는다", () => {
+    const { container } = render(<HomePage />);
+    const first = container.querySelector("main")!.firstElementChild!;
+    expect(first.tagName).toBe("HEADER");
+    expect(first).toContainElement(screen.getByRole("heading", { level: 1, name: "한국관광 100선" }));
   });
 
-  it("큰 제목(h1)은 그대로 한국관광 100선이다 — 검색에 걸리는 말", () => {
+  it("큰 제목(h1)은 한국관광 100선 하나다 — 검색에 걸리는 말", () => {
     render(<HomePage />);
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("한국관광 100선");
   });
 
-  it("'여행 100선 둘러보기'가 가리키는 자리(#spots)가 100선 구획 머리에 있다", () => {
+  it("환영 영역이나 예시 그림이 본문에 없다", () => {
     const { container } = render(<HomePage />);
-    const link = screen.getByRole("link", { name: /여행 100선 둘러보기/ });
-    const target = container.querySelector(link.getAttribute("href")!);
-    expect(target).toBeTruthy();
-    expect(target!.contains(screen.getByRole("heading", { level: 1 }))).toBe(true);
-    // 위 띠(높이 56px)에 가려지지 않게 내려와 선다.
-    expect(target!.className).toContain("scroll-mt");
+    expect(screen.queryByRole("heading", { level: 2, name: /사진만 고르면/ })).toBeNull();
+    expect(container.querySelector("img[alt*='예시']")).toBeNull();
+    expect(screen.queryByRole("link", { name: /여행 100선 둘러보기/ })).toBeNull();
   });
 
-  it("떠 있는 '사진 고르기' 단추와 환영 영역의 단추가 같은 곳으로 간다", () => {
+  it("떠 있는 '사진 고르기' 단추만 사진 고르는 화면으로 간다", () => {
     render(<HomePage />);
-    for (const link of screen.getAllByRole("link", { name: /^\+?\s*사진 고르기$|^📷\s*사진 고르기$/ })) {
-      expect(link).toHaveAttribute("href", "/trips/new");
-    }
+    const picks = screen.getAllByRole("link", { name: /사진 고르기/ });
+    expect(picks).toHaveLength(1);
+    expect(picks[0]).toHaveAttribute("href", "/trips/new");
   });
 });

@@ -4,11 +4,10 @@ import type { SavedTrip } from "@/lib/supabase/trips";
 import { readStart } from "@/lib/start";
 
 /*
-  첫 화면 맨 위는 그 사람의 형편을 보고 달라진다.
-
-  기록이 없는 사람(로그인 전이든, 로그인했지만 아직 하나도 안 남겼든)에게는 이 서비스가 무엇을 해 주는지를
-  보여 주는 환영 영역(WelcomeHero)을, 기록이 있는 사람에게는 가장 최근 여행 한 줄을 올린다. 기록이 있는 사람에게
-  "내 여행"이 빈 벽이면 안 되고, 없는 사람에게 남의 여행지 목록만 내밀어도 안 된다.
+  첫 화면에서 여행을 남긴 사람에게만 가장 최근 여행 한 줄을 올린다. 기록이 없는 사람(로그인 전이든, 로그인했지만 아직
+  하나도 안 남겼든)에게는 아무것도 그리지 않는다 — 이 서비스가 무엇을 해 주는지는 로그인 전 방문자에게 뜨는 환영
+  팝업(WelcomeDialog)이 말하고, 여행 100선은 맨 위에서 시작한다. 기록이 있는 사람에게 "내 여행"이 빈 벽이면 안 되고,
+  없는 사람에게 빈 띠를 내밀어도 안 된다.
 */
 
 vi.mock("@/lib/supabase/config", () => ({ isSupabaseConfigured: true }));
@@ -50,7 +49,8 @@ async function 띠(maybeSignedIn = false) {
   return render(<HomeIntro maybeSignedIn={maybeSignedIn} />);
 }
 
-const 환영 = { level: 2, name: /사진만 고르면/ } as const;
+/** 알아보는 동안의 빈 자리(보이지 않는다). */
+const 자리 = (container: HTMLElement) => container.querySelector("[aria-hidden='true'].invisible");
 
 describe("HomeIntro", () => {
   beforeEach(() => {
@@ -58,22 +58,19 @@ describe("HomeIntro", () => {
     rows = [];
   });
 
-  it("로그인하지 않았으면 환영 영역을 보인다 — 무엇을 할 수 있는지와 단추 하나", async () => {
+  it("로그인하지 않았으면 아무것도 그리지 않는다 — 환영은 팝업이 하고, 여행 100선이 맨 위에서 시작한다", async () => {
     user = null;
-    await 띠();
-    expect(await screen.findByRole("heading", 환영)).toBeTruthy();
-    expect(screen.getByRole("link", { name: "사진 고르기" })).toHaveAttribute("href", "/trips/new");
-    // 빈 벽을 내밀지 않는다.
-    expect(screen.queryByRole("link", { name: /내 여행/ })).toBeNull();
-    // 로그인 전 사람에게는 기록할 때 로그인한다고 미리 알린다.
-    expect(screen.getByText("기록으로 남길 때 로그인해요")).toBeTruthy();
+    const view = await 띠();
+    expect(view.container).toBeEmptyDOMElement();
+    // 로그인 여부를 묻는 것이 끝난 뒤에도 그대로다.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(view.container).toBeEmptyDOMElement();
   });
 
-  it("기록이 하나도 없으면 로그인했어도 환영 영역 — 다만 로그인 이야기는 빼고", async () => {
+  it("기록이 하나도 없으면 로그인했어도 아무것도 남기지 않는다", async () => {
     rows = [];
-    await 띠(true);
-    expect(await screen.findByRole("heading", 환영)).toBeTruthy();
-    expect(screen.queryByText("기록으로 남길 때 로그인해요")).toBeNull();
+    const view = await 띠(true);
+    await waitFor(() => expect(view.container).toBeEmptyDOMElement());
   });
 
   it("기록이 있으면 가장 최근 것을 올린다", async () => {
@@ -87,8 +84,14 @@ describe("HomeIntro", () => {
     expect(screen.getByText(/여행 2건을 남기셨어요/)).toBeTruthy();
     // 내 여행의 문은 이제 지도다.
     expect(screen.getByRole("link", { name: /내 여행/ })).toHaveAttribute("href", "/?v=sketch");
-    // 환영 영역은 더 이상 필요 없다.
-    expect(screen.queryByRole("heading", 환영)).toBeNull();
+  });
+
+  it("환영 영역이나 예시 그림은 없다 — 한때 이 자리에 있었지만 아래 100선을 밀어 냈다", async () => {
+    rows = [trip({ id: "t1", title: "민수랑 첫 휴가" })];
+    const view = await 띠(true);
+    await screen.findByText("민수랑 첫 휴가");
+    expect(screen.queryByRole("heading", { name: /사진만 고르면/ })).toBeNull();
+    expect(view.container.querySelector("img[alt*='예시']")).toBeNull();
   });
 
   it("이름이 없는 여행은 날짜로 부른다", async () => {
@@ -117,7 +120,8 @@ describe("HomeIntro", () => {
 
 /*
   화면이 번쩍이거나 아래 내용이 밀리면 누르려던 것이 손가락 밑에서 움직인다. 서버가 로그인 쿠키를 보고 첫 그림을
-  정한다: 로그인 전 사람에게는 처음부터 환영 영역을(기다릴 것이 없다), 로그인한 사람에게는 자리만 비워 둔다.
+  정한다: 로그인 전 사람에게는 처음부터 아무것도 없고(비워 둘 자리도 없다), 로그인한 사람에게는 띠 높이만큼 자리만
+  비워 둔다.
 */
 describe("HomeIntro · 첫 그림", () => {
   beforeEach(() => {
@@ -125,48 +129,49 @@ describe("HomeIntro · 첫 그림", () => {
     rows = [];
   });
 
-  it("로그인 쿠키가 없으면 처음 그림부터 환영 영역이 보인다 — 로그인 확인을 기다리지 않는다", async () => {
+  it("로그인 쿠키가 없으면 처음 그림부터 비어 있고 자리도 잡지 않는다 — 여행 100선이 밀리지 않는다", async () => {
     user = null;
-    await 띠(false);
-    // await 없이 곧바로 있어야 한다.
-    expect(screen.getByRole("heading", 환영)).toBeTruthy();
+    const view = await 띠(false);
+    expect(view.container).toBeEmptyDOMElement();
   });
 
   it("로그인 쿠키가 있으면 처음에는 자리만 잡아 두고 아무것도 보이지 않는다", async () => {
     rows = [trip({ id: "t1", title: "민수랑 첫 휴가" })];
     const view = await 띠(true);
 
-    // 환영 영역을 보였다가 띠로 바꾸면 번쩍인다. 형편을 알기 전에는 비워 둔다.
-    expect(screen.queryByRole("heading", 환영)).toBeNull();
-    const spacer = view.container.firstElementChild as HTMLElement;
-    expect(spacer.getAttribute("aria-hidden")).toBe("true");
-    expect(spacer.className).toContain("invisible");
+    const spacer = 자리(view.container) as HTMLElement;
+    expect(spacer).toBeTruthy();
+    expect(view.container.querySelector("section")).toBeNull();
 
     await screen.findByText("민수랑 첫 휴가");
-    expect(view.container.querySelector("[aria-hidden='true'].invisible")).toBeNull();
+    expect(자리(view.container)).toBeNull();
   });
 
   it("자리는 띠의 높이쯤이라 띠로 바뀔 때 거의 밀리지 않는다", async () => {
     rows = [trip({ id: "t1", title: "민수랑 첫 휴가" })];
     const view = await 띠(true);
-    const spacer = view.container.firstElementChild as HTMLElement;
-    expect(spacer.className).toMatch(/\bh-32\b/);
+    expect((자리(view.container) as HTMLElement).className).toMatch(/\bh-32\b/);
     await screen.findByText("민수랑 첫 휴가");
   });
 
-  it("쿠키는 없는데 사실은 로그인한 사람이면 — 환영 영역이 보였다가 띠로 바뀐다", async () => {
-    rows = [trip({ id: "t1", title: "민수랑 첫 휴가" })];
-    await 띠(false);
-    expect(screen.getByRole("heading", 환영)).toBeTruthy();
-    expect(await screen.findByText("민수랑 첫 휴가")).toBeTruthy();
-    expect(screen.queryByRole("heading", 환영)).toBeNull();
+  it("로그인 쿠키는 있는데 기록이 없으면 자리가 사라진다", async () => {
+    rows = [];
+    const view = await 띠(true);
+    expect(자리(view.container)).toBeTruthy();
+    await waitFor(() => expect(view.container).toBeEmptyDOMElement());
   });
 
-  it("로그인 쿠키는 있는데 세션이 끝난 사람이면 자리를 비웠다가 환영 영역을 보인다", async () => {
+  it("로그인 쿠키는 있는데 세션이 끝난 사람이면 자리가 사라진다", async () => {
     user = null;
-    await 띠(true);
-    expect(await screen.findByRole("heading", 환영)).toBeTruthy();
-    expect(screen.getByText("기록으로 남길 때 로그인해요")).toBeTruthy();
+    const view = await 띠(true);
+    await waitFor(() => expect(view.container).toBeEmptyDOMElement());
+  });
+
+  it("쿠키는 없다고 봤는데 사실은 로그인했고 기록이 있으면 — 비어 있다가 띠가 생긴다", async () => {
+    rows = [trip({ id: "t1", title: "민수랑 첫 휴가" })];
+    const view = await 띠(false);
+    expect(view.container).toBeEmptyDOMElement();
+    expect(await screen.findByText("민수랑 첫 휴가")).toBeTruthy();
   });
 });
 
@@ -203,15 +208,16 @@ describe("HomeIntro · 다음에 열 갈래", () => {
 
   it("기록이 없으면 기억하지 않는다 — 빈 지도로 열지 않는다", async () => {
     rows = [];
-    await 띠(true);
-    await screen.findByRole("heading", 환영);
+    const view = await 띠(true);
+    await waitFor(() => expect(view.container).toBeEmptyDOMElement());
     expect(readStart()).toBeNull();
   });
 
   it("로그인 전이면 기억하지 않는다", async () => {
     user = null;
-    await 띠();
-    await screen.findByRole("heading", 환영);
+    const view = await 띠();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(view.container).toBeEmptyDOMElement();
     expect(readStart()).toBeNull();
   });
 });
