@@ -70,7 +70,8 @@ export function activeNav(pathname: string, start: Start | null): NavId | null {
  *
  * 주소(?v=)가 먼저고, 없으면 지난번에 고른 것, 그것도 없으면 여행 100선 — app/page 가
  * 서버에서 고르는 규칙과 같다. 서버가 그린 첫 그림에서는 쿠키를 모르므로 "unknown"을
- * 받으면 모른다(null)고 답한다.
+ * 받으면 모른다(null)고 답한다. 지난번에 고른 것은 로그인했을 수 있는 사람만 따른다 — 부르는 쪽이
+ * 로그인하지 않았으면 null 로 걸러 넘긴다(보여 줄 것 없는 빈 지도 대신 환영 영역을 여는 규칙).
  */
 export function homeStart(fromUrl: string | null, remembered: Start | "unknown" | null): Start | null {
   if (fromUrl === "sketch" || fromUrl === "spots") return fromUrl;

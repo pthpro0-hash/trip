@@ -62,9 +62,30 @@ describe("HomePage · 내 여행의 모습", () => {
     expect(sketchProps.current?.initialYear).toBe("2025");
   });
 
-  it("지난번에 내 여행을 골랐으면 주소에 갈래가 없어도 내 여행", async () => {
+  it("지난번에 내 여행을 골랐으면 주소에 갈래가 없어도 내 여행 — 로그인했을 수 있을 때", async () => {
     remembered = "sketch";
+    cookieNames = ["start", "sb-abcdefgh-auth-token"];
     await open({});
+    expect(screen.getByText("지도 허브")).toBeTruthy();
+  });
+
+  /*
+    로그인하지 않은 사람에게 내 여행은 보여 줄 것이 없는 빈 지도다 — 지도가 화면을 다 차지하고 안내는 작은 시트
+    하나뿐이다. 지난번에 내 여행을 골랐어도(로그아웃, 세션 만료) 로그인한 사람일 수 없으면 여행 100선 쪽(환영 영역
+    이 맨 위에 있다)을 연다. 탭을 눌러 주소에 갈래가 적혔으면 그것을 따른다.
+  */
+  it("로그인 쿠키가 없으면 지난번에 골랐던 내 여행을 따르지 않고 여행 100선(환영 영역)을 연다", async () => {
+    remembered = "sketch";
+    cookieNames = ["start"];
+    await open({});
+    expect(screen.getByText("여행 100선 홈")).toBeTruthy();
+    expect(sketchProps.current).toBeNull();
+  });
+
+  it("로그인 전이어도 주소에 v=sketch 가 있으면(탭을 눌렀으면) 내 여행을 연다", async () => {
+    remembered = "sketch";
+    cookieNames = ["start"];
+    await open({ v: "sketch" });
     expect(screen.getByText("지도 허브")).toBeTruthy();
   });
 

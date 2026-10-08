@@ -32,7 +32,13 @@ export default async function HomePage({
   // 한장 요약의 "그해를 지도에서 보기"가 해를 적어 보낸다.
   const year = typeof y === "string" && /^\d{4}$/.test(y) ? y : undefined;
   const store = await cookies();
-  const start = startOf(typeof v === "string" ? v : undefined, store.get(START_COOKIE)?.value);
+  const maybeSignedIn = hasSessionCookie(store.getAll().map((cookie) => cookie.name));
+  /*
+    지난번에 고른 갈래(내 여행)는 로그인했을 수 있는 사람에게만 따른다. 로그인하지 않은 사람에게 내 여행은 보여 줄 것이
+    없는 빈 지도다 — 지도가 화면을 다 차지하고 안내는 작은 시트 하나뿐이다. 로그아웃했거나 세션이 끝난 사람이 그 빈
+    지도로 열리면 환영 영역을 못 본다. 탭을 눌러 주소에 갈래(?v=)가 적혔으면 그것은 따른다.
+  */
+  const start = startOf(typeof v === "string" ? v : undefined, maybeSignedIn ? store.get(START_COOKIE)?.value : undefined);
 
   if (start === "sketch") {
     return (
@@ -48,7 +54,7 @@ export default async function HomePage({
     <SpotsHome
       switcher={<StartSwitch current="spots" />}
       // 로그인한 사람일 수 있으면 맨 위 자리만 비워 두었다가 채운다(번쩍이거나 밀리지 않게). 값은 읽지 않고 이름만 본다.
-      maybeSignedIn={hasSessionCookie(store.getAll().map((cookie) => cookie.name))}
+      maybeSignedIn={maybeSignedIn}
     />
   );
 }

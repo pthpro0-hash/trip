@@ -13,3 +13,16 @@
 const SESSION = /^sb-.+-auth-token(\.\d+)?$/;
 
 export const hasSessionCookie = (names: string[]): boolean => names.some((name) => SESSION.test(name));
+
+/**
+ * 이 브라우저에 로그인 세션 쿠키가 있나. 위 띠·아래 탭이 "지금 첫 화면이 어느 갈래인가"를 가릴 때 쓴다 —
+ * 서버가 첫 화면을 여는 규칙(app/page)과 같아야 켜진 탭과 화면이 어긋나지 않는다. 세션 쿠키는 브라우저가
+ * 읽을 수 있게 둔 것이라(httpOnly 가 아니다) 이름을 볼 수 있다.
+ */
+export function hasSessionCookieHere(): boolean {
+  try {
+    return hasSessionCookie(document.cookie.split(";").map((part) => part.trim().split("=")[0]));
+  } catch {
+    return false;
+  }
+}

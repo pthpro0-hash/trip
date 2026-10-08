@@ -31,6 +31,7 @@ const on = () =>
 describe("BottomNav", () => {
   beforeEach(() => {
     document.cookie = "start=; path=/; max-age=0";
+    document.cookie = "sb-abcdefgh-auth-token=; path=/; max-age=0";
     path = "/";
     search = "";
   });
@@ -83,9 +84,26 @@ describe("BottomNav", () => {
       expect(on()).toEqual(["내 여행"]);
     });
 
-    it("첫 화면에서 주소에 갈래가 없으면 지난번에 고른 것", () => {
+    it("첫 화면에서 주소에 갈래가 없으면 지난번에 고른 것 — 로그인했을 수 있을 때", () => {
+      document.cookie = "start=sketch; path=/";
+      document.cookie = "sb-abcdefgh-auth-token=x; path=/";
+      at("/");
+      expect(on()).toEqual(["내 여행"]);
+    });
+
+    /*
+      로그인하지 않은 사람에게 내 여행은 보여 줄 것이 없는 빈 지도다. 지난번에 내 여행을 골랐어도(로그아웃, 세션
+      만료) 서버는 여행 100선(환영 영역)을 연다 — 켜진 탭도 그것과 같아야 한다.
+    */
+    it("로그인하지 않았으면 지난번에 고른 내 여행을 따르지 않는다 — 서버가 여는 화면(100선)과 같게", () => {
       document.cookie = "start=sketch; path=/";
       at("/");
+      expect(on()).toEqual(["여행 100선"]);
+    });
+
+    it("로그인하지 않았어도 주소에 갈래가 있으면(탭을 눌렀으면) 그것을 따른다", () => {
+      document.cookie = "start=spots; path=/";
+      at("/", "v=sketch");
       expect(on()).toEqual(["내 여행"]);
     });
 

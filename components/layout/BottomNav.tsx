@@ -15,6 +15,7 @@ import {
   type NavId,
 } from "@/lib/nav";
 import { readStart, rememberStart, type Start } from "@/lib/start";
+import { hasSessionCookieHere } from "@/lib/sessionCookie";
 import { canIn, useFamilyView } from "@/lib/familyView";
 
 /*
@@ -152,7 +153,8 @@ function Current({ pathname }: { pathname: string }) {
   const params = useSearchParams();
   const remembered = useSyncExternalStore<Start | "none" | "unknown">(
     subscribeNever,
-    () => readStart() ?? "none",
+    // 지난번에 고른 갈래는 로그인했을 수 있을 때만 따른다 — 서버가 첫 화면을 여는 규칙(app/page)과 같아야 한다.
+    () => (hasSessionCookieHere() ? readStart() : null) ?? "none",
     () => "unknown",
   );
   const start = pathname === "/" ? homeStart(params.get("v"), remembered === "none" ? null : remembered) : null;
