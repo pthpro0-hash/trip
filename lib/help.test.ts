@@ -131,6 +131,40 @@ describe("도움말 내용", () => {
     });
   });
 
+  /*
+    여행 상세의 단추가 바뀌었다 — "링크 공유"와 "엽서 보내기"가 "공유" 하나로 합쳐지고(누르면 고르는 시트), 지우기는
+    "⋯" 안으로 들어갔다. 안내가 옛 이름을 말하면 없는 단추를 찾아 헤맨다.
+  */
+  describe("여행 상세의 단추 이름", () => {
+    const all = () =>
+      CHAPTERS.flatMap((chapter) => chapter.steps)
+        .map((step) => `${step.title} ${step.summary} ${step.detail}`)
+        .join(" ");
+    const stepOf = (title: string) => CHAPTERS.flatMap((chapter) => chapter.steps).find((step) => step.title === title)!;
+
+    it("엽서는 '공유'에서 '부모님께 엽서 보내기'로 보낸다고 알린다", () => {
+      const step = stepOf("엽서 보내기");
+      expect(step.summary).toContain("'공유'");
+      expect(step.detail).toContain("'공유'");
+      expect(step.detail).toContain("'부모님께 엽서 보내기'");
+    });
+
+    it("여행 하나의 링크는 '공유'에서 '링크로 보여 주기'로 만든다고 알린다", () => {
+      const step = stepOf("여행 하나만 링크로 보여 주기");
+      expect(step.summary).toContain("'공유'");
+      expect(step.detail).toContain("'링크로 보여 주기'");
+    });
+
+    it("여행 상세의 지우기는 '⋯' 안에 있다고 알린다", () => {
+      expect(stepOf("언제든 지울 수 있어요").detail).toContain("'⋯' 안의 '이 여행 지우기'");
+    });
+
+    it("없어진 단추 이름을 여행 상세의 것으로 말하지 않는다", () => {
+      expect(all()).not.toContain("여행 상세의 '링크 공유'");
+      expect(all()).not.toContain("여행 상세의 '엽서 보내기'");
+    });
+  });
+
   it("가족 책장은 계정과 보관에서 갈래를 따로 떼어 냈다 — 순서는 스케치·이번 여행·100선·가족 책장·계정", () => {
     expect(CHAPTERS.map((chapter) => chapter.id)).toEqual(["sketch", "trip", "browse", "shelf", "account"]);
     const shelf = CHAPTERS.find((chapter) => chapter.id === "shelf")!;

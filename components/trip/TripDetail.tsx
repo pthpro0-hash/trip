@@ -28,6 +28,10 @@ import { logEvent } from "@/lib/supabase/serviceLog";
 import { companionSuggestions } from "@/lib/companions";
 import { attachParticle, companionLabel } from "@/lib/korean";
 import { CompanionEditor } from "./CompanionEditor";
+import { ShareChooser } from "./ShareChooser";
+import { TripHero } from "./TripHero";
+import { TripMoreMenu } from "./TripMoreMenu";
+import { coverPhotoOf } from "@/lib/tripCover";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
@@ -61,6 +65,26 @@ const placeHref = (name: string) => `/places?name=${encodeURIComponent(name)}`;
 
 function hourMinute(date: Date) {
   return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+}
+
+/** 제목 칸 오른쪽의 연필. 고칠 수 있다는 것을 안내 문장 대신 이것으로 알린다. */
+function Pencil() {
+  return (
+    <svg
+      data-icon="pencil"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="pointer-events-none absolute right-2 top-1/2 h-5 w-5 -translate-y-1/2 text-text-faint"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z" />
+      <path d="M14.5 7.5l3 3" />
+    </svg>
+  );
 }
 
 export function TripDetail({ tripId }: { tripId: string }) {
@@ -119,6 +143,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [confirmingTrip, setConfirmingTrip] = useState(false);
   const [removingTrip, setRemovingTrip] = useState(false);
   const [tripError, setTripError] = useState(false);
+  /** 공유를 눌러 "어떻게 보낼까" 고르는 시트가 떠 있는가. 고르고 나면 링크 창이나 엽서 창으로 바뀐다. */
+  const [picking, setPicking] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [sendingPostcard, setSendingPostcard] = useState(false);
   /*
@@ -439,6 +465,10 @@ export function TripDetail({ tripId }: { tripId: string }) {
     lng: visit.lng,
     name: visit.placeName,
   }));
+  /** 맨 위에 올릴 사진. 사진이 하나도 없는 여행에는 없다. */
+  const cover = coverPhotoOf(trip);
+  // 링크와 엽서는 내 여행으로만 보낸다. 가족의 여행을 보는 중에는 단추를 내지 않는다.
+  const canShare = Boolean(userId) && ownTrip;
 
   return (
     <>
@@ -447,6 +477,20 @@ export function TripDetail({ tripId }: { tripId: string }) {
         다른 데를 누르면 절반만 지워진 기록이 남는다.
       */}
       {removingTrip && <WaitingOverlay title="여행을 지우고 있어요" />}
+      {picking && canShare && (
+        <ShareChooser
+          title={trip.title?.trim() || formatSpan(trip.startedOn, trip.endedOn)}
+          onLink={() => {
+            setPicking(false);
+            setSharing(true);
+          }}
+          onPostcard={() => {
+            setPicking(false);
+            setSendingPostcard(true);
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
       {sharing && userId && <TripShareDialog userId={userId} trip={trip} onClose={() => setSharing(false)} />}
       {sendingPostcard && userId && ownTrip && (
         <SendPostcardDialog
@@ -467,32 +511,47 @@ export function TripDetail({ tripId }: { tripId: string }) {
       )}
       {removingPhoto && <WaitingOverlay title="사진을 지우고 있어요" />}
 
+      {/*
+        맨 위는 대표 사진이다. 전에는 글쓰기 칸(제목 · 부제 · 동행)으로 시작해 "내 여행"이라는 느낌이 안 났다. 사진 주소가
+        오기 전에는 같은 크기의 빈 자리가 서고, 사진이 하나도 없는 여행에는 자리를 두지 않는다.
+      */}
+      {cover && (
+        <TripHero url={photoUrls.get(cover.storagePath) ?? null} onOpen={() => void open(cover.storagePath)} />
+      )}
+
       <div>
         {/*
           날짜를 값이 아니라 안내 글로 둔다. 값으로 넣으면 이름을 짓지
           않은 사람이 손만 대도 날짜 문구가 제목으로 굳어 버린다.
+
+          고칠 수 있다는 것은 "눌러 고칠 수 있어요" 같은 안내 문장이 아니라 제목 옆의 연필로 알린다.
         */}
-        <input
-          type="text"
-          value={title}
-          aria-label="여행 제목"
-          readOnly={!canEdit}
-          onChange={(event) => {
-            setTitle(event.target.value);
-            setTitleSaved(false);
-          }}
-          onBlur={onBlurUnless(() => void submitTitle())}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") event.currentTarget.blur();
-            if (event.key === "Escape") {
-              cancelling.current = true;
-              setTitle(trip.title ?? "");
-              event.currentTarget.blur();
-            }
-          }}
-          placeholder={formatSpan(trip.startedOn, trip.endedOn)}
-          className="-mx-2 w-full rounded-xl bg-transparent px-2 py-1 text-[28px] font-bold tracking-tight text-text outline-none transition placeholder:text-text placeholder:opacity-100 hover:bg-bg-subtle focus:bg-bg-subtle focus:ring-2 focus:ring-accent md:text-[32px]"
-        />
+        <div className="relative">
+          <input
+            type="text"
+            value={title}
+            aria-label="여행 제목"
+            readOnly={!canEdit}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              setTitleSaved(false);
+            }}
+            onBlur={onBlurUnless(() => void submitTitle())}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+              if (event.key === "Escape") {
+                cancelling.current = true;
+                setTitle(trip.title ?? "");
+                event.currentTarget.blur();
+              }
+            }}
+            placeholder={formatSpan(trip.startedOn, trip.endedOn)}
+            className={`-mx-2 w-full rounded-xl bg-transparent px-2 py-1 text-[28px] font-bold tracking-tight text-text outline-none transition placeholder:text-text placeholder:opacity-100 hover:bg-bg-subtle focus:bg-bg-subtle focus:ring-2 focus:ring-accent md:text-[32px] ${
+              canEdit ? "pr-10" : ""
+            }`}
+          />
+          {canEdit && <Pencil />}
+        </div>
         {/*
           부제도 같은 규칙이다 — 자동값을 값이 아니라 안내 글로 둔다.
           그래야 손만 댄 것과 직접 쓴 것이 구별된다.
@@ -518,11 +577,12 @@ export function TripDetail({ tripId }: { tripId: string }) {
           placeholder={autoSubtitle || "한 줄 덧붙이기"}
           className="-mx-2 mt-0.5 w-full rounded-lg bg-transparent px-2 py-1 text-[16px] text-text-muted outline-none transition placeholder:text-text-muted placeholder:opacity-100 hover:bg-bg-subtle focus:bg-bg-subtle focus:ring-2 focus:ring-accent"
         />
-        <p className="mt-0.5 px-0 text-[14px] text-text-faint">
-          <span>{formatSpan(trip.startedOn, trip.endedOn)}</span>
-          {titleSaved && <span> · 바꿨어요</span>}
-        </p>
-        <div className="mt-0.5 text-[14px] text-text-faint">
+        {/* 날짜와 동행은 한 줄에 놓는다. 칸이 모자라면 동행이 다음 줄로 내려간다. */}
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[14px] text-text-faint">
+          <p>
+            <span>{formatSpan(trip.startedOn, trip.endedOn)}</span>
+            {titleSaved && <span> · 바꿨어요</span>}
+          </p>
           {canEdit ? (
             <CompanionEditor
               value={trip.companions}
@@ -538,61 +598,58 @@ export function TripDetail({ tripId }: { tripId: string }) {
             이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.
           </p>
         )}
-        {canEdit && (
-          <p className="mt-1.5 text-[13px] text-text-faint">
-            제목·부제·동행·장소 이름을 눌러 고칠 수 있어요. 비우면 원래대로 돌아가요.
-          </p>
-        )}
       </div>
 
       {/*
-        지우기는 맨 아래가 아니라 여기에 둔다. 사진을 다 훑어 내려간
-        끝에서 지우기를 만나면 손이 미끄러진다.
+        할 일은 "공유" 하나다. 링크 공유와 엽서 보내기를 따로 두면 이름만으로는 무엇이 누구에게 가는지 알기 어렵다 —
+        누르면 시트에서 고른다. 지우기는 "⋯" 안으로 들어갔다. 사진을 다 훑어 내려간 끝에서 지우기를 만나면 손이
+        미끄러진다는 이유로 맨 아래가 아니라 여기에 두는 것은 그대로다.
       */}
-      <div className="flex flex-wrap items-center gap-3">
-        {userId && ownTrip && (
-          <button
-            type="button"
-            onClick={() => setSharing(true)}
-            className="self-start rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-accent transition hover:bg-line"
-          >
-            링크 공유
-          </button>
-        )}
-        {userId && ownTrip && (
-          <button
-            type="button"
-            onClick={() => setSendingPostcard(true)}
-            className="self-start rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-accent transition hover:bg-line"
-          >
-            엽서 보내기
-          </button>
-        )}
-        {canRemove && (
-          <button
-            type="button"
-            onClick={() => (confirmingTrip ? void removeTrip() : setConfirmingTrip(true))}
-            onBlur={() => setConfirmingTrip(false)}
-            disabled={removingTrip}
-            className={`self-start rounded-full px-3.5 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
-              confirmingTrip
-                ? "bg-[#d70015] text-white"
-                : "bg-bg-subtle text-text-muted hover:bg-line"
-            }`}
-          >
-            {removingTrip
-              ? "지우는 중…"
-              : confirmingTrip
-                ? postcardCount > 0
+      {(canShare || canRemove) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {canShare && (
+            <button
+              type="button"
+              onClick={() => setPicking(true)}
+              className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full bg-accent px-5 py-2.5 text-[15px] font-semibold text-on-accent transition hover:bg-accent-hover sm:flex-none sm:px-8"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                className="h-[18px] w-[18px]"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="6" cy="12" r="2.5" />
+                <circle cx="18" cy="6" r="2.5" />
+                <circle cx="18" cy="18" r="2.5" />
+                <path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6" />
+              </svg>
+              공유
+            </button>
+          )}
+          {canRemove && (
+            <TripMoreMenu
+              confirming={confirmingTrip}
+              removing={removingTrip}
+              confirmText={
+                postcardCount > 0
                   ? `정말 지울까요? 사진과 보낸 엽서 ${postcardCount}장이 함께 사라져요`
                   : "정말 지울까요? 사진도 함께 사라져요"
-                : "이 여행 지우기"}
-          </button>
-        )}
-        {tripError && (
-          <span className="text-[13px] text-text-muted">지우지 못했어요. 잠시 후 다시 시도해 주세요.</span>
-        )}
-      </div>
+              }
+              onAsk={() => setConfirmingTrip(true)}
+              onConfirm={() => void removeTrip()}
+              onCancel={() => setConfirmingTrip(false)}
+            />
+          )}
+          {tripError && (
+            <span className="text-[13px] text-text-muted">지우지 못했어요. 잠시 후 다시 시도해 주세요.</span>
+          )}
+        </div>
+      )}
 
       {stops.length > 0 && (
         <div className="h-[320px] overflow-hidden rounded-2xl ring-1 ring-line">

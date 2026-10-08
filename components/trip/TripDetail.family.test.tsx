@@ -69,8 +69,10 @@ describe("TripDetail · 가족의 여행", () => {
   it("내 여행이면 고치기·지우기·공유가 모두 보인다", async () => {
     await open();
     expect(fetched.mock.calls[0][1]).toBe("나");
-    expect(screen.getByRole("button", { name: "링크 공유" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /이 여행 지우기/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "공유" })).toBeTruthy();
+    // 지우기는 "⋯" 안에 있다.
+    expect(screen.getByRole("button", { name: "더 보기" })).toBeTruthy();
+    expect(document.querySelector('[data-icon="pencil"]')).not.toBeNull();
     expect(screen.getByRole("button", { name: "성산일출봉 이름 고치기" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "이 사진 지우기" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "적어두기" })).toBeTruthy();
@@ -85,8 +87,8 @@ describe("TripDetail · 가족의 여행", () => {
   const withRole = (role: "view" | "edit" | "full") =>
     window.sessionStorage.setItem("family-view", JSON.stringify({ ownerId: "엄마", label: "mom@example.com", role }));
   const BUTTONS = {
-    share: "링크 공유",
-    deleteTrip: /이 여행 지우기/,
+    share: "공유",
+    deleteTrip: "더 보기",
     rename: "성산일출봉 이름 고치기",
     deletePhoto: "이 사진 지우기",
     note: "적어두기",
@@ -103,6 +105,8 @@ describe("TripDetail · 가족의 여행", () => {
     expect(title.readOnly).toBe(true);
     expect(screen.getByLabelText("부제")).toHaveProperty("readOnly", true);
     expect(shown()).toEqual([]);
+    // 고칠 수 없으니 고칠 수 있다는 표시(연필)도 없다.
+    expect(document.querySelector('[data-icon="pencil"]')).toBeNull();
     // 읽는 것은 그대로 보인다.
     expect(screen.getByText("성산일출봉")).toBeTruthy();
     expect(screen.getByDisplayValue("비가 왔다")).toBeTruthy();

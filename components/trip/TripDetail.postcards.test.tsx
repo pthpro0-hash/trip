@@ -76,31 +76,41 @@ describe("TripDetail · 엽서", () => {
     window.sessionStorage.clear();
   });
 
-  it("내 여행에는 [엽서 보내기]가 있고, 누르면 엽서 창이 열린다", async () => {
+  /** 지우기는 "⋯" 안에 있다. */
+  const 지우기 = () => {
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+    fireEvent.click(screen.getByRole("button", { name: /이 여행 지우기/ }));
+  };
+
+  it("내 여행에서 [공유] → [부모님께 엽서 보내기]를 고르면 엽서 창이 열린다", async () => {
     await open();
-    fireEvent.click(screen.getByRole("button", { name: "엽서 보내기" }));
+    fireEvent.click(screen.getByRole("button", { name: "공유" }));
+    fireEvent.click(await screen.findByRole("button", { name: /부모님께 엽서 보내기/ }));
     expect(await screen.findByText("엽서 창이 열렸어요")).toBeTruthy();
+    // 고르는 시트는 닫히고, 창이 겹쳐 뜨지 않는다.
+    expect(screen.queryByRole("dialog", { name: /공유하기/ })).toBeNull();
   });
 
-  it("가족의 여행을 볼 때는 [엽서 보내기]가 없다", async () => {
+  it("가족의 여행을 볼 때는 공유도 엽서도 없다", async () => {
     window.sessionStorage.setItem("family-view", JSON.stringify({ ownerId: "엄마", label: "mom@example.com", role: "full" }));
     await open();
+    expect(screen.queryByRole("button", { name: "공유" })).toBeNull();
     expect(screen.queryByRole("button", { name: "엽서 보내기" })).toBeNull();
   });
 
   it("엽서를 안 보낸 여행은 지우기 확인이 전과 같다", async () => {
     await open();
-    fireEvent.click(screen.getByRole("button", { name: /이 여행 지우기/ }));
+    지우기();
     expect(screen.getByRole("button", { name: "정말 지울까요? 사진도 함께 사라져요" })).toBeTruthy();
   });
 
   it("엽서를 보낸 여행은 지우기 확인에 엽서 수가 나온다", async () => {
     counts.trips = new Map([["t1", 2]]);
     await open();
-    await waitFor(() => expect(screen.getByRole("button", { name: /이 여행 지우기/ })).toBeTruthy());
+    await waitFor(() => expect(screen.getByRole("button", { name: "더 보기" })).toBeTruthy());
     // 숫자를 받아 올 때까지 기다렸다가 누른다.
     await new Promise((resolve) => setTimeout(resolve, 20));
-    fireEvent.click(screen.getByRole("button", { name: /이 여행 지우기/ }));
+    지우기();
     expect(screen.getByRole("button", { name: "정말 지울까요? 사진과 보낸 엽서 2장이 함께 사라져요" })).toBeTruthy();
   });
 

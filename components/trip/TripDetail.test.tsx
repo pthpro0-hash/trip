@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import type { TripDetail as Detail } from "@/lib/supabase/tripDetail";
 import { LIST_HREF } from "@/lib/nav";
 
@@ -92,8 +92,13 @@ vi.mock("@/lib/supabase/tripDetail", async (importOriginal) => ({
   saveVisitName: (...args: unknown[]) => saveVisitName(...args),
 }));
 
-async function 상세(title: string | null = "화진포해변 외 2곳", subtitle: string | null = null) {
+async function 상세(
+  title: string | null = "화진포해변 외 2곳",
+  subtitle: string | null = null,
+  edit?: (trip: Detail) => void,
+) {
   current = detail(title, subtitle);
+  edit?.(current);
   vi.resetModules();
   const { TripDetail } = await import("./TripDetail");
   render(<TripDetail tripId="t1" />);
@@ -358,6 +363,9 @@ describe("사진 크게 보기", () => {
   });
 });
 
+/** 지우기는 "⋯" 안에 있다 — 먼저 연다. */
+const 메뉴열기 = async () => fireEvent.click(await screen.findByRole("button", { name: "더 보기" }));
+
 describe("여행 통째로 지우기", () => {
   beforeEach(() => {
     push.mockReset();
@@ -365,8 +373,15 @@ describe("여행 통째로 지우기", () => {
     deleteTrip.mockResolvedValue(true);
   });
 
+  it("지우기는 눌러야 나오는 메뉴 안에 있다 — 공유 단추 바로 옆에 나란히 있지 않다", async () => {
+    await 상세();
+    await screen.findByRole("button", { name: "더 보기" });
+    expect(screen.queryByRole("button", { name: /이 여행 지우기/ })).toBeNull();
+  });
+
   it("한 번 물어보고 나서 지운다", async () => {
     await 상세();
+    await 메뉴열기();
     fireEvent.click(await screen.findByRole("button", { name: "이 여행 지우기" }));
 
     // 사진도 함께 사라진다는 것을 이때 알려 준다.
@@ -380,6 +395,7 @@ describe("여행 통째로 지우기", () => {
 
   it("지우고 나면 목록으로 보낸다", async () => {
     await 상세();
+    await 메뉴열기();
     fireEvent.click(await screen.findByRole("button", { name: "이 여행 지우기" }));
     fireEvent.click(await screen.findByRole("button", { name: /정말 지울까요/ }));
 
@@ -388,6 +404,7 @@ describe("여행 통째로 지우기", () => {
 
   it("손을 떼면 묻던 것을 거둔다 — 잘못 눌러도 지워지지 않게", async () => {
     await 상세();
+    await 메뉴열기();
     const button = await screen.findByRole("button", { name: "이 여행 지우기" });
     fireEvent.click(button);
     fireEvent.blur(button);
@@ -399,6 +416,7 @@ describe("여행 통째로 지우기", () => {
   it("지우지 못하면 그렇다고 말하고 그 자리에 머문다", async () => {
     deleteTrip.mockResolvedValue(false);
     await 상세();
+    await 메뉴열기();
     fireEvent.click(await screen.findByRole("button", { name: "이 여행 지우기" }));
     fireEvent.click(await screen.findByRole("button", { name: /정말 지울까요/ }));
 
@@ -407,10 +425,79 @@ describe("여행 통째로 지우기", () => {
   });
 });
 
-describe("TripDetail 링크 공유", () => {
-  it("여행 상세에도 링크 공유가 있고, 누르면 링크 창이 열린다", async () => {
+describe("TripDetail 공유", () => {
+  it("단추는 '공유' 하나 — 링크 공유와 엽서 보내기가 따로 나란히 있지 않다", async () => {
     await 상세();
-    fireEvent.click(await screen.findByRole("button", { name: "링크 공유" }));
+    expect(await screen.findByRole("button", { name: "공유" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "링크 공유" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "엽서 보내기" })).toBeNull();
+  });
+
+  it("누르면 아래에서 시트가 올라와 고르게 한다 — 이 여행의 이름과 함께", async () => {
+    await 상세("민수랑 첫 휴가");
+    fireEvent.click(await screen.findByRole("button", { name: "공유" }));
+    const sheet = await screen.findByRole("dialog", { name: "민수랑 첫 휴가 공유하기" });
+    expect(within(sheet).getByRole("button", { name: /링크로 보여 주기/ })).toBeTruthy();
+    expect(within(sheet).getByRole("button", { name: /부모님께 엽서 보내기/ })).toBeTruthy();
+  });
+
+  it("이름을 짓지 않은 여행은 날짜로 부른다", async () => {
+    await 상세(null);
+    fireEvent.click(await screen.findByRole("button", { name: "공유" }));
+    expect(await screen.findByRole("dialog", { name: "2026년 9월 13일 ~ 9월 14일 공유하기" })).toBeTruthy();
+  });
+
+  it("링크로 보여 주기를 고르면 시트가 닫히고 링크 창이 열린다 — 창이 겹쳐 뜨지 않는다", async () => {
+    await 상세();
+    fireEvent.click(await screen.findByRole("button", { name: "공유" }));
+    fireEvent.click(await screen.findByRole("button", { name: /링크로 보여 주기/ }));
     expect(await screen.findByText("링크 창이 열렸어요")).toBeTruthy();
+    expect(screen.queryByRole("dialog", { name: /공유하기/ })).toBeNull();
+  });
+
+  it("시트를 닫으면 아무 창도 열리지 않는다", async () => {
+    await 상세();
+    fireEvent.click(await screen.findByRole("button", { name: "공유" }));
+    fireEvent.click(await screen.findByRole("button", { name: "닫기" }));
+    expect(screen.queryByRole("dialog", { name: /공유하기/ })).toBeNull();
+    expect(screen.queryByText("링크 창이 열렸어요")).toBeNull();
+  });
+});
+
+describe("여행 상세의 머리", () => {
+  it("맨 위에 대표 사진이 선다 — 대표로 세워 둔 사진", async () => {
+    await 상세();
+    const hero = await screen.findByRole("button", { name: "대표 사진 크게 보기" });
+    expect(hero.querySelector("img")).toHaveAttribute("src", "https://예시/작은/나/v2/1.webp");
+  });
+
+  it("대표 사진을 누르면 크게 보는 창이 열린다", async () => {
+    await 상세();
+    fireEvent.click(await screen.findByRole("button", { name: "대표 사진 크게 보기" }));
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(await screen.findByText("1 / 2")).toBeTruthy();
+  });
+
+  it("사진이 하나도 없는 여행은 대표 사진 자리를 두지 않는다", async () => {
+    await 상세("화진포해변 외 2곳", null, (trip) => {
+      for (const visit of trip.visits) visit.photos = [];
+    });
+    await screen.findByLabelText("여행 제목");
+    expect(screen.queryByRole("button", { name: "대표 사진 크게 보기" })).toBeNull();
+  });
+
+  it("'눌러 고칠 수 있어요' 안내 문장은 없다 — 제목에 연필 표시가 있다", async () => {
+    await 상세();
+    expect(screen.queryByText(/눌러 고칠 수 있어요/)).toBeNull();
+    expect(document.querySelector('[data-icon="pencil"]')).not.toBeNull();
+  });
+
+  it("날짜와 동행은 한 줄에 나란히 놓인다", async () => {
+    await 상세("민수랑 첫 휴가");
+    const date = screen.getByText(/2026년 9월 13일 ~ 9월 14일/);
+    const companions = screen.getByText(/민수와/);
+    const row = date.closest("p")!.parentElement!;
+    expect(companions.closest("span[class*='inline-flex']")!.parentElement).toBe(row);
+    expect(row.className).toContain("flex-wrap");
   });
 });
