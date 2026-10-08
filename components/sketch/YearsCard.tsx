@@ -1,4 +1,5 @@
-import { KOREA_FULL_VIEWBOX, KOREA_LAND_PATHS, project } from "@/lib/koreaMap";
+import { KOREA_FULL_VIEWBOX, project } from "@/lib/koreaMap";
+import { sidoShapes } from "@/lib/sidoShapes";
 import { formatDistance } from "@/lib/geo";
 import { dotRadius } from "@/lib/sketch";
 import { fitText } from "@/lib/svgText";
@@ -22,7 +23,9 @@ const MAP_HEIGHT = 440;
 const MAP_WIDTH = Math.round((340 / 600) * MAP_HEIGHT);
 const SEA = "#dbeafe";
 const LAND = "#f5f3ec";
-const COAST = "#b6c6d2";
+/* 시도 경계(지도형 카드와 같다). */
+const BORDER = "#a9bac7";
+const BORDER_WIDTH = 2;
 const BAR_ROWS = 6;
 
 interface YearsCardProps {
@@ -79,9 +82,17 @@ export function YearsCard({ stats, headline, layers, rows }: YearsCardProps) {
       </defs>
       <g clipPath="url(#years-map)">
         <rect x={offsetX} y={MAP_TOP} width={MAP_WIDTH} height={MAP_HEIGHT} fill={SEA} rx={12} />
-        <g transform={`translate(${offsetX} ${MAP_TOP}) scale(${scale}) translate(${-view.x} ${-view.y})`}>
-          {KOREA_LAND_PATHS.map((path) => (
-            <path key={path.slice(0, 24)} d={path} fill={LAND} stroke={COAST} strokeWidth={1.4} />
+        <g transform={`translate(${offsetX} ${MAP_TOP}) scale(${scale}) translate(${-view.x} ${-view.y})`} data-basemap>
+          {sidoShapes().list.map((sido) => (
+            <path
+              key={sido.name}
+              d={sido.d}
+              fillRule="evenodd"
+              fill={LAND}
+              stroke={BORDER}
+              strokeWidth={BORDER_WIDTH}
+              strokeLinejoin="round"
+            />
           ))}
         </g>
 

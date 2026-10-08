@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -28,6 +28,20 @@ import { Waiting } from "@/components/layout/Waiting";
 */
 
 type Status = "loading" | "guest" | "failed" | "ready";
+
+/*
+  제목 한 줄. 해 탭이 있으면 같은 줄에 둔다(좁은 폰에서 해가 많으면 탭이 아래로 내려간다).
+  예전에는 제목 아래 "한 해를 한 장의 그림과 이야기로"라는 부제가 있었지만 제목과 탭이 이미 하는 말이라
+  없앴다 — 폰의 첫 화면에서 카드가 그만큼 위로 올라온다. 불러오는 중에도 제목은 보인다.
+*/
+function Head({ children }: { children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <h1 className="text-[24px] font-bold tracking-tight text-text md:text-[28px]">한장 요약</h1>
+      {children}
+    </div>
+  );
+}
 
 export function SketchView() {
   const [status, setStatus] = useState<Status>(isSupabaseConfigured ? "loading" : "guest");
@@ -140,46 +154,62 @@ export function SketchView() {
     return years[0] ?? null;
   })();
 
-  if (status === "loading") return <Waiting title="스케치를 그리고 있어요" />;
+  if (status === "loading") {
+    return (
+      <>
+        <Head />
+        <Waiting title="스케치를 그리고 있어요" />
+      </>
+    );
+  }
 
   if (status === "guest") {
     return (
-      <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6">
-        <p className="text-[15px] text-text-muted">
-          로그인하시면 한 해의 여행을 한 장의 그림과 이야기로 모아 드려요.
-        </p>
-        <Link
-          href="/login?next=%2Fsketch"
-          className="self-start rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
-        >
-          로그인하기
-        </Link>
-      </div>
+      <>
+        <Head />
+        <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6">
+          <p className="text-[15px] text-text-muted">
+            로그인하시면 한 해의 여행을 한 장의 그림과 이야기로 모아 드려요.
+          </p>
+          <Link
+            href="/login?next=%2Fsketch"
+            className="self-start rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+          >
+            로그인하기
+          </Link>
+        </div>
+      </>
     );
   }
 
   if (status === "failed") {
     return (
-      <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[15px] text-text-muted">
-        기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
-      </p>
+      <>
+        <Head />
+        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[15px] text-text-muted">
+          기록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.
+        </p>
+      </>
     );
   }
 
   if (trips.length === 0 || shown === null) {
     return (
-      <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6 text-center">
-        <p className="text-[17px] font-medium text-text">아직 그릴 것이 없어요</p>
-        <p className="text-[15px] leading-relaxed text-text-muted">
-          사진을 고르면 한 해가 한 장의 그림이 돼요.
-        </p>
-        <Link
-          href="/trips/new"
-          className="self-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
-        >
-          사진 고르기
-        </Link>
-      </div>
+      <>
+        <Head />
+        <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6 text-center">
+          <p className="text-[17px] font-medium text-text">아직 그릴 것이 없어요</p>
+          <p className="text-[15px] leading-relaxed text-text-muted">
+            사진을 고르면 한 해가 한 장의 그림이 돼요.
+          </p>
+          <Link
+            href="/trips/new"
+            className="self-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+          >
+            사진 고르기
+          </Link>
+        </div>
+      </>
     );
   }
 
@@ -204,24 +234,26 @@ export function SketchView() {
   return (
     <>
       {/* 해가 하나뿐이면 고를 것이 없다. 탭을 두지 않는다. */}
-      {years.length > 1 && (
-        <div role="tablist" aria-label="해 고르기" className="flex flex-wrap gap-1.5">
-          {(["all", ...years] as const).map((entry) => (
-            <button
-              key={entry}
-              type="button"
-              role="tab"
-              aria-selected={entry === shown}
-              onClick={() => pick(entry)}
-              className={`rounded-full px-4 py-2 text-[15px] font-semibold tabular-nums transition ${
-                entry === shown ? "bg-text text-bg" : "bg-bg-subtle text-text-muted hover:bg-line hover:text-text"
-              }`}
-            >
-              {entry === "all" ? "전체" : entry}
-            </button>
-          ))}
-        </div>
-      )}
+      <Head>
+        {years.length > 1 && (
+          <div role="tablist" aria-label="해 고르기" className="flex flex-wrap gap-1.5">
+            {(["all", ...years] as const).map((entry) => (
+              <button
+                key={entry}
+                type="button"
+                role="tab"
+                aria-selected={entry === shown}
+                onClick={() => pick(entry)}
+                className={`rounded-full px-3.5 py-1.5 text-[14px] font-semibold tabular-nums transition ${
+                  entry === shown ? "bg-text text-bg" : "bg-bg-subtle text-text-muted hover:bg-line hover:text-text"
+                }`}
+              >
+                {entry === "all" ? "전체" : entry}
+              </button>
+            ))}
+          </div>
+        )}
+      </Head>
 
       {shown === "all" ? (
         <AllYearsShowcase all={all} sidoOf={sidoOf} onPickYear={pick} userId={shareId} />

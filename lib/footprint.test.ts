@@ -291,8 +291,8 @@ describe("labelOf · 지도 아래 띠", () => {
   const totals = { trips: 3, places: 5, photos: 91 };
   const counts = tripsPerMonth(steps);
 
-  it("처음에는 재생을 권한다", () => {
-    expect(labelOf(steps, initialPlay, counts, totals).title).toBe("재생을 눌러 보세요");
+  it("처음에는 재생을 권한다 — 부연 없이 한 줄만", () => {
+    expect(labelOf(steps, initialPlay, counts, totals)).toEqual({ title: "재생을 눌러 보세요", sub: "" });
   });
 
   it("재생 중에는 지금 곳의 날짜·장소명과 사진 수", () => {

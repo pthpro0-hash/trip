@@ -94,3 +94,30 @@ h2 {
 .rs-24 { font-size: calc(24px * var(--rs, 1)); }
 .rs-28 { font-size: calc(28px * var(--rs, 1)); }
 .rs-32 { font-size: calc(32px * var(--rs, 1)); }
+
+
+/*
+  발자취의 재생 단추. 처음(아직 한 번도 안 눌렀을 때)에는 깜빡이며 둘레로 번져 눌러 보게 한다 —
+  눌러 봐야 지도가 움직인다는 걸 알 수 있다(FootprintPlayer 가 그때만 data-nudge="true" 를 단다).
+  움직임에 민감한 사람을 위해 기기의 "동작 줄이기"에서는 깜빡이지 않고 눈에 띄는 테두리만 둔다.
+*/
+@keyframes play-nudge {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 55%, transparent);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-accent) 0%, transparent);
+  }
+}
+.play-nudge[data-nudge="true"] {
+  animation: play-nudge 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .play-nudge[data-nudge="true"] {
+    animation: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+}

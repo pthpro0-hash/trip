@@ -23,7 +23,6 @@ import { canIn, useFamilyView } from "@/lib/familyView";
 import { SketchCard } from "./SketchCard";
 import { CollageCard } from "./CollageCard";
 import { LineCard } from "./LineCard";
-import { PAPER } from "./cardInk";
 import { StoryScenes } from "./StoryScenes";
 import { FootprintPlayer } from "./FootprintPlayer";
 import { footprintSteps, tripsPerMonth } from "@/lib/footprint";
@@ -41,8 +40,10 @@ const ShareDialog = dynamic(() => import("@/components/share/ShareDialog").then(
   한 해를 한 장으로 — 그리고 그 아래 이야기.
 
   이 페이지는 남에게 보여 주는 얼굴이다. 찾고 거르는 일은 지도가 맡고,
-  여기서는 한 해를 작품으로 보여 준다. 맨 위에 그해의 한 줄을 크게,
-  그 아래 카드를, 더 내려가면 그해가 어땠는지를 장면마다 풀어 말한다.
+  여기서는 한 해를 작품으로 보여 준다. 맨 위가 카드다 — 그해의 한 줄은 카드 안에
+  이미 크게 있어서 카드 위에 같은 문장을 또 적지 않는다(폰의 첫 화면을 반복이
+  차지하고 카드가 아래로 밀렸다). 카드 바로 아래 한 줄에 모양 고르기와 한 줄
+  고쳐 쓰기를 모으고, 더 내려가면 그해가 어땠는지를 장면마다 풀어 말한다.
 
   저장 단추는 늘 화면 아래에 붙어 있다. 어디까지 읽어 내려가든, 마음에
   들면 그 자리에서 바로 저장할 수 있어야 한다.
@@ -82,7 +83,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
   const holder = useRef<HTMLDivElement>(null);
   // 가족의 여행에서는 한 줄을 고칠 수 있는 권한이 있어야 쓴다.
   const canEdit = canIn(useFamilyView(), "edit");
-  const [saving, setSaving] = useState<"card" | "story" | null>(null);
+  const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState(false);
   const [writeFailed, setWriteFailed] = useState(false);
@@ -235,19 +236,14 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
   /* 콜라주 사진을 얹는 중에 저장하면 빈 칸이 찍힌다. 다 얹을 때까지 기다린다. */
   const waitingPhotos = style === "collage" && collageBusy;
 
-  const save = async (kind: "card" | "story") => {
+  const save = async () => {
     const svg = holder.current?.querySelector("svg");
     if (!svg) return;
-    setSaving(kind);
+    setSaving(true);
     setFailed(false);
-    const base = `여행스케치-${title}${styleSuffix(style)}`;
-    const name = kind === "story" ? `${base}-세로.png` : `${base}.png`;
-    const ok = await downloadSvgAsPng(svg, name, {
-      story: kind === "story",
-      background: style === "line" ? PAPER : undefined,
-    });
+    const ok = await downloadSvgAsPng(svg, `여행스케치-${title}${styleSuffix(style)}.png`);
     if (!ok) setFailed(true);
-    setSaving(null);
+    setSaving(false);
   };
 
   const write = async (next: string) => {
@@ -270,55 +266,9 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
       )}
 
       {/*
-        그해의 한 줄을 크게. 화면이 먼저 지어 두지만 그해가 어땠는지는
-        본인만 안다 — 고쳐 쓰면 그 말이 카드에도 들어간다.
-      */}
-      <header className="flex flex-col gap-2">
-        {editing ? (
-          <input
-            type="text"
-            autoFocus
-            defaultValue={written ?? ""}
-            placeholder={made}
-            aria-label={`${year}년 한 줄`}
-            onBlur={(event) => {
-              if (cancelling.current) {
-                cancelling.current = false;
-                setEditing(false);
-                return;
-              }
-              void write(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") event.currentTarget.blur();
-              if (event.key === "Escape") {
-                cancelling.current = true;
-                event.currentTarget.blur();
-              }
-            }}
-            className="w-full rounded-xl bg-bg-subtle px-3.5 py-3 text-[20px] font-bold tracking-tight text-text outline-none ring-1 ring-line placeholder:font-normal placeholder:text-text-faint focus:ring-2 focus:ring-accent"
-          />
-        ) : (
-          <p className="text-[24px] font-bold leading-snug tracking-tight text-text md:text-[28px]">{line}</p>
-        )}
-        <div className="flex items-center gap-3 text-[13px]">
-          {!editing && canEdit && (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="font-medium text-accent hover:text-accent-hover"
-            >
-              ✎ 한 줄 고쳐 쓰기
-            </button>
-          )}
-          {editing && <span className="text-text-faint">비우면 화면이 지은 말로 돌아가요. Esc 로 취소.</span>}
-          {writeFailed && <span className="text-text-muted">적어두지 못했어요.</span>}
-        </div>
-      </header>
-
-      {/*
-        카드가 먼저다. 열자마자 보여야 하는 것은 결과이고, 모양을 바꾸는 것은 그다음
-        일이다 — 고르는 줄이 카드 위에 있으면 첫 화면이 설정으로 시작한다.
+        카드가 맨 위다. 열자마자 보여야 하는 것은 결과이고, 모양을 바꾸는 것은 그다음
+        일이다 — 고르는 줄이 카드 위에 있으면 첫 화면이 설정으로 시작한다. 그해의 한 줄은
+        카드 안에 이미 가장 크게 있다.
       */}
       <div ref={holder} className="overflow-hidden rounded-2xl ring-1 ring-line">
         {style === "collage" ? (
@@ -339,38 +289,82 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
       </div>
 
       {/*
-        카드 모양. 같은 한 해라도 보여 줄 곳에 따라 어울리는 모양이 다르다.
-        고른 모양 그대로 저장된다. 바로 위 카드의 것이라 카드에 붙여 둔다.
+        카드 아래 한 줄 — 카드 모양 고르기와 한 줄 고쳐 쓰기. 같은 한 해라도 보여 줄 곳에 따라 어울리는
+        모양이 다르고, 고른 모양 그대로 저장된다. 바로 위 카드의 것이라 카드에 붙여 둔다. 모양 이름은
+        지도·사진 콜라주·선 그림이면 뜻이 읽혀서 설명 문장은 달지 않는다.
+
+        그해의 한 줄은 화면이 먼저 지어 두지만 그해가 어땠는지는 본인만 안다 — 고쳐 쓰면 그 말이 카드에도
+        들어간다. 고치는 중에는 이 줄이 입력칸으로 바뀐다.
       */}
       <div className="-mt-2 flex flex-col gap-2">
-        <div role="radiogroup" aria-label="카드 모양" className="flex gap-1.5">
-          {CARD_STYLES.map((option) => {
-            const blocked = option.id === "collage" && picks.length === 0;
-            return (
+        {editing ? (
+          <>
+            <input
+              type="text"
+              autoFocus
+              defaultValue={written ?? ""}
+              placeholder={made}
+              aria-label={`${year}년 한 줄`}
+              onBlur={(event) => {
+                if (cancelling.current) {
+                  cancelling.current = false;
+                  setEditing(false);
+                  return;
+                }
+                void write(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+                if (event.key === "Escape") {
+                  cancelling.current = true;
+                  event.currentTarget.blur();
+                }
+              }}
+              className="w-full rounded-xl bg-bg-subtle px-3.5 py-3 text-[18px] font-bold tracking-tight text-text outline-none ring-1 ring-line placeholder:font-normal placeholder:text-text-faint focus:ring-2 focus:ring-accent"
+            />
+            <p className="text-[13px] text-text-faint">비우면 화면이 지은 말로 돌아가요. Esc 로 취소.</p>
+          </>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <div role="radiogroup" aria-label="카드 모양" className="flex min-w-0 flex-1 gap-1.5">
+              {CARD_STYLES.map((option) => {
+                const blocked = option.id === "collage" && picks.length === 0;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={option.id === style}
+                    disabled={blocked}
+                    onClick={() => keepCardStyle(option.id)}
+                    className={`min-w-0 flex-1 rounded-xl px-1.5 py-2 text-[14px] font-medium transition disabled:opacity-40 ${
+                      option.id === style
+                        ? "bg-text text-bg"
+                        : "bg-bg-subtle text-text-muted hover:bg-line hover:text-text"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+            {canEdit && (
               <button
-                key={option.id}
                 type="button"
-                role="radio"
-                aria-checked={option.id === style}
-                disabled={blocked}
-                onClick={() => keepCardStyle(option.id)}
-                className={`flex-1 rounded-xl px-2 py-2 text-[14px] font-medium transition disabled:opacity-40 ${
-                  option.id === style
-                    ? "bg-text text-bg"
-                    : "bg-bg-subtle text-text-muted hover:bg-line hover:text-text"
-                }`}
+                onClick={() => setEditing(true)}
+                aria-label="한 줄 고쳐 쓰기"
+                className="shrink-0 rounded-xl bg-bg-subtle px-3 py-2 text-[14px] font-medium text-accent transition hover:bg-line"
               >
-                {option.label}
+                <span aria-hidden="true">✎</span> 한 줄
               </button>
-            );
-          })}
-        </div>
-        <p className="text-[13px] text-text-faint">
-          {picks.length === 0 && chosen === "collage"
-            ? "이 해에는 올린 사진이 없어 지도로 보여 드려요."
-            : CARD_STYLES.find((option) => option.id === style)?.hint}
-          {style === "collage" && collageBusy && " · 사진을 얹고 있어요…"}
-        </p>
+            )}
+          </div>
+        )}
+        {writeFailed && <p className="text-[13px] text-text-muted">적어두지 못했어요.</p>}
+        {picks.length === 0 && chosen === "collage" && (
+          <p className="text-[13px] text-text-faint">이 해에는 올린 사진이 없어 지도로 보여 드려요.</p>
+        )}
+        {style === "collage" && collageBusy && <p className="text-[13px] text-text-faint">사진을 얹고 있어요…</p>}
       </div>
 
       <FootprintPlayer
@@ -386,34 +380,25 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
 
       {/*
         저장은 늘 손 닿는 데. 어디까지 읽어 내려가든 그 자리에서 저장한다.
-        공유는 대개 세로라 스토리용을 따로 둔다. 그림 대신 링크로 보내면
-        받는 사람이 그해 이야기까지 넘겨 볼 수 있다.
+        그림 대신 링크로 보내면 받는 사람이 그해 이야기까지 넘겨 볼 수 있다.
       */}
       <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex flex-col gap-1.5 border-t border-line bg-bg/95 px-5 py-3 backdrop-blur-md [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
         {failed && <p className="text-[13px] text-text-muted">저장하지 못했어요.</p>}
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => void save("card")}
-            disabled={saving !== null || waitingPhotos}
+            onClick={() => void save()}
+            disabled={saving || waitingPhotos}
             aria-label={`${year}년 이미지 저장`}
             className="flex-1 rounded-full bg-accent px-1.5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
           >
             이미지 저장
           </button>
-          <button
-            type="button"
-            onClick={() => void save("story")}
-            disabled={saving !== null || waitingPhotos}
-            className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-text transition hover:bg-line disabled:opacity-60"
-          >
-            스토리용 세로
-          </button>
           {userId && (
             <button
               type="button"
               onClick={() => setSharing(true)}
-              disabled={saving !== null || waitingPhotos}
+              disabled={saving || waitingPhotos}
               aria-label={`${year}년 링크로 보여 주기`}
               className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-accent transition hover:bg-line disabled:opacity-60"
             >

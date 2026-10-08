@@ -23,7 +23,6 @@ export function YearMap({ year, cards }: { year: string; cards: InboxCard[] }) {
       totals={yearTotals(cards, steps)}
       photoUrls={photoUrls}
       heading={`${year}년 다녀온 곳`}
-      hint="곳을 하나씩 찍어 봐요"
       showMonths
     />
   );

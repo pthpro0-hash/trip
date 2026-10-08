@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import type { SketchTrip } from "@/lib/sketch";
 
 vi.mock("@/lib/supabase/client", () => ({ getBrowserClient: () => null }));
@@ -22,7 +22,7 @@ const all: SketchTrip[] = [
   안다. 고쳐 쓰는 길이 막히면 안 되고, 취소가 저장이 되어도 안 된다.
 */
 describe("SketchShowcase · 한 줄", () => {
-  it("화면이 지어 둔 말을 크게 보인다", () => {
+  it("고쳐 쓰는 길이 있다", () => {
     render(<SketchShowcase year={2026} all={all} written={undefined} onWrite={async () => true} sidoOf={undefined} />);
     expect(screen.getByRole("button", { name: /한 줄 고쳐 쓰기/ })).toBeTruthy();
   });
@@ -30,6 +30,19 @@ describe("SketchShowcase · 한 줄", () => {
   it("적어 둔 말이 있으면 그것을 보인다", () => {
     render(<SketchShowcase year={2026} all={all} written="민수랑 바다만 본 해" onWrite={async () => true} sidoOf={undefined} />);
     expect(screen.getAllByText("민수랑 바다만 본 해").length).toBeGreaterThan(0);
+  });
+
+  /*
+    그해의 한 줄은 카드 안에 이미 크게 있다. 카드 위에 같은 문장을 또 크게 적으면 폰의 첫 화면 한가운데를
+    반복이 차지해 카드가 아래로 밀린다.
+  */
+  it("한 줄은 카드 안에만 있다 — 카드 밖에 같은 말이 또 나오지 않는다", () => {
+    const { container } = render(
+      <SketchShowcase year={2026} all={all} written="민수랑 바다만 본 해" onWrite={async () => true} sidoOf={undefined} />,
+    );
+    const found = screen.getAllByText("민수랑 바다만 본 해");
+    expect(found).toHaveLength(1);
+    expect(found[0].closest("svg")).toBe(container.querySelector("svg"));
   });
 
   it("고쳐 쓰고 Enter 를 누르면 그해의 말로 적는다", async () => {
@@ -57,7 +70,14 @@ describe("SketchShowcase · 한 줄", () => {
   it("저장 단추가 늘 붙어 있다", () => {
     render(<SketchShowcase year={2026} all={all} written={undefined} onWrite={async () => true} sidoOf={undefined} />);
     expect(screen.getByRole("button", { name: "2026년 이미지 저장" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "스토리용 세로" })).toBeTruthy();
+  });
+
+  it("'스토리용 세로'는 없다 — 기능째 걷어 냈다", () => {
+    render(<SketchShowcase year={2026} all={all} written={undefined} onWrite={async () => true} sidoOf={undefined} userId="u1" />);
+    expect(screen.queryByRole("button", { name: /스토리/ })).toBeNull();
+    // 남은 단추는 이미지 저장과 링크 공유 둘.
+    const bar = screen.getByRole("button", { name: "2026년 이미지 저장" }).parentElement!;
+    expect(within(bar).getAllByRole("button").map((button) => button.textContent)).toEqual(["이미지 저장", "링크 공유"]);
   });
 });
 
@@ -168,10 +188,33 @@ describe("SketchShowcase · 순서", () => {
     expect(after(card, screen.getByRole("radiogroup", { name: "카드 모양" }))).toBe(true);
   });
 
-  it("그해의 한 줄은 카드 위에 남는다", () => {
+  it("한 줄 고쳐 쓰기는 카드 아래, 카드 모양 고르기와 같은 줄에 있다 — 카드가 맨 위로 올라온다", () => {
     const { container } = open();
     const card = container.querySelector("svg")!;
-    expect(after(screen.getByRole("button", { name: /한 줄 고쳐 쓰기/ }), card)).toBe(true);
+    const edit = screen.getByRole("button", { name: /한 줄 고쳐 쓰기/ });
+    const group = screen.getByRole("radiogroup", { name: "카드 모양" });
+    expect(after(card, edit)).toBe(true);
+    expect(group.parentElement).toBe(edit.parentElement);
+  });
+
+  it("카드 위에는 카드 말고 아무것도 없다", () => {
+    const { container } = open();
+    const article = container.querySelector("article")!;
+    expect(article.firstElementChild?.querySelector("svg")).toBeTruthy();
+  });
+
+  it("카드 모양 설명 문장은 없다 — 이름만으로 알 수 있다", () => {
+    open();
+    expect(screen.queryByText(/다닌 곳과 계절을 지도 위에/)).toBeNull();
+    expect(screen.queryByText(/그해의 사진을 한 장에/)).toBeNull();
+  });
+
+  it("고쳐 쓰는 중에는 그 줄이 입력칸으로 바뀐다", () => {
+    open();
+    fireEvent.click(screen.getByRole("button", { name: /한 줄 고쳐 쓰기/ }));
+    expect(screen.getByLabelText("2026년 한 줄")).toBeTruthy();
+    expect(screen.getByText(/Esc 로 취소/)).toBeTruthy();
+    expect(screen.queryByRole("radiogroup", { name: "카드 모양" })).toBeNull();
   });
 
   it("카드 모양 고르기는 그해의 이야기보다 위다 — 카드를 바꾸고 바로 이어 읽는다", () => {

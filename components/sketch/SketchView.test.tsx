@@ -98,6 +98,35 @@ describe("SketchView · 상세에서 돌아왔을 때", () => {
   });
 });
 
+/*
+  폰의 첫 화면에서 제목·부제·해 탭이 세 줄을 차지했다. 부제("한 해를 한 장의 그림과 이야기로")는 제목이 이미
+  하는 말이라 없애고, 제목과 해 탭을 한 줄에 둔다. 제목은 불러오는 중에도 보여야 한다.
+*/
+describe("SketchView · 윗부분", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+    window.history.replaceState(null, "", "/sketch");
+  });
+
+  it("제목과 해 탭이 한 줄(같은 상자)에 있다", async () => {
+    render(<SketchView />);
+    const tabs = await screen.findByRole("tablist", { name: "해 고르기" });
+    const title = screen.getByRole("heading", { level: 1, name: "한장 요약" });
+    expect(title.parentElement).toBe(tabs.parentElement);
+  });
+
+  it("부제는 없다", async () => {
+    render(<SketchView />);
+    await screen.findByRole("tablist", { name: "해 고르기" });
+    expect(screen.queryByText(/한 해를 한 장의 그림과 이야기로/)).toBeNull();
+  });
+
+  it("제목은 불러오는 중에도 보인다", () => {
+    render(<SketchView />);
+    expect(screen.getByRole("heading", { level: 1, name: "한장 요약" })).toBeTruthy();
+  });
+});
+
 describe("SketchView · 곳의 날짜", () => {
   beforeEach(() => {
     window.sessionStorage.clear();

@@ -28,6 +28,10 @@ import {
 
   내 화면에서는 점을 눌러 그 여행으로 갈 수 있다. 링크로 받은 화면(shared)에는
   갈 곳이 없어 점을 눌러도 이름만 보인다.
+
+  '재생'을 눌러 봐야 지도가 움직인다는 것을 알 수 있다. 처음(아직 한 번도 안 눌렀을 때)에는 그 단추가
+  깜빡여 누르도록 이끌고, 누른 뒤에는 멈춘다(CSS 는 globals.css 의 play-nudge — 동작 줄이기 설정이면
+  깜빡이지 않는다). 제목 옆 힌트와 지도 아래 부연은 "재생을 눌러 보세요"와 같은 말이라 두지 않는다.
 */
 
 const FRAME = { width: 340, height: 400 };
@@ -49,7 +53,6 @@ interface FootprintPlayerProps {
   backHref?: string;
   /** 위 제목. 한 해가 아니라 여행 하나를 보일 때(엽서)는 "다녀온 길"처럼 바꾼다. */
   heading?: string;
-  hint?: string;
   /** 아래 달 막대를 둘지. 여행 하나(엽서)에는 달을 고를 일이 없다. */
   showMonths?: boolean;
 }
@@ -84,7 +87,7 @@ function MapTag({
   );
 }
 
-export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared = false, backHref, heading = "그해의 발자취", hint = "날짜순으로 찍어 봐요", showMonths = true }: FootprintPlayerProps) {
+export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared = false, backHref, heading = "그해의 발자취", showMonths = true }: FootprintPlayerProps) {
   const [state, dispatch] = useReducer(playReducer, initialPlay);
   const [picked, setPicked] = useState<number | null>(null);
   const count = steps.length;
@@ -111,14 +114,13 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
   const shown = picked !== null ? steps[picked] : null;
   const shownPhoto = shown?.photoPath ? photoUrls?.get(shown.photoPath) : undefined;
   const canPlay = !state.playing;
+  // 아직 한 번도 안 눌렀다 — 처음 상태 그대로(재생 중도, 끝까지 본 뒤도, 달을 골라 본 뒤도 아니다).
+  const nudge = !state.playing && !state.done && state.sel === null && state.cur < 0;
   const tagIndex = picked ?? (state.sel === null && state.cur >= 0 && !state.done ? state.cur : null);
 
   return (
     <section aria-label="발자취" className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-[18px] font-bold tracking-tight text-text">{heading}</h2>
-        <span className="text-[13px] text-text-faint">{hint}</span>
-      </div>
+      <h2 className="text-[18px] font-bold tracking-tight text-text">{heading}</h2>
 
       <div className="overflow-hidden rounded-2xl ring-1 ring-line" style={{ background: SEA }}>
         <svg
@@ -171,7 +173,7 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
         <div className="flex items-center gap-3 bg-bg px-4 py-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[16px] font-bold text-text">{label.title}</p>
-            <p className="truncate text-[13px] text-text-muted">{label.sub}</p>
+            {label.sub && <p className="truncate text-[13px] text-text-muted">{label.sub}</p>}
           </div>
           <div className="flex shrink-0 gap-1.5">
             <button
@@ -181,7 +183,8 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
                 setPicked(null);
                 dispatch({ type: "play", count });
               }}
-              className="rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+              data-nudge={nudge ? "true" : undefined}
+              className="play-nudge rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
             >
               {state.playing ? "멈춤" : state.done || state.sel !== null ? "다시 재생" : state.cur >= 0 ? "이어서" : "재생"}
             </button>

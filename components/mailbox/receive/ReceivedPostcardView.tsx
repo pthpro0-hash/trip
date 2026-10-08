@@ -195,7 +195,6 @@ export function ReceivedPostcardView({ token, card, preview = false }: { token: 
           totals={{ trips: 1, places: steps.length, photos: steps.reduce((sum, step) => sum + step.photoCount, 0) }}
           photoUrls={photoUrls}
           heading="다녀온 길"
-          hint="곳을 하나씩 찍어 봐요"
           showMonths={false}
         />
       )}

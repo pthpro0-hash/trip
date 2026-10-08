@@ -66,9 +66,49 @@ describe("FootprintPlayer", () => {
   });
 
   it("제목을 바꾸고 달 막대를 뺄 수 있다 — 엽서(여행 하나)에서 쓴다", () => {
-    render(<FootprintPlayer steps={steps} monthCounts={counts} totals={totals} heading="다녀온 길" hint="곳을 하나씩 찍어 봐요" showMonths={false} />);
+    render(<FootprintPlayer steps={steps} monthCounts={counts} totals={totals} heading="다녀온 길" showMonths={false} />);
     expect(screen.getByRole("heading", { name: "다녀온 길" })).toBeTruthy();
-    expect(screen.getByText("곳을 하나씩 찍어 봐요")).toBeTruthy();
     expect(screen.queryByRole("group", { name: "달별 여행 수" })).toBeNull();
+  });
+
+  /*
+    제목 옆 힌트("날짜순으로 찍어 봐요")와 지도 아래 띠의 부연("다녀온 곳이 날짜순으로 찍혀요")이
+    같은 말을 되풀이했다. 처음 띠에는 "재생을 눌러 보세요" 한 줄만 남긴다.
+  */
+  it("처음에는 '재생을 눌러 보세요' 한 줄만 있다 — 같은 말을 되풀이하지 않는다", () => {
+    render(<FootprintPlayer steps={steps} monthCounts={counts} totals={totals} />);
+    expect(screen.getByText("재생을 눌러 보세요")).toBeTruthy();
+    expect(screen.queryByText(/날짜순으로 찍/)).toBeNull();
+  });
+
+  /*
+    '재생'을 눌러 봐야 이 지도가 움직인다는 것을 알 수 있다. 처음에는 단추가 깜빡여 눈길을 끈다.
+    누른 뒤에는 멈춘다 — 계속 깜빡이면 보는 데 방해다.
+  */
+  describe("재생 단추 깜빡임", () => {
+    const play = () => screen.getByRole("button", { name: /재생|멈춤|이어서/ });
+
+    it("아직 한 번도 안 눌렀으면 깜빡인다", () => {
+      render(<FootprintPlayer steps={steps} monthCounts={counts} totals={totals} />);
+      expect(play()).toHaveAttribute("data-nudge", "true");
+    });
+
+    it("누르면 멈춘다", () => {
+      render(<FootprintPlayer steps={steps} monthCounts={counts} totals={totals} />);
+      fireEvent.click(play());
+      expect(play()).not.toHaveAttribute("data-nudge");
+    });
+
+    it("끝까지 본 뒤 '다시 재생'에서는 깜빡이지 않는다 — 이미 아는 단추다", () => {
+      render(<FootprintPlayer steps={steps} monthCounts={counts} totals={totals} />);
+      fireEvent.click(screen.getByRole("button", { name: "끝으로" }));
+      expect(screen.getByRole("button", { name: "다시 재생" })).not.toHaveAttribute("data-nudge");
+    });
+
+    it("달 막대를 눌러 본 뒤에도 깜빡이지 않는다", () => {
+      render(<FootprintPlayer steps={steps} monthCounts={counts} totals={totals} />);
+      fireEvent.click(screen.getByRole("button", { name: "8월 여행 1번" }));
+      expect(screen.getByRole("button", { name: "다시 재생" })).not.toHaveAttribute("data-nudge");
+    });
   });
 });

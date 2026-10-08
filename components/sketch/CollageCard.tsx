@@ -12,7 +12,7 @@ import { CARD_HEIGHT, CARD_MARGIN, CARD_WIDTH, FAINT, FONT, INK, MUTED, SIGNATUR
   칸에 그해를 대표하는 한 장, 그 아래로 간 날 순서대로. 칸마다 그곳
   이름을 적어 사진만 봐도 어디인지 안다.
 
-  지도형과 같은 판(720×1060)이라 저장과 스토리용 세로 변환이 그대로 된다.
+  지도형과 같은 판(720×1060)이라 저장과 링크 미리보기가 그대로 된다.
 */
 
 const MOSAIC = { x: CARD_MARGIN, y: 168, width: CARD_WIDTH - CARD_MARGIN * 2, height: 680 };

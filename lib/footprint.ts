@@ -207,5 +207,6 @@ export function labelOf(
   }
   const step = steps[state.cur];
   if (step) return { title: stepTitle(step), sub: `사진 ${step.photoCount}장` };
-  return { title: "재생을 눌러 보세요", sub: "다녀온 곳이 날짜순으로 찍혀요" };
+  // 부연은 두지 않는다 — 제목 한 줄과 깜빡이는 재생 단추로 충분하다.
+  return { title: "재생을 눌러 보세요", sub: "" };
 }

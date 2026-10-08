@@ -15,10 +15,10 @@
 
 export type CardStyle = "map" | "collage" | "line";
 
-export const CARD_STYLES: { id: CardStyle; label: string; hint: string }[] = [
-  { id: "map", label: "지도", hint: "다닌 곳과 계절을 지도 위에" },
-  { id: "collage", label: "사진 콜라주", hint: "그해의 사진을 한 장에" },
-  { id: "line", label: "선 그림", hint: "걸어 둘 만한 한 장의 선" },
+export const CARD_STYLES: { id: CardStyle; label: string }[] = [
+  { id: "map", label: "지도" },
+  { id: "collage", label: "사진 콜라주" },
+  { id: "line", label: "선 그림" },
 ];
 
 const KEY = "sketch:cardStyle";

@@ -9,45 +9,6 @@
 /** 화면보다 크게 그려야 저장본이 흐리지 않다. */
 const SCALE = 2;
 
-/*
-  스토리에 올릴 비율.
-
-  공유는 대부분 세로다. 카드 자체를 9:16 으로 다시 짜는 대신 흰 바탕
-  가운데에 앉힌다 — 카드 하나만 관리하면 되고, 위아래 여백은 스토리에
-  글자나 스티커를 얹을 자리가 되어 오히려 쓸모가 있다.
-*/
-export const STORY = { width: 1080, height: 1920 } as const;
-
-/**
- * 세로 바탕 안에 카드를 통째로 앉힐 자리.
- *
- * 폭에만 맞추면 카드가 길어졌을 때 위아래가 잘린다. 긴 쪽에 맞춰
- * 넣어야 무엇을 바꾸든 안 잘린다.
- */
-export function fitInStory(
-  width: number,
-  height: number,
-  box: { width: number; height: number } = STORY,
-  margin = 0.9,
-): { x: number; y: number; width: number; height: number } {
-  const scale = Math.min((box.width * margin) / width, (box.height * margin) / height);
-  const drawWidth = width * scale;
-  const drawHeight = height * scale;
-  return {
-    x: (box.width - drawWidth) / 2,
-    y: (box.height - drawHeight) / 2,
-    width: drawWidth,
-    height: drawHeight,
-  };
-}
-
-export interface SaveOptions {
-  /** 세로(9:16) 바탕에 앉혀 내보낸다. */
-  story?: boolean;
-  /** 세로 바탕의 색. 카드 바탕과 같아야 카드가 액자에 끼운 듯 떠 보이지 않는다. */
-  background?: string;
-}
-
 /** SVG 글자를 그림으로 읽어 캔버스에 그리고 PNG 로. 못 그리면 null. */
 async function rasterize(
   markup: string,
@@ -79,7 +40,7 @@ async function rasterize(
 }
 
 /** 화면의 SVG 를 PNG 로. 못 그리면 null. */
-export async function svgToPngBlob(svg: SVGSVGElement, options: SaveOptions = {}): Promise<Blob | null> {
+export async function svgToPngBlob(svg: SVGSVGElement): Promise<Blob | null> {
   const viewBox = svg.viewBox.baseVal;
   const width = viewBox.width || svg.clientWidth;
   const height = viewBox.height || svg.clientHeight;
@@ -91,20 +52,9 @@ export async function svgToPngBlob(svg: SVGSVGElement, options: SaveOptions = {}
   clone.setAttribute("height", String(height));
   const markup = new XMLSerializer().serializeToString(clone);
 
-  if (!options.story) {
-    return rasterize(markup, { width: width * SCALE, height: height * SCALE }, (context, image) =>
-      context.drawImage(image, 0, 0, width * SCALE, height * SCALE),
-    );
-  }
-
-  return rasterize(markup, STORY, (context, image) => {
-    // 바탕을 먼저 칠한다. 칠하지 않으면 남는 자리가 투명하게 나가고,
-    // 스토리에 올리면 그 부분이 시커멓게 된다.
-    context.fillStyle = options.background ?? "#ffffff";
-    context.fillRect(0, 0, STORY.width, STORY.height);
-    const box = fitInStory(width, height);
-    context.drawImage(image, box.x, box.y, box.width, box.height);
-  });
+  return rasterize(markup, { width: width * SCALE, height: height * SCALE }, (context, image) =>
+    context.drawImage(image, 0, 0, width * SCALE, height * SCALE),
+  );
 }
 
 /** 이미 짜 둔 SVG 글자를 그 크기 그대로 PNG 로. */
@@ -112,12 +62,8 @@ export function markupToPngBlob(markup: string, size: { width: number; height: n
   return rasterize(markup, size, (context, image) => context.drawImage(image, 0, 0, size.width, size.height));
 }
 
-export async function downloadSvgAsPng(
-  svg: SVGSVGElement,
-  fileName: string,
-  options: SaveOptions = {},
-): Promise<boolean> {
-  const png = await svgToPngBlob(svg, options);
+export async function downloadSvgAsPng(svg: SVGSVGElement, fileName: string): Promise<boolean> {
+  const png = await svgToPngBlob(svg);
   if (!png) return false;
 
   const link = document.createElement("a");

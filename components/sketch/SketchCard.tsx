@@ -1,4 +1,6 @@
-import { KOREA_LAND_PATHS, project } from "@/lib/koreaMap";
+import { project } from "@/lib/koreaMap";
+import { sidoShapes } from "@/lib/sidoShapes";
+import { fitText } from "@/lib/svgText";
 import { regionViewBox } from "@/lib/photo/regionView";
 import type { Region } from "@/lib/types";
 import { formatDistance } from "@/lib/geo";
@@ -25,14 +27,26 @@ import { CARD_HEIGHT, CARD_WIDTH, FAINT, FONT, INK, MUTED, SIGNATURE, type CardS
 
 const WIDTH = CARD_WIDTH;
 const HEIGHT = CARD_HEIGHT;
-const MAP_TOP = 190;
-const MAP_HEIGHT = 450;
-/* 전국을 세로 450 에 맞췄을 때의 가로. 권역을 골라도 이 자리는 그대로다. */
-const MAP_WIDTH = Math.round((340 / 600) * 450);
+/*
+  지도는 카드의 주인이다. 예전에는 세로 450, 가로 255 로 카드 폭(720)의 1/3 남짓이라 폰에서 손톱만 했다.
+  세로 562(약 25% 큼)로 키웠다. 늘어난 만큼의 자리는 머리(제목과 한 줄 사이·지도 위)와 아래 숫자 칸을
+  줄여서 만든다 — 판(720×1060)은 저장·링크 미리보기·다른 모양과 같아야 해서 그대로 둔다.
+*/
+const MAP_TOP = 150;
+const MAP_HEIGHT = 562;
+/* 전국을 세로 562 에 맞췄을 때의 가로. 권역을 골라도 이 자리는 그대로다. */
+const MAP_WIDTH = Math.round((340 / 600) * MAP_HEIGHT);
 
 const SEA = "#dbeafe";
 const LAND = "#f5f3ec";
-const COAST = "#b6c6d2";
+/* 시도 경계. 카드가 폰에서는 절반 아래로 줄어 보이므로, 지도 단위로 2 는 되어야 가는 선으로나마 읽힌다. */
+const BORDER = "#a9bac7";
+const BORDER_WIDTH = 2;
+
+/* 숫자 칸: 두 줄 두 칸. 칸 하나는 아래로 약 46 이어진다(값 30 + 풀이 15). */
+const STATS_TOP = MAP_TOP + MAP_HEIGHT + 160;
+const STATS_ROW = 66;
+const STATS_COLUMN = 336;
 
 const SEASONS: Season[] = ["봄", "여름", "가을", "겨울"];
 
@@ -147,12 +161,15 @@ export function SketchCard({
     >
       <rect width={WIDTH} height={HEIGHT} fill="#ffffff" />
 
-      <text x={48} y={78} fontFamily={FONT} fontSize={30} fontWeight={600} fill={MUTED}>
+      <text x={48} y={66} fontFamily={FONT} fontSize={30} fontWeight={600} fill={MUTED}>
         {title}
       </text>
-      {/* 사람은 숫자가 아니라 문장을 기억한다. 이 줄이 이 카드에서 가장 크다. */}
-      <text x={48} y={132} fontFamily={FONT} fontSize={40} fontWeight={700} fill={INK}>
-        {headline}
+      {/*
+        사람은 숫자가 아니라 문장을 기억한다. 이 줄이 이 카드에서 가장 크다. 직접 길게 적은 한 줄이
+        카드 밖으로 나가지 않게 폭에 맞춰 줄인다(다른 모양의 카드와 같다).
+      */}
+      <text x={48} y={114} fontFamily={FONT} fontSize={40} fontWeight={700} fill={INK}>
+        {fitText(headline, WIDTH - 96, 40)}
       </text>
 
       {/*
@@ -167,11 +184,21 @@ export function SketchCard({
 
       <g clipPath="url(#sketch-map)">
         <rect x={offsetX} y={MAP_TOP} width={mapWidth} height={MAP_HEIGHT} fill={SEA} rx={12} />
+        {/* 해안선만이 아니라 시도 경계까지 — 어느 도를 다녀왔는지 읽히게. 발자취 지도와 같은 경계다. */}
         <g
           transform={`translate(${offsetX} ${MAP_TOP}) scale(${scale}) translate(${-view.x} ${-view.y})`}
+          data-basemap
         >
-          {KOREA_LAND_PATHS.map((path) => (
-            <path key={path.slice(0, 24)} d={path} fill={LAND} stroke={COAST} strokeWidth={1.4} />
+          {sidoShapes().list.map((sido) => (
+            <path
+              key={sido.name}
+              d={sido.d}
+              fillRule="evenodd"
+              fill={LAND}
+              stroke={BORDER}
+              strokeWidth={BORDER_WIDTH}
+              strokeLinejoin="round"
+            />
           ))}
         </g>
 
@@ -330,24 +357,30 @@ export function SketchCard({
         })}
       </g>
 
-      {/* 숫자 — 오른쪽 한 줄이 그 수가 무슨 뜻인지 풀어 준다. */}
-      <g transform={`translate(48 ${MAP_TOP + MAP_HEIGHT + 160})`}>
-        {stats.map(([label, value, aside], index) => (
-          <g key={label} transform={`translate(0 ${index * 54})`}>
-            <text y={4} fontFamily={FONT} fontSize={16} fill={FAINT}>
-              {label}
+      {/*
+        숫자 — 두 줄 두 칸. 넉 줄을 쌓으면 지도를 키울 자리가 없다. 칸마다 이름과 값이 한 줄에 서고,
+        그 수가 무슨 뜻인지 풀어 주는 말이 값 밑에 선다.
+      */}
+      {stats.map(([label, value, aside], index) => (
+        <g
+          key={label}
+          data-stat={label}
+          transform={`translate(${48 + (index % 2) * STATS_COLUMN} ${STATS_TOP + Math.floor(index / 2) * STATS_ROW})`}
+        >
+          <text y={4} fontFamily={FONT} fontSize={16} fill={FAINT}>
+            {label}
+          </text>
+          <text x={96} y={8} fontFamily={FONT} fontSize={30} fontWeight={700} fill={INK}>
+            {value}
+          </text>
+          {/* 풀이는 칸의 왼쪽 끝에서 시작해 칸 폭(288)을 다 쓴다. 값 밑에 붙이면 오른쪽 칸에서 여백을 넘는다. */}
+          {aside && (
+            <text y={36} fontFamily={FONT} fontSize={16} fill={MUTED}>
+              {fitText(aside, STATS_COLUMN - 48, 16)}
             </text>
-            <text x={130} y={8} fontFamily={FONT} fontSize={30} fontWeight={700} fill={INK}>
-              {value}
-            </text>
-            {aside && (
-              <text x={300} y={6} fontFamily={FONT} fontSize={17} fill={MUTED}>
-                {aside}
-              </text>
-            )}
-          </g>
-        ))}
-      </g>
+          )}
+        </g>
+      ))}
 
       <text x={48} y={HEIGHT - 44} fontFamily={FONT} fontSize={15} fill={FAINT}>
         {SIGNATURE}

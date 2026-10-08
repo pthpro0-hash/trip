@@ -36,7 +36,7 @@ interface AllYearsShowcaseProps {
 
 export function AllYearsShowcase({ all, sidoOf, onPickYear, userId = null }: AllYearsShowcaseProps) {
   const holder = useRef<HTMLDivElement>(null);
-  const [saving, setSaving] = useState<"card" | "story" | null>(null);
+  const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
 
   const story = useMemo(() => yearsStory(all, sidoOf), [all, sidoOf]);
@@ -47,24 +47,21 @@ export function AllYearsShowcase({ all, sidoOf, onPickYear, userId = null }: All
   const [sharing, setSharing] = useState(false);
   const closeShare = useCallback(() => setSharing(false), []);
 
-  const save = async (kind: "card" | "story") => {
+  const save = async () => {
     const svg = holder.current?.querySelector("svg");
     if (!svg) return;
-    setSaving(kind);
+    setSaving(true);
     setFailed(false);
-    const name = kind === "story" ? "여행스케치-지금까지-세로.png" : "여행스케치-지금까지.png";
-    if (!(await downloadSvgAsPng(svg, name, { story: kind === "story" }))) setFailed(true);
-    setSaving(null);
+    if (!(await downloadSvgAsPng(svg, "여행스케치-지금까지.png"))) setFailed(true);
+    setSaving(false);
   };
 
   return (
     <article className="flex flex-col gap-5">
       {saving && <WaitingOverlay title="그림을 만들고 있어요" note="다 되면 저절로 받아져요." />}
 
-      <header className="flex flex-col gap-1">
-        <p className="text-[24px] font-bold leading-snug tracking-tight text-text md:text-[28px]">{line}</p>
-        <p className="text-[15px] text-text-muted">{story.spanLine}</p>
-      </header>
+      {/* 한 줄은 카드 안에 이미 가장 크게 있다 — 위에 또 적지 않는다. 기간 설명만 작게 남긴다. */}
+      <p className="-mb-1 text-[14px] text-text-muted">{story.spanLine}</p>
 
       <div ref={holder} className="overflow-hidden rounded-2xl ring-1 ring-line">
         <YearsCard stats={story.total} headline={line} layers={story.layers} rows={story.rows} />
@@ -77,26 +74,18 @@ export function AllYearsShowcase({ all, sidoOf, onPickYear, userId = null }: All
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => void save("card")}
-            disabled={saving !== null}
+            onClick={() => void save()}
+            disabled={saving}
             aria-label="지금까지 이미지 저장"
             className="flex-1 rounded-full bg-accent px-1.5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
           >
             이미지 저장
           </button>
-          <button
-            type="button"
-            onClick={() => void save("story")}
-            disabled={saving !== null}
-            className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-text transition hover:bg-line disabled:opacity-60"
-          >
-            스토리용 세로
-          </button>
           {userId && (
             <button
               type="button"
               onClick={() => setSharing(true)}
-              disabled={saving !== null}
+              disabled={saving}
               aria-label="지금까지 링크로 보여 주기"
               className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-accent transition hover:bg-line disabled:opacity-60"
             >

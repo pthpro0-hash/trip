@@ -9,13 +9,8 @@ export const metadata: Metadata = {
 
 export default function SketchPage() {
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-5 px-5 pb-16 pt-8">
-      <div>
-        <h1 className="text-[28px] font-bold tracking-tight text-text md:text-[32px]">
-          한장 요약
-        </h1>
-        <p className="mt-1 text-[15px] text-text-muted">한 해를 한 장의 그림과 이야기로</p>
-      </div>
+    // 제목은 SketchView 안에 있다 — 해 탭과 한 줄에 두려고.
+    <main className="mx-auto flex max-w-2xl flex-col gap-4 px-5 pb-16 pt-5">
       <SketchView />
     </main>
   );
