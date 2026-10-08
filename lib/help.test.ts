@@ -89,6 +89,48 @@ describe("도움말 내용", () => {
     expect(tabs?.detail).toContain("사진을 고르는 화면");
   });
 
+  /*
+    내 여행 화면의 시트가 바뀌었다 — 처음 모습에 여행 카드 줄, 달 막대는 "기간" 단추 뒤로, 지도 위의 칩 둘은 "지도 옵션"
+    하나로, "열기"는 눌린 여행에만. 안내가 옛 이름을 말하면 없는 단추를 찾아 헤맨다.
+  */
+  describe("내 여행 시트의 이름", () => {
+    const sketch = () => CHAPTERS.find((chapter) => chapter.id === "sketch")!.steps;
+    const text = () => sketch().map((step) => `${step.title} ${step.summary} ${step.detail}`).join(" ");
+    const stepOf = (title: string) => sketch().find((step) => step.title === title)!;
+
+    it("지도 위 단추는 '지도 옵션' 하나이고, 그 안에 다녀온 시도와 100선 겹쳐 보기가 있다고 알린다", () => {
+      expect(stepOf("밟은 시도를 세어 보세요").detail).toContain("'지도 옵션'");
+      expect(stepOf("밟은 시도를 세어 보세요").detail).toContain("'다녀온 시도 N/17'");
+      expect(stepOf("100선을 겹쳐 보세요").detail).toContain("'지도 옵션'");
+      expect(stepOf("100선을 겹쳐 보세요").detail).toContain("'100선 겹쳐 보기'");
+    });
+
+    it("달 막대는 '기간'을 눌러야 열린다고 알린다", () => {
+      const step = stepOf("기간으로 좁혀 보세요");
+      expect(step.summary).toContain("'기간'");
+      expect(step.detail).toContain("'기간'");
+      expect(step.detail).toContain("풀기");
+    });
+
+    it("여행을 누르면 지도에서 고르고, '열기'는 눌린 여행에 나타난다고 알린다", () => {
+      const step = stepOf("지도를 옮기면 목록이 따라와요");
+      expect(step.detail).toContain("여행 카드");
+      expect(step.detail).toContain("눌린 여행에 나타나는 '열기'");
+    });
+
+    it("처음에는 여행 카드, 끌어올리면 목록이라고 알린다", () => {
+      const step = stepOf("목록을 끌어 올리고 내리세요");
+      expect(step.summary).toContain("여행 카드");
+      expect(step.detail).toContain("가로로 늘어서요");
+    });
+
+    it("없어진 이름을 말하지 않는다 — 시도 칩, 잇기 끄기", () => {
+      expect(text()).not.toContain("'시도 N/17'을 누르면");
+      expect(text()).not.toContain("잇기 끄기");
+      expect(text()).not.toContain("목록 위의 막대");
+    });
+  });
+
   it("가족 책장은 계정과 보관에서 갈래를 따로 떼어 냈다 — 순서는 스케치·이번 여행·100선·가족 책장·계정", () => {
     expect(CHAPTERS.map((chapter) => chapter.id)).toEqual(["sketch", "trip", "browse", "shelf", "account"]);
     const shelf = CHAPTERS.find((chapter) => chapter.id === "shelf")!;

@@ -11,7 +11,9 @@ import { tripFocus } from "@/lib/scrollMemory";
   강원도로 옮기기만 하면 된다 — 따로 거를 것이 없다.
 
   한 줄을 누르면 그 여행을 지도에 잇고 그리로 날아간다. 상세로 가는 것은
-  옆의 "열기"다. 누르자마자 지도를 떠나 버리면 지도로 고르는 맛이 없다.
+  눌린 줄에 나타나는 "열기"다. 누르자마자 지도를 떠나 버리면 지도로 고르는
+  맛이 없다. 모든 줄에 "열기"를 달아 두면 줄을 누르면 열리는 줄 알고 눌렀다가
+  지도만 움직이는 데 놀란다 — 살짝 올린 모습의 여행 카드(TripCards)와 같은 규칙이다.
 */
 
 interface TripsPanelProps {
@@ -74,13 +76,15 @@ export function TripsPanel({ trips, focused, photoUrls, onFocus, onShowAll }: Tr
                   </span>
                 </span>
               </button>
-              <Link
-                href={`/trips/${trip.tripId}`}
-                onClick={() => tripFocus.rememberFrom("/?v=sketch")}
-                className="shrink-0 rounded-full bg-surface px-3 py-1.5 text-[13px] font-medium text-accent ring-1 ring-line transition hover:bg-accent-soft"
-              >
-                열기
-              </Link>
+              {on && (
+                <Link
+                  href={`/trips/${trip.tripId}`}
+                  onClick={() => tripFocus.rememberFrom("/?v=sketch")}
+                  className="shrink-0 rounded-full bg-surface px-3 py-1.5 text-[13px] font-medium text-accent ring-1 ring-line transition hover:bg-accent-soft"
+                >
+                  열기
+                </Link>
+              )}
             </div>
           </li>
         );

@@ -36,6 +36,9 @@ import { HubSheet, PEEK, PEEK_EMPTY, snapHeights, type Snap } from "./HubSheet";
 import { PlacePanel } from "./PlacePanel";
 import { TripsPanel } from "./TripsPanel";
 import { ViewSwitch } from "./ViewSwitch";
+import { TripCards } from "./TripCards";
+import { MapOptions } from "./MapOptions";
+import { PeriodChip } from "./PeriodChip";
 import { TripArchive } from "@/components/trip/TripArchive";
 
 /*
@@ -271,6 +274,8 @@ export function HubView({
   /** 100선 겹쳐 보기. */
   const [showCurated, setShowCurated] = useState(false);
   const [pickedSpot, setPickedSpot] = useState<string | null>(null);
+  /** 달 막대("기간")를 펼쳤는가. 살짝 올린 모습의 시트에는 자리가 없어, 그릴 때 따로 가린다. */
+  const [periodOpen, setPeriodOpen] = useState(false);
   const wishlist = useWishlist();
 
   /*
@@ -342,6 +347,18 @@ export function HubView({
     () => tripsIn(inView, (id) => startedOn.get(id) ?? ""),
     [inView, startedOn],
   );
+  /*
+    시트에 늘어놓을 여행. 평소에는 지금 지도에 보이는 것만이다(지도를 옮기면 따라온다). 그런데 여행을 하나 고르면 지도가 그
+    여행으로 날아가고, 그 바람에 목록이 그 여행 하나로 줄어 다른 여행으로 건너뛸 길이 사라진다. 고른 동안에는 기간 안의
+    모든 여행을 늘어놓는다 — 줄이는 것은 지도를 직접 옮긴 손이 할 일이다.
+  */
+  const everyTrip = useMemo(
+    () => tripsIn(shown, (id) => startedOn.get(id) ?? ""),
+    [shown, startedOn],
+  );
+  const listed = focused ? everyTrip : tripsInView;
+  /** 지도가 좁아서 목록이 줄어 있는가. 그렇다면 되돌릴 길(전체 보기)을 준다. */
+  const narrowed = !focused && tripsInView.length < everyTrip.length;
   const route = useMemo(
     () =>
       focused
@@ -358,6 +375,38 @@ export function HubView({
 
   const shownTrips = new Set(shown.map((place) => place.tripId)).size;
   const shownPhotos = shown.reduce((sum, place) => sum + place.photoCount, 0);
+
+  /*
+    시트를 옮길 때는 늘 이 길로. 살짝 내리면 달 막대는 접는다 — 접은 줄 알았던 막대가 다시 올릴 때 저절로 펼쳐져
+    있으면 놀란다.
+  */
+  const changeSnap = (next: Snap) => {
+    setSnap(next);
+    if (next === "peek") setPeriodOpen(false);
+  };
+
+  /*
+    달 막대는 "기간"을 눌러야 펼쳐진다. 살짝 올린 모습의 시트에는 막대가 들어갈 자리가 없다(여행 카드가 그 자리를
+    쓴다) — 눌렀는데 접혀 있으면 안 되니 막대가 들어갈 만큼 시트를 올린다. 넓은 화면은 옆에 서 있는 목록이라 올릴 것이 없다.
+  */
+  const barsShown = periodOpen && months.length > 1 && (wide || snap !== "peek");
+  const togglePeriod = () => {
+    if (barsShown) {
+      setPeriodOpen(false);
+      return;
+    }
+    setPeriodOpen(true);
+    if (!wide && snap === "peek") setSnap("half");
+  };
+
+  /*
+    여행은 한 번에 한 모습으로만 그린다. 살짝 올린 모습에서는 가로 카드, 끌어올리면 세로 목록이다. 같은 여행이 둘로
+    보이면 어느 것을 눌러야 하는지 헷갈리고, 화면 읽기 도구는 둘 다 읽는다. 끌어올리는 동안에는 둘 다 둔다 — 올라오는
+    시트가 빈 칸으로 비어 보이지 않게.
+  */
+  const compact = !wide && snap === "peek";
+  const showCards = compact;
+  const showList = !compact || dragHeight !== null;
 
   /*
     다시 걸을 것은 지금 고른 여행이다. 따로 묻지 않는다 — 무엇을 걷고
@@ -480,7 +529,7 @@ export function HubView({
       flights.current += 1;
       setFlyTo({ key: flights.current, places: sido.sidoBounds(name) });
     }
-    setSnap("peek");
+    changeSnap("peek");
   };
 
   const pickSpot = (id: string) => {
@@ -500,19 +549,37 @@ export function HubView({
     fly(places.filter((place) => place.tripId === trip.tripId));
   };
 
+  const showAllTrips = () => {
+    setFocused(null);
+    // 기간을 골랐으면 그 기간의 여행이 다 보이게. 기간 밖 여행까지 보이게 날아가면 고른 기간이 무색하다.
+    fly(shown.length > 0 ? shown : places);
+  };
+
   const header = (
     <SheetHeader
       status={status}
       tripCount={range ? shownTrips : trips.length}
       photoCount={shownPhotos}
-      rangeText={range ? rangeLabel(range) : null}
       placesOnScreen={inView.length}
-      focusedLabel={focused ? (tripsInView.find((trip) => trip.tripId === focused)?.label ?? null) : null}
+      focused={focused !== null}
       onClearFocus={() => setFocused(null)}
-      timeline={
-        months.length > 1 ? (
-          <MonthBars months={months} totals={totals} range={range} onRange={chooseRange} />
+      narrowed={narrowed}
+      onShowAll={showAllTrips}
+      wide={wide}
+      cards={
+        showCards && status === "ready" && places.length > 0 ? (
+          <TripCards
+            trips={listed}
+            focused={focused}
+            photoUrls={pinUrls}
+            onFocus={focusTrip}
+            onShowAll={showAllTrips}
+          />
         ) : null
+      }
+      periodChip={months.length > 1 ? <PeriodChip range={range} open={barsShown} onToggle={togglePeriod} /> : null}
+      timeline={
+        barsShown ? <MonthBars months={months} totals={totals} range={range} onRange={chooseRange} /> : null
       }
       walkLabel={walkable.length > 0 ? walkLabel : null}
       onWalk={startWalk}
@@ -557,7 +624,7 @@ export function HubView({
             : null;
 
   const body =
-    status !== "ready" || places.length === 0 ? null : (
+    status !== "ready" || places.length === 0 || !showList ? null : (
       <>
         {echo && !range && !focused && (
           <EchoCard
@@ -570,14 +637,11 @@ export function HubView({
           />
         )}
         <TripsPanel
-          trips={tripsInView}
+          trips={listed}
           focused={focused}
           photoUrls={pinUrls}
           onFocus={focusTrip}
-          onShowAll={() => {
-            setFocused(null);
-            fly(places);
-          }}
+          onShowAll={showAllTrips}
         />
       </>
     );
@@ -602,38 +666,17 @@ export function HubView({
   );
 
   /*
-    지도 위 왼쪽에 띄우는 두 단추. 칠한 곳 모음과 100선 겹쳐 보기.
-    아직 얹을 것이 없으면 띄우지 않는다.
+    지도 위 왼쪽에 띄우는 단추 하나. 칠한 곳 모음(다녀온 시도)과 100선 겹쳐 보기가 이 안에 있다 — 예전에는 칩 둘이
+    늘 떠 있어 무엇인지 알기 어렵고 지도를 가렸다. 아직 얹을 것이 없으면 띄우지 않는다.
   */
   const controls = !empty && !replay && (
     <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col items-start gap-2 sm:top-[68px]">
-      <button
-        type="button"
-        onClick={openCollection}
-        className="pointer-events-auto rounded-full bg-surface px-3 py-1.5 text-[13px] font-semibold text-text shadow-[0_2px_10px_rgba(0,0,0,0.15)] ring-1 ring-line transition hover:bg-bg-subtle"
-      >
-        시도 {sido ? tally.size : "…"}/17
-      </button>
-      <button
-        type="button"
-        onClick={toggleCurated}
-        aria-pressed={showCurated}
-        className={`pointer-events-auto rounded-full px-3 py-1.5 text-[13px] font-semibold shadow-[0_2px_10px_rgba(0,0,0,0.15)] ring-1 transition ${
-          showCurated
-            ? "bg-accent text-on-accent ring-accent"
-            : "bg-surface text-text ring-line hover:bg-bg-subtle"
-        }`}
-      >
-        {showCurated ? "100선 끄기" : "100선 겹쳐 보기"}
-      </button>
-      {showCurated && (
-        <p className="pointer-events-auto rounded-lg bg-surface/95 px-2.5 py-1.5 text-[11px] leading-relaxed text-text-muted shadow-sm ring-1 ring-line">
-          <span className="mr-1 inline-block h-2.5 w-2.5 rounded-full border-2 border-accent bg-white align-[-1px]" />
-          아직 안 간 곳
-          <span className="ml-2 mr-1 inline-block h-2.5 w-2.5 rounded-full border-2 border-white bg-accent align-[-1px]" />
-          가고 싶은 곳
-        </p>
-      )}
+      <MapOptions
+        sidoCount={sido ? tally.size : null}
+        curatedOn={showCurated}
+        onSido={openCollection}
+        onCurated={toggleCurated}
+      />
     </div>
   );
 
@@ -670,7 +713,7 @@ export function HubView({
           <HubSheet
             snap={snap}
             onSnap={(next) => {
-              setSnap(next);
+              changeSnap(next);
               setDragHeight(null);
             }}
             heights={heights}
@@ -708,12 +751,21 @@ interface SheetHeaderProps {
   status: Status;
   tripCount: number;
   photoCount: number;
-  /** 기간을 골랐으면 그 기간. 요약 앞에 붙인다. */
-  rangeText: string | null;
   placesOnScreen: number;
-  focusedLabel: string | null;
+  /** 여행을 하나 골라 지도에 이어 두었는가. */
+  focused: boolean;
   onClearFocus: () => void;
-  /** 달 막대. 자료가 한 달뿐이면 없다. */
+  /** 지도가 좁아서 목록이 줄어 있는가. */
+  narrowed: boolean;
+  /** 모든 여행이 보이게 지도를 넓힌다. */
+  onShowAll: () => void;
+  /** 옆 목록(넓은 화면)인가. 좁은 화면의 시트는 높이가 못 박혀 있어 단추 줄이 줄을 바꾸면 안 된다. */
+  wide: boolean;
+  /** 여행 카드 줄. 살짝 올린 모습에서만 있다 — 끌어올리면 세로 목록이 그 일을 한다. */
+  cards: ReactNode;
+  /** "기간" 단추. 달이 하나뿐이면 고를 기간이 없어 없다. */
+  periodChip: ReactNode;
+  /** 펼친 달 막대. "기간"을 눌러야 있다. */
   timeline: ReactNode;
   /** 다시 걷기 단추의 이름. 걸을 것이 없으면 null. */
   walkLabel: string | null;
@@ -730,10 +782,14 @@ function SheetHeader({
   status,
   tripCount,
   photoCount,
-  rangeText,
   placesOnScreen,
-  focusedLabel,
+  focused,
   onClearFocus,
+  narrowed,
+  onShowAll,
+  wide,
+  cards,
+  periodChip,
   timeline,
   walkLabel,
   onWalk,
@@ -788,23 +844,39 @@ function SheetHeader({
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex items-baseline justify-between gap-3">
+        {/* 첫 줄은 늘 무엇의 목록인지다. 고른 여행의 이름은 고른 카드 · 줄이 말한다. */}
         <p className="min-w-0 truncate text-[15px] font-semibold text-text">
-          {focusedLabel ?? `${rangeText ? `${rangeText} · ` : ""}여행 ${tripCount} · 사진 ${photoCount}장`}
+          내 여행 {tripCount}개
+          <span className="ml-1.5 text-[13px] font-normal text-text-faint">사진 {photoCount}장</span>
         </p>
-        {focusedLabel ? (
+        {focused ? (
           <button
             type="button"
             onClick={onClearFocus}
             className="shrink-0 text-[13px] font-medium text-text-muted hover:text-text"
           >
-            잇기 끄기
+            선택 풀기
           </button>
         ) : (
-          <span className="shrink-0 text-[13px] text-text-faint">이 화면 {placesOnScreen}곳</span>
+          <span className="flex shrink-0 items-baseline gap-2 text-[13px]">
+            <span className="text-text-faint">이 화면 {placesOnScreen}곳</span>
+            {narrowed && (
+              <button
+                type="button"
+                onClick={onShowAll}
+                className="font-medium text-accent transition hover:text-accent-hover"
+              >
+                전체 보기
+              </button>
+            )}
+          </span>
         )}
       </div>
+      {cards}
       {timeline}
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+      <div
+        className={`flex items-center gap-2 pb-0.5 ${wide ? "flex-wrap" : "overflow-x-auto [scrollbar-width:none]"}`}
+      >
         {/*
           다시 걷기가 맨 앞이다. 이 화면에서 다른 데서는 못 하는 일이
           이것이다.
@@ -818,6 +890,8 @@ function SheetHeader({
             ▶ {walkLabel}
           </button>
         )}
+        {/* 달 막대를 여닫는다. 거른 기간이 있으면 이 단추가 말한다. */}
+        {periodChip}
         {/* 같은 여행을 목록으로도 본다. 검색하고 거르고 지우는 것은 그쪽이 한다. */}
         {onList && <ViewSwitch view="map" onChange={onList} />}
         {/* 폰에서는 접는다 — 하단 탭의 가운데 단추와 "한장"이 이 일을 한다. */}
