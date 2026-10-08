@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import type { ReadResult } from "@/lib/photo/readShots";
+import type { DateRange } from "@/lib/supabase/trips";
+import { MAP_HREF, SKETCH_HREF } from "@/lib/nav";
 import { readStart } from "@/lib/start";
 
 /*
@@ -9,6 +11,9 @@ import { readStart } from "@/lib/start";
   묶기 규칙 자체는 순수 함수 쪽에서 재고, 여기서는 사람이 손대는 부분만
   본다 — 제목을 짓는 것, 잘못 묶인 것을 나누는 것, 도로 합치는 것.
   실제 파일 대신 읽어낸 결과를 바로 끼워 넣는다.
+
+  길은 세 걸음이다 — 고르기 · 확인 · 기록. 확인 화면의 여행 카드는 곳 목록 · 동행 · 나누기 · 합치기를
+  "다듬기" 안에 접어 두고, 아래에는 기록 막대가 붙는다.
 */
 
 const 고성 = { lat: 38.4798, lng: 128.4391 };
@@ -32,25 +37,37 @@ const 이틀 = [
   shot("e.jpg", "2026-09-14T10:02", 송정),
 ];
 
+// 석 달 떨어진 두 나들이 — 합칠 수 있는 사이가 아니다.
+const 두여행 = [shot("a.jpg", "2026-06-13T09:00", 고성), shot("b.jpg", "2026-09-14T09:00", 강릉)];
+
 const readShots = vi.fn<(files: File[]) => Promise<ReadResult>>();
 const saveTrip = vi.fn();
+const uploadPhotos = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+
+let currentUser: { id: string } | null = { id: "나" };
+let savedRanges: DateRange[] = [];
 
 vi.mock("@/lib/photo/readShots", () => ({ readShots: (files: File[]) => readShots(files) }));
 
 vi.mock("@/lib/supabase/photos", () => ({
-  uploadPhotos: async () => ({ uploaded: 0, unsupported: [], overLimit: 0 }),
+  uploadPhotos: (...args: unknown[]) => uploadPhotos(...args),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
   getBrowserClient: () => ({
-    auth: { getUser: async () => ({ data: { user: { id: "나" } } }) },
+    auth: { getUser: async () => ({ data: { user: currentUser } }) },
   }),
 }));
 
 vi.mock("@/lib/supabase/trips", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/supabase/trips")>()),
-  fetchSavedRanges: async () => [],
+  fetchSavedRanges: async () => savedRanges,
   saveTrip: (...args: unknown[]) => saveTrip(...args),
+}));
+
+// 작은 그림은 따로 시험한다. 여기서는 카드마다 어떤 사진을 건넸는지만 본다.
+vi.mock("./photoImport/TripThumbs", () => ({
+  TripThumbs: ({ files }: { files: File[] }) => <div data-testid="thumbs">{files.map((file) => file.name).join(",")}</div>,
 }));
 
 /** 좌표가 몇 개 오든 이름을 지어 돌려주는 가짜 /api/place. */
@@ -72,6 +89,11 @@ function 장소응답(points: { lat: number; lng: number }[]) {
   };
 }
 
+async function 화면열기() {
+  const { PhotoImport } = await import("./PhotoImport");
+  return render(<PhotoImport />);
+}
+
 async function 사진넣기(shots = 이틀) {
   readShots.mockResolvedValue({
     shots,
@@ -80,8 +102,7 @@ async function 사진넣기(shots = 이틀) {
     unreadable: [],
   });
 
-  const { PhotoImport } = await import("./PhotoImport");
-  const view = render(<PhotoImport />);
+  const view = await 화면열기();
 
   const input = view.container.querySelector('input[type="file"]')!;
   const files = shots.map((s) => new File(["x"], s.id, { type: "image/jpeg" }));
@@ -94,17 +115,42 @@ async function 사진넣기(shots = 이틀) {
 
 const 제목칸 = () => screen.getAllByLabelText("여행 제목") as HTMLInputElement[];
 
+/** 접혀 있는 카드의 "다듬기"를 모두 연다. */
+function 다듬기열기() {
+  for (const button of screen.getAllByRole("button", { name: /^(다듬기|방문한 곳 보기)/ })) {
+    if (button.getAttribute("aria-expanded") === "false") fireEvent.click(button);
+  }
+}
+
+const 지금걸음 = () =>
+  screen.getAllByRole("listitem").find((item) => item.getAttribute("aria-current") === "step")?.textContent;
+
+const 기록단추 = (건수 = 1) => screen.findByRole("button", { name: new RegExp(`여행 ${건수}건 기록하기`) });
+
 describe("PhotoImport", () => {
   beforeEach(() => {
     vi.resetModules();
     readShots.mockReset();
     saveTrip.mockReset();
     saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: [] });
+    uploadPhotos.mockReset();
+    uploadPhotos.mockResolvedValue({ uploaded: 0, unsupported: [], overLimit: 0, failed: 0 });
+    currentUser = { id: "나" };
+    savedRanges = [];
+    sessionStorage.clear();
+    // 완료 화면이 맨 위로 올린다. 시험이 끝난 뒤 늦게 도착하는 저장에도 jsdom 의 "구현되지 않음" 소리가 나지 않게,
+    // 되돌리지 않는 가짜를 둔다(창은 파일마다 따로 만들어진다).
+    window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
 
     vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => ({
       ok: true,
       json: async () => 장소응답(JSON.parse(String(init.body)).points),
     }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("장소에서 제목을 지어 미리 넣어 둔다", async () => {
@@ -119,10 +165,86 @@ describe("PhotoImport", () => {
     await waitFor(() => expect(제목칸()[0].value).not.toBe(""));
 
     fireEvent.change(제목칸()[0], { target: { value: "민수랑 첫 휴가" } });
-    fireEvent.click(screen.getByRole("button", { name: /여행 1건 기록하기/ }));
+    fireEvent.click(await 기록단추());
 
     await waitFor(() => expect(saveTrip).toHaveBeenCalled());
     expect(saveTrip.mock.calls[0].at(-1)).toBe("민수랑 첫 휴가");
+  });
+
+  describe("걸음 표시", () => {
+    it("처음에는 1 고르기", async () => {
+      await 화면열기();
+      expect(지금걸음()).toBe("1고르기");
+    });
+
+    it("사진을 읽고 나면 2 확인", async () => {
+      await 사진넣기();
+      expect(지금걸음()).toBe("2확인");
+    });
+
+    it("기록하고 나면 3 기록", async () => {
+      await 사진넣기();
+      fireEvent.click(await 기록단추());
+      await screen.findByText("여행 1건을 기록했어요");
+      expect(지금걸음()).toBe("3기록");
+    });
+  });
+
+  describe("고르기 화면", () => {
+    it("사진 고르기 단추가 하나, 크게 있다", async () => {
+      await 화면열기();
+      const button = screen.getByRole("button", { name: "사진 고르기" });
+      expect(button.className).toContain("w-full");
+    });
+
+    it("약속은 정확하다 — 고르는 동안은 기기 밖으로 나가지 않는다, 올린다는 말은 기록할 때 한다", async () => {
+      const { container } = await 화면열기();
+      expect(screen.getByText("고르는 동안 사진은 이 기기 밖으로 나가지 않아요")).toBeTruthy();
+      // 예전 문구는 기록할 때 사진을 올릴 수 있어서 틀린 약속이었다.
+      expect(container.textContent).not.toMatch(/올라가지 않아요\.?$/);
+      expect(container.textContent).not.toContain("읽기는 이 브라우저 안에서만");
+    });
+
+    it("로그인하지 않은 사람에게는 기록할 때 로그인한다는 것을 미리 말한다", async () => {
+      currentUser = null;
+      await 화면열기();
+      expect(await screen.findByText("기록으로 남길 때 로그인해요")).toBeTruthy();
+    });
+
+    it("로그인한 사람에게는 로그인 이야기를 하지 않는다", async () => {
+      await 화면열기();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(screen.queryByText("기록으로 남길 때 로그인해요")).toBeNull();
+    });
+
+    it("반복되는 설명 줄(부제)이 없다", async () => {
+      const { container } = await 화면열기();
+      expect(container.textContent).not.toContain("기억나지 않는 사진도");
+    });
+  });
+
+  describe("확인 화면 · 카드", () => {
+    it("카드마다 그 여행의 사진 몇 장을 건넨다 — 처음 · 가운데 · 끝에서", async () => {
+      await 사진넣기();
+      // 사진 다섯 장(a~e) 중 처음·가운데·끝.
+      expect(screen.getByTestId("thumbs")).toHaveTextContent("a.jpg,c.jpg,e.jpg");
+    });
+
+    it("곳 목록 · 동행은 접혀 있다", async () => {
+      await 사진넣기();
+      expect(screen.queryByLabelText("누구와 가셨나요?")).toBeNull();
+      expect(screen.queryByText("송정해변")).toBeNull();
+    });
+
+    it("나눌 자리가 있으면 접힌 단추에 제안으로 알린다", async () => {
+      await 사진넣기();
+      expect(screen.getByRole("button", { name: /^다듬기/ })).toHaveTextContent("제안 1");
+    });
+
+    it("기간은 사람이 읽는 말로 적는다", async () => {
+      await 사진넣기();
+      expect(screen.getByText(/2026년 9월 13일 ~ 14일 · 사진 5장 · 방문 3곳/)).toBeTruthy();
+    });
   });
 
   /*
@@ -137,7 +259,7 @@ describe("PhotoImport", () => {
     const 기록하기 = async () => {
       await 사진넣기();
       await waitFor(() => expect(제목칸()[0].value).not.toBe(""));
-      fireEvent.click(screen.getByRole("button", { name: /여행 1건 기록하기/ }));
+      fireEvent.click(await 기록단추());
       await waitFor(() => expect(saveTrip).toHaveBeenCalled());
     };
 
@@ -152,7 +274,7 @@ describe("PhotoImport", () => {
       document.cookie = "start=spots; path=/";
       await 기록하기();
       // 기록이 끝난 뒤(화면이 바뀐 뒤)에도 그대로다.
-      await screen.findByText("여행 1건을 기록했어요.");
+      await screen.findByText("여행 1건을 기록했어요");
       expect(readStart()).toBe("spots");
     });
 
@@ -164,69 +286,257 @@ describe("PhotoImport", () => {
     });
   });
 
-  it("멀리 떨어진 날 경계에서만 나누기를 묻는다", async () => {
-    await 사진넣기();
-    expect(screen.getByText(/여기서 날이 바뀌고 9\dkm 떨어져요/)).toBeTruthy();
+  describe("다듬기 · 나누기와 합치기", () => {
+    it("멀리 떨어진 날 경계에서만 나누기를 묻는다", async () => {
+      await 사진넣기();
+      다듬기열기();
+      expect(screen.getByText(/여기서 날이 바뀌고 9\dkm 떨어져요/)).toBeTruthy();
 
-    // 같은 날 안에서 장소만 옮긴 자리에는 묻지 않는다.
-    expect(screen.getAllByRole("button", { name: "따로 기록하기" })).toHaveLength(1);
+      // 같은 날 안에서 장소만 옮긴 자리에는 묻지 않는다.
+      expect(screen.getAllByRole("button", { name: "따로 기록하기" })).toHaveLength(1);
+    });
+
+    it("가까운 데서 잤으면 나누기를 묻지 않는다", async () => {
+      await 사진넣기([
+        shot("a.jpg", "2026-09-13T18:00", 강릉),
+        shot("b.jpg", "2026-09-14T08:00", 송정),
+      ]);
+      다듬기열기();
+      expect(screen.queryByRole("button", { name: "따로 기록하기" })).toBeNull();
+      // 제안도 없다.
+      expect(screen.getByRole("button", { name: /^다듬기/ })).not.toHaveTextContent("제안");
+    });
+
+    it("나누면 두 건이 되고, 앞 여행의 제목은 그대로 남는다", async () => {
+      await 사진넣기();
+      await waitFor(() => expect(제목칸()[0].value).not.toBe(""));
+      fireEvent.change(제목칸()[0], { target: { value: "고성 나들이" } });
+
+      다듬기열기();
+      fireEvent.click(screen.getByRole("button", { name: "따로 기록하기" }));
+
+      await screen.findByText(/여행 2건을 찾았어요/);
+      await waitFor(() => expect(제목칸()[0].value).toBe("고성 나들이"));
+      // 갈라져 나온 쪽은 제 장소로 새 이름을 받는다.
+      expect(제목칸()[1].value).toBe("안목해변·송정해변");
+    });
+
+    it("나눈 뒤 아래 여행에는 합치기 제안이 붙는다", async () => {
+      await 사진넣기();
+      다듬기열기();
+      fireEvent.click(screen.getByRole("button", { name: "따로 기록하기" }));
+      await screen.findByText(/여행 2건을 찾았어요/);
+
+      const [, 둘째] = screen.getAllByRole("button", { name: /^다듬기/ });
+      expect(둘째).toHaveTextContent("제안 1");
+    });
+
+    it("합치면 처음 지어 둔 제목이 되살아난다", async () => {
+      await 사진넣기();
+      await waitFor(() => expect(제목칸()[0].value).not.toBe(""));
+      fireEvent.change(제목칸()[0], { target: { value: "강릉 1박 2일" } });
+
+      다듬기열기();
+      fireEvent.click(screen.getByRole("button", { name: "따로 기록하기" }));
+      await screen.findByText(/여행 2건을 찾았어요/);
+
+      다듬기열기();
+      fireEvent.click(screen.getByRole("button", { name: /위 여행과 한 여행이었어요/ }));
+      await screen.findByText(/여행 1건을 찾았어요/);
+      await waitFor(() => expect(제목칸()[0].value).toBe("강릉 1박 2일"));
+    });
+
+    it("한참 떨어진 여행에는 합치기를 달지 않는다", async () => {
+      await 사진넣기(두여행);
+      expect(screen.getAllByRole("listitem").length).toBeGreaterThan(0);
+      다듬기열기();
+      expect(screen.queryByRole("button", { name: /한 여행이었어요/ })).toBeNull();
+    });
+
+    it("같은 이름이 연달아 나오면 한 줄로 합쳐 보여준다", async () => {
+      // 안목에서 1km 넘게 걸었다 돌아온 셈이다. 규칙대로면 방문이 둘이지만
+      // "안목해변 → 안목해변"으로 늘어놓으면 읽는 사람만 어지럽다.
+      await 사진넣기([
+        shot("a.jpg", "2026-09-14T09:00", 강릉),
+        shot("b.jpg", "2026-09-14T10:00", 안목위쪽),
+        shot("c.jpg", "2026-09-14T11:00", 송정),
+      ]);
+      다듬기열기();
+      await waitFor(() => expect(screen.getAllByText("안목해변")).toHaveLength(1));
+      expect(screen.getByText(/사진 3장 · 방문 2곳/)).toBeTruthy();
+      expect(screen.getByText("송정해변")).toBeTruthy();
+    });
+
+    it("함께 간 사람은 다듬기 안에서 적고, 기록에 담긴다", async () => {
+      await 사진넣기();
+      다듬기열기();
+      fireEvent.change(screen.getByLabelText("누구와 가셨나요?"), { target: { value: "민수" } });
+      fireEvent.click(await 기록단추());
+      await waitFor(() => expect(saveTrip).toHaveBeenCalled());
+      expect(saveTrip.mock.calls[0][4]).toBe("민수");
+    });
   });
 
-  it("가까운 데서 잤으면 나누기를 묻지 않는다", async () => {
-    await 사진넣기([
-      shot("a.jpg", "2026-09-13T18:00", 강릉),
-      shot("b.jpg", "2026-09-14T08:00", 송정),
-    ]);
-    expect(screen.queryByRole("button", { name: "따로 기록하기" })).toBeNull();
+  describe("여행 아님", () => {
+    it("뺀 자리에 얇은 줄이 남고, 되돌릴 수 있다", async () => {
+      await 사진넣기(두여행);
+      expect(screen.getByText("여행 2건을 찾았어요")).toBeTruthy();
+
+      fireEvent.click(screen.getAllByRole("button", { name: "여행 아님" })[0]);
+      expect(screen.getByText("여행 1건을 찾았어요")).toBeTruthy();
+      expect(screen.getByText(/을 뺐어요/)).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "되돌리기" }));
+      expect(screen.getByText("여행 2건을 찾았어요")).toBeTruthy();
+      expect(screen.queryByText(/을 뺐어요/)).toBeNull();
+    });
+
+    it("뺀 여행은 기록하지 않는다 — 기록할 건수도 줄어든다", async () => {
+      await 사진넣기(두여행);
+      fireEvent.click(screen.getAllByRole("button", { name: "여행 아님" })[0]);
+      fireEvent.click(await 기록단추(1));
+      await waitFor(() => expect(saveTrip).toHaveBeenCalledTimes(1));
+    });
+
+    it("모두 빼면 그렇게 말하고, 기록 막대는 거둔다", async () => {
+      await 사진넣기();
+      fireEvent.click(screen.getByRole("button", { name: "여행 아님" }));
+      expect(screen.getByText("여행을 모두 뺐어요")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /기록하기/ })).toBeNull();
+      // 되돌릴 길은 남는다.
+      expect(screen.getByRole("button", { name: "되돌리기" })).toBeTruthy();
+    });
+
+    it("'일상이에요' 라는 옛 이름은 없다", async () => {
+      const { container } = await 사진넣기();
+      expect(container.textContent).not.toContain("일상이에요");
+    });
   });
 
-  it("나누면 두 건이 되고, 앞 여행의 제목은 그대로 남는다", async () => {
-    await 사진넣기();
-    await waitFor(() => expect(제목칸()[0].value).not.toBe(""));
-    fireEvent.change(제목칸()[0], { target: { value: "고성 나들이" } });
+  describe("기록 막대", () => {
+    it("로그인했으면 사진도 함께 올릴지 고르고 기록한다", async () => {
+      await 사진넣기();
+      const bar = (await 기록단추()).closest("div")!.parentElement!;
+      expect(within(bar).getByRole("checkbox", { name: /사진도 함께 올리기/ })).toBeChecked();
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: "따로 기록하기" }));
+    it("사진도 함께 올리기를 켜 두면 사진을 올린다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      await 사진넣기();
+      fireEvent.click(await 기록단추());
+      await waitFor(() => expect(uploadPhotos).toHaveBeenCalled());
+    });
 
-    await screen.findByText(/여행 2건을 찾았어요/);
-    await waitFor(() => expect(제목칸()[0].value).toBe("고성 나들이"));
-    // 갈라져 나온 쪽은 제 장소로 새 이름을 받는다.
-    expect(제목칸()[1].value).toBe("안목해변·송정해변");
+    it("끄면 사진을 올리지 않는다 — 언제 어디를 다녀왔는지만 기록한다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      await 사진넣기();
+      fireEvent.click(screen.getByRole("checkbox", { name: /사진도 함께 올리기/ }));
+      fireEvent.click(await 기록단추());
+      await screen.findByText("여행 1건을 기록했어요");
+      expect(uploadPhotos).not.toHaveBeenCalled();
+    });
+
+    it("로그인 전에는 로그인하고 기록하게 한다 — 기록 단추도 올릴 사진 칸도 없다", async () => {
+      currentUser = null;
+      await 사진넣기();
+      const link = await screen.findByRole("link", { name: "로그인하고 기록하기" });
+      expect(link).toHaveAttribute("href", "/login?next=%2Ftrips%2Fnew");
+      expect(screen.getByText("로그인한 뒤 같은 사진을 한 번 더 골라 주세요")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /기록하기/ })).toBeNull();
+      expect(screen.queryByRole("checkbox")).toBeNull();
+    });
+
+    it("로그인 전에는 제목을 고칠 수 없다 — 기록할 수 없는 결과를 다듬게 하지 않는다", async () => {
+      currentUser = null;
+      await 사진넣기();
+      expect(screen.queryByLabelText("여행 제목")).toBeNull();
+    });
+
+    it("이미 기록한 날짜와 겹치면 알리고, 기록할 것이 없다고 말한다", async () => {
+      savedRanges = [{ start: "2026-09-13", end: "2026-09-14" }];
+      await 사진넣기();
+      await waitFor(() => expect(screen.getByText("이미 기록한 날짜와 겹쳐요.")).toBeTruthy());
+      expect(await screen.findByRole("button", { name: "모두 이미 기록했어요" })).toBeDisabled();
+      // 이미 기록한 여행은 제목을 고치는 칸이 아니다.
+      expect(screen.queryByLabelText("여행 제목")).toBeNull();
+    });
   });
 
-  it("합치면 처음 지어 둔 제목이 되살아난다", async () => {
-    await 사진넣기();
-    await waitFor(() => expect(제목칸()[0].value).not.toBe(""));
-    fireEvent.change(제목칸()[0], { target: { value: "강릉 1박 2일" } });
+  describe("가족의 여행을 보는 중", () => {
+    const 가족보기 = (role: "view" | "edit" | "full") =>
+      sessionStorage.setItem("family-view", JSON.stringify({ ownerId: "엄마", label: "mom@example.com", role }));
 
-    fireEvent.click(screen.getByRole("button", { name: "따로 기록하기" }));
-    await screen.findByText(/여행 2건을 찾았어요/);
+    it("더할 권한이 없으면 안내만 하고 기록 막대는 없다", async () => {
+      가족보기("view");
+      await 사진넣기();
+      expect(screen.getByText(/mom@example.com 님의 여행에는 사진을 더할 수 없어요/)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /기록하기/ })).toBeNull();
+      expect(screen.queryByRole("link", { name: "로그인하고 기록하기" })).toBeNull();
+    });
 
-    fireEvent.click(screen.getByRole("button", { name: /위 여행과 한 여행이었어요/ }));
-    await screen.findByText(/여행 1건을 찾았어요/);
-    await waitFor(() => expect(제목칸()[0].value).toBe("강릉 1박 2일"));
+    it("더할 수 있으면 그 사람의 여행에 더해진다고 알리고, 그 사람의 여행으로 기록한다", async () => {
+      가족보기("full");
+      await 사진넣기();
+      expect(screen.getByText("mom@example.com")).toBeTruthy();
+      fireEvent.click(await 기록단추());
+      await waitFor(() => expect(saveTrip).toHaveBeenCalled());
+      expect(saveTrip.mock.calls[0][1]).toBe("엄마");
+    });
   });
 
-  it("한참 떨어진 여행에는 합치기를 달지 않는다", async () => {
-    await 사진넣기([
-      shot("a.jpg", "2026-06-13T09:00", 고성),
-      shot("b.jpg", "2026-09-14T09:00", 강릉),
-    ]);
-    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: /한 여행이었어요/ })).toBeNull();
+  describe("기록이 끝난 뒤", () => {
+    it("끝났다고 크게 말하고, 방금 기록한 카드들은 거둔다", async () => {
+      await 사진넣기();
+      fireEvent.click(await 기록단추());
+      expect(await screen.findByRole("heading", { name: "여행 1건을 기록했어요" })).toBeTruthy();
+      expect(screen.queryByLabelText("여행 제목")).toBeNull();
+      expect(screen.queryByRole("button", { name: /기록하기/ })).toBeNull();
+    });
+
+    it("다음에 갈 곳 둘을 건넨다 — 지도에서 보기, 한장 요약 보기", async () => {
+      await 사진넣기();
+      fireEvent.click(await 기록단추());
+      expect(await screen.findByRole("link", { name: "지도에서 보기" })).toHaveAttribute("href", MAP_HREF);
+      expect(screen.getByRole("link", { name: "한장 요약 보기" })).toHaveAttribute("href", SKETCH_HREF);
+    });
+
+    it("올라간 사진과 못 올린 사진을 알린다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      uploadPhotos.mockResolvedValue({ uploaded: 4, unsupported: ["x.heic"], overLimit: 0, failed: 0 });
+      await 사진넣기();
+      fireEvent.click(await 기록단추());
+      expect(await screen.findByText("사진 4장을 함께 올렸어요")).toBeTruthy();
+      expect(screen.getByText(/1장은 이 브라우저가 열지 못하는 형식이라 올리지 못했어요/)).toBeTruthy();
+    });
+
+    it("사진 더 고르기 — 처음 화면으로 돌아가 곧바로 고르는 창을 연다", async () => {
+      const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
+      await 사진넣기();
+      fireEvent.click(await 기록단추());
+      await screen.findByRole("heading", { name: "여행 1건을 기록했어요" });
+
+      fireEvent.click(screen.getByRole("button", { name: "사진 더 고르기" }));
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("button", { name: "사진 고르기" })).toBeTruthy();
+      expect(지금걸음()).toBe("1고르기");
+      // 지난 결과가 남아 있지 않다.
+      expect(screen.queryByText(/여행 \d건을 찾았어요/)).toBeNull();
+    });
+
+    it("저장하지 못한 여행이 있으면 말하고, 다시 기록해 볼 수 있다", async () => {
+      saveTrip.mockResolvedValue({ ok: false });
+      await 사진넣기();
+      fireEvent.click(await 기록단추());
+      expect(await screen.findByRole("heading", { name: "새로 기록한 여행이 없어요" })).toBeTruthy();
+      expect(screen.getByText("1건은 저장하지 못했어요")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "다시 기록해 보기" }));
+      // 찾은 결과가 그대로 있어서 다시 누를 수 있다.
+      expect(await 기록단추()).toBeEnabled();
+      expect(지금걸음()).toBe("2확인");
+    });
   });
 
-  it("같은 이름이 연달아 나오면 한 줄로 합쳐 보여준다", async () => {
-    // 안목에서 1km 넘게 걸었다 돌아온 셈이다. 규칙대로면 방문이 둘이지만
-    // "안목해변 → 안목해변"으로 늘어놓으면 읽는 사람만 어지럽다.
-    await 사진넣기([
-      shot("a.jpg", "2026-09-14T09:00", 강릉),
-      shot("b.jpg", "2026-09-14T10:00", 안목위쪽),
-      shot("c.jpg", "2026-09-14T11:00", 송정),
-    ]);
-    await waitFor(() => expect(screen.getAllByText("안목해변")).toHaveLength(1));
-    expect(screen.getByText(/사진 3장 · 방문 2곳/)).toBeTruthy();
-    expect(screen.getByText("송정해변")).toBeTruthy();
-  });
   /*
     고르기 창을 닫고 나서 파일이 도착할 때까지의 틈.
 
@@ -235,8 +545,7 @@ describe("PhotoImport", () => {
   */
   describe("고르기 창을 닫은 뒤", () => {
     async function 창열기() {
-      const { PhotoImport } = await import("./PhotoImport");
-      const view = render(<PhotoImport />);
+      const view = await 화면열기();
       fireEvent.click(screen.getByRole("button", { name: "사진 고르기" }));
       // 창이 닫히면 초점이 돌아온다. 화면이 안내를 내미는 건 그때부터다.
       fireEvent.focus(window);
@@ -250,11 +559,16 @@ describe("PhotoImport", () => {
     });
 
     it("창이 떠 있는 동안에는 말하지 않는다", async () => {
-      const { PhotoImport } = await import("./PhotoImport");
-      render(<PhotoImport />);
+      await 화면열기();
       fireEvent.click(screen.getByRole("button", { name: "사진 고르기" }));
       // 아직 초점이 돌아오지 않았다 — 창은 열려 있다.
       expect(screen.queryByText("고르신 사진을 불러오고 있어요")).toBeNull();
+    });
+
+    it("기다리는 동안에도 걸음 표시는 1 고르기다", async () => {
+      await 창열기();
+      await screen.findByText("고르신 사진을 불러오고 있어요");
+      expect(지금걸음()).toBe("1고르기");
     });
 
     it("고르지 않고 닫으면 안내를 거둔다", async () => {

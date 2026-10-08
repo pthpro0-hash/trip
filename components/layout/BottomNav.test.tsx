@@ -113,8 +113,9 @@ describe("BottomNav", () => {
     });
 
     it("사진 고르기는 '켜진 곳'이 아니라 하는 일이다", () => {
-      at("/trips/new");
+      at("/trips/abc");
       expect(on()).toEqual(["내 여행"]);
+      expect(screen.getByRole("link", { name: "사진 고르기" })).not.toHaveAttribute("aria-current");
     });
 
     it("어느 쪽도 아니면 아무것도 켜지 않는다", () => {
@@ -124,7 +125,8 @@ describe("BottomNav", () => {
   });
 
   describe("숨길 때", () => {
-    it.each(["/sketch", "/login", "/auth/callback", "/s/abcdefghijklmnop", "/t/abcdefghijklmnop"])(
+    // 사진으로 여행 추가: 아래에는 기록 막대가 선다. 탭과 막대가 같은 자리에 쌓이지 않는다.
+    it.each(["/sketch", "/trips/new", "/login", "/auth/callback", "/s/abcdefghijklmnop", "/t/abcdefghijklmnop"])(
       "%s 에서는 없다",
       (pathname) => {
         at(pathname);

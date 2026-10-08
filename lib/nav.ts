@@ -85,11 +85,13 @@ export function homeStart(fromUrl: string | null, remembered: Start | "unknown" 
  * 숨기는 곳:
  *   한장 요약   저장 막대(이미지 저장·링크 공유)가 그 자리를 쓴다.
  *               두 줄을 겹쳐 쌓으면 화면 아래 15% 가 단추로 덮인다.
+ *   사진으로 여행 추가(/trips/new)   기록 막대(사진도 함께 올리기 · 기록하기)가 그 자리를 쓴다.
+ *               이 화면의 다음 걸음은 아래 단추 하나이고, 다른 곳으로 가는 길은 위 띠에 남는다.
  *   링크로 받은 화면(/s, /t)  받는 사람에게 "내 여행"은 없다.
  *   로그인 길   가려는 곳이 하나뿐이다.
  */
 export function showsBottomNav(pathname: string): boolean {
-  return !["/sketch", "/s", "/t", "/m", "/login", "/auth"].some((segment) => under(pathname, segment));
+  return !["/sketch", "/trips/new", "/s", "/t", "/m", "/login", "/auth"].some((segment) => under(pathname, segment));
 }
 
 /**

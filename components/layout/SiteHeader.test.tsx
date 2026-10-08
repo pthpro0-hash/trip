@@ -76,7 +76,7 @@ describe("SiteHeader", () => {
       },
     );
 
-    it.each(["/sketch", "/s/abc", "/t/abc", "/login"])(
+    it.each(["/sketch", "/trips/new", "/s/abc", "/t/abc", "/login"])(
       "%s — 아래 탭이 없으니 위 띠의 갈래를 접지 않는다",
       async (at) => {
         await 머리띠(at);

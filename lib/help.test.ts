@@ -60,6 +60,35 @@ describe("도움말 내용", () => {
     });
   });
 
+  /*
+    사진으로 여행 추가 화면은 세 걸음(고르기 · 확인 · 기록)이고, 확인 화면의 카드는 곳 목록 · 동행 · 나누기 · 합치기를
+    "다듬기" 안에 접고 아래에 기록 막대가 붙는다. 안내가 화면보다 앞서거나 뒤처지면 없는 단추를 찾아 헤맨다.
+  */
+  it("사진을 고르는 화면의 안내가 지금 화면의 이름을 쓴다", () => {
+    const sketch = CHAPTERS.find((chapter) => chapter.id === "sketch")!;
+    const text = sketch.steps.map((step) => `${step.title} ${step.summary} ${step.detail}`).join(" ");
+    // 지금 화면에 있는 단추들.
+    for (const word of ["여행 아님", "되돌리기", "다듬기", "제안", "위 여행과 한 여행이었어요", "따로 기록하기", "사진도 함께 올리기", "기록하기", "지도에서 보기", "한장 요약 보기"]) {
+      expect(text, word).toContain(word);
+    }
+    // 없어진 이름과 보이지 않게 된 기술 용어.
+    expect(text).not.toContain("일상이에요");
+    expect(text).not.toContain("2048px");
+  });
+
+  it("로그인하지 않아도 사진은 읽어 볼 수 있다는 것을 알린다", () => {
+    const sketch = CHAPTERS.find((chapter) => chapter.id === "sketch")!;
+    const first = sketch.steps[0];
+    expect(first.detail).toContain("로그인하지 않아도");
+    expect(first.detail).toContain("기록할 때 로그인");
+  });
+
+  it("아래 탭이 사진을 고르는 화면에서도 숨는다는 것을 알린다", () => {
+    const sketch = CHAPTERS.find((chapter) => chapter.id === "sketch")!;
+    const tabs = sketch.steps.find((step) => step.title === "폰에서는 아래 탭으로 오가세요");
+    expect(tabs?.detail).toContain("사진을 고르는 화면");
+  });
+
   it("가족 책장은 계정과 보관에서 갈래를 따로 떼어 냈다 — 순서는 스케치·이번 여행·100선·가족 책장·계정", () => {
     expect(CHAPTERS.map((chapter) => chapter.id)).toEqual(["sketch", "trip", "browse", "shelf", "account"]);
     const shelf = CHAPTERS.find((chapter) => chapter.id === "shelf")!;

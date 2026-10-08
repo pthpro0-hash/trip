@@ -169,6 +169,37 @@ export async function markerFromBlob(blob: Blob, name = "photo"): Promise<Blob> 
   return bakeFromBlob(blob, MARKER_EDGE, MARKER_QUALITY, name);
 }
 
+/*
+  확인 화면의 여행 카드에 붙일 작은 그림.
+
+  고른 사진은 아직 어디에도 올라가지 않았다 — 기기 안의 원본 파일뿐이다. 12MP 사진을 80px 칸에
+  그대로 그리면 브라우저가 칸마다 통째로 펼쳐 붙들고 있는다. 작은 판을 따로 구워 칸에 쓰고, 펼친
+  그림은 곧바로 닫는다. 칸은 가로세로 64pt 남짓이라 3배 화면에서 192px 이면 되고, 240px 면 넉넉하다.
+*/
+export const PREVIEW_EDGE = 240;
+export const PREVIEW_QUALITY = 0.7;
+
+/**
+ * 고른 사진 한 장(원본)에서 카드 칸에 붙일 작은 판을 만든다.
+ *
+ * 올리는 용도가 아니라 화면에만 쓴다 — 올릴 때는 shrinkToWebp 가 따로 줄인다. 아이폰 사진은 회전 정보를
+ * 따라 펼쳐야 세로 사진이 눕지 않는다. 브라우저가 못 여는 형식(예: 크롬의 HEIC)은 UnsupportedImageError
+ * 이고, 그 사진은 칸을 비워 두면 된다.
+ */
+export async function previewFromFile(file: Blob, name = "photo"): Promise<Blob> {
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch {
+    throw new UnsupportedImageError(name);
+  }
+  try {
+    return await bake(bitmap, PREVIEW_EDGE, PREVIEW_QUALITY, name);
+  } finally {
+    bitmap.close();
+  }
+}
+
 async function bakeFromBlob(
   blob: Blob,
   maxEdge: number,

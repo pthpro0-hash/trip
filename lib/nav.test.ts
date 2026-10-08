@@ -117,7 +117,7 @@ describe("isReceiverPath · 가족 책장 받는 쪽", () => {
 });
 
 describe("showsBottomNav · 폰 하단 탭을 보일 화면", () => {
-  it.each(["/", "/trips", "/trips/abc", "/trips/new", "/spots/경복궁", "/regions/강원권", "/course", "/places", "/help", "/privacy", "/me", "/family", "/mailboxes"])(
+  it.each(["/", "/trips", "/trips/abc", "/spots/경복궁", "/regions/강원권", "/course", "/places", "/help", "/privacy", "/me", "/family", "/mailboxes"])(
     "%s 에서는 보인다",
     (path) => {
       expect(showsBottomNav(path)).toBe(true);
@@ -126,6 +126,11 @@ describe("showsBottomNav · 폰 하단 탭을 보일 화면", () => {
 
   it("한장 요약에서는 숨긴다 — 저장 막대가 그 자리를 쓴다", () => {
     expect(showsBottomNav("/sketch")).toBe(false);
+  });
+
+  it("사진으로 여행 추가에서는 숨긴다 — 아래 기록 막대가 그 자리를 쓴다", () => {
+    // 막대(기록하기)와 탭이 같은 자리에 겹쳐 쌓이면 화면 아래 6분의 1이 단추로 덮인다.
+    expect(showsBottomNav("/trips/new")).toBe(false);
   });
 
   it("링크로 받은 화면에서는 숨긴다 — 받는 사람에게 '내 여행'은 없다", () => {
@@ -142,6 +147,8 @@ describe("showsBottomNav · 폰 하단 탭을 보일 화면", () => {
     expect(showsBottomNav("/spots/경복궁")).toBe(true);
     expect(showsBottomNav("/trips")).toBe(true);
     expect(showsBottomNav("/sketchbook")).toBe(true);
+    // 여행 상세(/trips/<아이디>)는 사진 추가 화면이 아니다.
+    expect(showsBottomNav("/trips/newer")).toBe(true);
   });
 });
 

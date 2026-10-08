@@ -1,9 +1,8 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { rememberedName, type PlaceMemory } from "@/lib/placeMemory";
 import { fetchPlaceNames } from "@/lib/supabase/placeNames";
-import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
 import { uploadPhotos, type UploadTarget } from "@/lib/supabase/photos";
@@ -21,12 +20,29 @@ import {
 } from "@/lib/photo/grouping";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { rememberStartIfUnset } from "@/lib/start";
-import { MAP_HREF } from "@/lib/nav";
 import { canIn, ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
 import { remainingText } from "@/lib/photo/eta";
+import { pickPreviewShots } from "@/lib/photo/preview";
+import { spanText } from "@/lib/photo/span";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 import type { Shot, Trip } from "@/lib/photo/types";
+import { DoneView } from "./photoImport/DoneView";
+import { ImportSteps } from "./photoImport/ImportSteps";
+import { SaveBar } from "./photoImport/SaveBar";
+import { DismissedTrip, TripCard } from "./photoImport/TripCard";
+import type { SaveOutcome, VisitLine } from "./photoImport/types";
+
+/*
+  사진으로 여행을 추가하는 길 — 세 걸음이다.
+
+    1 고르기   큰 단추 하나. 사진을 고르면 이 브라우저 안에서 촬영 시각과 위치를 읽는다.
+    2 확인     찾은 여행을 카드로 보여 준다(제목 · 기간 · 작은 그림). 곳 목록 · 동행 · 나누기 · 합치기는
+               "다듬기" 안에 접는다. 아래에는 기록 막대가 붙는다.
+    3 기록     끝났다고 말하고, 결과를 볼 곳 둘(지도 · 한장 요약)을 건넨다.
+
+  이 컴포넌트는 상태와 저장을 들고, 화면 조각은 photoImport/ 에 있다.
+*/
 
 interface PlaceAnswer {
   title: string;
@@ -35,20 +51,18 @@ interface PlaceAnswer {
   dong: string | null;
 }
 
-interface SaveOutcome {
-  saved: number;
-  skipped: number;
-  failed: number;
-  photos: number;
-  unsupported: string[];
-  overLimit: number;
-}
-
 interface Stage {
   name: "idle" | "reading" | "naming" | "ready" | "failed";
   done?: number;
   total?: number;
   message?: string;
+}
+
+/** 여행 하나와 그것을 가리키는 열쇠 · 목록에서의 자리. */
+interface Row {
+  trip: Trip;
+  index: number;
+  key: string;
 }
 
 const PLACE_BATCH = 25;
@@ -102,8 +116,8 @@ async function lookupPlaces(
 
 export function PhotoImport() {
   const inputRef = useRef<HTMLInputElement>(null);
-  // 사진을 올릴 때 원본 파일이 다시 필요하다. 읽을 때 이름으로 찾아 둔다.
-  const filesRef = useRef<Map<string, File>>(new Map());
+  // 고른 파일을 이름으로 찾아 둔다. 사진을 올릴 때 원본이 다시 필요하고, 카드의 작은 그림도 이것으로 만든다.
+  const [picked, setPicked] = useState<Map<string, File>>(new Map());
   const [stage, setStage] = useState<Stage>({ name: "idle" });
   const [read, setRead] = useState<ReadResult | null>(null);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -112,6 +126,11 @@ export function PhotoImport() {
   const [dailyShots, setDailyShots] = useState<Shot[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string | null>(null);
+  /*
+    로그인 여부를 알아보았는가. 알기 전에는 "로그인하고 기록하기"를 내밀지 않는다 — 이미 로그인한 사람이
+    사진을 읽는 몇 초 사이에 그 단추를 잠깐 보게 된다.
+  */
+  const [authChecked, setAuthChecked] = useState(false);
   /*
     가족의 여행을 보는 중이면 사진은 그 사람의 여행에 더해진다(userId 는 자료의 주인).
     더할 권한이 없으면 저장할 수 없다 — 올리는 곳이 남의 여행이라 안내만 한다.
@@ -141,31 +160,40 @@ export function PhotoImport() {
     if (!supabase) return;
     let active = true;
 
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!active || !data.user) return;
-      const viewed = readFamilyView();
-      // 더할 권한이 없으면 저장할 곳이 없다. 사용자 id 를 비워 두어 저장 길이 열리지 않게 한다.
-      if (viewed && !canIn(viewed, "add")) return;
-      const owner = ownerOf(viewed, data.user.id);
-      setUserId(owner);
-      // 같은 사진을 두 번 넣는 일이 잦다. 이미 저장한 날짜를 미리 알아 둔다.
-      setSavedRanges(await fetchSavedRanges(supabase, owner));
-      const remembered = await fetchPlaceNames(supabase, owner);
-      if (active) setMemories(remembered);
-    });
+    supabase.auth
+      .getUser()
+      .then(async ({ data }) => {
+        if (!active) return;
+        const viewed = readFamilyView();
+        // 로그인 전이거나 가족 여행에 더할 권한이 없으면 저장할 곳이 없다. 사용자 id 를 비워 두어 저장 길이 열리지 않게 한다.
+        if (!data.user || (viewed && !canIn(viewed, "add"))) {
+          setAuthChecked(true);
+          return;
+        }
+        const owner = ownerOf(viewed, data.user.id);
+        setUserId(owner);
+        setAuthChecked(true);
+        // 같은 사진을 두 번 넣는 일이 잦다. 이미 저장한 날짜를 미리 알아 둔다.
+        setSavedRanges(await fetchSavedRanges(supabase, owner));
+        const remembered = await fetchPlaceNames(supabase, owner);
+        if (active) setMemories(remembered);
+      })
+      .catch(() => {
+        // 알아보지 못했다. 로그인 길을 열어 둔다 — 이미 로그인했으면 로그인 화면이 이 화면으로 돌려보낸다.
+        if (active) setAuthChecked(true);
+      });
 
     return () => {
       active = false;
     };
   }, []);
 
-  const visible = useMemo(
-    () =>
-      trips
-        .map((trip, index) => ({ trip, index, key: tripKey(trip) }))
-        .filter(({ key }) => !dismissed.has(key)),
-    [trips, dismissed],
+  const rows = useMemo<Row[]>(
+    () => trips.map((trip, index) => ({ trip, index, key: tripKey(trip) })),
+    [trips],
   );
+
+  const visible = useMemo(() => rows.filter(({ key }) => !dismissed.has(key)), [rows, dismissed]);
 
   // 이미 저장한 날짜는 건너뛴다. 버튼에도 실제로 기록될 건수를 적어야
   // "3건 기록하기"를 눌렀는데 아무것도 안 늘어나는 일이 없다.
@@ -173,6 +201,17 @@ export function PhotoImport() {
     () => visible.filter(({ trip }) => !overlapsSaved(tripRange(trip), savedRanges)).length,
     [visible, savedRanges],
   );
+
+  // 각 여행 바로 위에 보이는 여행. 뺀 여행은 건너뛴다 — 합칠 수 있는지는 눈에 보이는 이웃과 따진다.
+  const aboveOf = useMemo(() => {
+    const above = new Map<string, Row>();
+    let last: Row | undefined;
+    for (const row of visible) {
+      if (last) above.set(row.key, last);
+      last = row;
+    }
+    return above;
+  }, [visible]);
 
   /*
     고르기 창을 연다.
@@ -221,7 +260,7 @@ export function PhotoImport() {
     setCompanions({});
     setTitles({});
     setUploadNote(null);
-    filesRef.current = new Map(files.map((file) => [file.name, file]));
+    setPicked(new Map(files.map((file) => [file.name, file])));
     setStage({ name: "reading", done: 0, total: files.length });
 
     const result = await readShots(files, (done, total) =>
@@ -299,6 +338,14 @@ export function PhotoImport() {
     );
   };
 
+  /** 여행이 아니라고 뺀다. 눌러서 잃은 것을 되찾을 길이 있다(undismiss). */
+  const dismiss = (key: string) => setDismissed(new Set(dismissed).add(key));
+  const undismiss = (key: string) => {
+    const next = new Set(dismissed);
+    next.delete(key);
+    setDismissed(next);
+  };
+
   const save = async () => {
     const supabase = getBrowserClient();
     if (!supabase || !userId) return;
@@ -354,7 +401,7 @@ export function PhotoImport() {
         const visitId = saved.visitIds![visitIndex];
         if (!visitId) return;
         visit.shots.forEach((shot, shotIndex) => {
-          const file = filesRef.current.get(shot.id);
+          const file = picked.get(shot.id);
           if (!file) return;
           targets.push({
             visitId,
@@ -438,6 +485,85 @@ export function PhotoImport() {
     );
   };
 
+  /** 카드의 "들른 곳" 줄들. 멀리 떨어진 날 경계에는 나누기 자리가 붙는다. */
+  const visitLinesOf = (trip: Trip, shaped: ReturnType<typeof shapeOf>): VisitLine[] => {
+    // 멀리 떨어진 날 경계만 묻는다. 가까운 데서 잔 1박 2일까지 물으면 성가시다.
+    const cuts = new Map(
+      dayBoundaries(trip)
+        .filter((boundary) => boundary.uncertain)
+        .map((boundary) => [boundary.day, boundary]),
+    );
+    return shaped.visits.map((visit, visitIndex) => {
+      const place = placeOf(visit);
+      const first = visit.shots[0].takenAt;
+      const last = visit.shots.at(-1)!.takenAt;
+      const before = shaped.visits[visitIndex - 1];
+      const day = dayKey(first);
+      const cut =
+        before && dayKey(before.shots.at(-1)!.takenAt) !== day ? cuts.get(day) : undefined;
+      return {
+        id: visitIndex,
+        title: place?.title ?? "장소 확인 중",
+        curated: Boolean(place?.isCuratedSpot),
+        when: `${day.slice(5)} ${hourMinute(first)}${
+          hourMinute(last) !== hourMinute(first) ? `~${hourMinute(last)}` : ""
+        } · ${visit.shots.length}장`,
+        cut: cut ? { day: cut.day, km: cut.km } : undefined,
+      };
+    });
+  };
+
+  const renderRow = ({ trip, index, key }: Row) => {
+    const days = tripDays(trip);
+    const span = spanText(days);
+
+    if (dismissed.has(key)) {
+      return <DismissedTrip title={titleOf(trip) || span} onUndo={() => undismiss(key)} />;
+    }
+
+    const shaped = shapeOf(trip);
+    const alreadySaved = overlapsSaved(tripRange(trip), savedRanges);
+    const editable = Boolean(userId) && !alreadySaved;
+    const above = aboveOf.get(key);
+
+    return (
+      <TripCard
+        title={titleOf(trip)}
+        onTitle={(next) => setTitles({ ...titles, [key]: next })}
+        span={span}
+        photos={trip.shots.length}
+        places={shaped.visits.length}
+        files={pickPreviewShots(trip.shots)
+          .map((shot) => picked.get(shot.id))
+          .filter((file): file is File => Boolean(file))}
+        visits={visitLinesOf(trip, shaped)}
+        companions={companions[key] ?? ""}
+        onCompanions={(next) => setCompanions({ ...companions, [key]: next })}
+        editable={editable}
+        alreadySaved={alreadySaved}
+        canMergeUp={editable && above !== undefined && canMerge(above.trip, trip)}
+        onMergeUp={() => above && merge(above.index, index)}
+        onSplit={(day) => split(index, day)}
+        onDismiss={() => dismiss(key)}
+      />
+    );
+  };
+
+  /** 사진을 더 고른다 — 처음 화면으로 돌아가 곧바로 고르는 창을 연다(누른 바로 그 순간이어야 창이 열린다). */
+  const more = () => {
+    setOutcome(null);
+    setTrips([]);
+    setRead(null);
+    setDailyShots([]);
+    setStage({ name: "idle" });
+    setPicked(new Map());
+    setDismissed(new Set());
+    setCompanions({});
+    setTitles({});
+    setUploadNote(null);
+    pick();
+  };
+
   /*
     고르는 칸은 화면이 어떻게 바뀌어도 늘 같은 자리에 둔다.
 
@@ -461,6 +587,7 @@ export function PhotoImport() {
     return (
       <>
         {picker}
+        <ImportSteps current={1} />
         <Waiting
           title="고르신 사진을 불러오고 있어요"
           note="사진이 많으면 여기서 조금 걸려요. 사진은 아직 어디로도 올라가지 않았어요."
@@ -473,6 +600,7 @@ export function PhotoImport() {
     return (
       <>
         {picker}
+        <ImportSteps current={1} />
         <Waiting
           title={stage.name === "reading" ? "사진을 읽고 있어요" : "장소를 찾고 있어요"}
           detail={stage.name === "reading" ? `${stage.done}장 / ${stage.total}장` : undefined}
@@ -482,249 +610,126 @@ export function PhotoImport() {
     );
   }
 
+  if (outcome) {
+    return (
+      <>
+        {picker}
+        <ImportSteps current={3} />
+        <DoneView outcome={outcome} onMore={more} onRetry={() => setOutcome(null)} />
+      </>
+    );
+  }
+
+  const hasTrips = trips.length > 0;
+  // 로그인 전이다. 알아보기 전에는 모른다고 본다.
+  const signedOut = authChecked && !userId && !noAdd;
+
+  /** 읽은 사진이 어떻게 갈렸는지. 무엇이 빠졌는지 알아야 "내 사진이 왜 없지?" 하지 않는다. */
+  const readSummary = read && (
+    <p className="text-[13px] text-text-faint">
+      사진 {read.shots.length + read.withoutLocation.length}장
+      {read.screenshots.length > 0 && ` · 화면 캡처 ${read.screenshots.length}장 제외`}
+      {dailyShots.length > 0 && ` · 일상 ${dailyShots.length}장 제외`}
+      {read.withoutLocation.length > 0 && ` · 위치 없음 ${read.withoutLocation.length}장`}
+      {read.unreadable.length > 0 && ` · 읽지 못함 ${read.unreadable.length}개`}
+    </p>
+  );
+
+  if (!hasTrips) {
+    return (
+      <>
+        {picker}
+        <ImportSteps current={1} />
+
+        <div className="flex flex-col gap-4 rounded-2xl bg-bg-subtle p-6">
+          <p className="break-keep text-[15px] leading-relaxed text-text-muted">
+            사진을 고르면 언제 어디서 찍었는지 읽어 여행으로 묶어 드려요.
+          </p>
+          <button
+            type="button"
+            onClick={pick}
+            className="w-full rounded-full bg-accent px-6 py-3.5 text-[16px] font-semibold text-on-accent transition hover:bg-accent-hover"
+          >
+            사진 고르기
+          </button>
+          {/*
+            약속은 정확해야 한다: 고르는 동안(읽는 동안)은 사진이 기기 밖으로 나가지 않지만, 기록할 때
+            "사진도 함께 올리기"를 고르면 올라간다. "올라가지 않아요"라고 하면 틀린 약속이 된다.
+          */}
+          <div className="flex items-start gap-1.5 break-keep text-[13px] leading-snug text-text-muted">
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              className="mt-px h-4 w-4 shrink-0"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="5" y="11" width="14" height="9" rx="2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+            </svg>
+            <p>
+              <span className="block">고르는 동안 사진은 이 기기 밖으로 나가지 않아요</span>
+              {signedOut && <span className="block text-text-faint">기록으로 남길 때 로그인해요</span>}
+            </p>
+          </div>
+        </div>
+
+        {readSummary}
+
+        {stage.name === "ready" && read && (
+          <div className="break-keep rounded-2xl bg-bg-subtle p-6 text-[15px] text-text-muted">
+            여행으로 묶을 만한 사진을 찾지 못했어요. 촬영 위치가 들어 있는 사진이 필요해요.
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       {picker}
-      <div className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6">
-        <p className="text-[15px] leading-relaxed text-text-muted">
-          사진을 고르면 언제 어디서 찍었는지 읽어 여행으로 묶어 드려요.
-          <br />
-          <span className="text-text-faint">
-            읽기는 이 브라우저 안에서만 일어나고, 사진은 올라가지 않아요.
-          </span>
-        </p>
+      <ImportSteps current={2} />
+
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[17px] font-semibold text-text">
+          {visible.length > 0 ? `여행 ${visible.length}건을 찾았어요` : "여행을 모두 뺐어요"}
+        </h2>
         <button
           type="button"
           onClick={pick}
-          className="self-start rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+          className="shrink-0 text-[13px] font-medium text-text-muted underline underline-offset-2 transition hover:text-text"
         >
-          사진 고르기
+          사진 다시 고르기
         </button>
       </div>
 
+      {readSummary}
+
       {stage.message && (
-        <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
-          {stage.message}
-        </p>
+        <p className="break-keep rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">{stage.message}</p>
       )}
 
-      {read && (
-        <p className="text-[13px] text-text-faint">
-          사진 {read.shots.length + read.withoutLocation.length}장
-          {read.screenshots.length > 0 && ` · 화면 캡처 ${read.screenshots.length}장 제외`}
-          {dailyShots.length > 0 && ` · 일상 ${dailyShots.length}장 제외`}
-          {read.withoutLocation.length > 0 && ` · 위치 없음 ${read.withoutLocation.length}장`}
-          {read.unreadable.length > 0 && ` · 읽지 못함 ${read.unreadable.length}개`}
-        </p>
-      )}
-
-      {stage.name === "ready" && trips.length === 0 && read && (
-        <div className="rounded-2xl bg-bg-subtle p-6 text-[15px] text-text-muted">
-          여행으로 묶을 만한 사진을 찾지 못했어요. 촬영 위치가 들어 있는 사진이 필요해요.
-        </div>
-      )}
-
-      {visible.length > 0 && (
-        <p className="text-[15px] font-medium text-text">여행 {visible.length}건을 찾았어요</p>
-      )}
-
-      <ol className="flex flex-col gap-4">
-        {visible.map(({ trip, index, key }, position) => {
-          const days = tripDays(trip);
-          const span = days.length > 1 ? `${days[0]} ~ ${days.at(-1)}` : days[0];
-          const shaped = shapeOf(trip);
-          const alreadySaved = overlapsSaved(tripRange(trip), savedRanges);
-          const editable = Boolean(userId) && !alreadySaved;
-          const previous = visible[position - 1];
-          // 멀리 떨어진 날 경계만 묻는다. 가까운 데서 잔 1박 2일까지 물으면 성가시다.
-          const cuts = new Map(
-            dayBoundaries(trip)
-              .filter((boundary) => boundary.uncertain)
-              .map((boundary) => [boundary.day, boundary]),
-          );
-
-          return (
-            <li key={key} className="flex flex-col gap-4">
-              {previous && editable && canMerge(previous.trip, trip) && (
-                <button
-                  type="button"
-                  onClick={() => merge(previous.index, index)}
-                  className="self-center rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text-muted transition hover:bg-line"
-                >
-                  ↑ 위 여행과 한 여행이었어요
-                </button>
-              )}
-
-              <div className="flex flex-col gap-3 rounded-2xl bg-surface p-5 ring-1 ring-line">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    {editable ? (
-                      <input
-                        type="text"
-                        value={titleOf(trip)}
-                        onChange={(event) => setTitles({ ...titles, [key]: event.target.value })}
-                        placeholder="이 여행의 이름"
-                        aria-label="여행 제목"
-                        className="-mx-2 w-full rounded-lg bg-transparent px-2 py-1 text-[17px] font-semibold tracking-tight text-text outline-none transition placeholder:font-normal placeholder:text-text-faint hover:bg-bg-subtle focus:bg-bg-subtle focus:ring-2 focus:ring-accent"
-                      />
-                    ) : (
-                      <p className="text-[17px] font-semibold tracking-tight text-text">
-                        {titleOf(trip) || span}
-                      </p>
-                    )}
-                    <p className="mt-0.5 text-[13px] text-text-faint">
-                      {span} · 사진 {trip.shots.length}장 · 방문 {shaped.visits.length}곳
-                      {days.length > 1 && ` · ${days.length}일`}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setDismissed(new Set(dismissed).add(key))}
-                    className="shrink-0 rounded-full bg-bg-subtle px-3 py-1.5 text-[13px] font-medium text-text-muted transition hover:bg-line"
-                  >
-                    일상이에요
-                  </button>
-                </div>
-
-                {alreadySaved && (
-                  <p className="text-[13px] text-text-faint">이미 기록한 날짜와 겹쳐요.</p>
-                )}
-
-                <ul className="flex flex-col gap-2">
-                  {shaped.visits.map((visit, visitIndex) => {
-                    const place = placeOf(visit);
-                    const first = visit.shots[0].takenAt;
-                    const last = visit.shots.at(-1)!.takenAt;
-                    const before = shaped.visits[visitIndex - 1];
-                    const day = dayKey(first);
-                    const cut =
-                      before && dayKey(before.shots.at(-1)!.takenAt) !== day
-                        ? cuts.get(day)
-                        : undefined;
-
-                    return (
-                      <Fragment key={visitIndex}>
-                        {cut && editable && (
-                          <li className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-bg-subtle px-3 py-2 text-[13px] text-text-muted">
-                            <span>여기서 날이 바뀌고 {Math.round(cut.km)}km 떨어져요.</span>
-                            <button
-                              type="button"
-                              onClick={() => split(index, cut.day)}
-                              className="font-medium text-accent transition hover:text-accent-hover"
-                            >
-                              따로 기록하기
-                            </button>
-                          </li>
-                        )}
-                        <li className="flex items-baseline gap-2 text-[15px]">
-                          <span className="text-text-faint">▸</span>
-                          <span className="font-medium text-text">
-                            {place?.title ?? "장소 확인 중"}
-                          </span>
-                          {place?.isCuratedSpot && (
-                            <span className="rounded-md bg-accent-soft px-1.5 py-0.5 text-[11px] font-medium text-accent">
-                              100선
-                            </span>
-                          )}
-                          <span className="text-[13px] text-text-faint">
-                            {dayKey(first).slice(5)} {hourMinute(first)}
-                            {hourMinute(last) !== hourMinute(first) && `~${hourMinute(last)}`} ·{" "}
-                            {visit.shots.length}장
-                          </span>
-                        </li>
-                      </Fragment>
-                    );
-                  })}
-                </ul>
-
-                {editable && (
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-[13px] font-medium text-text-faint">누구와 가셨나요?</span>
-                    <input
-                      type="text"
-                      value={companions[key] ?? ""}
-                      onChange={(event) =>
-                        setCompanions({ ...companions, [key]: event.target.value })
-                      }
-                      placeholder="예: 가족, 민수, 혼자"
-                      className="rounded-xl bg-bg-subtle px-3.5 py-2.5 text-[15px] text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
-                    />
-                  </label>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-
-      {outcome && (
-        <div className="flex flex-col gap-2 rounded-xl bg-accent-soft px-4 py-3 text-[14px] text-accent">
-          <p className="font-medium">
-            {outcome.saved > 0 ? `여행 ${outcome.saved}건을 기록했어요.` : "새로 기록한 여행이 없어요."}
-            {outcome.photos > 0 && ` 사진 ${outcome.photos}장을 함께 올렸어요.`}
-            {outcome.skipped > 0 && ` 이미 있던 ${outcome.skipped}건은 건너뛰었어요.`}
-            {outcome.failed > 0 && ` ${outcome.failed}건은 저장하지 못했어요.`}
-          </p>
-          {outcome.unsupported.length > 0 && (
-            <p className="text-[13px]">
-              {outcome.unsupported.length}장은 이 브라우저가 열지 못하는 형식이라 올리지
-              못했어요. 기록 자체는 남아 있어요.
-            </p>
-          )}
-          {outcome.overLimit > 0 && (
-            <p className="text-[13px]">
-              보관할 수 있는 사진 수를 넘어 {outcome.overLimit}장은 올리지 못했어요.
-            </p>
-          )}
-          <Link href={MAP_HREF} className="self-start font-medium underline underline-offset-2">
-            내 여행 보기 →
-          </Link>
-        </div>
-      )}
-
-      {visible.length > 0 && noAdd && (
-        <p className="rounded-xl bg-bg-subtle px-4 py-3.5 text-[14px] text-text-muted">
+      {noAdd && (
+        <p className="break-keep rounded-xl bg-bg-subtle px-4 py-3.5 text-[14px] text-text-muted">
           {family?.label} 님의 여행에는 사진을 더할 수 없어요(권한이 &lsquo;추가도 가능&rsquo;이 아니에요). 내
           여행으로 돌아가 올려 주세요.
         </p>
       )}
 
-      {visible.length > 0 && family !== null && userId && (
-        <p className="rounded-xl bg-accent-soft px-4 py-3 text-[14px] text-text">
+      {family !== null && userId && (
+        <p className="break-keep rounded-xl bg-accent-soft px-4 py-3 text-[14px] text-text">
           이 사진은 <span className="font-semibold">{family.label}</span> 님의 여행에 더해져요.
         </p>
       )}
 
-      {visible.length > 0 && !userId && !noAdd && (
-        <div className="flex flex-col gap-2 rounded-xl bg-bg-subtle px-4 py-3.5 text-[14px] text-text-muted">
-          <p>기록으로 남기려면 로그인이 필요해요. 찾은 결과는 로그인한 뒤 다시 골라 주세요.</p>
-          <Link
-            href="/login?next=%2Ftrips%2Fnew"
-            className="self-start font-medium text-accent hover:text-accent-hover"
-          >
-            로그인하기 →
-          </Link>
-        </div>
-      )}
-
-      {visible.length > 0 && userId && (
-        <label className="flex items-start gap-2.5 rounded-xl bg-bg-subtle px-4 py-3">
-          <input
-            type="checkbox"
-            checked={withPhotos}
-            onChange={(event) => setWithPhotos(event.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]"
-          />
-          <span className="text-[14px] leading-relaxed text-text-muted">
-            <span className="font-medium text-text">사진도 함께 올리기</span>
-            <br />
-            <span className="text-[13px] text-text-faint">
-              긴 변 2048px로 줄여 올리고 원본은 보관하지 않아요. 끄면 언제 어디를 다녀왔는지만
-              기록돼요.
-            </span>
-          </span>
-        </label>
-      )}
+      <ol className="flex flex-col gap-3">
+        {rows.map((row) => (
+          <li key={row.key}>{renderRow(row)}</li>
+        ))}
+      </ol>
 
       {/*
         기록하는 동안은 화면을 덮는다. 알리려는 것보다 막으려는 것이 크다 —
@@ -743,26 +748,15 @@ export function PhotoImport() {
         />
       )}
 
-      {visible.length > 0 && userId && (
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || unsavedCount === 0}
-          className="self-start rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
-        >
-          {saving
-            ? "기록하는 중…"
-            : unsavedCount === 0
-              ? "모두 이미 기록했어요"
-              : `여행 ${unsavedCount}건 기록하기`}
-        </button>
-      )}
-
-      {visible.length > 0 && (
-        <p className="text-[13px] leading-relaxed text-text-faint">
-          제목은 장소에서 지어 둔 것이니 마음에 들면 그대로 두세요. 묶음이 잘못됐다면 제목을
-          고치기 전에 나누거나 합쳐 주세요.
-        </p>
+      {visible.length > 0 && !noAdd && authChecked && (
+        <SaveBar
+          mode={signedOut ? "login" : "save"}
+          count={unsavedCount}
+          saving={saving}
+          withPhotos={withPhotos}
+          onWithPhotos={setWithPhotos}
+          onSave={save}
+        />
       )}
     </>
   );
