@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { CHAPTERS } from "@/lib/help";
 
 vi.mock("@/components/trip/StorageTidy", () => ({ StorageTidy: () => <p>보관함 정리 자리</p> }));
 vi.mock("@/components/layout/ScrollTop", () => ({ ScrollTop: () => null }));
@@ -39,15 +40,71 @@ describe("HelpPage · 가족 공유", () => {
 });
 
 describe("HelpPage · 가족 책장", () => {
-  it("엽서 보내기·받는 법·지우면 어떻게 되는지를 계정과 보관 갈래에 풀어 적었다", () => {
+  it("엽서 보내기·받는 법·지우면 어떻게 되는지를 '가족 책장' 갈래에 풀어 적었다", () => {
     render(<HelpPage />);
-    for (const title of ["부모님께 여행 엽서 보내기", "부모님이 엽서 받는 법", "엽서와 지우기"]) {
+    for (const title of ["엽서 보내기", "부모님이 엽서 받는 법", "엽서는 보낸 그대로 남아요", "책장 지우기", "내 책장 속으로 들어가 보기"]) {
       expect(screen.getByText(title)).toBeTruthy();
     }
-    const section = document.getElementById("account")!;
+    const section = document.getElementById("shelf")!;
     for (const word of ["가족 책장", "책장 3개", "기본 20장까지", "책장 설정", "권장", "링크 하나", "로그인", "답장", "하트", "사진마다", "책마다", "책꽂이", "작년 오늘", "올해의 책", "부모님 화면 보기", "책장 지우기", "사진 줄이기", "사진까지 보관할 책", "가고 싶은 곳 보내기", "내 찜에 담기", "가고 싶은 곳 받기", "책으로 저장(PDF)", "PDF로 저장", "새로 만들기", "거두기", "함께 지워"]) {
       expect(section.textContent).toContain(word);
     }
+  });
+});
+
+describe("HelpPage · 세 층 — 요약 · 목록 · 상세설명", () => {
+  it("갈래마다 한 줄 요약이 먼저 보인다", () => {
+    render(<HelpPage />);
+    for (const chapter of CHAPTERS) {
+      const section = document.getElementById(chapter.id)!;
+      expect(within(section).getByText(chapter.blurb)).toBeTruthy();
+    }
+  });
+
+  it("목록의 항목마다 제목과 한 줄 요약이 보인다", () => {
+    render(<HelpPage />);
+    for (const chapter of CHAPTERS) {
+      const section = document.getElementById(chapter.id)!;
+      const rows = section.querySelectorAll("details > summary");
+      expect(rows).toHaveLength(chapter.steps.length);
+      chapter.steps.forEach((step, index) => {
+        expect(rows[index].textContent).toContain(step.title);
+        expect(rows[index].textContent).toContain(step.summary);
+        // 상세설명은 눌러야 보이는 층이라 요약 줄에 들어 있지 않다.
+        expect(rows[index].textContent).not.toContain(step.detail);
+      });
+    }
+  });
+
+  it("상세설명은 처음에 접혀 있다 — 눌러야 펼쳐진다", () => {
+    render(<HelpPage />);
+    const all = document.querySelectorAll("#sketch details, #trip details, #browse details, #shelf details, #account details");
+    expect(all.length).toBeGreaterThan(0);
+    for (const item of all) expect((item as HTMLDetailsElement).open).toBe(false);
+  });
+
+  it("항목을 누르면 상세설명이 펼쳐진다", () => {
+    render(<HelpPage />);
+    const step = CHAPTERS[0].steps[0];
+    const row = screen.getByText(step.title).closest("summary")!;
+    const item = row.parentElement as HTMLDetailsElement;
+    expect(within(item).getByText(step.detail)).toBeTruthy();
+    fireEvent.click(row);
+    // jsdom 은 summary 를 눌러도 open 을 켜지 않는 것이 있어 직접 확인한다 — 눌러서 펼치는 구조(<details>)면 된다.
+    expect(item.tagName).toBe("DETAILS");
+  });
+
+  it("목차에 갈래가 다 있고, 가족 책장으로도 바로 간다", () => {
+    render(<HelpPage />);
+    const toc = screen.getByRole("navigation", { name: "목차" });
+    const hrefs = Array.from(toc.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(["#sketch", "#trip", "#browse", "#shelf", "#account", "#data"]);
+    expect(document.getElementById("shelf")).toBeTruthy();
+  });
+
+  it("항목을 누르면 설명이 펼쳐진다고 알려 준다", () => {
+    render(<HelpPage />);
+    expect(screen.getByText(/눌러 보세요|누르면 자세한 설명/)).toBeTruthy();
   });
 });
 

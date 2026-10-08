@@ -76,7 +76,11 @@ function Book({ token, card, preview }: { token: string; card: InboxCard; previe
   );
 }
 
-/** 한 해의 책꽂이. 접었다 펼 수 있고, 펼치면 표지와 그해 지도 단추가 나온다. */
+/** 해 제목 아래 두 단추의 모양 — 한 줄에 반씩. 글씨를 아주 크게 해도 좁은 폰에서 줄이 바뀔 뿐 넘치지 않게. */
+const shortButton =
+  "flex min-h-14 min-w-0 flex-1 items-center justify-center gap-1 rounded-2xl px-2 text-center rs-17 font-semibold leading-snug break-keep transition active:scale-[0.99]";
+
+/** 한 해의 책꽂이. 접었다 펼 수 있고, 펼치면 맨 위에 올해의 책·지도 단추, 그 밑에 표지가 나온다. */
 function Year({
   token,
   entry,
@@ -95,6 +99,7 @@ function Year({
   const title = yearTitle(entry.year, entry.cards.length);
   const label = entry.year === "" ? "날짜 모름" : `${entry.year}년`;
   const hasPlaces = entry.year !== "" && entry.cards.some((card) => card.places.length > 0);
+  const hasBook = showBook && entry.year !== "";
 
   return (
     <section className="flex flex-col gap-3">
@@ -114,33 +119,39 @@ function Year({
 
       {open && (
         <>
+          {/* 해 제목 바로 아래에 한 줄로. 짧게 적고, 어느 해인지는 읽어 주는 이름에만 둔다(바로 위에 해가 적혀 있다). */}
+          {(hasBook || hasPlaces) && (
+            <div className="flex gap-2.5">
+              {hasBook && (
+                <Link
+                  href={yearBookPath(token, entry.year, preview)}
+                  aria-label={`${label} 올해의 책 보기`}
+                  className={`${shortButton} bg-accent text-on-accent`}
+                >
+                  <span aria-hidden="true">📖</span> 올해의 책 보기
+                </Link>
+              )}
+              {hasPlaces && (
+                <button
+                  type="button"
+                  aria-label={mapOpen ? `${label} 지도 닫기` : `${label} 다녀온 곳 지도로 보기`}
+                  aria-expanded={mapOpen}
+                  onClick={() => setMapOpen((current) => !current)}
+                  className={`${shortButton} bg-accent-soft text-accent`}
+                >
+                  <span aria-hidden="true">🗺️</span> {mapOpen ? "지도 닫기" : "지도로 보기"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {mapOpen && hasPlaces && <YearMap year={entry.year} cards={entry.cards} />}
+
           <ul aria-label={`${title} 책꽂이`} className="grid grid-cols-2 gap-x-3.5 gap-y-5">
             {entry.cards.map((card) => (
               <Book key={card.id} token={token} card={card} preview={preview} />
             ))}
           </ul>
-
-          {showBook && entry.year !== "" && (
-            <Link
-              href={yearBookPath(token, entry.year, preview)}
-              className="flex min-h-14 items-center justify-center rounded-2xl bg-accent px-5 rs-18 font-semibold text-on-accent transition active:scale-[0.99]"
-            >
-              {label} 올해의 책 보기
-            </Link>
-          )}
-
-          {hasPlaces && (
-            <>
-              <button
-                type="button"
-                onClick={() => setMapOpen((current) => !current)}
-                className="min-h-14 rounded-2xl bg-accent-soft px-5 rs-18 font-semibold text-accent transition active:scale-[0.99]"
-              >
-                {mapOpen ? `${label} 지도 닫기` : `${label} 다녀온 곳 지도로 보기`}
-              </button>
-              {mapOpen && <YearMap year={entry.year} cards={entry.cards} />}
-            </>
-          )}
         </>
       )}
     </section>

@@ -16,6 +16,9 @@ export const metadata: Metadata = {
 
   팝업은 두 갈래만 훑고 지나간다. "그게 어디 있더라" 싶을 때 와서
   찾는 곳이 여기라, 갈래를 다 펴 놓고 위에 목차를 둔다.
+
+  글은 세 층이다. 갈래마다 한 줄 요약이 먼저 보이고, 그 밑에 항목의 목록(제목 + 한 줄 요약),
+  항목을 눌러야 자세한 설명이 펼쳐진다. 한꺼번에 다 펼쳐 두면 길어서 찾는 사람이 놓친다.
 */
 export default function HelpPage() {
   return (
@@ -26,6 +29,7 @@ export default function HelpPage() {
           사진만 고르면 다녀온 길이 한 장의 그림이 됩니다. 어디를 눌러 무엇이 되는지 적어
           두었어요.
         </p>
+        <p className="mt-1 text-[14px] leading-relaxed text-text-faint">항목을 누르면 자세한 설명이 펼쳐져요.</p>
       </header>
 
       {/* 찾으러 온 사람은 목차부터 본다. */}
@@ -61,18 +65,25 @@ export default function HelpPage() {
             <p className="mt-1 text-[15px] leading-relaxed text-text-muted">{chapter.blurb}</p>
           </div>
 
-          <ol className="flex flex-col gap-3.5">
+          {/* 목록: 제목과 한 줄 요약. 눌러야 자세한 설명(detail)이 펼쳐진다. */}
+          <ol className="flex flex-col gap-1.5">
             {chapter.steps.map((step, index) => (
-              <li key={step.title} className="flex gap-3">
-                <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-soft text-[12px] font-semibold text-accent">
-                  {index + 1}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[15px] font-semibold text-text">{step.title}</p>
-                  <p className="mt-0.5 text-[14px] leading-relaxed text-text-muted">
-                    {step.detail}
-                  </p>
-                </div>
+              <li key={step.title}>
+                <details className="group rounded-xl open:bg-bg-subtle">
+                  <summary className="flex cursor-pointer list-none items-start gap-3 rounded-xl px-2 py-2 transition hover:bg-bg-subtle [&::-webkit-details-marker]:hidden">
+                    <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-soft text-[12px] font-semibold text-accent">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] font-semibold text-text">{step.title}</span>
+                      <span className="mt-0.5 block text-[14px] leading-snug text-text-muted">{step.summary}</span>
+                    </span>
+                    <span aria-hidden="true" className="mt-0.5 shrink-0 text-[18px] text-text-faint transition group-open:rotate-90">
+                      ›
+                    </span>
+                  </summary>
+                  <p className="px-2 pb-3 pl-[2.75rem] text-[14px] leading-relaxed text-text-muted">{step.detail}</p>
+                </details>
               </li>
             ))}
           </ol>

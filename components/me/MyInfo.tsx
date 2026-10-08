@@ -5,6 +5,8 @@ import Link from "next/link";
 import { accountOf, type Account } from "@/lib/account";
 import { signOutAndReload } from "@/lib/signOut";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { fetchMailboxes } from "@/lib/supabase/mailbox";
+import { mailboxPath } from "@/lib/mailbox";
 import { fetchUnreadHeartCount, fetchUnreadReplyCount, fetchUnreadWishCount } from "@/lib/supabase/postcards";
 
 /*
@@ -14,15 +16,43 @@ import { fetchUnreadHeartCount, fetchUnreadReplyCount, fetchUnreadWishCount } fr
   폰에서는 이름이 접혀 사진만 남아 그것이 메뉴인지도 알기 어려웠다. 이제 폰의 하단 탭 맨 끝과 위 띠의
   이름·사진이 모두 여기로 온다. 로그아웃도 여기 있다(폰의 위 띠가 빠듯해서).
 
+  가족 책장은 줄이 둘이다. '가족 책장'은 관리 화면(설정·보낸 엽서·링크), 그 아래 책장마다 한 줄은 그 책장 안(책꽂이)으로
+  바로 들어가는 길이다. 예전에는 관리 화면 → '부모님 화면 보기'를 거쳐야 책꽂이가 보여 찾지 못했다.
+
   로그인하지 않았으면 로그인이 필요한 길은 내지 않고, 안내(도움말·처리방침·약관)만 남긴다.
 */
 
-function Row({ href, title, hint, badge }: { href: string; title: string; hint: string; badge?: string }) {
+/** 내 정보에 줄을 낼 책장 하나. */
+export interface ShelfLink {
+  id: string;
+  name: string;
+  token: string;
+}
+
+function Row({
+  href,
+  title,
+  hint,
+  badge,
+  nested,
+}: {
+  href: string;
+  title: string;
+  hint: string;
+  badge?: string;
+  /** 위 줄의 한 갈래 — 안으로 조금 들여 쓴다. */
+  nested?: boolean;
+}) {
   return (
     <Link
       href={href}
-      className="flex min-h-[60px] items-center gap-3 rounded-2xl bg-bg-subtle px-4 py-3 transition hover:bg-line"
+      className={`flex min-h-[60px] items-center gap-3 rounded-2xl bg-bg-subtle px-4 py-3 transition hover:bg-line ${nested ? "ml-5" : ""}`}
     >
+      {nested && (
+        <span aria-hidden="true" className="shrink-0 text-[20px]">
+          📚
+        </span>
+      )}
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-[16px] font-semibold text-text">{title}</span>
         <span className="text-[13px] leading-snug text-text-muted">{hint}</span>
@@ -58,11 +88,14 @@ export type MyInfoState = Account | "loading" | "login";
 export function MyInfoView({
   state,
   unread,
+  shelves = [],
   signingOut,
   onSignOut,
 }: {
   state: MyInfoState;
   unread: number;
+  /** 들어가 볼 수 있는 내 책장들(닫은 것·남의 것은 빠진다). 못 읽었으면 빈 목록. */
+  shelves?: ShelfLink[];
   signingOut: boolean;
   onSignOut: () => void;
 }) {
@@ -109,6 +142,10 @@ export function MyInfoView({
               hint="부모님께 엽서 보내기 — 앱도 로그인도 필요 없어요"
               badge={unread > 0 ? `새 소식 ${unread}` : undefined}
             />
+            {shelves.map((shelf) => (
+              // 미리보기 방식으로 들어간다 — 열어 본 표시·답장·하트는 부모님께 가지 않고, 안 열어 본 책도 책꽂이에 꽂혀 보인다.
+              <Row key={shelf.id} nested href={mailboxPath(shelf.token, "all")} title={shelf.name} hint="책꽂이 안으로 들어가기" />
+            ))}
           </Group>
           <Group title="내 자료">
             <Row href="/help#data" title="보관함 정리" hint="사진 용량을 확인하고 줄여요" />
@@ -135,6 +172,7 @@ export function MyInfoView({
 export function MyInfo() {
   const [state, setState] = useState<MyInfoState>("loading");
   const [unread, setUnread] = useState(0);
+  const [shelves, setShelves] = useState<ShelfLink[]>([]);
   const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
@@ -145,13 +183,17 @@ export function MyInfo() {
         const { data } = await supabase.auth.getUser();
         if (!data.user) return setState("login");
         setState(accountOf(data.user));
-        // 새 소식은 곁다리다. 못 세면 숫자 없이 조용히 둔다(두 함수 모두 실패하면 0 을 준다).
-        const [replies, hearts, wishes] = await Promise.all([
+        // 새 소식과 책장 줄은 곁다리다. 못 세고 못 읽으면 숫자·줄 없이 조용히 둔다(관리 줄은 그대로 남는다).
+        const [replies, hearts, wishes, boxes] = await Promise.all([
           fetchUnreadReplyCount(supabase),
           fetchUnreadHeartCount(supabase),
           fetchUnreadWishCount(supabase),
+          fetchMailboxes(supabase, data.user.id).catch(() => "failed" as const),
         ]);
         setUnread(replies + hearts + wishes);
+        if (boxes !== "failed") {
+          setShelves(boxes.owned.filter((box) => !box.closed).map((box) => ({ id: box.id, name: box.name, token: box.token })));
+        }
       } catch {
         setState((current) => (current === "loading" ? "login" : current));
       }
@@ -171,5 +213,5 @@ export function MyInfo() {
     }
   };
 
-  return <MyInfoView state={state} unread={unread} signingOut={signingOut} onSignOut={() => void signOut()} />;
+  return <MyInfoView state={state} unread={unread} shelves={shelves} signingOut={signingOut} onSignOut={() => void signOut()} />;
 }

@@ -13,6 +13,9 @@ import { CORE_CHAPTERS } from "@/lib/help";
 
   갈래를 한 번에 하나씩만 보여 준다. 두 갈래를 나란히 늘어놓으면 글이
   많아 보여서 읽기 전에 닫는다.
+
+  항목은 제목과 한 줄 요약까지만 보인다. 자세한 설명(detail)까지 다 늘어놓으면 팝업이 글로
+  가득 차 읽기 전에 닫는다 — 그것은 '도움말 전체 보기'에서 항목을 눌러 펼쳐 읽는다.
 */
 
 interface HelpDialogProps {
@@ -71,7 +74,7 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
           </button>
         </div>
 
-        <ol className="mt-4 flex flex-col gap-3.5 overflow-y-auto px-6 pb-4">
+        <ol className="mt-4 flex flex-col gap-3 overflow-y-auto px-6 pb-4">
           {chapter.steps.map((step, index) => (
             <li key={step.title} className="flex gap-3">
               <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-accent-soft text-[12px] font-semibold text-accent">
@@ -79,7 +82,7 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
               </span>
               <div className="min-w-0">
                 <p className="text-[15px] font-semibold text-text">{step.title}</p>
-                <p className="mt-0.5 text-[14px] leading-relaxed text-text-muted">{step.detail}</p>
+                <p className="mt-0.5 text-[14px] leading-snug text-text-muted">{step.summary}</p>
               </div>
             </li>
           ))}

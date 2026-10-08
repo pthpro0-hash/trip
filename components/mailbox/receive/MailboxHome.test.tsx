@@ -381,6 +381,64 @@ describe("MailboxHome · 올해의 책", () => {
     expect(screen.getByRole("link", { name: "2025년 올해의 책 보기" })).toHaveAttribute("href", `/m/${TOKEN}/year/2025`);
   });
 
+  /*
+    '올해의 책 보기'와 '지도로 보기'는 예전에 책 표지들을 다 지나 맨 아래에 있어, 있는 줄도 모르고 지나쳤다.
+    이제 '2026년 · 3권' 바로 아래, 표지들 위에서 한 줄에 나란히 놓는다. 짧게 줄여 쓰므로 해는 읽어 주는 이름에만 남긴다.
+  */
+  describe("해 제목 바로 아래의 두 단추", () => {
+    const shelved = view({ postcards: [opened("P", { places: [place("곳", "2026-09-13")] })] });
+
+    it("'올해의 책 보기'와 '지도로 보기'가 한 줄(같은 상자)에 나란히 있다", () => {
+      render(<MailboxHome token={TOKEN} view={shelved} today="2026-07-07" />);
+      const book = screen.getByRole("link", { name: "2026년 올해의 책 보기" });
+      const map = screen.getByRole("button", { name: "2026년 다녀온 곳 지도로 보기" });
+      expect(book.parentElement).toBe(map.parentElement);
+      expect(book).toHaveTextContent("올해의 책 보기");
+      expect(book).not.toHaveTextContent("2026년");
+      expect(map).toHaveTextContent("지도로 보기");
+      expect(map).not.toHaveTextContent("다녀온 곳");
+    });
+
+    it("해 제목 아래, 책 표지들 위에 있다", () => {
+      render(<MailboxHome token={TOKEN} view={shelved} today="2026-07-07" />);
+      const heading = screen.getByRole("button", { name: /2026년 · 1권/ });
+      const book = screen.getByRole("link", { name: "2026년 올해의 책 보기" });
+      const covers = screen.getByRole("list", { name: "2026년 · 1권 책꽂이" });
+      expect(heading.compareDocumentPosition(book) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(book.compareDocumentPosition(covers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
+    it("올해의 책을 끈 책장이면 지도 단추만 남는다", () => {
+      render(<MailboxHome token={TOKEN} view={{ ...shelved, settings: { ...RECOMMENDED, year: false } }} today="2026-07-07" />);
+      expect(screen.queryByRole("link", { name: /올해의 책/ })).toBeNull();
+      expect(screen.getByRole("button", { name: "2026년 다녀온 곳 지도로 보기" })).toBeTruthy();
+    });
+
+    it("곳 정보가 없는 해에는 올해의 책 단추만 남는다", () => {
+      render(<MailboxHome token={TOKEN} view={books} today="2026-07-07" />);
+      const book = screen.getByRole("link", { name: "2026년 올해의 책 보기" });
+      expect(book).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /지도/ })).toBeNull();
+    });
+
+    it("지도를 열면 단추 줄 바로 아래, 책 표지들 위에 펼쳐진다 — 단추를 누른 자리에서 바로 보인다", async () => {
+      render(<MailboxHome token={TOKEN} view={shelved} today="2026-07-07" />);
+      const map = screen.getByRole("button", { name: "2026년 다녀온 곳 지도로 보기" });
+      fireEvent.click(map);
+      const drawn = await screen.findByText(/^지도:/, {}, { timeout: 10000 });
+      const covers = screen.getByRole("list", { name: "2026년 · 1권 책꽂이" });
+      expect(map.compareDocumentPosition(drawn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(drawn.compareDocumentPosition(covers) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // 열면 같은 자리 단추가 닫기로 바뀐다 — 짧은 글, 읽어 주는 이름에는 해.
+      expect(screen.getByRole("button", { name: "2026년 지도 닫기" })).toHaveTextContent("지도 닫기");
+    });
+
+    it("접힌 해에서는 두 단추 모두 안 보인다", () => {
+      render(<MailboxHome token={TOKEN} view={books} today="2026-07-07" />);
+      expect(screen.queryByRole("link", { name: "2025년 올해의 책 보기" })).toBeNull();
+    });
+  });
+
   it("날짜를 모르는 책들 칸에는 올해의 책이 없다", () => {
     render(<MailboxHome token={TOKEN} view={view({ postcards: [opened("U", { startedOn: "", sentAt: "" })] })} today="2026-07-07" />);
     expect(screen.queryByRole("link", { name: /올해의 책/ })).toBeNull();

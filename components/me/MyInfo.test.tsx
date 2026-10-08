@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 
+const TOKEN_A = "A".repeat(43);
+const TOKEN_B = "B".repeat(43);
+const shelf = (id: string, name: string, token: string, over: { closed?: boolean } = {}) => ({ id, name, token, closed: false, ...over });
+
 const state = vi.hoisted(() => ({
   client: true,
-  user: null as null | { user_metadata?: Record<string, unknown>; email?: string },
+  user: null as null | { id?: string; user_metadata?: Record<string, unknown>; email?: string },
+  boxes: { owned: [], joined: [] } as { owned: unknown[]; joined: unknown[] } | "failed" | "throw",
   replies: 0,
   hearts: 0,
   wishes: 0,
@@ -18,6 +23,12 @@ vi.mock("@/lib/supabase/postcards", () => ({
   fetchUnreadHeartCount: async () => state.hearts,
   fetchUnreadWishCount: async () => state.wishes,
 }));
+vi.mock("@/lib/supabase/mailbox", () => ({
+  fetchMailboxes: async () => {
+    if (state.boxes === "throw") throw new Error("network");
+    return state.boxes;
+  },
+}));
 vi.mock("@/lib/signOut", () => ({ signOutAndReload: state.signOut }));
 
 const { MyInfo } = await import("./MyInfo");
@@ -27,7 +38,8 @@ const hrefOf = (name: string | RegExp) => screen.getByRole("link", { name }).get
 describe("MyInfo · 내 정보 메뉴", () => {
   beforeEach(() => {
     state.client = true;
-    state.user = { user_metadata: { full_name: "김지민", avatar_url: "https://img.example/a.png" }, email: "jimin@example.com" };
+    state.user = { id: "u1", user_metadata: { full_name: "김지민", avatar_url: "https://img.example/a.png" }, email: "jimin@example.com" };
+    state.boxes = { owned: [], joined: [] };
     state.replies = 0;
     state.hearts = 0;
     state.wishes = 0;
@@ -78,6 +90,99 @@ describe("MyInfo · 내 정보 메뉴", () => {
       render(<MyInfo />);
       const row = await screen.findByRole("link", { name: /^가족 책장/ });
       await waitFor(() => expect(within(row).getByText("새 소식 4")).toBeTruthy());
+    });
+
+    /*
+      책꽂이는 가족 책장(관리 화면)과 미리보기를 거쳐야 겨우 닿았다. 내 정보에서 책장마다 줄을 내어,
+      누르면 그 책장 안(책꽂이)으로 바로 들어간다.
+    */
+    describe("내 책장 속으로", () => {
+      it("내가 만든 책장마다 줄이 하나씩 있고, 누르면 그 책장 안(책꽂이)으로 들어간다", async () => {
+        state.boxes = {
+          owned: [shelf("1", "우리 엄마 아빠", TOKEN_A), shelf("2", "시댁", TOKEN_B)],
+          joined: [],
+        };
+        render(<MyInfo />);
+        const first = await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
+        // 미리보기 방식 — 열어 본 표시·답장·하트는 부모님께 가지 않고, 안 열어 본 책도 책꽂이에 보인다.
+        expect(first).toHaveAttribute("href", `/m/${TOKEN_A}?preview=all`);
+        expect(screen.getByRole("link", { name: /^시댁/ })).toHaveAttribute("href", `/m/${TOKEN_B}?preview=all`);
+      });
+
+      it("줄에 무엇이 열리는지 한 줄로 알려 준다", async () => {
+        state.boxes = { owned: [shelf("1", "우리 엄마 아빠", TOKEN_A)], joined: [] };
+        render(<MyInfo />);
+        const row = await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
+        expect(within(row).getByText(/책꽂이/)).toBeTruthy();
+      });
+
+      it("관리 화면으로 가는 '가족 책장' 줄은 그대로 있다 — 설정·보낸 엽서는 거기서", async () => {
+        state.boxes = { owned: [shelf("1", "우리 엄마 아빠", TOKEN_A)], joined: [] };
+        render(<MyInfo />);
+        await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
+        expect(hrefOf(/^가족 책장/)).toBe("/mailboxes");
+      });
+
+      it("책장 줄은 '가족' 묶음 안에, 가족 책장 줄 바로 아래에 있다", async () => {
+        state.boxes = { owned: [shelf("1", "우리 엄마 아빠", TOKEN_A)], joined: [] };
+        render(<MyInfo />);
+        const mine = await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
+        const manage = screen.getByRole("link", { name: /^가족 책장/ });
+        expect(manage.compareDocumentPosition(mine) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        const group = mine.closest("section");
+        expect(group?.querySelector("h2")?.textContent).toBe("가족");
+        expect(group?.contains(manage)).toBe(true);
+      });
+
+      it("닫아 둔 책장은 줄을 내지 않는다 — 부모님께도 아무것도 안 보이니 들어갈 것이 없다", async () => {
+        state.boxes = {
+          owned: [shelf("1", "우리 엄마 아빠", TOKEN_A), shelf("2", "닫은 책장", TOKEN_B, { closed: true })],
+          joined: [],
+        };
+        render(<MyInfo />);
+        await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
+        expect(screen.queryByRole("link", { name: /^닫은 책장/ })).toBeNull();
+      });
+
+      it("보내는 사람으로만 들어간 남의 책장은 줄을 내지 않는다", async () => {
+        state.boxes = { owned: [], joined: [shelf("9", "남의 책장", TOKEN_B)] };
+        render(<MyInfo />);
+        await screen.findByText("김지민");
+        await waitFor(() => expect(screen.queryByRole("link", { name: /^남의 책장/ })).toBeNull());
+      });
+
+      it("책장이 하나도 없으면 책장 줄 없이 '가족 책장' 줄만 있다", async () => {
+        render(<MyInfo />);
+        await screen.findByText("김지민");
+        expect(hrefOf(/^가족 책장/)).toBe("/mailboxes");
+        expect(screen.queryByRole("link", { name: /책꽂이 안으로/ })).toBeNull();
+      });
+
+      it("책장을 못 읽어도 나머지는 그대로다 — 관리 줄과 새 소식은 남는다", async () => {
+        state.replies = 1;
+        state.boxes = "failed";
+        render(<MyInfo />);
+        const row = await screen.findByRole("link", { name: /^가족 책장/ });
+        await waitFor(() => expect(within(row).getByText("새 소식 1")).toBeTruthy());
+        expect(screen.queryByRole("link", { name: /책꽂이 안으로/ })).toBeNull();
+      });
+
+      it("책장을 읽다가 오류가 나도 화면이 무너지지 않는다", async () => {
+        state.replies = 2;
+        state.boxes = "throw";
+        render(<MyInfo />);
+        const row = await screen.findByRole("link", { name: /^가족 책장/ });
+        await waitFor(() => expect(within(row).getByText("새 소식 2")).toBeTruthy());
+        expect(screen.getByRole("link", { name: /^가족 공유/ })).toBeTruthy();
+      });
+
+      it("로그인하지 않았으면 책장 줄도 없다", async () => {
+        state.user = null;
+        state.boxes = { owned: [shelf("1", "우리 엄마 아빠", TOKEN_A)], joined: [] };
+        render(<MyInfo />);
+        await screen.findByRole("link", { name: "로그인하기" });
+        expect(screen.queryByRole("link", { name: /^우리 엄마 아빠/ })).toBeNull();
+      });
     });
 
     it("로그아웃을 누르면 로그아웃한다", async () => {
