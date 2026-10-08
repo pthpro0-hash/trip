@@ -1,31 +1,32 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useId, useMemo, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/client";
-import { fetchMailboxes, type MailboxItem } from "@/lib/supabase/mailbox";
+import { createMailbox, fetchMailboxes, type MailboxInput, type MailboxItem } from "@/lib/supabase/mailbox";
 import { sendPostcard, type SendPostcardResult } from "@/lib/supabase/postcards";
 import type { TripDetail } from "@/lib/supabase/tripDetail";
-import {
-  BODY_MAX,
-  greetingsFor,
-  pickPostcardPhotos,
-  postcardUrl,
-  suggestionsFor,
-} from "@/lib/mailbox";
+import { BODY_MAX, greetingsFor, pickPostcardPhotos, suggestionsFor, type Tone } from "@/lib/mailbox";
+import { firstShelfInput, firstShelfItem } from "@/lib/mailboxFirst";
 import { attachParticle } from "@/lib/korean";
 import { sendLimits } from "@/lib/mailboxSettings";
 import { HubDialog } from "@/components/hub/HubDialog";
 import { WaitingOverlay } from "@/components/layout/Waiting";
+import { FirstShelfForm } from "./send/FirstShelfForm";
+import { PhotoPicker } from "./send/PhotoPicker";
+import { PostcardPreview } from "./send/PostcardPreview";
+import { SentDone } from "./send/SentDone";
+import { ShelfList } from "./send/ShelfList";
 
 /*
-  엽서 보내기 — 이 여행을 부모님 책장으로.
+  엽서 보내기 — 이 여행을 부모님께.
 
-  사진 3장(자동으로 골라 두고 바꿀 수 있다)과 한 줄을 쓰고, 받을 책장을 고른다. 인사말은 책장마다
-  따로다 — 한 번 쓰면 다른 책장에 복사되고 호칭만 그 책장 것으로 바뀐다. 직접 고친 책장은 따로 간다.
+  한 줄기로 간다: (처음이면 누구에게 보내는지 한 가지만 묻고) → 한 줄을 쓰면 위의 엽서 미리보기가 바로 바뀐다 → [엽서 만들기]
+  → 링크를 보낸다. 사진과 받는 곳·인사말은 자동으로 채워 접어 두었다 — 바꾸고 싶은 사람만 연다.
+
+  인사말은 책장마다 따로다 — 한 번 쓰면 다른 책장에 복사되고 호칭만 그 책장 것으로 바뀐다. 직접 고친 책장은 따로 간다.
   보내면 엽서는 그 순간의 모습으로 남는다(사진은 한 번만 복사한다).
 
-  보내기 단추는 폰의 공유창(카카오톡이 목록에 나온다)을 연다. 안 되는 브라우저에서는 링크 복사.
+  링크 보내기는 폰의 공유창(카카오톡이 목록에 나온다)을 연다. 안 되는 브라우저에서는 링크 복사(SentDone).
 */
 
 interface SendPostcardDialogProps {
@@ -55,6 +56,19 @@ const REASON: Record<Extract<SendPostcardResult, { ok: false }>["reason"], strin
   failed: "보내지 못했어요. 잠시 뒤 다시 해 주세요. (엽서는 나가지 않았어요)",
 };
 
+/** 처음 책장을 만들다 안 됐을 때. 책장이라는 말을 모르는 사람도 읽을 수 있게 쓴다. */
+const CREATE_REASON = {
+  invalid: "받는 분을 다시 적어 주세요. 예: 엄마, 아빠",
+  limit: "더 만들 수 없어요. ‘내 정보’의 ‘가족 책장’에서 쓰지 않는 곳을 닫은 뒤 다시 해 주세요.",
+  failed: "저장하지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.",
+} as const;
+
+/** 창 맨 위 글. 받는 곳이 하나로 정해졌으면 그분께, 아니면 그냥 부모님께. */
+function titleFor(selected: MailboxItem[]): string {
+  const name = selected.length === 1 ? selected[0].greetingName?.trim() : "";
+  return `${name || "부모님"}께 엽서 보내기`;
+}
+
 export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPostcardDialogProps) {
   const [boxes, setBoxes] = useState<MailboxItem[] | "loading" | "failed">("loading");
   const [senderName, setSenderName] = useState("");
@@ -70,7 +84,9 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   const [working, setWorking] = useState<{ done: number; total: number } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [sent, setSent] = useState<Sent | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const nameId = useId();
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -130,6 +146,13 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
     setChecked(next);
   };
 
+  // 엽서에는 여행 차례대로 실린다(sendPostcard) — 미리보기도 그 첫 사진을 보여 준다.
+  const firstShot = photos.find((photo) => picked.includes(photo.id));
+  const previewUrl = (firstShot && photoUrls.get(firstShot.storagePath)) || null;
+
+  /** 한 줄 아래 추천 문구: 받는 곳이 정해진 말투로. 책장마다의 추천은 접힌 목록 안에 있다. */
+  const tone: Tone = selected[0]?.tone ?? "casual";
+
   /*
     무엇이 빠졌는지. 단추를 흐리게 막아 두면 눌러도 아무 일이 없어 고장 난 것처럼 보인다 — 눌렀을 때
     빠진 것을 말로 알려 준다.
@@ -142,6 +165,22 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
         : senderName.trim().length === 0
           ? "보내는 이름을 적어 주세요. 받는 분께 ‘○○이 보낸 엽서’로 보여요."
           : null;
+
+  /** 처음 보내는 사람: 답 하나로 책장을 만들고 같은 창에서 이어 간다. */
+  const createShelf = async ({ who, tone: answer }: { who: string; tone: Tone }) => {
+    const supabase = getBrowserClient();
+    const input: MailboxInput | null = firstShelfInput(who, answer);
+    if (!supabase || !input || creating) return;
+    setCreating(true);
+    setCreateError(null);
+    const result = await createMailbox(supabase, userId, input);
+    setCreating(false);
+    if (!result.ok) {
+      setCreateError(CREATE_REASON[result.reason]);
+      return;
+    }
+    setBoxes([firstShelfItem(userId, input, result)]);
+  };
 
   const send = async () => {
     const supabase = getBrowserClient();
@@ -179,32 +218,8 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
     });
   };
 
-  const linkOf = (box: MailboxItem, postcardId: string) => postcardUrl(window.location.origin, box.token, postcardId);
-
-  const share = async (box: MailboxItem, greeting: string) => {
-    if (!sent) return;
-    try {
-      await navigator.share({
-        title: `${sent.senderName}이(가) 보낸 여행 엽서`,
-        text: greeting,
-        url: linkOf(box, sent.postcardId),
-      });
-    } catch {
-      // 공유 창을 닫은 것뿐이다.
-    }
-  };
-
-  const copy = async (box: MailboxItem) => {
-    if (!sent) return;
-    try {
-      await navigator.clipboard.writeText(linkOf(box, sent.postcardId));
-      setNote(`${box.name} 링크를 복사했어요. 카카오톡에 붙여 넣어 보내 주세요.`);
-    } catch {
-      setNote(`복사하지 못했어요. 이 주소를 직접 복사해 주세요: ${linkOf(box, sent.postcardId)}`);
-    }
-  };
-
-  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  // 오른쪽 위의 ✕ 를 피해 제목만 오른쪽을 비운다. 아래 칸들은 창 폭을 다 쓴다.
+  const heading = <h2 className="pr-9 text-[20px] font-bold tracking-tight text-text">{titleFor(selected)}</h2>;
 
   return (
     <HubDialog label="엽서 보내기" onClose={onClose}>
@@ -216,249 +231,122 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
         />
       )}
 
-      <div className="flex flex-col gap-5 pr-8">
+      <div className="flex flex-col gap-5">
         {sent ? (
+          <SentDone postcardId={sent.postcardId} senderName={sent.senderName} boxes={sent.boxes} onClose={onClose} />
+        ) : boxes === "loading" ? (
           <>
-            <div>
-              <h2 className="text-[20px] font-bold tracking-tight text-text">엽서를 만들었어요</h2>
-              <p className="mt-1 text-[14px] leading-relaxed text-text-muted">
-                이제 받는 분께 링크를 보내 주세요. 링크를 열면 로그인 없이 엽서를 볼 수 있어요. 엽서는 지금 모습으로
-                남고, 이 여행을 지우면 엽서도 함께 지워져요.
-              </p>
-            </div>
-            <ul className="flex flex-col gap-3">
-              {sent.boxes.map(({ box, greeting }) => (
-                <li key={box.id} className="flex flex-col gap-2 rounded-xl bg-bg-subtle p-3.5">
-                  <p className="text-[15px] font-semibold text-text">{box.name}</p>
-                  <p className="text-[13px] leading-relaxed text-text-muted">&ldquo;{greeting}&rdquo;</p>
-                  <div className="flex flex-wrap gap-2">
-                    {canShare && (
-                      <button
-                        type="button"
-                        onClick={() => void share(box, greeting)}
-                        className="rounded-full bg-[#fee500] px-4 py-2 text-[14px] font-medium text-[#1d1d1f]"
-                      >
-                        카카오톡 등으로 보내기
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => void copy(box)}
-                      className="rounded-full bg-bg px-4 py-2 text-[14px] font-medium text-text ring-1 ring-line hover:bg-line"
-                    >
-                      링크 복사
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            {note && (
-              <p role="status" className="break-all rounded-xl bg-bg-subtle px-4 py-3 text-[13px] text-text-muted">
-                {note}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="self-start rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-on-accent hover:bg-accent-hover"
-            >
-              닫기
-            </button>
+            {heading}
+            <p className="text-[14px] text-text-muted">불러오는 중…</p>
           </>
+        ) : boxes === "failed" ? (
+          <>
+            {heading}
+            <p className="text-[14px] text-text-muted">책장을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>
+          </>
+        ) : boxes.length === 0 ? (
+          <FirstShelfForm busy={creating} error={createError} onSubmit={(answer) => void createShelf(answer)} />
         ) : (
           <>
             <div>
-              <h2 className="text-[20px] font-bold tracking-tight text-text">부모님께 엽서 보내기</h2>
-              <p className="mt-1 text-[14px] leading-relaxed text-text-muted">
-                사진 몇 장과 한 줄을 골라 엽서로 보내요. 받는 분은 링크 하나로, 로그인 없이 열어 봐요.
-              </p>
+              {heading}
+              <p className="mt-1 text-[14px] leading-relaxed text-text-muted">받는 분은 링크 하나로, 로그인 없이 열어 봐요.</p>
             </div>
 
-            {boxes === "loading" && <p className="text-[14px] text-text-muted">책장을 불러오는 중…</p>}
-            {boxes === "failed" && <p className="text-[14px] text-text-muted">책장을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>}
-            {Array.isArray(boxes) && boxes.length === 0 && (
-              <p className="rounded-xl bg-bg-subtle p-4 text-[14px] leading-relaxed text-text-muted">
-                보낼 수 있는 책장이 없어요.{" "}
-                <Link href="/mailboxes" className="font-medium text-accent hover:text-accent-hover">
-                  책장을 만들어
-                </Link>{" "}
-                주세요.
-              </p>
-            )}
+            <PostcardPreview photoUrl={previewUrl} text={rows[0]?.text ?? ""} senderName={senderName} />
 
-            {Array.isArray(boxes) && boxes.length > 0 && (
-              <>
-                <section className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-[14px] font-semibold text-text">
-                      사진 <span className="font-normal text-text-muted">{picked.length}/{limits.photos}</span>
-                    </h3>
-                    {manual !== null && (
-                      <button type="button" onClick={() => setManual(null)} className="text-[12px] font-medium text-accent hover:text-accent-hover">
-                        추천으로 고르기
-                      </button>
-                    )}
-                  </div>
-                  {limitNote && <p className="text-[12px] leading-relaxed text-text-faint">{limitNote}</p>}
-                  {photos.length === 0 ? (
-                    <p className="text-[13px] text-text-faint">이 여행에는 사진이 없어요. 글과 지도만 가요.</p>
-                  ) : (
-                    <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
-                      {photos.map((photo) => {
-                        const on = picked.includes(photo.id);
-                        const url = photoUrls.get(photo.storagePath);
-                        return (
-                          <button
-                            key={photo.id}
-                            type="button"
-                            aria-pressed={on}
-                            aria-label={on ? "엽서에서 빼기" : "엽서에 넣기"}
-                            onClick={() => togglePhoto(photo.id)}
-                            disabled={!on && picked.length >= limits.photos}
-                            className={`relative aspect-square overflow-hidden rounded-lg bg-bg-subtle ring-2 transition disabled:opacity-40 ${
-                              on ? "ring-accent" : "ring-transparent"
-                            }`}
-                          >
-                            {url && (
-                              // eslint-disable-next-line @next/next/no-img-element -- 서명 주소는 그때그때 바뀐다
-                              <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" />
-                            )}
-                            {on && (
-                              <span className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-accent text-[11px] font-bold text-on-accent">
-                                {picked.indexOf(photo.id) + 1}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-
-                <section className="flex flex-col gap-2">
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-[14px] font-semibold text-text">한 줄</span>
-                    <textarea
-                      value={body}
-                      maxLength={BODY_MAX}
-                      rows={3}
-                      onChange={(event) => setBody(event.target.value)}
-                      placeholder="강릉 바다 보고 왔어요. 다음엔 같이 가요!"
-                      className="resize-y rounded-xl bg-bg-subtle px-3.5 py-2.5 text-[15px] leading-relaxed text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-[13px] text-text-muted">
-                    보내는 이름
-                    <input
-                      type="text"
-                      value={senderName}
-                      maxLength={20}
-                      onChange={(event) => setSenderName(event.target.value)}
-                      aria-label="보내는 이름"
-                      className="w-28 rounded-lg bg-bg-subtle px-2.5 py-1.5 text-[14px] text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
-                    />
-                    <span className="text-text-faint">받는 분께 &lsquo;○○이 보낸 엽서&rsquo;로 보여요</span>
-                  </label>
-                </section>
-
-                <section className="flex flex-col gap-2.5">
-                  <h3 className="text-[14px] font-semibold text-text">받을 책장</h3>
-                  {openBoxes.map((box) => {
-                    const row = rowOf(box.id);
-                    return (
-                      <div key={box.id} className="flex flex-col gap-2 rounded-xl bg-bg p-3 ring-1 ring-line">
-                        <label className="flex items-center gap-2.5">
-                          <input type="checkbox" checked={selectedIds.has(box.id)} onChange={() => toggleBox(box.id)} className="h-4 w-4" />
-                          <span className="min-w-0 flex-1 truncate text-[15px] font-medium text-text">{box.name}</span>
-                          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-accent">{box.tone === "polite" ? "존댓말" : "편하게"}</span>
-                        </label>
-                        {row && (
-                          <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[12px] text-text-faint">
-                                {box.useGreeting && box.greetingName ? `앞에 ‘${box.greetingName}’ 이 붙어요` : "호칭 없이 보내요"}
-                              </span>
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[11px] ${
-                                  row.edited ? "bg-[#faeeda] text-[#633806]" : "bg-[#e1f5ee] text-[#085041]"
-                                }`}
-                              >
-                                {row.edited ? "직접 고쳤어요" : "자동으로 채웠어요"}
-                              </span>
-                              {row.edited && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setOverrides((current) => {
-                                      const next = { ...current };
-                                      delete next[box.id];
-                                      return next;
-                                    })
-                                  }
-                                  className="text-[12px] font-medium text-accent"
-                                >
-                                  원래대로
-                                </button>
-                              )}
-                            </div>
-                            <textarea
-                              value={row.body}
-                              rows={2}
-                              maxLength={BODY_MAX}
-                              aria-label={`${box.name} 인사말`}
-                              onChange={(event) => setOverrides((current) => ({ ...current, [box.id]: event.target.value }))}
-                              className="resize-y rounded-lg bg-bg-subtle px-3 py-2 text-[14px] leading-relaxed text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
-                            />
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-[12px] text-text-faint">추천</span>
-                              {suggestionsFor(box.tone).map((suggestion) => (
-                                <button
-                                  key={suggestion}
-                                  type="button"
-                                  onClick={() =>
-                                    setOverrides((current) => ({
-                                      ...current,
-                                      [box.id]: `${(row.body || "").trim()} ${suggestion}`.trim(),
-                                    }))
-                                  }
-                                  className="rounded-full bg-bg-subtle px-2.5 py-1 text-[12px] text-text hover:bg-line"
-                                >
-                                  {suggestion}
-                                </button>
-                              ))}
-                            </div>
-                            {row.text && (
-                              <p className="text-[12px] leading-relaxed text-text-muted">
-                                받는 분께 보이는 글: <span className="text-text">&ldquo;{row.text}&rdquo;</span>
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </section>
-
-                {failure && (
-                  <p role="alert" className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
-                    {failure}
-                  </p>
-                )}
-
-                <div className="flex flex-col gap-1.5">
+            <section className="flex flex-col gap-2">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[14px] font-semibold text-text">한 줄</span>
+                <textarea
+                  value={body}
+                  maxLength={BODY_MAX}
+                  rows={2}
+                  onChange={(event) => setBody(event.target.value)}
+                  placeholder="강릉 바다 보고 왔어요. 다음엔 같이 가요!"
+                  className="resize-y rounded-xl bg-bg-subtle px-3.5 py-2.5 text-[16px] leading-relaxed text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
+                />
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestionsFor(tone).map((suggestion) => (
                   <button
+                    key={suggestion}
                     type="button"
-                    onClick={() => void send()}
-                    className="rounded-full bg-accent px-5 py-3 text-[15px] font-medium text-on-accent transition hover:bg-accent-hover"
+                    onClick={() => setBody((current) => `${current.trim()} ${suggestion}`.trim().slice(0, BODY_MAX))}
+                    className="rounded-full bg-bg-subtle px-3 py-1.5 text-[13px] text-text ring-1 ring-line hover:bg-line"
                   >
-                    {selected.length > 1 ? `${selected.length}곳에 엽서 보내기` : "엽서 보내기"}
+                    {suggestion}
                   </button>
-                  <p className="text-[12px] text-text-faint">
-                    엽서는 보낸 순간 그대로 남아요. 이 여행이나 사진을 지우면 엽서에서도 사라져요.
-                  </p>
-                </div>
-              </>
-            )}
+                ))}
+              </div>
+            </section>
+
+            <div className="flex items-center gap-2.5">
+              <label htmlFor={nameId} className="shrink-0 text-[14px] text-text-muted">
+                보내는 이름
+              </label>
+              <input
+                id={nameId}
+                type="text"
+                value={senderName}
+                maxLength={20}
+                onChange={(event) => setSenderName(event.target.value)}
+                className="min-w-0 flex-1 rounded-lg bg-bg-subtle px-3 py-2 text-[16px] text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
+              />
+            </div>
+
+            <PhotoPicker
+              photos={photos}
+              urls={photoUrls}
+              picked={picked}
+              limit={limits.photos}
+              limitNote={limitNote}
+              manual={manual !== null}
+              onToggle={togglePhoto}
+              onReset={() => setManual(null)}
+            />
+
+            <ShelfList
+              boxes={openBoxes}
+              selectedIds={selectedIds}
+              rows={rows}
+              onToggle={toggleBox}
+              onEdit={(id, text) => setOverrides((current) => ({ ...current, [id]: text }))}
+              onReset={(id) =>
+                setOverrides((current) => {
+                  const next = { ...current };
+                  delete next[id];
+                  return next;
+                })
+              }
+              onSuggest={(id, suggestion, current) =>
+                setOverrides((all) => ({ ...all, [id]: `${current.trim()} ${suggestion}`.trim() }))
+              }
+            />
+
+            <p className="text-[12px] text-text-faint">
+              엽서는 만든 순간 그대로 남아요. 이 여행이나 사진을 지우면 엽서에서도 사라져요.
+            </p>
+
+            {/*
+              만들기 단추는 창 아래에 붙어 있다 — 사진 격자나 받는 곳 목록을 펼쳐 길어져도 찾아 헤매지 않게. 빠진 것을 알리는
+              글도 여기 함께 둔다(위쪽에 두면 단추를 눌러도 화면 밖이라 아무 일도 없는 것처럼 보인다).
+              -mx-5 -mb-8 은 창의 안쪽 여백(px-5 pb-8)을 되돌려 띠가 창 폭을 다 쓰게 한다.
+            */}
+            <div className="sticky bottom-0 z-[1] -mx-5 -mb-8 flex flex-col gap-2 bg-surface px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_14px_-12px_rgba(0,0,0,0.2)]">
+              {failure && (
+                <p role="alert" className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
+                  {failure}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => void send()}
+                className="rounded-full bg-accent px-5 py-3 text-[15px] font-medium text-on-accent transition hover:bg-accent-hover"
+              >
+                {selected.length > 1 ? `${selected.length}곳에 엽서 만들기` : "엽서 만들기"}
+              </button>
+            </div>
           </>
         )}
       </div>

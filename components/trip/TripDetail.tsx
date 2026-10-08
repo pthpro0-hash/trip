@@ -19,7 +19,12 @@ import {
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { deletePhoto, setCoverPhoto, signedUrls, thumbUrls } from "@/lib/supabase/photos";
 import { deleteTrip } from "@/lib/supabase/trips";
-import { fetchPhotosInPostcards, fetchPostcardCounts } from "@/lib/supabase/postcards";
+import {
+  fetchPhotosInPostcards,
+  fetchPostcardCounts,
+  fetchTripPostcardLines,
+  type TripPostcardLine,
+} from "@/lib/supabase/postcards";
 import { canIn, ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
 import { LIST_HREF } from "@/lib/nav";
 import { rememberPlaceName } from "@/lib/supabase/placeNames";
@@ -31,6 +36,7 @@ import { CompanionEditor } from "./CompanionEditor";
 import { ShareChooser } from "./ShareChooser";
 import { TripHero } from "./TripHero";
 import { TripMoreMenu } from "./TripMoreMenu";
+import { TripPostcardStatus } from "./TripPostcardStatus";
 import { coverPhotoOf } from "@/lib/tripCover";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
@@ -153,6 +159,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
   */
   const [postcardCount, setPostcardCount] = useState(0);
   const [postcardPhotos, setPostcardPhotos] = useState<Set<string>>(new Set());
+  /** 이 여행으로 보낸 엽서가 받는 곳마다 열렸는지. 공유 줄 아래에 한 줄씩 보여 준다. 못 읽으면 줄이 없을 뿐이다. */
+  const [postcardLines, setPostcardLines] = useState<TripPostcardLine[]>([]);
   /*
     크게 보고 있는 사진. 목록에는 작은 판을 쓰지만 여기서는 보관본을
     그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.
@@ -194,6 +202,11 @@ export function TripDetail({ tripId }: { tripId: string }) {
       void fetchPostcardCounts(supabase, owner)
         .then((counts) => {
           if (active) setPostcardCount(counts.get(tripId) ?? 0);
+        })
+        .catch(() => undefined);
+      void fetchTripPostcardLines(supabase, owner, tripId)
+        .then((lines) => {
+          if (active) setPostcardLines(lines);
         })
         .catch(() => undefined);
       void fetchPhotosInPostcards(
@@ -503,6 +516,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
             const supabase = getBrowserClient();
             if (!supabase) return;
             void fetchPostcardCounts(supabase, userId).then((counts) => setPostcardCount(counts.get(tripId) ?? 0)).catch(() => undefined);
+            void fetchTripPostcardLines(supabase, userId, tripId).then(setPostcardLines).catch(() => undefined);
             void fetchPhotosInPostcards(supabase, trip.visits.flatMap((visit) => visit.photos.map((photo) => photo.id)))
               .then(setPostcardPhotos)
               .catch(() => undefined);
@@ -648,6 +662,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
           {tripError && (
             <span className="text-[13px] text-text-muted">지우지 못했어요. 잠시 후 다시 시도해 주세요.</span>
           )}
+          {/* 보낸 엽서를 열어 보셨는지. 줄바꿈되는 이 줄에서 한 줄을 통째로 차지한다. */}
+          {canShare && <TripPostcardStatus lines={postcardLines} />}
         </div>
       )}
 

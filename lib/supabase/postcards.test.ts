@@ -14,6 +14,7 @@ const {
   fetchPhotosInPostcards,
   fetchPostcardCounts,
   fetchSentPostcards,
+  fetchTripPostcardLines,
   fetchUnreadHeartCount,
   fetchUnreadReplyCount,
   fetchUnreadWishCount,
@@ -70,6 +71,9 @@ interface Options {
   postcardsOfTrip?: { id: string }[];
   photoRows?: { postcard_id: string; file: string }[];
   countRows?: { trip_id: string }[];
+  /** 이 여행으로 보낸 엽서(최근 것부터). */
+  tripCards?: { id: string; created_at: string }[];
+  boxRows?: unknown[];
   inPostcards?: { source_photo_id: string }[];
   sentRows?: unknown[];
   deliveryRows?: unknown[];
@@ -94,6 +98,8 @@ function fake(options: Options = {}) {
     if (name === "postcard_hearts") return options.heartRows ?? [];
     if (name === "mailbox_wishes") return options.wishRows ?? [];
     if (name === "postcards" && columns === "id") return options.postcardsOfTrip ?? [];
+    if (name === "postcards" && columns === "id,created_at") return options.tripCards ?? [];
+    if (name === "mailboxes") return options.boxRows ?? [];
     if (name === "postcards") return options.countRows ?? [];
     if (name === "postcard_photos" && columns.includes("postcard_id")) return options.photoRows ?? [];
     if (name === "postcard_photos") return options.inPostcards ?? [];
@@ -445,6 +451,106 @@ describe("지울 때 보여 줄 숫자", () => {
     const f = fake({ inPostcards: [{ source_photo_id: "p1" }, { source_photo_id: "p1" }, { source_photo_id: "p2" }] });
     expect([...(await fetchPhotosInPostcards(f.supabase, ["p1", "p2", "p3"]))].sort()).toEqual(["p1", "p2"]);
     expect((await fetchPhotosInPostcards(f.supabase, [])).size).toBe(0);
+  });
+});
+
+/*
+  여행 상세가 "엄마 아빠께 엽서를 보냈어요 · 열어 보셨어요 ✓"를 보여 주려면, 이 여행으로 보낸 엽서가 받는 곳마다 열렸는지를
+  한 줄씩 읽어야 한다. 새 표 없이 있는 표(엽서 · 배달 · 책장)만 읽는다.
+*/
+describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’", () => {
+  const cards = [
+    { id: "pc2", created_at: "2026-10-05T00:00:00Z" },
+    { id: "pc1", created_at: "2026-10-02T00:00:00Z" },
+  ];
+  const boxRows = [
+    { id: "m1", name: "우리 엄마 아빠", greeting_name: "엄마 아빠", closed_at: null },
+    { id: "m2", name: "장인 장모님 책장", greeting_name: null, closed_at: null },
+    { id: "m3", name: "닫은 곳", greeting_name: "삼촌", closed_at: "2026-10-01T00:00:00Z" },
+  ];
+
+  it("받는 곳마다 한 줄 — 이름 · 부르는 말 · 열어 봤는지", async () => {
+    const f = fake({
+      tripCards: cards,
+      boxRows,
+      deliveryRows: [
+        { postcard_id: "pc1", mailbox_id: "m1", opened_at: "2026-10-03T00:00:00Z" },
+        { postcard_id: "pc1", mailbox_id: "m2", opened_at: null },
+      ],
+    });
+    expect(await fetchTripPostcardLines(f.supabase, "u", "t1")).toEqual([
+      { mailboxId: "m1", name: "우리 엄마 아빠", greetingName: "엄마 아빠", opened: true },
+      { mailboxId: "m2", name: "장인 장모님 책장", greetingName: null, opened: false },
+    ]);
+  });
+
+  it("같은 곳에 여러 번 보냈으면 가장 최근에 보낸 엽서가 기준이다", async () => {
+    // pc2 가 더 최근이다. 옛 엽서를 열어 봤어도 새 엽서를 아직 안 열었으면 ‘아직’이다.
+    const stale = fake({
+      tripCards: cards,
+      boxRows,
+      deliveryRows: [
+        { postcard_id: "pc1", mailbox_id: "m1", opened_at: "2026-10-03T00:00:00Z" },
+        { postcard_id: "pc2", mailbox_id: "m1", opened_at: null },
+      ],
+    });
+    expect((await fetchTripPostcardLines(stale.supabase, "u", "t1"))[0]).toMatchObject({ mailboxId: "m1", opened: false });
+    // 받은 차례와 상관없이 — 새 엽서를 열었으면 열었다.
+    const fresh = fake({
+      tripCards: cards,
+      boxRows,
+      deliveryRows: [
+        { postcard_id: "pc2", mailbox_id: "m1", opened_at: "2026-10-06T00:00:00Z" },
+        { postcard_id: "pc1", mailbox_id: "m1", opened_at: null },
+      ],
+    });
+    const lines = await fetchTripPostcardLines(fresh.supabase, "u", "t1");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ mailboxId: "m1", opened: true });
+  });
+
+  it("닫은 책장과, 책장을 찾을 수 없는 배달은 빼고 보여 준다", async () => {
+    const f = fake({
+      tripCards: cards,
+      boxRows,
+      deliveryRows: [
+        { postcard_id: "pc1", mailbox_id: "m3", opened_at: null },
+        { postcard_id: "pc1", mailbox_id: "gone", opened_at: null },
+        { postcard_id: "pc1", mailbox_id: "m1", opened_at: null },
+      ],
+    });
+    expect((await fetchTripPostcardLines(f.supabase, "u", "t1")).map((line) => line.mailboxId)).toEqual(["m1"]);
+  });
+
+  it("이 여행의 엽서가 아닌 배달은 섞이지 않는다", async () => {
+    const f = fake({
+      tripCards: cards,
+      boxRows,
+      deliveryRows: [
+        { postcard_id: "other", mailbox_id: "m2", opened_at: "2026-10-03T00:00:00Z" },
+        { postcard_id: "pc1", mailbox_id: "m1", opened_at: null },
+      ],
+    });
+    expect((await fetchTripPostcardLines(f.supabase, "u", "t1")).map((line) => line.mailboxId)).toEqual(["m1"]);
+  });
+
+  it("부르는 말이 공백뿐이면 없는 것으로 본다", async () => {
+    const f = fake({
+      tripCards: cards,
+      boxRows: [{ id: "m1", name: "우리 집", greeting_name: "  ", closed_at: null }],
+      deliveryRows: [{ postcard_id: "pc1", mailbox_id: "m1", opened_at: null }],
+    });
+    expect((await fetchTripPostcardLines(f.supabase, "u", "t1"))[0].greetingName).toBeNull();
+  });
+
+  it("보낸 엽서가 없으면 빈 목록 — 배달도 책장도 읽지 않는다", async () => {
+    const f = fake({ tripCards: [], boxRows });
+    expect(await fetchTripPostcardLines(f.supabase, "u", "t1")).toEqual([]);
+    expect(f.log).toEqual(["select postcards"]);
+  });
+
+  it("못 읽으면 빈 목록 — 줄이 안 보일 뿐 여행 상세는 그대로다", async () => {
+    expect(await fetchTripPostcardLines(fake({ selectError: "500" }).supabase, "u", "t1")).toEqual([]);
   });
 });
 

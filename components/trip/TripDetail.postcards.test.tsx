@@ -16,7 +16,14 @@ vi.mock("@/lib/supabase/client", () => ({
 vi.mock("@/components/course/CourseMap", () => ({ CourseMap: () => null }));
 vi.mock("@/components/share/TripShareDialog", () => ({ TripShareDialog: () => null }));
 vi.mock("@/components/mailbox/SendPostcardDialog", () => ({
-  SendPostcardDialog: () => <p>엽서 창이 열렸어요</p>,
+  SendPostcardDialog: ({ onClose }: { onClose: () => void }) => (
+    <div>
+      <p>엽서 창이 열렸어요</p>
+      <button type="button" onClick={onClose}>
+        엽서 창 닫기
+      </button>
+    </div>
+  ),
 }));
 vi.mock("@/lib/supabase/photos", () => ({
   thumbUrls: async (_c: unknown, paths: string[]) => new Map(paths.map((path) => [path, `https://예시/${path}`])),
@@ -25,10 +32,15 @@ vi.mock("@/lib/supabase/photos", () => ({
   setCoverPhoto: async () => true,
 }));
 
-const counts = vi.hoisted(() => ({ trips: new Map<string, number>(), photos: new Set<string>() }));
+const counts = vi.hoisted(() => ({
+  trips: new Map<string, number>(),
+  photos: new Set<string>(),
+  lines: [] as { mailboxId: string; name: string; greetingName: string | null; opened: boolean }[],
+}));
 vi.mock("@/lib/supabase/postcards", () => ({
   fetchPostcardCounts: async () => counts.trips,
   fetchPhotosInPostcards: async () => counts.photos,
+  fetchTripPostcardLines: async () => counts.lines,
 }));
 
 const trip: Detail = {
@@ -73,6 +85,7 @@ describe("TripDetail · 엽서", () => {
   beforeEach(() => {
     counts.trips = new Map();
     counts.photos = new Set();
+    counts.lines = [];
     window.sessionStorage.clear();
   });
 
@@ -96,6 +109,58 @@ describe("TripDetail · 엽서", () => {
     await open();
     expect(screen.queryByRole("button", { name: "공유" })).toBeNull();
     expect(screen.queryByRole("button", { name: "엽서 보내기" })).toBeNull();
+  });
+
+  describe("보낸 엽서 — 열어 보셨는지", () => {
+    const sent = (over: Partial<(typeof counts.lines)[number]> = {}) => ({
+      mailboxId: "m1",
+      name: "우리 엄마 아빠",
+      greetingName: "엄마 아빠",
+      opened: false,
+      ...over,
+    });
+    const status = () => screen.queryByRole("list", { name: "보낸 엽서" });
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+
+    it("엽서를 보낸 여행에는 공유 줄 아래에 받는 곳 상태가 나온다", async () => {
+      counts.lines = [sent()];
+      await open();
+      expect(await screen.findByRole("list", { name: "보낸 엽서" })).toHaveTextContent(
+        "엄마 아빠께 엽서를 보냈어요 · 아직 안 열어 보셨어요",
+      );
+    });
+
+    it("열어 보셨으면 열어 보셨다고 나온다", async () => {
+      counts.lines = [sent({ opened: true })];
+      await open();
+      expect(await screen.findByRole("list", { name: "보낸 엽서" })).toHaveTextContent("열어 보셨어요 ✓");
+    });
+
+    it("엽서를 안 보낸 여행에는 줄이 없다", async () => {
+      await open();
+      await settle();
+      expect(status()).toBeNull();
+    });
+
+    it("가족의 여행을 볼 때는 줄이 없다 — 엽서는 내 여행으로만 보낸다", async () => {
+      window.sessionStorage.setItem("family-view", JSON.stringify({ ownerId: "엄마", label: "mom@example.com", role: "full" }));
+      counts.lines = [sent()];
+      await open();
+      await settle();
+      expect(status()).toBeNull();
+    });
+
+    it("엽서를 보내고 창을 닫으면 줄이 새로 읽혀 바로 나온다", async () => {
+      await open();
+      await settle();
+      expect(status()).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "공유" }));
+      fireEvent.click(await screen.findByRole("button", { name: /부모님께 엽서 보내기/ }));
+      await screen.findByText("엽서 창이 열렸어요");
+      counts.lines = [sent()];
+      fireEvent.click(screen.getByRole("button", { name: "엽서 창 닫기" }));
+      expect(await screen.findByRole("list", { name: "보낸 엽서" })).toHaveTextContent("엄마 아빠께 엽서를 보냈어요");
+    });
   });
 
   it("엽서를 안 보낸 여행은 지우기 확인이 전과 같다", async () => {

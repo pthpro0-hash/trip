@@ -161,6 +161,59 @@ export async function fetchPostcardCounts(supabase: SupabaseClient, userId: stri
   return counts;
 }
 
+/** 이 여행으로 보낸 엽서의 받는 곳 한 줄. 여행 상세가 "엄마 아빠께 엽서를 보냈어요 · 열어 보셨어요"로 보여 준다. */
+export interface TripPostcardLine {
+  mailboxId: string;
+  /** 책장 이름("우리 엄마 아빠"). */
+  name: string;
+  /** 부르는 말("엄마 아빠"). 없으면 null. */
+  greetingName: string | null;
+  /** 이 책장에 가장 최근에 보낸 엽서를 받는 분이 열어 봤는가. */
+  opened: boolean;
+}
+
+/**
+ * 이 여행으로 보낸 엽서를 받는 곳마다 한 줄로. 같은 책장에 여러 번 보냈으면 가장 최근 엽서가 기준이고, 닫은 책장은 뺀다
+ * (열어 볼 수 없는 곳에 "아직 안 열어 보셨어요"가 영영 남지 않게). 못 읽으면 빈 목록 — 줄이 안 보일 뿐 여행 상세는 그대로다.
+ * 새 표 없이 있는 표(엽서 · 배달 · 책장)만 읽는다.
+ */
+export async function fetchTripPostcardLines(supabase: SupabaseClient, userId: string, tripId: string): Promise<TripPostcardLine[]> {
+  const cards = await supabase
+    .from("postcards")
+    .select("id,created_at")
+    .eq("sender_id", userId)
+    .eq("trip_id", tripId)
+    .order("created_at", { ascending: false });
+  if (cards.error || !cards.data || cards.data.length === 0) return [];
+  // 최근 엽서가 앞에 오는 차례. 책장마다 처음 만나는 배달이 가장 최근 것이다.
+  const newestFirst = new Map((cards.data as { id: string }[]).map((card, index) => [card.id, index]));
+
+  const [deliveries, boxes] = await Promise.all([
+    supabase.from("postcard_deliveries").select("postcard_id,mailbox_id,opened_at").in("postcard_id", [...newestFirst.keys()]),
+    supabase.from("mailboxes").select("id,name,greeting_name,closed_at"),
+  ]);
+  if (deliveries.error || !deliveries.data || boxes.error || !boxes.data) return [];
+  const boxOf = new Map(
+    (boxes.data as { id: string; name: string; greeting_name: string | null; closed_at: string | null }[]).map((box) => [box.id, box]),
+  );
+
+  const rows = (deliveries.data as { postcard_id: string; mailbox_id: string; opened_at: string | null }[])
+    .filter((row) => newestFirst.has(row.postcard_id))
+    .sort((a, b) => newestFirst.get(a.postcard_id)! - newestFirst.get(b.postcard_id)!);
+  const lines = new Map<string, TripPostcardLine>();
+  for (const row of rows) {
+    const box = boxOf.get(row.mailbox_id);
+    if (!box || box.closed_at != null || lines.has(row.mailbox_id)) continue;
+    lines.set(row.mailbox_id, {
+      mailboxId: row.mailbox_id,
+      name: box.name,
+      greetingName: box.greeting_name?.trim() || null,
+      opened: row.opened_at != null,
+    });
+  }
+  return [...lines.values()];
+}
+
 /** 받는 분이 남긴 답장 한 번. */
 export interface SentReply {
   id: string;

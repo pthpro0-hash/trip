@@ -87,7 +87,7 @@ export function ShareChooser({ title, onLink, onPostcard, onClose }: ShareChoose
               </svg>
             }
             title="부모님께 엽서 보내기"
-            hint="부모님 책장에 사진과 한 줄이 엽서로 도착해요"
+            hint="부모님께 사진과 한 줄이 엽서로 도착해요"
             onClick={onPostcard}
           />
         </div>

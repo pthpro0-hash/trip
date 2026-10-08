@@ -33,7 +33,7 @@ describe("ShareChooser", () => {
   it("각각 누구에게 어떻게 가는지 한 줄로 알린다", () => {
     chooser();
     expect(screen.getByText("링크를 아는 사람은 이 여행 하나를 사진까지 볼 수 있어요")).toBeTruthy();
-    expect(screen.getByText("부모님 책장에 사진과 한 줄이 엽서로 도착해요")).toBeTruthy();
+    expect(screen.getByText("부모님께 사진과 한 줄이 엽서로 도착해요")).toBeTruthy();
   });
 
   it("엽서에 실리는 사진 수를 못 박아 말하지 않는다 — 고르는 창이 정한다", () => {

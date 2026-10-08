@@ -149,6 +149,35 @@ describe("도움말 내용", () => {
       expect(step.detail).toContain("'부모님께 엽서 보내기'");
     });
 
+    it("책장은 처음 엽서를 보낼 때 '누구에게 보내나요?'에 답하면 저절로 만들어진다고 알린다", () => {
+      const step = stepOf("책장 만들기");
+      expect(step.summary).toContain("저절로");
+      expect(step.detail).toContain("'누구에게 보내나요?'");
+      expect(step.detail).toContain("'가족 책장'");
+    });
+
+    it("엽서는 한 줄을 쓰고 '엽서 만들기'를 누르면 된다고 알린다", () => {
+      expect(stepOf("엽서 보내기").detail).toContain("'엽서 만들기'");
+    });
+
+    it("사진과 인사말은 접혀 있고, 어느 단추로 연다고 알린다", () => {
+      const step = stepOf("사진과 인사말은 알아서 채워져요");
+      expect(step.detail).toContain("'사진 바꾸기'");
+      expect(step.detail).toContain("'인사말 고치기'");
+      expect(step.detail).toContain("'받는 곳 바꾸기'");
+    });
+
+    it("부모님이 열어 보셨는지는 여행 상세의 공유 줄 아래에서 본다고 알린다", () => {
+      const step = stepOf("부모님이 열어 보셨는지");
+      expect(step.summary).toContain("여행 상세");
+      expect(step.detail).toContain("열어 보셨어요");
+      expect(step.detail).toContain("아직 안 열어 보셨어요");
+    });
+
+    it("없어진 길을 말하지 않는다 — 책장을 먼저 만들러 가야 한다는 안내", () => {
+      expect(all()).not.toContain("에서 책장을 만들면 돼요");
+    });
+
     it("여행 하나의 링크는 '공유'에서 '링크로 보여 주기'로 만든다고 알린다", () => {
       const step = stepOf("여행 하나만 링크로 보여 주기");
       expect(step.summary).toContain("'공유'");
