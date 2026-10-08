@@ -22,7 +22,9 @@ describe("FirstShelfForm", () => {
     expect(screen.getByRole("heading", { name: "부모님께 엽서 보내기" })).toBeTruthy();
     expect(screen.getByText("먼저 받는 분을 알려 주세요. 한 번만 하면 돼요.")).toBeTruthy();
     expect(who()).toBeTruthy();
-    expect(screen.getByRole("radiogroup", { name: "말투" })).toBeTruthy();
+    // 묶음 이름은 fieldset 의 legend 하나가 맡는다(안쪽 radiogroup 에 같은 이름을 또 달지 않는다).
+    expect(screen.getByRole("group", { name: "말투" })).toBeTruthy();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
     // 책장 이름 · 부르는 말 같은 칸은 묻지 않는다.
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
   });

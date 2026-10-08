@@ -102,10 +102,17 @@ describe("PhotoPicker", () => {
     expect(screen.queryByRole("button", { name: "추천으로 고르기" })).toBeNull();
   });
 
-  it("한도 때문에 줄어든 까닭을 알려 준다", () => {
+  it("한도 때문에 줄어든 까닭을 접어 둔 채로도 알려 준다 — 펼쳐야 알 수 있으면 ‘왜 6장이지?’가 된다", () => {
     picker({ limitNote: "책장 설정에 따라 6장까지 고를 수 있어요." });
-    fireEvent.click(toggle());
     expect(screen.getByText("책장 설정에 따라 6장까지 고를 수 있어요.")).toBeTruthy();
+    // 펼쳐도 한 번만 나온다.
+    fireEvent.click(toggle());
+    expect(screen.getAllByText("책장 설정에 따라 6장까지 고를 수 있어요.")).toHaveLength(1);
+  });
+
+  it("까닭이 없으면 말하지 않는다", () => {
+    const { container } = picker({ limitNote: null });
+    expect(container.textContent).not.toContain("고를 수 있어요");
   });
 
   it("사진 그림은 필요할 때만 받는다 — 사진이 많은 여행도 창이 가볍게 열린다", () => {

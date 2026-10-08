@@ -37,7 +37,7 @@ export function PostcardPreview({ photoUrl, text, senderName }: PostcardPreviewP
           <p className="text-[14px] leading-relaxed text-text-faint">한 줄을 쓰면 여기에 이렇게 보여요</p>
         )}
         <p className="text-[12px] text-text-faint">
-          {sender ? `${attachParticle(sender, "이", "가")} 보낸 엽서 · 받는 분께 이렇게 보여요` : "보내는 이름을 적어 주세요"}
+          {sender ? `${attachParticle(sender, "이", "가")} 보낸 여행 엽서 · 받는 분께 이렇게 보여요` : "보내는 이름을 적어 주세요"}
         </p>
       </div>
     </div>

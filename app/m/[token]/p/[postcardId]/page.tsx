@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchMailboxPostcard, postcardFileUrl } from "@/lib/supabase/mailboxPublic";
+import { attachParticle } from "@/lib/korean";
 import { isMailboxToken, isPostcardId, isPreview, postcardTitle } from "@/lib/mailbox";
 import { ReceivedPostcardView } from "@/components/mailbox/receive/ReceivedPostcardView";
 
@@ -37,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!card) return { title: "열리지 않는 엽서", robots };
 
   // 카톡 미리보기: "지민이 보낸 여행 엽서"와 첫 사진, 인사말 한 줄.
-  const title = `${card.senderName}이(가) 보낸 여행 엽서`;
+  const title = `${attachParticle(card.senderName, "이", "가")} 보낸 여행 엽서`;
   const description = card.greeting || postcardTitle(card.snapshot);
   const first = card.snapshot.files[0];
   const image = first ? postcardFileUrl(card.id, first) : undefined;

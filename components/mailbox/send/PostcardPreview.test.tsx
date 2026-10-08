@@ -13,7 +13,7 @@ describe("PostcardPreview", () => {
     );
     expect(container.querySelector("img")).toHaveAttribute("src", "https://예시/a.webp");
     expect(screen.getByText("“엄마 아빠, 바다 보고 왔어요”")).toBeTruthy();
-    expect(screen.getByText(/민지가 보낸 엽서/)).toBeTruthy();
+    expect(screen.getByText(/민지가 보낸 여행 엽서/)).toBeTruthy();
   });
 
   it("받는 분께 이렇게 보인다고 말한다", () => {
@@ -23,7 +23,7 @@ describe("PostcardPreview", () => {
 
   it("보낸 사람의 이름에 받침이 있으면 '이'를 붙인다", () => {
     render(<PostcardPreview photoUrl={null} text="안녕" senderName="지민" />);
-    expect(screen.getByText(/지민이 보낸 엽서/)).toBeTruthy();
+    expect(screen.getByText(/지민이 보낸 여행 엽서/)).toBeTruthy();
   });
 
   it("글이 비어 있으면 어디에 쓰는지 안내한다 — 빈 따옴표를 보이지 않는다", () => {
@@ -35,7 +35,7 @@ describe("PostcardPreview", () => {
   it("보내는 이름이 비어 있으면 적어 달라고 한다", () => {
     render(<PostcardPreview photoUrl={null} text="안녕" senderName="  " />);
     expect(screen.getByText("보내는 이름을 적어 주세요")).toBeTruthy();
-    expect(screen.queryByText(/보낸 엽서/)).toBeNull();
+    expect(screen.queryByText(/보낸 여행 엽서/)).toBeNull();
   });
 
   it("사진이 없으면 사진 자리는 빈 칸이다 — 이 여행에 사진이 없거나 하나도 안 골랐을 때", () => {

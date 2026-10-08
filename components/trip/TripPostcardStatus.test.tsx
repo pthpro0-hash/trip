@@ -39,9 +39,9 @@ describe("TripPostcardStatus", () => {
     expect(mark).toBeTruthy();
   });
 
-  it("부르는 말이 없는 책장은 책장 이름으로 말한다", () => {
+  it("부르는 말이 없는 책장은 책장 이름으로 말한다 — 따옴표로 묶어 어떤 이름에도 ‘에’가 자연스럽게", () => {
     render(<TripPostcardStatus lines={[line({ greetingName: null, name: "장인 장모님 책장" })]} />);
-    expect(screen.getByRole("listitem")).toHaveTextContent("장인 장모님 책장에 엽서를 보냈어요 · 아직 안 열어 보셨어요");
+    expect(screen.getByRole("listitem")).toHaveTextContent("‘장인 장모님 책장’에 엽서를 보냈어요 · 아직 안 열어 보셨어요");
   });
 
   it("받는 곳이 여럿이면 한 곳에 한 줄씩", () => {

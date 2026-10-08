@@ -56,9 +56,15 @@ describe("ReceivedPostcardView · 부모님이 보는 엽서", () => {
     calls.heart.mockResolvedValue({ ok: true });
   });
 
+  it("보낸 사람 이름의 받침에 맞는 조사로 쓴다 — ‘이(가)’ 같은 자리표시를 그대로 내보이지 않는다", () => {
+    render(<ReceivedPostcardView token={TOKEN} card={card({ senderName: "수아" })} />);
+    expect(screen.getByText("수아가 보낸 여행 엽서")).toBeTruthy();
+    expect(screen.queryByText(/이\(가\)/)).toBeNull();
+  });
+
   it("누가 보낸 엽서인지, 제목·기간·인사말이 크게 보인다", () => {
     render(<ReceivedPostcardView token={TOKEN} card={card()} />);
-    expect(screen.getByText("지민이(가) 보낸 여행 엽서")).toBeTruthy();
+    expect(screen.getByText("지민이 보낸 여행 엽서")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "강릉 바다" })).toBeTruthy();
     expect(screen.getByText("9월 13일 ~ 14일")).toBeTruthy();
     expect(screen.getByText("엄마 아빠, 바다 보고 왔어요")).toBeTruthy();

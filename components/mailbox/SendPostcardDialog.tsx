@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { createMailbox, fetchMailboxes, type MailboxInput, type MailboxItem } from "@/lib/supabase/mailbox";
 import { sendPostcard, type SendPostcardResult } from "@/lib/supabase/postcards";
@@ -82,30 +82,47 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   const [checked, setChecked] = useState<Set<string> | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [working, setWorking] = useState<{ done: number; total: number } | null>(null);
+  /** 보내다 실패한 까닭(서버 쪽). 다음에 누를 때까지 남는다. */
   const [failure, setFailure] = useState<string | null>(null);
+  /** [엽서 만들기]를 눌러 본 적이 있는가. 그러면 빠진 것을 그때그때 알리고, 채우면 알림이 사라진다. */
+  const [tried, setTried] = useState(false);
   const [sent, setSent] = useState<Sent | null>(null);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const nameId = useId();
+  /*
+    책장을 방금 만들어 '누구에게' 화면이 사라지고 엽서 쓰기로 넘어오면, 눌렀던 단추가 없어져 초점이 갈 곳을 잃는다 — 새 제목으로
+    옮겨 화면 낭독기가 새 걸음을 읽게 한다. (엽서를 열 때부터 글칸에 초점을 주지는 않는다: 폰에서는 키보드가 바로 올라와 미리보기를 가린다.)
+  */
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [focusHeading, setFocusHeading] = useState(false);
+  useEffect(() => {
+    if (focusHeading) headingRef.current?.focus();
+  }, [focusHeading]);
 
   useEffect(() => {
     const supabase = getBrowserClient();
     if (!supabase) return;
     let active = true;
     void (async () => {
-      const { data } = await supabase.auth.getUser();
-      const meta = data.user?.user_metadata ?? {};
-      // 로그인 수단마다 이름이 들어 있는 칸이 다르다(카카오는 nickname 만 있기도 하다). 없으면 이메일 앞부분.
-      const account = String(meta.full_name ?? meta.name ?? meta.nickname ?? meta.preferred_username ?? data.user?.email?.split("@")[0] ?? "")
-        .trim()
-        .split(/\s+/)[0]
-        .slice(0, 20);
-      if (active) setSenderName(remembered() || account);
-      const list = await fetchMailboxes(supabase, userId);
-      if (!active) return;
-      if (list === "failed") return setBoxes("failed");
-      // 닫은 책장에는 보낼 수 없다.
-      setBoxes([...list.owned, ...list.joined].filter((box) => !box.closed));
+      try {
+        const { data } = await supabase.auth.getUser();
+        const meta = data.user?.user_metadata ?? {};
+        // 로그인 수단마다 이름이 들어 있는 칸이 다르다(카카오는 nickname 만 있기도 하다). 없으면 이메일 앞부분.
+        const account = String(meta.full_name ?? meta.name ?? meta.nickname ?? meta.preferred_username ?? data.user?.email?.split("@")[0] ?? "")
+          .trim()
+          .split(/\s+/)[0]
+          .slice(0, 20);
+        if (active) setSenderName(remembered() || account);
+        const list = await fetchMailboxes(supabase, userId);
+        if (!active) return;
+        if (list === "failed") return setBoxes("failed");
+        // 닫은 책장에는 보낼 수 없다.
+        setBoxes([...list.owned, ...list.joined].filter((box) => !box.closed));
+      } catch {
+        // 읽다가 끊겼다 — '불러오는 중…'에 영영 머물지 않게.
+        if (active) setBoxes("failed");
+      }
     })();
     return () => {
       active = false;
@@ -166,6 +183,9 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
           ? "보내는 이름을 적어 주세요. 받는 분께 ‘○○이 보낸 엽서’로 보여요."
           : null;
 
+  /** 아래 띠에 보이는 알림: 서버 쪽 실패가 먼저, 아니면 눌러 본 뒤로는 지금 빠진 것(채우면 사라진다). */
+  const notice = failure ?? (tried ? missing : null);
+
   /** 처음 보내는 사람: 답 하나로 책장을 만들고 같은 창에서 이어 간다. */
   const createShelf = async ({ who, tone: answer }: { who: string; tone: Tone }) => {
     const supabase = getBrowserClient();
@@ -173,34 +193,63 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
     if (!supabase || !input || creating) return;
     setCreating(true);
     setCreateError(null);
-    const result = await createMailbox(supabase, userId, input);
-    setCreating(false);
-    if (!result.ok) {
-      setCreateError(CREATE_REASON[result.reason]);
-      return;
+    try {
+      /*
+        지난 시도가 서버에는 들어갔는데 답이 오다 끊겼다면('저장하지 못했어요'가 떴는데 사실은 만들어져 있다면) 다시 눌러 만들 때
+        같은 책장이 둘이 된다 — 둘 다 받는 곳으로 골라져 부모님께 링크가 두 개 간다. 만들기 전에 한 번 더 읽어, 이미 열린
+        책장이 있으면 새로 만들지 않고 그것을 쓴다.
+      */
+      const existing = await fetchMailboxes(supabase, userId);
+      if (existing !== "failed") {
+        const open = [...existing.owned, ...existing.joined].filter((box) => !box.closed);
+        if (open.length > 0) {
+          setBoxes(open);
+          setFocusHeading(true);
+          return;
+        }
+      }
+      const result = await createMailbox(supabase, userId, input);
+      if (!result.ok) {
+        setCreateError(CREATE_REASON[result.reason]);
+        return;
+      }
+      setBoxes([firstShelfItem(userId, input, result)]);
+      setFocusHeading(true);
+    } catch {
+      // 통신이 끊겼다 — 단추가 '만드는 중…'에 영영 잠기지 않게 한다.
+      setCreateError(CREATE_REASON.failed);
+    } finally {
+      setCreating(false);
     }
-    setBoxes([firstShelfItem(userId, input, result)]);
   };
 
   const send = async () => {
     const supabase = getBrowserClient();
     if (!supabase || working) return;
     if (missing) {
-      setFailure(missing);
+      setFailure(null);
+      setTried(true);
       return;
     }
     setFailure(null);
+    setTried(false);
     setWorking({ done: 0, total: picked.length });
-    const result = await sendPostcard(supabase, {
-      senderId: userId,
-      senderName,
-      trip,
-      photoIds: picked,
-      maxPhotos: limits.photos,
-      size: limits.size as 640 | 960,
-      deliveries: rows.map((row) => ({ mailboxId: row.mailboxId, greeting: row.text })),
-      onProgress: (done, total) => setWorking({ done, total }),
-    });
+    let result: SendPostcardResult;
+    try {
+      result = await sendPostcard(supabase, {
+        senderId: userId,
+        senderName,
+        trip,
+        photoIds: picked,
+        maxPhotos: limits.photos,
+        size: limits.size as 640 | 960,
+        deliveries: rows.map((row) => ({ mailboxId: row.mailboxId, greeting: row.text })),
+        onProgress: (done, total) => setWorking({ done, total }),
+      });
+    } catch {
+      // 통신이 끊겼다 — 대기 화면이 영영 화면을 덮고 있지 않게, 나가지 않은 것으로 다룬다.
+      result = { ok: false, reason: "failed" };
+    }
     setWorking(null);
     if (!result.ok) {
       setFailure(REASON[result.reason]);
@@ -219,13 +268,18 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   };
 
   // 오른쪽 위의 ✕ 를 피해 제목만 오른쪽을 비운다. 아래 칸들은 창 폭을 다 쓴다.
-  const heading = <h2 className="pr-9 text-[20px] font-bold tracking-tight text-text">{titleFor(selected)}</h2>;
+  const heading = (
+    <h2 ref={headingRef} tabIndex={-1} className="pr-9 text-[20px] font-bold tracking-tight text-text outline-none">
+      {titleFor(selected)}
+    </h2>
+  );
 
   return (
-    <HubDialog label="엽서 보내기" onClose={onClose}>
+    // 만드는 동안에는 닫지 못하게 한다 — 닫아 버리면 만든 엽서의 링크를 받을 길이 없다.
+    <HubDialog label="엽서 보내기" onClose={onClose} locked={Boolean(working) || creating}>
       {working && (
         <WaitingOverlay
-          title="엽서를 보내고 있어요"
+          title="엽서를 만들고 있어요"
           detail={working.total > 0 ? `사진 ${working.done}장 / ${working.total}장` : undefined}
           note="고른 사진을 엽서 보관함으로 옮기는 중이에요."
         />
@@ -334,9 +388,9 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
               -mx-5 -mb-8 은 창의 안쪽 여백(px-5 pb-8)을 되돌려 띠가 창 폭을 다 쓰게 한다.
             */}
             <div className="sticky bottom-0 z-[1] -mx-5 -mb-8 flex flex-col gap-2 bg-surface px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_14px_-12px_rgba(0,0,0,0.2)]">
-              {failure && (
+              {notice && (
                 <p role="alert" className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
-                  {failure}
+                  {notice}
                 </p>
               )}
               <button

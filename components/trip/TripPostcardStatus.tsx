@@ -19,7 +19,7 @@ export function TripPostcardStatus({ lines }: TripPostcardStatusProps) {
     <ul aria-label="보낸 엽서" className="flex w-full flex-col gap-0.5 text-[14px] text-text-muted">
       {lines.map((line) => (
         <li key={line.mailboxId} className="break-keep">
-          {line.greetingName ? `${line.greetingName}께 엽서를 보냈어요` : `${line.name}에 엽서를 보냈어요`}
+          {line.greetingName ? `${line.greetingName}께 엽서를 보냈어요` : `‘${line.name}’에 엽서를 보냈어요`}
           {" · "}
           {line.opened ? (
             <span className="font-medium text-accent">

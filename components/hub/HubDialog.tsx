@@ -19,28 +19,33 @@ interface HubDialogProps {
   /** 읽어 주는 기계가 부를 이름. */
   label: string;
   onClose: () => void;
+  /**
+   * 일이 진행되는 동안 닫지 못하게 한다(Esc · 바깥 누르기 · 닫기 단추를 무시). 엽서를 만드는 중에 닫아 버리면 그 일의
+   * 결과(링크)를 받을 길이 없다.
+   */
+  locked?: boolean;
   children: ReactNode;
 }
 
-export function HubDialog({ label, onClose, children }: HubDialogProps) {
+export function HubDialog({ label, onClose, locked = false, children }: HubDialogProps) {
   useEffect(() => {
     // 창 뒤의 페이지가 따라 굴러가지 않게.
     const kept = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && !locked) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = kept;
       window.removeEventListener("keydown", onKey);
     };
-  }, [onClose]);
+  }, [onClose, locked]);
 
   return (
     <div
       className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 md:items-center md:p-6"
-      onClick={onClose}
+      onClick={locked ? undefined : onClose}
     >
       <div
         role="dialog"
@@ -53,12 +58,14 @@ export function HubDialog({ label, onClose, children }: HubDialogProps) {
         <button
           type="button"
           onClick={onClose}
+          disabled={locked}
           aria-label="닫기"
-          className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-bg-subtle text-[16px] text-text-muted transition hover:bg-line hover:text-text"
+          className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full bg-bg-subtle text-[16px] text-text-muted transition hover:bg-line hover:text-text disabled:opacity-40"
         >
           <span aria-hidden="true">✕</span>
         </button>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-8 pt-5">{children}</div>
+        {/* scroll-pb-32: 초점이 가는 칸을 굴려 올 때 아래 128px 는 비워 둔다(창 아래에 붙는 띠가 칸을 가리지 않게). */}
+        <div className="min-h-0 flex-1 scroll-pb-32 overflow-y-auto overscroll-contain px-5 pb-8 pt-5">{children}</div>
       </div>
     </div>
   );

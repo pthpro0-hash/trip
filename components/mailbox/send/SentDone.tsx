@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { attachParticle } from "@/lib/korean";
 import { postcardUrl } from "@/lib/mailbox";
 import type { MailboxItem } from "@/lib/supabase/mailbox";
@@ -30,6 +30,9 @@ function whoOpens(boxes: SentDoneProps["boxes"]): string {
 
 export function SentDone({ postcardId, senderName, boxes, onClose }: SentDoneProps) {
   const [note, setNote] = useState<string | null>(null);
+  // 단추가 사라지고 새 걸음이 나타나면 초점이 갈 곳을 잃는다 — 제목으로 옮겨 화면 낭독기가 새 걸음을 읽게 한다.
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus(), []);
   const linkOf = (box: MailboxItem) => postcardUrl(window.location.origin, box.token, postcardId);
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
@@ -58,7 +61,9 @@ export function SentDone({ postcardId, senderName, boxes, onClose }: SentDonePro
     <>
       {/* 오른쪽 위의 ✕ 를 피해 제목만 오른쪽을 비운다. */}
       <div className="pr-9">
-        <h2 className="text-[20px] font-bold tracking-tight text-text">엽서를 만들었어요</h2>
+        <h2 ref={heading} tabIndex={-1} className="text-[20px] font-bold tracking-tight text-text outline-none">
+          엽서를 만들었어요
+        </h2>
         <p className="mt-1 text-[14px] leading-relaxed text-text-muted">
           이제 받는 분께 링크를 보내 주세요. 링크를 열면 로그인 없이 엽서를 볼 수 있어요.
         </p>

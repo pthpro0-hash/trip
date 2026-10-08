@@ -51,6 +51,11 @@ describe("SentDone", () => {
     expect(screen.getByText(/로그인 없이/)).toBeTruthy();
   });
 
+  it("새 걸음이 뜨면 초점이 제목으로 온다 — 눌렀던 단추가 사라져도 초점이 갈 곳을 잃지 않는다", () => {
+    done();
+    expect(screen.getByRole("heading", { name: "엽서를 만들었어요" })).toHaveFocus();
+  });
+
   it("엽서는 지금 모습으로 남고, 여행을 지우면 함께 지워진다는 것을 말해 둔다", () => {
     done();
     expect(screen.getByText(/지금 모습으로 남고/)).toBeTruthy();

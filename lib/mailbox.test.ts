@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   BODY_MAX,
+  GREETING_MAX,
   DEFAULT_REACTIONS,
   MAILBOX_LIMIT,
   MAILBOX_SENDER_LIMIT,
@@ -119,7 +120,31 @@ describe("composeGreeting · 호칭은 본문과 따로, 맨 앞에만", () => {
 
   it("앞뒤 공백을 다듬고 글자 수 한도를 넘지 않는다", () => {
     expect(composeGreeting(box, "  안녕  ")).toBe("엄마 아빠, 안녕");
-    expect(composeGreeting(box, "가".repeat(BODY_MAX + 50)).length).toBeLessThanOrEqual(BODY_MAX + "엄마 아빠, ".length);
+    expect(composeGreeting({ ...box, useGreeting: false }, "가".repeat(BODY_MAX + 50))).toHaveLength(BODY_MAX);
+  });
+
+  // 호칭이 붙으면 본문 한도(300)만 지켜서는 부족하다 — DB 는 인사말 전체를 300자로 막아, 넘으면 사진을 올린 뒤에야 저장이
+  // 거부되고 다시 눌러도 영영 안 나갔다.
+  it("호칭까지 합쳐서도 인사말 전체 한도(300자)를 넘지 않는다 — 줄이는 것은 본문 끝이다", () => {
+    const long = composeGreeting(box, "가".repeat(BODY_MAX));
+    expect(long).toHaveLength(GREETING_MAX);
+    expect(long.startsWith("엄마 아빠, 가가가")).toBe(true);
+  });
+
+  it("한도에 못 미치면 본문을 한 글자도 줄이지 않는다", () => {
+    const body = "가".repeat(GREETING_MAX - "엄마 아빠, ".length);
+    expect(composeGreeting(box, body)).toBe(`엄마 아빠, ${body}`);
+  });
+
+  it("줄이다가 이모지를 반으로 자르지 않는다 — 반쪽 글자는 저장 때 거부된다", () => {
+    // 😀 은 두 칸이다. 호칭을 붙이면 본문 한도(293칸)가 두 칸 글자의 한가운데에 떨어진다.
+    const cut = composeGreeting(box, "😀".repeat(200));
+    expect(cut.length).toBeLessThanOrEqual(GREETING_MAX);
+    expect(cut.charCodeAt(cut.length - 1)).toBeGreaterThanOrEqual(0xdc00);
+    // 호칭 없이 본문만이어도 한도(300칸)가 두 칸 글자의 한가운데면 앞에서 자른다.
+    const plain = composeGreeting({ ...box, useGreeting: false }, `a${"😀".repeat(200)}`);
+    expect(plain.length).toBeLessThanOrEqual(BODY_MAX);
+    expect(plain.charCodeAt(plain.length - 1)).toBeGreaterThanOrEqual(0xdc00);
   });
 });
 

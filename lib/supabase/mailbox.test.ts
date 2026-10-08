@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RECOMMENDED } from "@/lib/mailboxSettings";
+import { firstShelfInput } from "@/lib/mailboxFirst";
 import {
   acceptMailboxInvite,
   cancelMailboxInvite,
@@ -213,6 +214,22 @@ describe("createMailbox", () => {
     expect(await createMailbox(client, "me", { ...input, name: "가".repeat(41) })).toEqual({ ok: false, reason: "invalid" });
     expect(await createMailbox(client, "me", { ...input, greetingName: "가".repeat(21) })).toEqual({ ok: false, reason: "invalid" });
     expect(calls).toHaveLength(0);
+  });
+
+  // 엽서 창은 한 줄 답("엄마, 아빠")에서 책장 입력을 지어 낸다. 지어 낸 값이 서버 규칙(이름 40자·부르는 말 20자·받는 분 10자씩 여섯
+  // 명)에 걸려 'invalid'로 거절되면 처음 보내는 사람은 영문도 모르고 막힌다.
+  it("엽서 창이 한 줄 답에서 지은 입력은 길고 많아도 서버 규칙을 통과한다", async () => {
+    const names = ["가나다라마바사아자차", "카타파하가나다라마바", "사아자차카타파하가나", "다라마바사아자차카타", "파하가나다라마바사아", "자차카타파하가나다라", "일곱번째"];
+    for (const who of ["엄마, 아빠", "장인 장모님", names.join(" ")]) {
+      const { client, calls } = fake();
+      const made = firstShelfInput(who, "polite")!;
+      const result = await createMailbox(client, "me", made);
+      expect(result.ok, who).toBe(true);
+      const saved = calls.find((c) => c.op === "insert")!.value as { name: string; greeting_name: string; members: string[] };
+      expect(saved.name.length).toBeLessThanOrEqual(40);
+      expect(saved.greeting_name.length).toBeLessThanOrEqual(20);
+      expect(saved.members.length).toBeGreaterThan(0);
+    }
   });
 
   it("책장 3개를 넘으면 limit", async () => {

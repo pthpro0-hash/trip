@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { attachParticle } from "@/lib/korean";
 import {
   markPostcardOpened,
   postcardFileUrl,
@@ -139,7 +140,7 @@ export function ReceivedPostcardView({ token, card, preview = false }: { token: 
     >
       {preview && <PreviewBanner />}
 
-      <p className="rs-18 font-semibold text-accent">{card.senderName}이(가) 보낸 여행 엽서</p>
+      <p className="rs-18 font-semibold text-accent">{attachParticle(card.senderName, "이", "가")} 보낸 여행 엽서</p>
 
       <PhotoAlbum postcardId={card.id} files={photos} hearts={albumHearts} />
 

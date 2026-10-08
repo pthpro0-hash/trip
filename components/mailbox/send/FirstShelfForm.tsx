@@ -72,7 +72,7 @@ export function FirstShelfForm({ busy, error, onSubmit }: FirstShelfFormProps) {
           className="rounded-xl bg-bg-subtle px-3.5 py-3 text-[16px] text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
         />
         {names.length > 0 ? (
-          <span aria-label="받는 분 미리보기" className="flex flex-wrap gap-1.5">
+          <span role="group" aria-label="받는 분 미리보기" className="flex flex-wrap gap-1.5">
             {names.map((name) => (
               <span key={name} className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[12px] text-accent">
                 {name}
@@ -86,11 +86,13 @@ export function FirstShelfForm({ busy, error, onSubmit }: FirstShelfFormProps) {
 
       <fieldset className="flex flex-col gap-1.5">
         <legend className="mb-1 text-[14px] font-semibold text-text">말투</legend>
-        <div role="radiogroup" aria-label="말투" className="flex gap-2">
+        {/* 묶음 이름은 위의 legend 가 이미 ‘말투’라고 부른다 — 안쪽에 같은 이름을 또 달면 두 번 읽힌다. */}
+        <div className="flex gap-2">
           {TONES.map((option) => (
             <label
               key={option.value}
-              className={`flex-1 cursor-pointer rounded-xl px-3 py-2.5 text-center text-[15px] font-medium ring-1 transition ${
+              // 라디오는 화면에서 숨겼으니(sr-only) 키보드로 옮겨 다닐 때 어디인지 이 칸의 테두리가 알려 준다.
+              className={`flex-1 cursor-pointer rounded-xl px-3 py-2.5 text-center text-[15px] font-medium ring-1 transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent ${
                 tone === option.value ? "bg-accent-soft text-accent ring-accent" : "bg-bg text-text-muted ring-line"
               }`}
             >
@@ -108,8 +110,8 @@ export function FirstShelfForm({ busy, error, onSubmit }: FirstShelfFormProps) {
         </div>
         <span className="text-[12px] text-text-faint">
           {tone === "polite"
-            ? `보낼 때 존댓말 추천 문구가 떠요. 예: “${suggestionsFor("polite")[0]}”`
-            : "보낼 때 편한 추천 문구가 떠요."}
+            ? `엽서를 쓸 때 존댓말 추천 문구가 떠요. 예: “${suggestionsFor("polite")[0]}”`
+            : "엽서를 쓸 때 편한 말투의 추천 문구가 떠요."}
         </span>
       </fieldset>
 

@@ -58,6 +58,9 @@ export function PhotoPicker({ photos, urls, picked, limit, limitNote, manual, on
         </button>
       </div>
 
+      {/* 책장 설정 때문에 장수가 줄었다면 까닭을 접힌 채로도 말한다(펼쳐야 알 수 있으면 '왜 6장이지?'가 된다). */}
+      {limitNote && <p className="text-[12px] leading-relaxed text-text-faint">{limitNote}</p>}
+
       {open && (
         <div id={panel} className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
@@ -73,7 +76,6 @@ export function PhotoPicker({ photos, urls, picked, limit, limitNote, manual, on
               </button>
             )}
           </div>
-          {limitNote && <p className="text-[12px] leading-relaxed text-text-faint">{limitNote}</p>}
           <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
             {photos.map((photo) => {
               const on = picked.includes(photo.id);

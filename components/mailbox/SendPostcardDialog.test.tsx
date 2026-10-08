@@ -61,7 +61,11 @@ const trip: TripDetail = {
 };
 const photoUrls = new Map(trip.visits.flatMap((visit) => visit.photos.map((p) => [p.storagePath, `https://x/${p.id}`] as const)));
 
-const open = () => render(<SendPostcardDialog userId="me" trip={trip} photoUrls={photoUrls} onClose={vi.fn()} />);
+const open = () => {
+  const onClose = vi.fn();
+  const view = render(<SendPostcardDialog userId="me" trip={trip} photoUrls={photoUrls} onClose={onClose} />);
+  return { ...view, onClose };
+};
 
 const LINE = /강릉 바다 보고 왔어요/;
 /** 창이 열려 책장을 읽어 온 뒤. */
@@ -114,12 +118,12 @@ describe("SendPostcardDialog · 책장이 하나일 때 (가장 흔한 길)", ()
       expect(preview().queryByText("한 줄을 쓰면 여기에 이렇게 보여요")).toBeNull();
     });
 
-    it("보내는 이름이 ‘○○이 보낸 엽서’로 보인다", async () => {
+    it("보내는 이름이 부모님 화면의 제목과 같은 말(‘○○이 보낸 여행 엽서’)로 보인다", async () => {
       open();
       await ready();
-      expect(preview().getByText(/김지민이 보낸 엽서/)).toBeTruthy();
+      expect(preview().getByText(/김지민이 보낸 여행 엽서/)).toBeTruthy();
       fireEvent.change(screen.getByLabelText("보내는 이름"), { target: { value: "수아" } });
-      expect(preview().getByText(/수아가 보낸 엽서/)).toBeTruthy();
+      expect(preview().getByText(/수아가 보낸 여행 엽서/)).toBeTruthy();
       fireEvent.change(screen.getByLabelText("보내는 이름"), { target: { value: "" } });
       expect(preview().getByText("보내는 이름을 적어 주세요")).toBeTruthy();
     });
@@ -132,6 +136,19 @@ describe("SendPostcardDialog · 책장이 하나일 때 (가장 흔한 길)", ()
       openPhotos();
       fireEvent.click(screen.getAllByRole("button", { name: "엽서에서 빼기" })[0]);
       expect(hero()?.getAttribute("src")).toBe("https://x/A2");
+    });
+
+    it("사진을 빼고 다시 넣어도 미리보기는 엽서에 맨 먼저 실리는(여행 차례) 사진이다 — 눌러 넣은 사진이 뒤로 가지 않는다", async () => {
+      const { container } = open();
+      await ready();
+      const hero = () => container.ownerDocument.querySelector<HTMLImageElement>("[aria-label='엽서 미리보기'] img");
+      openPhotos();
+      const first = () => screen.getAllByRole("button", { name: /엽서에서 빼기|엽서에 넣기/ })[0];
+      fireEvent.click(first()); // A1 빼기
+      expect(hero()?.getAttribute("src")).toBe("https://x/A2");
+      fireEvent.click(first()); // A1 다시 넣기 — 고른 목록에서는 맨 뒤지만 엽서에는 여행 차례로 실린다
+      expect(hero()?.getAttribute("src")).toBe("https://x/A1");
+      expect(first()).toHaveTextContent("1");
     });
 
     it("사진이 하나도 없는 여행이어도 미리보기와 보내기는 된다 — 글과 지도만 간다", async () => {
@@ -223,6 +240,15 @@ describe("SendPostcardDialog · 처음 보내는 사람 (책장이 하나도 없
     expect(screen.getByRole("heading", { name: "엄마 아빠께 엽서 보내기" })).toBeTruthy();
   });
 
+  it("답하면 새 걸음의 제목으로 초점이 온다 — 눌렀던 단추가 사라져도 초점이 갈 곳을 잃지 않는다", async () => {
+    open();
+    await screen.findByLabelText("누구에게 보내나요?");
+    answer("엄마, 아빠");
+    next();
+    await ready();
+    expect(screen.getByRole("heading", { name: "엄마 아빠께 엽서 보내기" })).toHaveFocus();
+  });
+
   it("고른 말투가 책장에 간다 — 존댓말이면 존댓말 추천이 뜬다", async () => {
     open();
     await screen.findByLabelText("누구에게 보내나요?");
@@ -252,6 +278,46 @@ describe("SendPostcardDialog · 처음 보내는 사람 (책장이 하나도 없
       ),
     );
     Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+  });
+
+  it("만드는 중에 엔터를 한 번 더 쳐도 두 번 만들지 않는다", async () => {
+    create.mockReturnValue(new Promise(() => undefined));
+    const { container } = open();
+    await screen.findByLabelText("누구에게 보내나요?");
+    answer("엄마, 아빠");
+    next();
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    fireEvent.submit(container.ownerDocument.querySelector("[role=dialog] form")!);
+    fireEvent.submit(container.ownerDocument.querySelector("[role=dialog] form")!);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  // 서버에는 들어갔는데 답이 오다 끊기면 '저장하지 못했어요'가 뜬다. 그때 다시 누르면 같은 책장이 또 만들어져 둘 다
+  // 받는 곳으로 골라지고 부모님께 링크가 두 개 간다.
+  it("저장하지 못했다고 떴는데 사실은 서버에 만들어져 있었다면, 다시 눌러도 같은 책장이 또 만들어지지 않는다", async () => {
+    create.mockImplementationOnce(async () => {
+      state.boxes = [box({ id: "m9", token: "Z".repeat(43) })];
+      return { ok: false, reason: "failed" };
+    });
+    open();
+    await screen.findByLabelText("누구에게 보내나요?");
+    answer("엄마, 아빠");
+    next();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/저장하지 못했어요/);
+    next();
+    expect(await ready()).toBeTruthy(); // 같은 창에서 엽서 쓰기로 이어진다
+    expect(create).toHaveBeenCalledTimes(1); // 두 번째에는 만들지 않고 이미 있는 책장을 쓴다
+    expect(screen.getByRole("heading", { name: "엄마 아빠께 엽서 보내기" })).toBeTruthy();
+  });
+
+  it("만드는 도중 통신이 끊겨 오류가 터져도 단추가 영영 잠기지 않는다", async () => {
+    create.mockRejectedValueOnce(new Error("끊김"));
+    open();
+    await screen.findByLabelText("누구에게 보내나요?");
+    answer("엄마, 아빠");
+    next();
+    expect(await screen.findByRole("alert")).toHaveTextContent(/저장하지 못했어요/);
+    expect(screen.getByRole("button", { name: "다음" })).toBeEnabled();
   });
 
   it("비워 두고 누르면 만들지 않고 무엇이 빠졌는지 알려 준다", async () => {
@@ -515,6 +581,80 @@ describe("SendPostcardDialog · 빠진 것 알려 주기", () => {
     fireEvent.click(screen.getByRole("button", { name: "엽서 만들기" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("받을 책장을 골라 주세요");
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+/*
+  만들기 단추와 빠진 것 알림은 창 아래의 한 띠에 붙어 있다. 그래서 알림이 안 사라지면 계속 눈에 걸리고, 일이 도는 동안 창이
+  닫히면 결과(링크)를 받을 길이 없다.
+*/
+describe("SendPostcardDialog · 알림과 잠금", () => {
+  it("빠졌다는 알림은 채우는 순간 사라진다 — 아래 띠에 붙어 있어 안 사라지면 계속 눈에 걸린다", async () => {
+    open();
+    await ready();
+    expect(screen.queryByRole("alert")).toBeNull(); // 눌러 보기 전에는 말하지 않는다
+    fireEvent.click(screen.getByRole("button", { name: "2곳에 엽서 만들기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("한 줄을 적어 주세요");
+    writeLine("안녕");
+    expect(screen.queryByRole("alert")).toBeNull();
+    // 이미 눌러 본 뒤라, 다시 비우면 바로 알려 준다.
+    fireEvent.change(screen.getByLabelText("보내는 이름"), { target: { value: "" } });
+    expect(screen.getByRole("alert")).toHaveTextContent("보내는 이름을 적어 주세요");
+  });
+
+  it("보내다 통신이 끊겨 오류가 터져도 대기 화면이 걷히고, 나가지 않았다고 알린다", async () => {
+    send.mockRejectedValue(new Error("끊김"));
+    open();
+    await ready();
+    writeLine("안녕");
+    fireEvent.click(screen.getByRole("button", { name: "2곳에 엽서 만들기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("엽서는 나가지 않았어요");
+    expect(screen.queryByText("엽서를 만들고 있어요")).toBeNull();
+    expect(screen.getByRole("button", { name: "2곳에 엽서 만들기" })).toBeEnabled();
+  });
+
+  it("엽서를 만드는 동안에는 ‘엽서를 만들고 있어요’가 뜨고 Esc 로도 닫히지 않는다 — 끝나면 닫힌다", async () => {
+    let finish!: (value: unknown) => void;
+    send.mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const { onClose } = open();
+    await ready();
+    writeLine("안녕");
+    fireEvent.click(screen.getByRole("button", { name: "2곳에 엽서 만들기" }));
+    expect(await screen.findByText("엽서를 만들고 있어요")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    finish({ ok: true, postcardId: "P".repeat(43) });
+    await screen.findByText("엽서를 만들었어요");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("책장을 만드는 동안에도 Esc 로 닫히지 않는다", async () => {
+    state.boxes = [];
+    create.mockReturnValue(new Promise(() => undefined));
+    const { onClose } = open();
+    fireEvent.change(await screen.findByLabelText("누구에게 보내나요?"), { target: { value: "엄마" } });
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    await screen.findByRole("button", { name: "만드는 중…" });
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  // 호칭이 붙으면 본문 한도(300)만 지켜서는 부족하다 — DB 는 인사말 전체를 300자로 막아, 넘으면 사진을 올린 뒤에야 저장이 거부되고
+  // 다시 눌러도 영영 안 나간다.
+  it("긴 글에 호칭이 붙어도 책장마다의 인사말은 서버 한도(300자)를 넘지 않는다", async () => {
+    open();
+    await ready();
+    writeLine("가".repeat(300));
+    fireEvent.click(screen.getByRole("button", { name: "2곳에 엽서 만들기" }));
+    await waitFor(() => expect(send).toHaveBeenCalled());
+    const greetings = send.mock.calls[0][1].deliveries.map((delivery: { greeting: string }) => delivery.greeting);
+    expect(greetings).toHaveLength(2);
+    for (const greeting of greetings) expect(greeting.length).toBeLessThanOrEqual(300);
   });
 });
 

@@ -22,6 +22,8 @@ export const MAILBOX_SENDER_LIMIT = 8;
 export const POSTCARD_PHOTOS_MAX = 20;
 /** 인사말 본문의 글자 수. */
 export const BODY_MAX = 300;
+/** 한 책장에 가는 인사말 전체(호칭 포함)의 글자 수. DB 도 같은 수로 막는다(postcard_deliveries.greeting). */
+export const GREETING_MAX = 300;
 export const NAME_MAX = 40;
 export const GREETING_NAME_MAX = 20;
 /** 받는 분 이름("엄마") 하나의 글자 수와 책장당 수. */
@@ -107,10 +109,20 @@ export interface GreetingTarget {
  * 본문 안의 "아빠"나 "이모"는 건드리지 않는다. 본문이 비면 호칭만 덩그러니 나가지 않게 빈 글.
  */
 export function composeGreeting(target: GreetingTarget, body: string): string {
-  const text = body.trim().slice(0, BODY_MAX);
+  const text = clip(body.trim(), BODY_MAX);
   if (!text) return "";
   const name = target.greetingName?.trim();
-  return target.useGreeting && name ? `${name}, ${text}` : text;
+  if (!(target.useGreeting && name)) return text;
+  // 호칭까지 합쳐 DB 한도(300자)를 넘으면 저장이 거부되어 엽서가 영영 안 나간다 — 본문 끝을 줄인다.
+  const prefix = `${name}, `;
+  return `${prefix}${clip(text, GREETING_MAX - prefix.length)}`;
+}
+
+/** 글자 수를 줄이되 이모지 같은 두 칸짜리 글자를 반으로 자르지 않는다(반쪽 글자는 저장 때 거부된다). */
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const last = text.charCodeAt(max - 1);
+  return text.slice(0, last >= 0xd800 && last <= 0xdbff ? max - 1 : max);
 }
 
 export interface GreetingRow {

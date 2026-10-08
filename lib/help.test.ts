@@ -156,8 +156,10 @@ describe("도움말 내용", () => {
       expect(step.detail).toContain("'가족 책장'");
     });
 
-    it("엽서는 한 줄을 쓰고 '엽서 만들기'를 누르면 된다고 알린다", () => {
-      expect(stepOf("엽서 보내기").detail).toContain("'엽서 만들기'");
+    it("엽서는 한 줄을 쓰고 '엽서 만들기'를 누르면 되고, 링크는 '카카오톡 등으로 보내기'로 보낸다고 알린다", () => {
+      const detail = stepOf("엽서 보내기").detail;
+      expect(detail).toContain("'엽서 만들기'");
+      expect(detail).toContain("'카카오톡 등으로 보내기'");
     });
 
     it("사진과 인사말은 접혀 있고, 어느 단추로 연다고 알린다", () => {
