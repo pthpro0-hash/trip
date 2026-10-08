@@ -35,22 +35,22 @@ describe("BottomNav", () => {
     search = "";
   });
 
-  it("내 여행 · 한장 · 사진 고르기 · 여행 100선 · 내 정보, 다섯 곳으로 간다", () => {
+  it("내 여행 · 한장 요약 · 사진 고르기 · 여행 100선 · 내 정보, 다섯 곳으로 간다", () => {
     at("/trips/abc");
     expect(screen.getByRole("link", { name: "내 여행" })).toHaveAttribute("href", MAP_HREF);
-    expect(screen.getByRole("link", { name: "한장" })).toHaveAttribute("href", SKETCH_HREF);
+    expect(screen.getByRole("link", { name: "한장 요약" })).toHaveAttribute("href", SKETCH_HREF);
     expect(screen.getByRole("link", { name: "사진 고르기" })).toHaveAttribute("href", ADD_HREF);
     expect(screen.getByRole("link", { name: "여행 100선" })).toHaveAttribute("href", SPOTS_HREF);
     expect(screen.getByRole("link", { name: "내 정보" })).toHaveAttribute("href", ME_HREF);
   });
 
-  it("＋가 가운데에 온다 — 내 여행 · 한장 · ＋ · 여행 100선 · 내 정보 순서", () => {
+  it("＋가 가운데에 온다 — 내 여행 · 한장 요약 · ＋ · 여행 100선 · 내 정보 순서", () => {
     at("/trips/abc");
     const bar_ = bar()!;
     // 가운데 단추는 글자 앞에 ＋ 표시가 붙어 있다.
     expect([...bar_.querySelectorAll("a")].map((link) => link.textContent?.replace(/^\+/, ""))).toEqual([
       "내 여행",
-      "한장",
+      "한장 요약",
       "사진 고르기",
       "여행 100선",
       "내 정보",
@@ -165,10 +165,10 @@ describe("BottomNav", () => {
       expect(readStart()).toBe("spots");
     });
 
-    it("한장과 사진 고르기는 갈래를 바꾸지 않는다", () => {
+    it("한장 요약과 사진 고르기는 갈래를 바꾸지 않는다", () => {
       document.cookie = "start=spots; path=/";
       at("/trips/abc");
-      press("한장");
+      press("한장 요약");
       press("사진 고르기");
       expect(readStart()).toBe("spots");
     });

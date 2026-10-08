@@ -25,7 +25,7 @@ describe("SiteHeader", () => {
   it("세 갈래를 보여주고, 갈래는 주소에 적힌다", async () => {
     await 머리띠("/trips/abc");
     expect(screen.getByRole("link", { name: "내 여행" })).toHaveAttribute("href", "/?v=sketch");
-    expect(screen.getByRole("link", { name: "한장" })).toHaveAttribute("href", "/sketch");
+    expect(screen.getByRole("link", { name: "한장 요약" })).toHaveAttribute("href", "/sketch");
     expect(screen.getByRole("link", { name: "여행 100선" })).toHaveAttribute("href", "/?v=spots");
   });
 
@@ -56,23 +56,52 @@ describe("SiteHeader", () => {
     ["/trips/abc", "내 여행"],
     ["/trips/new", "내 여행"],
     ["/places", "내 여행"],
-    ["/sketch", "한장"],
+    ["/sketch", "한장 요약"],
   ])("%s 에서는 '%s' 가 켜진다", async (at, expected) => {
     await 머리띠(at);
     expect(켜진곳()).toEqual([expected]);
   });
 
+  /*
+    폰에는 아래 탭이 있다. 위 띠와 아래 탭이 같은 말("내 여행 · 여행 100선")을 되풀이하면 화면이 어수선하고, 위 띠에는
+    서비스 이름이 들어갈 자리도 없었다. 아래 탭이 있는 화면에서는 위 띠의 갈래를 접고 이름을 보인다. 아래 탭이 없는
+    화면(한장 요약, 링크로 받은 화면, 로그인)에서는 위 띠의 갈래가 유일한 길이라 그대로 둔다.
+  */
   describe("폰에서", () => {
-    it.each(["/", "/trips/abc", "/sketch", "/s/abc"])("%s 에서도 위 띠의 갈래를 접지 않는다", async (at) => {
-      await 머리띠(at);
-      expect(screen.getByRole("navigation", { name: "주요 메뉴" }).className).not.toContain("max-sm:hidden");
-      expect(screen.getByRole("link", { name: "내 여행" }).className).not.toContain("max-sm:hidden");
-      expect(screen.getByRole("link", { name: "여행 100선" }).className).not.toContain("max-sm:hidden");
+    it.each(["/", "/trips/abc", "/spots/경복궁", "/me"])(
+      "%s — 아래 탭이 있으니 위 띠의 갈래는 접는다",
+      async (at) => {
+        await 머리띠(at);
+        expect(screen.getByRole("navigation", { name: "주요 메뉴" }).className).toContain("max-sm:hidden");
+      },
+    );
+
+    it.each(["/sketch", "/s/abc", "/t/abc", "/login"])(
+      "%s — 아래 탭이 없으니 위 띠의 갈래를 접지 않는다",
+      async (at) => {
+        await 머리띠(at);
+        expect(screen.getByRole("navigation", { name: "주요 메뉴" }).className).not.toContain("max-sm:hidden");
+        expect(screen.getByRole("link", { name: "내 여행" }).className).not.toContain("max-sm:hidden");
+        expect(screen.getByRole("link", { name: "여행 100선" }).className).not.toContain("max-sm:hidden");
+      },
+    );
+
+    it("아래 탭이 없는 화면에서도 '한장 요약' 갈래는 폰의 위 띠에서 접는다 — 375px 에 셋이 들어가지 않는다", async () => {
+      await 머리띠("/login");
+      expect(screen.getByRole("link", { name: "한장 요약" }).className).toContain("max-sm:hidden");
     });
 
-    it("'한장'만 폰의 위 띠에서 접는다 — 375px 에 셋이 들어가지 않는다", async () => {
+    it("아래 탭이 있는 화면에서는 서비스 이름이 위 띠에 글자로 보인다", async () => {
       await 머리띠("/trips/abc");
-      expect(screen.getByRole("link", { name: "한장" }).className).toContain("max-sm:hidden");
+      const name = screen.getAllByText("내 여행 스케치").find((node) => !node.className.includes("sr-only"))!;
+      expect(name.className).not.toContain("hidden");
+    });
+
+    it("아래 탭이 없는 화면에서는 이름을 폰에서 접는다 — 갈래와 계정 칩이 들어가야 한다", async () => {
+      await 머리띠("/sketch");
+      const name = screen.getAllByText("내 여행 스케치").find((node) => !node.className.includes("sr-only"))!;
+      expect(name.className).toContain("hidden");
+      expect(name.className).toContain("sm:inline");
     });
   });
 

@@ -743,13 +743,25 @@ function SheetHeader({
     return (
       <div className="flex flex-col gap-2 pb-1">
         <p className="text-[15px] font-semibold text-text">다녀온 곳이 이 지도에 사진으로 찍혀요</p>
-        <p className="text-[13px] text-text-muted">로그인하고 사진을 고르면, 언제 어디서 찍었는지 읽어 지도에 얹어 드려요.</p>
-        <Link
-          href="/login?next=%2F%3Fv%3Dsketch"
-          className="self-start rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
-        >
-          로그인하기
-        </Link>
+        <p className="text-[13px] text-text-muted">사진을 고르면 언제 어디서 찍었는지 읽어 지도에 얹어 드려요.</p>
+        {/*
+          첫 화면의 환영 영역과 같은 약속, 같은 단추. 로그인부터 하라고 하면 빈 벽이다 — 사진 고르기는 로그인 없이
+          시작하고, 로그인은 기록으로 남길 때 한다. 이미 계정이 있는 사람을 위해 로그인은 곁에 작게 둔다.
+        */}
+        <div className="flex items-center gap-4">
+          <Link
+            href={ADD_HREF}
+            className="rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+          >
+            사진 고르기
+          </Link>
+          <Link
+            href="/login?next=%2F%3Fv%3Dsketch"
+            className="text-[14px] font-medium text-accent transition hover:text-accent-hover"
+          >
+            로그인
+          </Link>
+        </div>
       </div>
     );
   }

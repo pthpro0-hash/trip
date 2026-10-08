@@ -18,7 +18,7 @@ import { readStart, rememberStart, type Start } from "@/lib/start";
 import { canIn, useFamilyView } from "@/lib/familyView";
 
 /*
-  폰 하단 탭 — 내 여행 · 한장 · 사진 고르기 · 여행 100선 · 내 정보.
+  폰 하단 탭 — 내 여행 · 한장 요약 · 사진 고르기 · 여행 100선 · 내 정보.
 
   폰에서는 위 띠가 좁아 갈래를 둘 이상 두기 어렵고(375px 에서는 갈래 둘과 계정 칩만으로
   폭이 꽉 찬다), 화면마다 "사진 고르기 · 한장 요약 · 여행 목록" 단추가 제각각 흩어져
@@ -87,7 +87,7 @@ interface Item {
 
 const ITEMS: Item[] = [
   { id: "trips", label: "내 여행", href: MAP_HREF, icon: PIN, remember: "sketch" },
-  { id: "sketch", label: "한장", href: SKETCH_HREF, icon: FRAME },
+  { id: "sketch", label: "한장 요약", href: SKETCH_HREF, icon: FRAME },
   { id: "add", label: "사진 고르기", href: ADD_HREF, icon: null },
   { id: "spots", label: "여행 100선", href: SPOTS_HREF, icon: COMPASS, remember: "spots" },
   { id: "me", label: "내 정보", href: ME_HREF, icon: PERSON },

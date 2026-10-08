@@ -5,7 +5,6 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { RegisterServiceWorker } from "@/components/layout/RegisterServiceWorker";
 import { FamilyBanner } from "@/components/family/FamilyBanner";
 import { BottomNav, BottomNavSpace } from "@/components/layout/BottomNav";
-import { FirstVisitHelp } from "@/components/help/FirstVisitHelp";
 import "./globals.css";
 
 const SITE_NAME = "내 여행 스케치";
@@ -59,8 +58,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* 폰에서는 아래에 탭이 있다. 내용이 그 밑에 가리지 않게 자리를 비워 둔다. */}
         <BottomNavSpace>{children}</BottomNavSpace>
         <BottomNav />
-        {/* 처음 온 사람에게 한 번만, 이 서비스가 무엇을 해 주는지 말해 준다. */}
-        <FirstVisitHelp />
         {/* 이 기기의 목록과 계정의 목록을 이어 준다. 그리는 것은 없다. */}
         <CollectionSync />
         <Analytics />

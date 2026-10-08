@@ -7,7 +7,7 @@ import { AccountChip } from "@/components/auth/AccountChip";
 import { MailboxBell } from "@/components/mailbox/MailboxBell";
 import { rememberStart, type Start } from "@/lib/start";
 import { canIn, useFamilyView } from "@/lib/familyView";
-import { isReceiverPath } from "@/lib/nav";
+import { isReceiverPath, showsBottomNav } from "@/lib/nav";
 import { ADD_HREF, MAP_HREF, SKETCH_HREF, SPOTS_HREF, activeNav, type NavId } from "@/lib/nav";
 
 /*
@@ -20,16 +20,18 @@ import { ADD_HREF, MAP_HREF, SKETCH_HREF, SPOTS_HREF, activeNav, type NavId } fr
   그래서 나누는 일은 여기서 한다. 어느 쪽이 커 보일지는 첫 화면이
   그 사람의 형편을 보고 정한다(HomeIntro 참고).
 
-  갈래는 셋이다 — 내 여행(지도·목록), 한장(해마다 한 장), 여행 100선. 한장 요약이
+  갈래는 셋이다 — 내 여행(지도·목록), 한장 요약(해마다 한 장), 여행 100선. 한장 요약이
   자리를 얻은 것은 이 서비스가 보여 주려는 결과이기 때문이다.
 
-  위 띠의 갈래는 어느 화면에서든, 폰에서도 늘 보인다(첫 화면 포함). 길을 잃으면
-  맨 위를 보면 된다. 폰의 하단 탭(BottomNav)은 엄지가 닿는 두 번째 길이다.
+  넓은 화면에서는 위 띠의 갈래가 늘 보인다. 폰에는 엄지가 닿는 아래 탭(BottomNav)이 있어서, 그 탭이 있는
+  화면에서는 위 띠의 갈래를 접고 서비스 이름을 보인다 — 같은 말("내 여행 · 여행 100선")이 위아래에 되풀이되면
+  어수선하고, 위 띠에는 이름이 들어갈 자리도 없었다. 아래 탭이 없는 화면(한장 요약, 링크로 받은 화면, 로그인)에서는
+  위 띠의 갈래가 유일한 길이라 폰에서도 그대로 둔다.
 */
 
 const TABS: { id: NavId; label: string; href: string; start?: Start }[] = [
   { id: "trips", label: "내 여행", href: MAP_HREF, start: "sketch" },
-  { id: "sketch", label: "한장", href: SKETCH_HREF },
+  { id: "sketch", label: "한장 요약", href: SKETCH_HREF },
   { id: "spots", label: "여행 100선", href: SPOTS_HREF, start: "spots" },
 ];
 
@@ -40,6 +42,8 @@ export function SiteHeader() {
   const active = activeNav(pathname, null);
   // 가족의 여행을 보는 동안에는 내 사진을 더하는 단추를 내지 않는다(남의 여행에 올리는 것으로 헷갈린다).
   const canAdd = canIn(useFamilyView(), "add");
+  // 폰의 아래 탭이 있는 화면이면 위 띠의 갈래는 폰에서 접는다.
+  const bottomNav = showsBottomNav(pathname);
 
   // 가족 책장의 받는 쪽(부모님)에는 위 띠가 없다 — 엽서와 답장 단추뿐이다.
   if (isReceiverPath(pathname)) return null;
@@ -53,16 +57,16 @@ export function SiteHeader() {
           className="flex min-w-0 shrink items-center gap-1.5 truncate whitespace-nowrap text-[15px] font-semibold tracking-tight text-text transition hover:text-accent"
         >
           {/*
-            좁은 화면에서는 이름을 접고 로고만 남긴다. 375px 에서는
-            갈래 둘과 계정 칩만으로 폭이 꽉 차, 이름을 두면 "여행." 으로
-            잘린다. 잘린 이름보다 기호 하나가 낫다.
+            아래 탭이 없는 화면의 좁은 폭에서는 이름을 접고 로고만 남긴다. 375px 에서는 갈래 둘과 계정 칩만으로
+            폭이 꽉 차, 이름을 두면 "여행." 으로 잘린다. 잘린 이름보다 기호 하나가 낫다. 아래 탭이 있는 화면에서는
+            위 띠에 갈래가 없으니 이름이 들어간다.
           */}
           <Logo className="h-6 w-6 shrink-0" />
-          <span className="hidden sm:inline">내 여행 스케치</span>
-          <span className="sr-only sm:hidden">내 여행 스케치</span>
+          <span className={bottomNav ? "truncate" : "hidden sm:inline"}>내 여행 스케치</span>
+          {!bottomNav && <span className="sr-only sm:hidden">내 여행 스케치</span>}
         </Link>
 
-        <nav aria-label="주요 메뉴" className="flex items-center gap-1">
+        <nav aria-label="주요 메뉴" className={`flex items-center gap-1 ${bottomNav ? "max-sm:hidden" : ""}`}>
             {TABS.map((tab) => (
               <Link
                 key={tab.id}

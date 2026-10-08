@@ -2,20 +2,29 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 let remembered: string | undefined;
+let cookieNames: string[] = [];
 vi.mock("next/headers", () => ({
-  cookies: async () => ({ get: (name: string) => (name === "start" && remembered ? { value: remembered } : undefined) }),
+  cookies: async () => ({
+    get: (name: string) => (name === "start" && remembered ? { value: remembered } : undefined),
+    getAll: () => cookieNames.map((name) => ({ name, value: "x" })),
+  }),
 }));
 
 const sketchProps = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }));
+const spotsProps = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }));
 vi.mock("@/components/hub/SketchHub", () => ({
   SketchHub: (props: Record<string, unknown>) => {
     sketchProps.current = props;
     return <p>지도 허브</p>;
   },
 }));
-vi.mock("@/components/home/SpotsHome", () => ({ SpotsHome: () => <p>여행 100선 홈</p> }));
+vi.mock("@/components/home/SpotsHome", () => ({
+  SpotsHome: (props: Record<string, unknown>) => {
+    spotsProps.current = props;
+    return <p>여행 100선 홈</p>;
+  },
+}));
 vi.mock("@/components/home/StartSwitch", () => ({ StartSwitch: () => null }));
-vi.mock("@/components/help/SketchInvite", () => ({ SketchInvite: () => null }));
 const { default: HomePage } = await import("./page");
 
 const open = async (params: Record<string, string>) => render(await HomePage({ searchParams: Promise.resolve(params) }));
@@ -27,7 +36,9 @@ const open = async (params: Record<string, string>) => render(await HomePage({ s
 describe("HomePage · 내 여행의 모습", () => {
   beforeEach(() => {
     remembered = undefined;
+    cookieNames = [];
     sketchProps.current = null;
+    spotsProps.current = null;
   });
 
   it("주소에 view 가 없으면 지도", async () => {
@@ -61,5 +72,40 @@ describe("HomePage · 내 여행의 모습", () => {
     await open({ v: "spots", view: "list" });
     expect(screen.getByText("여행 100선 홈")).toBeTruthy();
     expect(sketchProps.current).toBeNull();
+  });
+});
+
+/*
+  첫 화면 맨 위(환영 영역 또는 내 여행 한 줄)가 번쩍이거나 아래를 밀지 않게, 서버가 로그인 쿠키가 있는지만
+  보고 첫 그림을 정한다. 검색엔진처럼 쿠키가 없으면 환영 영역이 처음부터 보인다.
+*/
+describe("HomePage · 로그인 쿠키를 보고 첫 그림을 정한다", () => {
+  beforeEach(() => {
+    remembered = undefined;
+    cookieNames = [];
+    spotsProps.current = null;
+  });
+
+  it("쿠키가 하나도 없으면 로그인한 사람일 수 없다", async () => {
+    await open({});
+    expect(spotsProps.current?.maybeSignedIn).toBe(false);
+  });
+
+  it("로그인 세션 쿠키가 있으면 로그인한 사람일 수 있다", async () => {
+    cookieNames = ["sb-abcdefgh-auth-token"];
+    await open({});
+    expect(spotsProps.current?.maybeSignedIn).toBe(true);
+  });
+
+  it("갈래를 기억하는 쿠키(start)만으로는 로그인했다고 보지 않는다", async () => {
+    remembered = "spots";
+    cookieNames = ["start"];
+    await open({});
+    expect(spotsProps.current?.maybeSignedIn).toBe(false);
+  });
+
+  it("안내 창(SketchInvite)은 더 두지 않는다", async () => {
+    const { container } = await open({});
+    expect(container.querySelector("[role='dialog']")).toBeNull();
   });
 });

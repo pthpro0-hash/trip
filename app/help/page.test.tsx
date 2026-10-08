@@ -112,7 +112,7 @@ describe("HelpPage · 내 정보", () => {
   it("가족 공유·가족 책장·로그아웃이 '내 정보'에 있다고 알려 준다 — 옛 길(이름 칩 → 가족 공유)은 더 말하지 않는다", () => {
     render(<HelpPage />);
     const text = document.body.textContent ?? "";
-    expect(text).toContain("내 여행 · 한장 · 사진 고르기 · 여행 100선 · 내 정보");
+    expect(text).toContain("내 여행 · 한장 요약 · 사진 고르기 · 여행 100선 · 내 정보");
     expect(text).toContain("'내 정보'");
     expect(text).toContain("로그아웃");
     expect(text).not.toContain("위 띠의 내 이름을 누르면 '가족 공유'가 열려요");

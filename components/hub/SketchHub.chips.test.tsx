@@ -95,3 +95,60 @@ describe("HubView · 지도 시트의 머리", () => {
     expect((container.firstElementChild as HTMLElement).className).toContain("var(--bottom-nav-h,0px)");
   });
 });
+
+/*
+  로그인 전 사람이 "내 여행"을 눌러 처음 보는 시트. 첫 화면의 환영 영역과 같은 약속을 하고 같은 단추(사진 고르기)를
+  앞세운다 — 로그인하라는 말부터 들으면 빈 벽이다. 사진 고르기는 로그인 없이 시작할 수 있고, 로그인은 기록으로
+  남길 때 하면 된다.
+*/
+describe("HubView · 로그인 전 시트", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+  });
+
+  const openGuest = () =>
+    render(
+      <HubView
+        status="guest"
+        userId={null}
+        trips={[]}
+        places={[]}
+        pinUrls={new Map()}
+        returnTrip={null}
+        switcher={<span>갈래 스위치</span>}
+      />,
+    );
+
+  it("무엇이 되는지 한 줄로 말한다", () => {
+    openGuest();
+    expect(screen.getByText("다녀온 곳이 이 지도에 사진으로 찍혀요")).toBeTruthy();
+    expect(screen.getByText("사진을 고르면 언제 어디서 찍었는지 읽어 지도에 얹어 드려요.")).toBeTruthy();
+  });
+
+  it("앞세운 단추는 '사진 고르기' — 로그인 없이 시작한다", () => {
+    openGuest();
+    const pick = screen.getByRole("link", { name: "사진 고르기" });
+    expect(pick).toHaveAttribute("href", "/trips/new");
+    expect(pick.className).toContain("bg-accent");
+  });
+
+  it("로그인은 작은 링크로 곁에 둔다 — 돌아올 곳은 내 여행", () => {
+    openGuest();
+    const login = screen.getByRole("link", { name: "로그인" });
+    expect(login.getAttribute("href")).toBe("/login?next=%2F%3Fv%3Dsketch");
+    expect(login.className).not.toContain("bg-accent");
+  });
+
+  it("로그인부터 하라고 말하지 않는다", () => {
+    const { container } = openGuest();
+    expect(container.textContent).not.toContain("로그인하고 사진을 고르면");
+    expect(screen.queryByRole("link", { name: "로그인하기" })).toBeNull();
+  });
+});
