@@ -1,5 +1,6 @@
 "use client";
 
+import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
@@ -94,12 +95,12 @@ export function SiteHeader() {
             폰에서는 하단 탭의 가운데 단추가 그 일을 한다.
           */}
           {canAdd && (
-            <Link
+            <AddPhotosLink
               href={ADD_HREF}
               className="hidden shrink-0 items-center rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-on-accent transition hover:bg-accent-hover sm:inline-flex"
             >
               + 사진 고르기
-            </Link>
+            </AddPhotosLink>
           )}
           {/*
             좁은 화면에서는 물음표만 남긴다. 375px 에서는 갈래 둘과 계정

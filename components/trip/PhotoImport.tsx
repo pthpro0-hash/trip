@@ -11,6 +11,7 @@ import { canPrepare, prepareForLogin } from "@/lib/photo/prepare";
 import { clearStash, loadStashedPhoto, probeStash, readStash, type StashMeta } from "@/lib/photo/stash";
 import { fromStashed, shotsOf, toStashed } from "@/lib/photo/stashTrips";
 import { goTo } from "@/lib/goTo";
+import { launchOpened, subscribeLaunch, takePendingFiles } from "@/lib/photo/launch";
 import { RESUME_LOGIN_HREF, resumeRequested } from "@/lib/photo/resume";
 import {
   canMerge,
@@ -501,6 +502,47 @@ export function PhotoImport() {
       setStage({ name: "ready", message: "장소 이름을 가져오지 못했어요. 날짜와 사진은 그대로예요." });
     }
   };
+
+  /*
+    다른 화면의 [사진 고르기]로 사진첩을 열고 이 화면으로 온 경우(lib/photo/launch). 사진첩이 열려 있는 동안은 '불러오는 중'을
+    보이고(창이 닫혀 초점이 돌아오면), 고른 사진이 오면 직접 고른 것과 똑같이 읽는다. 늦게 와도(이 화면이 뜨기 전에 골랐어도) 받는다.
+  */
+  const handleRef = useRef(handleFiles);
+  useEffect(() => {
+    handleRef.current = handleFiles;
+  });
+  useEffect(() => {
+    let alive = true;
+    let waiting = false;
+    const onBack = () => {
+      waiting = false;
+      if (alive && launchOpened()) setPicking(true);
+    };
+    const sync = () => {
+      if (!alive) return;
+      const files = takePendingFiles();
+      if (files) {
+        void handleRef.current(files);
+        return;
+      }
+      if (launchOpened()) {
+        if (!waiting) {
+          waiting = true;
+          window.addEventListener("focus", onBack, { once: true });
+        }
+      } else {
+        setPicking(false);
+      }
+    };
+    const off = subscribeLaunch(sync);
+    // 이 화면이 뜨기 전에 이미 열렸거나 골랐을 수 있다. 그리는 도중에 상태를 바꾸지 않도록 한 박자 뒤에 본다.
+    void Promise.resolve().then(sync);
+    return () => {
+      alive = false;
+      off();
+      window.removeEventListener("focus", onBack);
+    };
+  }, []);
 
   /*
     나누거나 합치면 방문이 다시 잡히고, 전에 없던 좌표가 생길 수 있다.

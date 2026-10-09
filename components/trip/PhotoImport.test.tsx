@@ -1089,6 +1089,43 @@ describe("PhotoImport", () => {
   });
 
   /*
+    다른 화면의 [사진 고르기]가 숨은 입력칸으로 사진첩을 연 채 이 화면으로 온다(lib/photo/launch). 고른 사진은 직접 고른 것과 똑같이 읽는다.
+  */
+  describe("다른 화면에서 사진첩을 열고 온 경우", () => {
+    // 시험마다 모듈을 새로 불러오므로 우체통도 화면과 같은 판을 그때그때 불러온다.
+    const 우체통 = () => import("@/lib/photo/launch");
+    const 골랐다 = async (shots = 이틀) => {
+      readShots.mockResolvedValue({ shots, withoutLocation: [], screenshots: [], unreadable: [] });
+      (await 우체통()).receiveFiles(shots.map((s) => new File(["x"], s.id, { type: "image/jpeg" })));
+    };
+
+    it("이 화면이 뜬 뒤에 고른 사진을 받아 여행을 보여 준다", async () => {
+      await 화면열기();
+      await 골랐다();
+      expect(await screen.findByText(/여행 \d건을 찾았어요/)).toBeTruthy();
+    });
+
+    it("이 화면이 뜨기 전에 이미 골랐어도 받는다", async () => {
+      await 골랐다();
+      await 화면열기();
+      expect(await screen.findByText(/여행 \d건을 찾았어요/)).toBeTruthy();
+    });
+
+    it("사진첩이 닫히고 초점이 돌아오면 '불러오는 중'을 보이고, 취소하면 평소 화면으로 돌아온다", async () => {
+      const L = await 우체통();
+      const el = document.createElement("input");
+      el.click = vi.fn();
+      L.registerLauncherInput(el);
+      await 화면열기();
+      L.launchPicker();
+      fireEvent.focus(window);
+      expect(await screen.findByText("고르신 사진을 불러오고 있어요")).toBeTruthy();
+      L.cancelLaunch();
+      expect(await screen.findByRole("button", { name: "사진 고르기" })).toBeTruthy();
+    });
+  });
+
+  /*
     고르기 창을 닫고 나서 파일이 도착할 때까지의 틈.
 
     수백 장이면 여기서 몇 초가 그냥 흐른다. 그동안 화면이 그대로면

@@ -1,5 +1,6 @@
 "use client";
 
+import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
@@ -202,12 +203,12 @@ export function SketchView() {
           <p className="text-[15px] leading-relaxed text-text-muted">
             사진을 고르면 한 해가 한 장의 그림이 돼요.
           </p>
-          <Link
+          <AddPhotosLink
             href="/trips/new"
             className="self-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
           >
             사진 고르기
-          </Link>
+          </AddPhotosLink>
         </div>
       </>
     );

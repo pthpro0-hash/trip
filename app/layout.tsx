@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { RegisterServiceWorker } from "@/components/layout/RegisterServiceWorker";
 import { FamilyBanner } from "@/components/family/FamilyBanner";
 import { BottomNav, BottomNavSpace } from "@/components/layout/BottomNav";
+import { PhotoLauncher } from "@/components/photo/PhotoLauncher";
 import "./globals.css";
 
 const SITE_NAME = "내 여행 스케치";
@@ -60,6 +61,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomNav />
         {/* 이 기기의 목록과 계정의 목록을 이어 준다. 그리는 것은 없다. */}
         <CollectionSync />
+        {/* [사진 고르기]를 누르면 사진첩이 곧바로 열리게 하는 숨은 입력칸. */}
+        <PhotoLauncher />
         <Analytics />
         <RegisterServiceWorker />
       </body>

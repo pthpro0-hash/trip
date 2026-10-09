@@ -1,7 +1,7 @@
 "use client";
 
+import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import {
   fromSearchEngine,
@@ -182,13 +182,13 @@ export function WelcomeDialog() {
           ))}
         </ol>
 
-        <Link
+        <AddPhotosLink
           href="/trips/new"
           onClick={close}
           className="flex w-full items-center justify-center rounded-full bg-accent px-6 py-3.5 text-[16px] font-semibold text-on-accent transition hover:bg-accent-hover"
         >
           사진 고르기
-        </Link>
+        </AddPhotosLink>
 
         <div className="flex items-start gap-1.5 text-[13px] leading-snug text-text-muted">
           <svg

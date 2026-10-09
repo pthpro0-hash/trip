@@ -1,5 +1,6 @@
 "use client";
 
+import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
@@ -240,12 +241,12 @@ export function TripList() {
           사진을 고르면 언제 어디를 다녀왔는지 찾아 드려요.
         </p>
         {canAdd && (
-          <Link
+          <AddPhotosLink
             href={ADD_HREF}
             className="self-center rounded-full bg-accent px-5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
           >
             사진 고르기
-          </Link>
+          </AddPhotosLink>
         )}
       </div>
     );

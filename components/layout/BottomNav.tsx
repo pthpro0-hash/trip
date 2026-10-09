@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
+import { launchPicker } from "@/lib/photo/launch";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
   ADD_HREF,
@@ -113,7 +114,14 @@ function Bar({ active }: { active: NavId | null }) {
             <li key={item.id} className="min-w-0">
               <Link
                 href={item.href}
-                onClick={item.remember ? () => rememberStart(item.remember!) : undefined}
+                onClick={
+                  item.remember
+                    ? () => rememberStart(item.remember!)
+                    : item.id === "add"
+                      ? // 가운데 ＋ 는 사진첩을 곧바로 연다(lib/photo/launch).
+                        () => void launchPicker()
+                      : undefined
+                }
                 aria-current={on ? "page" : undefined}
                 className={`flex h-full flex-col items-center justify-center gap-0.5 text-[11px] transition ${
                   on ? "font-semibold text-accent" : "font-medium text-text-muted"

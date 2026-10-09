@@ -1,5 +1,6 @@
 "use client";
 
+import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import spotsData from "@/lib/data/spots.json";
@@ -250,13 +251,13 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
         폰에서는 접는다 — 하단 탭의 가운데 단추가 같은 일을 한다. 이름은 어디서나
         "사진 고르기"다(예전에는 여기만 "여행 스케치 그리기"였다).
       */}
-      <Link
+      <AddPhotosLink
         href="/trips/new"
         className="fixed bottom-5 right-5 z-20 flex items-center gap-1.5 rounded-full bg-accent px-4 py-3 text-[14px] font-medium text-on-accent shadow-lg transition hover:bg-accent-hover max-sm:hidden"
       >
         <span aria-hidden="true">📷</span>
         사진 고르기
-      </Link>
+      </AddPhotosLink>
     </main>
   );
 }

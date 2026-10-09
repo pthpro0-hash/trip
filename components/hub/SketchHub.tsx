@@ -1,5 +1,6 @@
 "use client";
 
+import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -805,12 +806,12 @@ function SheetHeader({
           시작하고, 로그인은 기록으로 남길 때 한다. 이미 계정이 있는 사람을 위해 로그인은 곁에 작게 둔다.
         */}
         <div className="flex items-center gap-4">
-          <Link
+          <AddPhotosLink
             href={ADD_HREF}
             className="rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
           >
             사진 고르기
-          </Link>
+          </AddPhotosLink>
           <Link
             href="/login?next=%2F%3Fv%3Dsketch"
             className="text-[14px] font-medium text-accent transition hover:text-accent-hover"
@@ -831,12 +832,12 @@ function SheetHeader({
       <div className="flex flex-col gap-2 pb-1">
         <p className="text-[15px] font-semibold text-text">사진을 고르면 여기에 점이 찍혀요</p>
         <p className="text-[13px] text-text-muted">찍은 시각과 위치를 읽어 다녀온 길을 지도에 그려 드려요.</p>
-        <Link
+        <AddPhotosLink
           href={ADD_HREF}
           className="self-start rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
         >
           사진 고르기
-        </Link>
+        </AddPhotosLink>
       </div>
     );
   }
@@ -895,12 +896,12 @@ function SheetHeader({
         {/* 같은 여행을 목록으로도 본다. 검색하고 거르고 지우는 것은 그쪽이 한다. */}
         {onList && <ViewSwitch view="map" onChange={onList} />}
         {/* 폰에서는 접는다 — 하단 탭의 가운데 단추와 "한장"이 이 일을 한다. */}
-        <Link
+        <AddPhotosLink
           href={ADD_HREF}
           className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line max-sm:hidden"
         >
           + 사진 고르기
-        </Link>
+        </AddPhotosLink>
         <Link
           href={SKETCH_HREF}
           className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text transition hover:bg-line max-sm:hidden"
