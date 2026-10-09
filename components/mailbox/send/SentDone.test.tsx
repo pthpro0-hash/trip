@@ -112,6 +112,15 @@ describe("SentDone", () => {
       );
     });
 
+    it("공유창이 열리지 못하면(거절) 눌러도 아무 일이 없어 보이지 않게 ‘링크 복사’를 권한다", async () => {
+      setShare(async () => {
+        throw new DOMException("막힘", "NotAllowedError");
+      });
+      done();
+      fireEvent.click(screen.getByRole("button", { name: "카카오톡 등으로 보내기" }));
+      expect(await screen.findByRole("status")).toHaveTextContent("공유창을 열지 못했어요. ‘링크 복사’로 보내 주세요.");
+    });
+
     it("공유창이 없는 브라우저에는 링크 복사만 있다", () => {
       setShare(undefined);
       done();

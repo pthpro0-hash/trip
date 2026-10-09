@@ -11,16 +11,23 @@ export function canShareLink(): boolean {
   return typeof navigator !== "undefined" && typeof navigator.share === "function";
 }
 
-/** 엽서 링크를 공유창으로 보낸다. 창을 그냥 닫은 것은 실패가 아니다. */
-export async function shareCard(input: { senderName: string; greeting: string; url: string }): Promise<void> {
+/** 공유창으로 보냈다 / 사용자가 창을 그냥 닫았다 / 창이 열리지 못했다. */
+export type ShareResult = "shared" | "cancelled" | "failed";
+
+/**
+ * 엽서 링크를 공유창으로 보낸다. 창을 그냥 닫은 것(AbortError)은 실패가 아니다("cancelled"). 그 밖의 거절 — 공유창이 있다고
+ * 하면서 막는 웹뷰(카카오톡 앱 안의 브라우저 등) — 은 "failed" 라서, 부르는 쪽이 링크 복사 같은 다른 길을 내야 한다.
+ */
+export async function shareCard(input: { senderName: string; greeting: string; url: string }): Promise<ShareResult> {
   try {
     await navigator.share({
       title: `${attachParticle(input.senderName, "이", "가")} 보낸 여행 엽서`,
       text: input.greeting,
       url: input.url,
     });
-  } catch {
-    // 공유 창을 닫은 것뿐이다.
+    return "shared";
+  } catch (error) {
+    return (error as { name?: string } | null)?.name === "AbortError" ? "cancelled" : "failed";
   }
 }
 

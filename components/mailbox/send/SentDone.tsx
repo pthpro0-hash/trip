@@ -38,7 +38,11 @@ export function SentDone({ postcardId, senderName, boxes, onClose }: SentDonePro
   const canShare = canShareLink();
 
   // 공유창·복사는 여행 상세에서 다시 보낼 때와 같은 규칙이다(lib/shareLink).
-  const share = (box: MailboxItem, greeting: string) => shareCard({ senderName, greeting, url: linkOf(box) });
+  const share = async (box: MailboxItem, greeting: string) => {
+    const result = await shareCard({ senderName, greeting, url: linkOf(box) });
+    // 창을 그냥 닫은 것은 끝이다. 열리지 못했다면(공유창이 있다면서 막는 웹뷰 등) 눌러도 아무 일이 없어 보이지 않게 다른 길을 알린다.
+    if (result === "failed") setNote("공유창을 열지 못했어요. ‘링크 복사’로 보내 주세요.");
+  };
 
   const copy = async (box: MailboxItem) => {
     const url = linkOf(box);

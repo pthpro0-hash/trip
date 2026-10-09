@@ -93,9 +93,10 @@ function showPostcardLines(
   const unseen = unseenReactions(lines);
   if (unseen.replies.length === 0 && unseen.hearts.length === 0) return;
   setFresh((current) => new Set([...current, ...unseen.replies, ...unseen.hearts]));
-  void Promise.all([markRepliesSeen(supabase, unseen.replies), markHeartsSeen(supabase, unseen.hearts)])
-    .then(() => window.dispatchEvent(new Event(REPLIES_SEEN)))
-    .catch(() => undefined);
+  // 하나가 막혀도 다른 하나는 적히고 위 띠의 점도 다시 센다(allSettled — 어느 쪽이 실패해도 신호를 건너뛰지 않는다).
+  void Promise.allSettled([markRepliesSeen(supabase, unseen.replies), markHeartsSeen(supabase, unseen.hearts)]).then(() =>
+    window.dispatchEvent(new Event(REPLIES_SEEN)),
+  );
 }
 
 /** 제목 칸 오른쪽의 연필. 고칠 수 있다는 것을 안내 문장 대신 이것으로 알린다. */
@@ -189,6 +190,18 @@ export function TripDetail({ tripId }: { tripId: string }) {
   /** 이번에 처음 본 부모님의 답장·하트 id('새 답장' 표시). 봤다고 적은 뒤에도 이 화면에 머무는 동안 남는다. */
   const [freshReactions, setFreshReactions] = useState<Set<string>>(new Set());
   /*
+    보낸 엽서 줄을 읽는 요청의 차례. 처음 읽는 요청이 늦게 돌아와(통신이 느릴 때) 그사이 엽서를 보내고 새로 읽은 줄을 옛 줄로
+    덮어쓰지 않게, 가장 나중에 보낸 요청의 답만 받는다. 화면을 떠난 뒤에 돌아온 답으로는 '봤다'고 적지도 않는다.
+  */
+  const linesRequest = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  /*
     크게 보고 있는 사진. 목록에는 작은 판을 쓰지만 여기서는 보관본을
     그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.
   */
@@ -208,7 +221,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
         setStatus("guest");
         return;
       }
-      const owner = ownerOf(readFamilyView(), data.user.id);
+      const view = readFamilyView();
+      const owner = ownerOf(view, data.user.id);
       setUserId(owner);
 
       const detail = await fetchTripDetail(supabase, owner, tripId);
@@ -231,10 +245,13 @@ export function TripDetail({ tripId }: { tripId: string }) {
           if (active) setPostcardCount(counts.get(tripId) ?? 0);
         })
         .catch(() => undefined);
-      if (owner === data.user.id) {
+      // 내 여행에서만(그리는 쪽의 ownTrip 과 같은 조건 — 가족의 여행에는 엽서도, 남의 반응을 '봤다'고 적을 일도 없다).
+      if (view === null) {
+        const request = ++linesRequest.current;
         void fetchTripPostcardLines(supabase, owner, tripId)
           .then((lines) => {
-            if (active) showPostcardLines(supabase, lines, setPostcardLines, setFreshReactions);
+            if (!active || !lines || request !== linesRequest.current) return;
+            showPostcardLines(supabase, lines, setPostcardLines, setFreshReactions);
           })
           .catch(() => undefined);
       }
@@ -545,8 +562,13 @@ export function TripDetail({ tripId }: { tripId: string }) {
             const supabase = getBrowserClient();
             if (!supabase) return;
             void fetchPostcardCounts(supabase, userId).then((counts) => setPostcardCount(counts.get(tripId) ?? 0)).catch(() => undefined);
+            const request = ++linesRequest.current;
             void fetchTripPostcardLines(supabase, userId, tripId)
-              .then((lines) => showPostcardLines(supabase, lines, setPostcardLines, setFreshReactions))
+              .then((lines) => {
+                // 화면을 떠났거나 더 나중 요청이 있으면 버리고, 못 읽었으면(null) 보이는 줄을 그대로 둔다.
+                if (!mounted.current || !lines || request !== linesRequest.current) return;
+                showPostcardLines(supabase, lines, setPostcardLines, setFreshReactions);
+              })
               .catch(() => undefined);
             void fetchPhotosInPostcards(supabase, trip.visits.flatMap((visit) => visit.photos.map((photo) => photo.id)))
               .then(setPostcardPhotos)

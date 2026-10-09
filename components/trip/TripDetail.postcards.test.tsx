@@ -38,6 +38,8 @@ const counts = vi.hoisted(() => ({
   trips: new Map<string, number>(),
   photos: new Set<string>(),
   lines: [] as TripPostcardLine[],
+  /** 보낸 엽서 줄을 읽는 호출. 기본은 lines 를 돌려주고, 시험이 늦게 돌아오는 답이나 읽기 실패(null)로 바꾼다. */
+  fetchLines: vi.fn<() => Promise<TripPostcardLine[] | null>>(),
 }));
 /** 답장·하트를 '봤다'고 적는 호출(처음 본 id 만 와야 한다). */
 const marks = vi.hoisted(() => ({
@@ -47,7 +49,7 @@ const marks = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/postcards", () => ({
   fetchPostcardCounts: async () => counts.trips,
   fetchPhotosInPostcards: async () => counts.photos,
-  fetchTripPostcardLines: async () => counts.lines,
+  fetchTripPostcardLines: () => counts.fetchLines(),
   markRepliesSeen: marks.replies,
   markHeartsSeen: marks.hearts,
 }));
@@ -86,8 +88,9 @@ vi.mock("@/lib/supabase/tripDetail", async (importOriginal) => ({
 async function open() {
   vi.resetModules();
   const { TripDetail } = await import("./TripDetail");
-  render(<TripDetail tripId="t1" />);
+  const view = render(<TripDetail tripId="t1" />);
   await screen.findByLabelText("여행 제목");
+  return view;
 }
 
 describe("TripDetail · 엽서", () => {
@@ -95,6 +98,8 @@ describe("TripDetail · 엽서", () => {
     counts.trips = new Map();
     counts.photos = new Set();
     counts.lines = [];
+    counts.fetchLines.mockReset();
+    counts.fetchLines.mockImplementation(async () => counts.lines);
     marks.replies.mockClear();
     marks.hearts.mockClear();
     window.sessionStorage.clear();
@@ -243,6 +248,115 @@ describe("TripDetail · 엽서", () => {
         fireEvent.click(screen.getByRole("button", { name: "엽서 창 닫기" }));
         await settle();
         expect(screen.getByText("새 답장")).toBeTruthy();
+      });
+
+      /** 엽서 창을 열었다 닫는다 — 닫을 때 줄을 다시 읽는다. */
+      const reopenAndClose = async () => {
+        fireEvent.click(screen.getByRole("button", { name: "공유" }));
+        fireEvent.click(await screen.findByRole("button", { name: /부모님께 엽서 보내기/ }));
+        await screen.findByText("엽서 창이 열렸어요");
+        fireEvent.click(screen.getByRole("button", { name: "엽서 창 닫기" }));
+      };
+
+      it("엽서 창을 닫아 다시 읽을 때 새로 온 반응도 ‘봤다’고 적는다 — 새 id 만, 위 띠에도 알린다", async () => {
+        const heard = vi.fn();
+        window.addEventListener(REPLIES_SEEN, heard);
+        counts.lines = [sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", true)] })];
+        await open();
+        await screen.findByText("엄마가 ‘좋구나’ 하셨어요");
+        await settle();
+        expect(marks.replies).not.toHaveBeenCalled();
+        counts.lines = [
+          sent({
+            opened: true,
+            replies: [reply("r1", "엄마", "좋구나", true), reply("r2", "아빠", "잘 다녀왔니", false)],
+            hearts: [heart("h2", "아빠", "b.webp", false)],
+          }),
+        ];
+        await reopenAndClose();
+        await waitFor(() => expect(marks.replies).toHaveBeenCalledTimes(1));
+        expect(marks.replies.mock.calls[0][1]).toEqual(["r2"]);
+        expect(marks.hearts.mock.calls[0][1]).toEqual(["h2"]);
+        expect(await screen.findByText("새 답장")).toBeTruthy();
+        expect(screen.getByText("새 하트")).toBeTruthy();
+        await waitFor(() => expect(heard).toHaveBeenCalled());
+        window.removeEventListener(REPLIES_SEEN, heard);
+      });
+
+      it("‘봤다’고 적는 통신이 실패해도 반응은 그대로 보이고 오류로 번지지 않는다", async () => {
+        const heard = vi.fn();
+        window.addEventListener(REPLIES_SEEN, heard);
+        marks.replies.mockResolvedValueOnce(false);
+        marks.hearts.mockRejectedValueOnce(new Error("끊김"));
+        counts.lines = [sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", false)], hearts: [heart("h1", "엄마", "a.webp", false)] })];
+        await open();
+        expect(await screen.findByText("새 답장")).toBeTruthy();
+        expect(screen.getByText("새 하트")).toBeTruthy();
+        // 하나가 막혀도 위 띠의 점은 다시 센다.
+        await waitFor(() => expect(heard).toHaveBeenCalled());
+        window.removeEventListener(REPLIES_SEEN, heard);
+      });
+
+      it("화면을 떠난 뒤에 돌아온 답으로는 ‘봤다’고 적지 않는다 — 보지도 못한 반응이다", async () => {
+        let release!: (lines: TripPostcardLine[]) => void;
+        counts.fetchLines.mockImplementationOnce(
+          () =>
+            new Promise<TripPostcardLine[]>((resolve) => {
+              release = resolve;
+            }),
+        );
+        const view = await open();
+        view.unmount();
+        release([sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", false)] })]);
+        await settle();
+        expect(marks.replies).not.toHaveBeenCalled();
+        expect(marks.hearts).not.toHaveBeenCalled();
+      });
+
+      it("엽서 창을 닫은 직후 화면을 떠나면, 뒤늦게 돌아온 답으로는 ‘봤다’고 적지 않는다", async () => {
+        const view = await open();
+        await settle();
+        let release!: (lines: TripPostcardLine[]) => void;
+        counts.fetchLines.mockImplementationOnce(
+          () =>
+            new Promise<TripPostcardLine[]>((resolve) => {
+              release = resolve;
+            }),
+        );
+        await reopenAndClose();
+        view.unmount();
+        release([sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", false)] })]);
+        await settle();
+        expect(marks.replies).not.toHaveBeenCalled();
+      });
+
+      it("처음 읽는 요청이 늦게 돌아와도, 그사이 엽서를 보내고 새로 읽은 줄을 옛 줄로 덮어쓰지 않는다", async () => {
+        let releaseFirst!: (lines: TripPostcardLine[]) => void;
+        counts.fetchLines.mockImplementationOnce(
+          () =>
+            new Promise<TripPostcardLine[]>((resolve) => {
+              releaseFirst = resolve;
+            }),
+        );
+        await open();
+        // 첫 요청이 아직 안 돌아온 채 엽서를 보내고 닫아, 새로 읽은 줄이 나온다.
+        counts.lines = [sent()];
+        await reopenAndClose();
+        expect(await screen.findByRole("list", { name: "보낸 엽서" })).toBeTruthy();
+        // 이제 옛 요청의 답(보낸 엽서 없음)이 돌아와도 줄은 그대로다.
+        releaseFirst([]);
+        await settle();
+        expect(status()).not.toBeNull();
+      });
+
+      it("다시 읽다가 못 읽으면(null) 보이던 줄을 그대로 둔다 — 읽기 한 번 실패에 줄이 사라지지 않게", async () => {
+        counts.lines = [sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", true)] })];
+        await open();
+        await screen.findByText("엄마가 ‘좋구나’ 하셨어요");
+        counts.fetchLines.mockImplementationOnce(async () => null);
+        await reopenAndClose();
+        await settle();
+        expect(screen.getByText("엄마가 ‘좋구나’ 하셨어요")).toBeTruthy();
       });
 
       it("가족의 여행을 볼 때는 읽지도, ‘봤다’고 적지도 않는다 — 남의 반응이다", async () => {

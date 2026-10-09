@@ -175,7 +175,10 @@ describe("도움말 내용", () => {
       expect(step.detail).toContain("열어 보셨어요");
       expect(step.detail).toContain("아직 안 열어 보셨어요");
       expect(step.detail).toContain("'새 답장'");
+      expect(step.detail).toContain("'새 하트'");
       expect(step.detail).toContain("[다시 보내기]");
+      // 컴퓨터(공유창이 없는 브라우저)에서는 같은 자리가 [링크 복사]다.
+      expect(step.detail).toContain("[링크 복사]");
     });
 
     it("없어진 길을 말하지 않는다 — 책장을 먼저 만들러 가야 한다는 안내", () => {

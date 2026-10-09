@@ -32,11 +32,29 @@ describe("shareCard", () => {
     expect(share).toHaveBeenLastCalledWith(expect.objectContaining({ title: "수아가 보낸 여행 엽서" }));
   });
 
-  it("공유창을 그냥 닫아도(거절) 오류로 번지지 않는다", async () => {
+  it("보냈으면 shared", async () => {
+    setShare(async () => undefined);
+    expect(await shareCard({ senderName: "지민", greeting: "g", url: "u" })).toBe("shared");
+  });
+
+  it("공유창을 그냥 닫으면(AbortError) 오류로 번지지 않고 cancelled — 실패가 아니다", async () => {
     setShare(async () => {
       throw new DOMException("취소", "AbortError");
     });
-    await expect(shareCard({ senderName: "지민", greeting: "g", url: "u" })).resolves.toBeUndefined();
+    expect(await shareCard({ senderName: "지민", greeting: "g", url: "u" })).toBe("cancelled");
+  });
+
+  // 카카오톡 앱 안의 브라우저처럼 share 가 있다면서 거절하는 곳에서는 눌러도 아무 일이 없어 보인다 — 부르는 쪽이 다른 길을 내도록
+  // 실패를 알린다.
+  it("그 밖의 거절(NotAllowedError · TypeError 등)은 failed 로 알린다", async () => {
+    setShare(async () => {
+      throw new DOMException("막힘", "NotAllowedError");
+    });
+    expect(await shareCard({ senderName: "지민", greeting: "g", url: "u" })).toBe("failed");
+    setShare(async () => {
+      throw new TypeError("지원하지 않아요");
+    });
+    expect(await shareCard({ senderName: "지민", greeting: "g", url: "u" })).toBe("failed");
   });
 });
 

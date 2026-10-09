@@ -144,6 +144,41 @@ describe("TripPostcardStatus · 부모님의 답장과 하트", () => {
     expect(within(oldReply).queryByText("새 답장")).toBeNull();
   });
 
+  // 받는 쪽 답장 단추는 눌러도 잠기지 않아서, 보내졌는지 못 미더운 부모님이 서너 번 누르시면 똑같은 줄이 쌓였다.
+  it("같은 사람이 같은 말을 여러 번 보내셨으면 한 줄로 묶고 몇 번인지 말한다 — ‘새 답장’도 한 번만", () => {
+    render(
+      <TripPostcardStatus
+        lines={[
+          line({
+            opened: true,
+            replies: [
+              reply("r1", "엄마", "좋구나"),
+              reply("r2", "엄마", "좋구나", false),
+              reply("r3", "엄마", "좋구나", false),
+              reply("r4", "아빠", "좋구나"),
+            ],
+          }),
+        ]}
+        fresh={new Set(["r2", "r3"])}
+      />,
+    );
+    expect(screen.getByText("엄마가 ‘좋구나’ 하셨어요 · 3번")).toBeTruthy();
+    expect(screen.getByText("아빠가 ‘좋구나’ 하셨어요")).toBeTruthy();
+    expect(screen.getAllByText(/하셨어요/)).toHaveLength(2);
+    expect(screen.getAllByText("새 답장")).toHaveLength(1);
+  });
+
+  // 이 줄은 가장 최근에 보낸 엽서 기준이라, 아직 안 열어 보셨는데 반응이 보인다면 앞서 보낸 엽서에 남기신 것이다.
+  it("아직 안 열어 보셨는데 반응이 있으면 지난 엽서의 반응이라고 밝힌다 — 위 줄과 모순처럼 보이지 않게", () => {
+    render(<TripPostcardStatus lines={[line({ opened: false, replies: [reply("r1", "엄마", "좋구나")] })]} />);
+    expect(screen.getByText("지난 엽서에 남기신 반응이에요")).toBeTruthy();
+  });
+
+  it("열어 보셨으면 그런 말을 붙이지 않는다", () => {
+    render(<TripPostcardStatus lines={[line({ opened: true, replies: [reply("r1", "엄마", "좋구나")] })]} />);
+    expect(screen.queryByText(/지난 엽서/)).toBeNull();
+  });
+
   it("반응이 없으면 반응 줄도 없다", () => {
     render(<TripPostcardStatus lines={[line({ opened: true })]} />);
     expect(screen.queryByText(/하셨어요/)).toBeNull();
@@ -194,6 +229,46 @@ describe("TripPostcardStatus · 다시 보내기", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "장모님께 엽서 다시 보내기" }));
     await waitFor(() => expect(share).toHaveBeenCalledWith(expect.objectContaining({ url: linkOf("U".repeat(43)), text: "장모님, 안녕" })));
+  });
+
+  // 카카오톡 앱 안의 브라우저처럼 share 가 있다면서 거절하는 곳에서는 눌러도 아무 일이 없어 보였다.
+  it("공유창이 열리지 못하면(거절) 링크 복사로 이어 간다 — 눌러도 아무 일이 없는 단추가 되지 않게", async () => {
+    const share = vi.fn(async () => {
+      throw new DOMException("막힘", "NotAllowedError");
+    });
+    const writeText = vi.fn(async () => undefined);
+    setShare(share);
+    setClipboard({ writeText });
+    render(<TripPostcardStatus lines={[line()]} />);
+    fireEvent.click(screen.getByRole("button", { name: "엄마 아빠께 엽서 다시 보내기" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(linkOf()));
+    expect(await screen.findByRole("status")).toHaveTextContent("우리 엄마 아빠 링크를 복사했어요. 카카오톡에 붙여 넣어 보내 주세요.");
+  });
+
+  it("공유창이 열리지 못하고 복사까지 막혀도 주소를 보여 준다", async () => {
+    setShare(async () => {
+      throw new TypeError("지원하지 않아요");
+    });
+    setClipboard(undefined);
+    render(<TripPostcardStatus lines={[line()]} />);
+    fireEvent.click(screen.getByRole("button", { name: /다시 보내기/ }));
+    const note = await screen.findByRole("status");
+    expect(note).toHaveTextContent("복사하지 못했어요");
+    expect(note).toHaveTextContent(linkOf());
+  });
+
+  it("공유창을 그냥 닫으면 복사로 넘어가지 않는다 — 닫은 것은 끝이다", async () => {
+    const writeText = vi.fn(async () => undefined);
+    setClipboard({ writeText });
+    setShare(async () => {
+      throw new DOMException("취소", "AbortError");
+    });
+    render(<TripPostcardStatus lines={[line()]} />);
+    fireEvent.click(screen.getByRole("button", { name: /다시 보내기/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /다시 보내기/ })).toBeEnabled());
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(writeText).not.toHaveBeenCalled();
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("공유창을 닫아도 아무 일이 없다", async () => {

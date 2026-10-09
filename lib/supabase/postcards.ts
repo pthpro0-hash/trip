@@ -185,17 +185,23 @@ export interface TripPostcardLine {
 /**
  * 이 여행으로 보낸 엽서를 받는 곳마다 한 줄로. 같은 책장에 여러 번 보냈으면 가장 최근 엽서가 기준(열어 봤는지 · 다시 보내는 링크)
  * 이고, 닫은 책장은 뺀다(열어 볼 수 없는 곳에 "아직 안 열어 보셨어요"가 영영 남지 않게). 부모님의 답장·하트는 이 여행의 엽서
- * 전부에서 그 책장 몫을 모은다. 못 읽으면 빈 목록 — 줄이 안 보일 뿐 여행 상세는 그대로다(답장·하트 표만 못 읽으면 반응만 빈다).
+ * 전부에서 그 책장 몫을 모은다. 보낸 엽서가 없으면 빈 목록, **못 읽었으면 null** — 부르는 쪽이 지금 보이는 줄을 그대로 두게
+ * 한다(빈 목록으로 덮으면 읽기 실패 한 번에 보이던 줄이 사라진다). 답장·하트 표만 못 읽으면 줄은 나오고 반응만 빈다.
  * 새 표 없이 있는 표(엽서 · 배달 · 책장 · 답장 · 하트)만 읽는다.
  */
-export async function fetchTripPostcardLines(supabase: SupabaseClient, userId: string, tripId: string): Promise<TripPostcardLine[]> {
+export async function fetchTripPostcardLines(
+  supabase: SupabaseClient,
+  userId: string,
+  tripId: string,
+): Promise<TripPostcardLine[] | null> {
   const cards = await supabase
     .from("postcards")
     .select("id,created_at,sender_name")
     .eq("sender_id", userId)
     .eq("trip_id", tripId)
     .order("created_at", { ascending: false });
-  if (cards.error || !cards.data || cards.data.length === 0) return [];
+  if (cards.error || !cards.data) return null;
+  if (cards.data.length === 0) return [];
   const cardRows = cards.data as { id: string; sender_name: string }[];
   // 최근 엽서가 앞에 오는 차례. 책장마다 처음 만나는 배달이 가장 최근 것이다.
   const newestFirst = new Map(cardRows.map((card, index) => [card.id, index]));
@@ -221,7 +227,7 @@ export async function fetchTripPostcardLines(supabase: SupabaseClient, userId: s
         .order("created_at", { ascending: true }),
     ).catch(() => ({ data: null, error: { message: "x" } })),
   ]);
-  if (deliveries.error || !deliveries.data || boxes.error || !boxes.data) return [];
+  if (deliveries.error || !deliveries.data || boxes.error || !boxes.data) return null;
   const boxOf = new Map(
     (boxes.data as { id: string; name: string; greeting_name: string | null; closed_at: string | null; token: string }[]).map((box) => [box.id, box]),
   );

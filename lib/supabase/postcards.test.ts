@@ -471,6 +471,8 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
     { id: "m2", name: "장인 장모님 책장", greeting_name: null, closed_at: null, token: "U".repeat(43) },
     { id: "m3", name: "닫은 곳", greeting_name: "삼촌", closed_at: "2026-10-01T00:00:00Z", token: "V".repeat(43) },
   ];
+  /** 읽힌 줄(못 읽은 경우는 맨 아래 시험에서 따로 본다). */
+  const read = async (f: ReturnType<typeof fake>) => (await fetchTripPostcardLines(f.supabase, "u", "t1"))!;
   const delivery = (postcard_id: string, mailbox_id: string, opened_at: string | null = null, greeting = "안녕") => ({
     postcard_id,
     mailbox_id,
@@ -487,7 +489,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
         delivery("pc1", "m2", null, "바다 보고 왔어요"),
       ],
     });
-    expect(await fetchTripPostcardLines(f.supabase, "u", "t1")).toEqual([
+    expect(await read(f)).toEqual([
       {
         mailboxId: "m1",
         name: "우리 엄마 아빠",
@@ -522,7 +524,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
       boxRows,
       deliveryRows: [delivery("pc1", "m1", "2026-10-03T00:00:00Z", "옛 글"), delivery("pc2", "m1", null, "새 글")],
     });
-    expect((await fetchTripPostcardLines(stale.supabase, "u", "t1"))[0]).toMatchObject({
+    expect((await read(stale))[0]).toMatchObject({
       mailboxId: "m1",
       opened: false,
       postcardId: "pc2",
@@ -534,7 +536,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
       boxRows,
       deliveryRows: [delivery("pc2", "m1", "2026-10-06T00:00:00Z", "새 글"), delivery("pc1", "m1", null, "옛 글")],
     });
-    const lines = await fetchTripPostcardLines(fresh.supabase, "u", "t1");
+    const lines = await read(fresh);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatchObject({ mailboxId: "m1", opened: true, postcardId: "pc2" });
   });
@@ -545,7 +547,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
       boxRows,
       deliveryRows: [delivery("pc1", "m3"), delivery("pc1", "gone"), delivery("pc1", "m1")],
     });
-    expect((await fetchTripPostcardLines(f.supabase, "u", "t1")).map((line) => line.mailboxId)).toEqual(["m1"]);
+    expect((await read(f)).map((line) => line.mailboxId)).toEqual(["m1"]);
   });
 
   it("이 여행의 엽서가 아닌 배달은 섞이지 않는다", async () => {
@@ -554,7 +556,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
       boxRows,
       deliveryRows: [delivery("other", "m2", "2026-10-03T00:00:00Z"), delivery("pc1", "m1")],
     });
-    expect((await fetchTripPostcardLines(f.supabase, "u", "t1")).map((line) => line.mailboxId)).toEqual(["m1"]);
+    expect((await read(f)).map((line) => line.mailboxId)).toEqual(["m1"]);
   });
 
   it("부르는 말이 공백뿐이면 없는 것으로 본다", async () => {
@@ -563,7 +565,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
       boxRows: [{ id: "m1", name: "우리 집", greeting_name: "  ", closed_at: null, token: "T".repeat(43) }],
       deliveryRows: [delivery("pc1", "m1")],
     });
-    expect((await fetchTripPostcardLines(f.supabase, "u", "t1"))[0].greetingName).toBeNull();
+    expect((await read(f))[0].greetingName).toBeNull();
   });
 
   describe("부모님이 남긴 답장·하트", () => {
@@ -599,7 +601,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
         ],
         heartRows: [heart("h1", "pc2", "m1", "엄마", "a.webp"), heart("h2", "pc1", "m2", "장모님", ""), heart("h9", "other", "m1", "남", "x.webp")],
       });
-      const [first, second] = await fetchTripPostcardLines(f.supabase, "u", "t1");
+      const [first, second] = await read(f);
       expect(first.mailboxId).toBe("m1");
       expect(first.replies).toEqual([
         { id: "r1", mailboxId: "m1", who: "엄마", reaction: "좋구나", at: "2026-10-06T01:00:00Z", seen: true },
@@ -618,7 +620,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
         deliveryRows: [delivery("pc1", "m3")],
         replyRows: [reply("r1", "pc1", "m3", "삼촌", "좋구나")],
       });
-      expect(await fetchTripPostcardLines(f.supabase, "u", "t1")).toEqual([]);
+      expect(await read(f)).toEqual([]);
     });
 
     it("답장·하트 표를 못 읽어도(아직 없을 때도) 줄은 나온다 — 반응만 비어 있다", async () => {
@@ -628,7 +630,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
         deliveryRows: [delivery("pc1", "m1")],
         failTables: ["postcard_replies", "postcard_hearts"],
       });
-      const lines = await fetchTripPostcardLines(f.supabase, "u", "t1");
+      const lines = await read(f);
       expect(lines).toHaveLength(1);
       expect(lines[0]).toMatchObject({ mailboxId: "m1", replies: [], hearts: [] });
     });
@@ -636,15 +638,16 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’�
 
   it("보낸 엽서가 없으면 빈 목록 — 배달도 책장도 반응도 읽지 않는다", async () => {
     const f = fake({ tripCards: [], boxRows });
-    expect(await fetchTripPostcardLines(f.supabase, "u", "t1")).toEqual([]);
+    expect(await read(f)).toEqual([]);
     expect(f.log).toEqual(["select postcards"]);
   });
 
-  it("못 읽으면 빈 목록 — 줄이 안 보일 뿐 여행 상세는 그대로다", async () => {
-    expect(await fetchTripPostcardLines(fake({ selectError: "500" }).supabase, "u", "t1")).toEqual([]);
+  // 못 읽은 것과 보낸 적 없는 것은 다르다 — 빈 목록으로 덮으면 읽기가 한 번 실패할 때 보이던 줄이 화면에서 사라진다.
+  it("못 읽으면 null — 보낸 적 없는 빈 목록과 달라서, 부르는 쪽이 보이던 줄을 그대로 둘 수 있다", async () => {
+    expect(await fetchTripPostcardLines(fake({ selectError: "500" }).supabase, "u", "t1")).toBeNull();
     // 배달이나 책장을 못 읽은 때도 마찬가지.
-    expect(await fetchTripPostcardLines(fake({ tripCards: cards, boxRows, failTables: ["postcard_deliveries"] }).supabase, "u", "t1")).toEqual([]);
-    expect(await fetchTripPostcardLines(fake({ tripCards: cards, failTables: ["mailboxes"] }).supabase, "u", "t1")).toEqual([]);
+    expect(await fetchTripPostcardLines(fake({ tripCards: cards, boxRows, failTables: ["postcard_deliveries"] }).supabase, "u", "t1")).toBeNull();
+    expect(await fetchTripPostcardLines(fake({ tripCards: cards, failTables: ["mailboxes"] }).supabase, "u", "t1")).toBeNull();
   });
 });
 
