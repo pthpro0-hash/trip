@@ -27,7 +27,7 @@ import {
 import { fetchSentPostcards, fetchWishes, markHeartsSeen, markRepliesSeen, markWishesSeen, withdrawPostcard, type SentPostcard } from "@/lib/supabase/postcards";
 import { groupWishes, type SentWish } from "@/lib/mailboxWishes";
 import { WishList } from "./WishList";
-import { summarizeHearts, type HeartLine } from "@/lib/mailboxHearts";
+import { heartTarget, summarizeHearts } from "@/lib/mailboxHearts";
 import { attachParticle } from "@/lib/korean";
 import type { MailboxSettings } from "@/lib/mailboxSettings";
 import { REPLIES_SEEN } from "./MailboxBell";
@@ -72,13 +72,6 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 
 const pill =
   "rounded-full bg-bg-subtle px-3 py-1.5 text-[13px] font-medium text-text transition hover:bg-line disabled:opacity-60";
-
-/** 하트를 어디에 눌렀는지 — "사진 2장에", "이 여행에", "이 여행과 사진 2장에". */
-function heartTarget(line: HeartLine): string {
-  if (line.book && line.photos > 0) return `이 여행과 사진 ${line.photos}장에`;
-  if (line.book) return "이 여행에";
-  return `사진 ${line.photos}장에`;
-}
 
 /**
  * 부모님 화면을 미리 본다(새 탭). 받는 쪽 화면 그대로이되 "열어 봤다" 표시·답장·하트는 가지 않는다.

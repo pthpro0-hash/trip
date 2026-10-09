@@ -169,11 +169,13 @@ describe("도움말 내용", () => {
       expect(step.detail).toContain("'받는 곳 바꾸기'");
     });
 
-    it("부모님이 열어 보셨는지는 여행 상세의 공유 줄 아래에서 본다고 알린다", () => {
-      const step = stepOf("부모님이 열어 보셨는지");
+    it("부모님 반응(열어 보셨는지·답장·하트)은 여행 상세의 공유 줄 아래에서 보고, 안 열어 보셨으면 다시 보낸다고 알린다", () => {
+      const step = stepOf("부모님 반응 보기");
       expect(step.summary).toContain("여행 상세");
       expect(step.detail).toContain("열어 보셨어요");
       expect(step.detail).toContain("아직 안 열어 보셨어요");
+      expect(step.detail).toContain("'새 답장'");
+      expect(step.detail).toContain("[다시 보내기]");
     });
 
     it("없어진 길을 말하지 않는다 — 책장을 먼저 만들러 가야 한다는 안내", () => {

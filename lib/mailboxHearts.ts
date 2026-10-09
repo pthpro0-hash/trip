@@ -50,6 +50,13 @@ export interface HeartLine {
   ids: string[];
 }
 
+/** 하트를 어디에 눌렀는지 — "사진 2장에", "이 여행에", "이 여행과 사진 2장에". */
+export function heartTarget(line: HeartLine): string {
+  if (line.book && line.photos > 0) return `이 여행과 사진 ${line.photos}장에`;
+  if (line.book) return "이 여행에";
+  return `사진 ${line.photos}장에`;
+}
+
 export function summarizeHearts(rows: { id: string; mailboxId: string; who: string; file: string }[]): HeartLine[] {
   const lines: HeartLine[] = [];
   for (const row of rows) {

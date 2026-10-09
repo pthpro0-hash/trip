@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import type { TripDetail as Detail } from "@/lib/supabase/tripDetail";
+import type { TripPostcardLine } from "@/lib/supabase/postcards";
+import { REPLIES_SEEN } from "@/lib/mailboxEvents";
 
 /*
   엽서를 보낸 여행이나 사진을 지우려 할 때는 "엽서도 함께 지워져요"를 미리 알린다 — 모르고 지워서
@@ -35,12 +37,19 @@ vi.mock("@/lib/supabase/photos", () => ({
 const counts = vi.hoisted(() => ({
   trips: new Map<string, number>(),
   photos: new Set<string>(),
-  lines: [] as { mailboxId: string; name: string; greetingName: string | null; opened: boolean }[],
+  lines: [] as TripPostcardLine[],
+}));
+/** 답장·하트를 '봤다'고 적는 호출(처음 본 id 만 와야 한다). */
+const marks = vi.hoisted(() => ({
+  replies: vi.fn<(client: unknown, ids: string[]) => Promise<boolean>>(async () => true),
+  hearts: vi.fn<(client: unknown, ids: string[]) => Promise<boolean>>(async () => true),
 }));
 vi.mock("@/lib/supabase/postcards", () => ({
   fetchPostcardCounts: async () => counts.trips,
   fetchPhotosInPostcards: async () => counts.photos,
   fetchTripPostcardLines: async () => counts.lines,
+  markRepliesSeen: marks.replies,
+  markHeartsSeen: marks.hearts,
 }));
 
 const trip: Detail = {
@@ -86,6 +95,8 @@ describe("TripDetail · 엽서", () => {
     counts.trips = new Map();
     counts.photos = new Set();
     counts.lines = [];
+    marks.replies.mockClear();
+    marks.hearts.mockClear();
     window.sessionStorage.clear();
   });
 
@@ -112,11 +123,17 @@ describe("TripDetail · 엽서", () => {
   });
 
   describe("보낸 엽서 — 열어 보셨는지", () => {
-    const sent = (over: Partial<(typeof counts.lines)[number]> = {}) => ({
+    const sent = (over: Partial<TripPostcardLine> = {}): TripPostcardLine => ({
       mailboxId: "m1",
       name: "우리 엄마 아빠",
       greetingName: "엄마 아빠",
       opened: false,
+      postcardId: "P".repeat(43),
+      senderName: "김지민",
+      greeting: "엄마 아빠, 바다 보고 왔어요",
+      token: "T".repeat(43),
+      replies: [],
+      hearts: [],
       ...over,
     });
     const status = () => screen.queryByRole("list", { name: "보낸 엽서" });
@@ -148,6 +165,94 @@ describe("TripDetail · 엽서", () => {
       await open();
       await settle();
       expect(status()).toBeNull();
+    });
+
+    it("안 열어 보셨으면 [다시 보내기] — 그 엽서의 링크로 공유창을 연다", async () => {
+      const share = vi.fn(async () => undefined);
+      Object.defineProperty(navigator, "share", { value: share, configurable: true });
+      counts.lines = [sent()];
+      await open();
+      fireEvent.click(await screen.findByRole("button", { name: "엄마 아빠께 엽서 다시 보내기" }));
+      await waitFor(() =>
+        expect(share).toHaveBeenCalledWith(
+          expect.objectContaining({ url: `${window.location.origin}/m/${"T".repeat(43)}/p/${"P".repeat(43)}`, text: "엄마 아빠, 바다 보고 왔어요" }),
+        ),
+      );
+      Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+    });
+
+    describe("부모님의 답장·하트", () => {
+      const reply = (id: string, who: string, reaction: string, seen: boolean) => ({
+        id,
+        mailboxId: "m1",
+        who,
+        reaction,
+        at: "2026-10-06T00:00:00Z",
+        seen,
+      });
+      const heart = (id: string, who: string, file: string, seen: boolean) => ({ id, mailboxId: "m1", who, file, seen });
+
+      it("답장과 하트가 그 줄 아래에 보이고, 처음 본 것에는 ‘새 답장’·‘새 하트’가 붙는다", async () => {
+        counts.lines = [sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", false)], hearts: [heart("h1", "아빠", "a.webp", false)] })];
+        await open();
+        const list = await screen.findByRole("list", { name: "보낸 엽서" });
+        expect(within(list).getByText("엄마가 ‘좋구나’ 하셨어요")).toBeTruthy();
+        expect(within(list).getByText("새 답장")).toBeTruthy();
+        expect(within(list).getByText("아빠가 사진 1장에 하트를 눌렀어요")).toBeTruthy();
+        expect(within(list).getByText("새 하트")).toBeTruthy();
+      });
+
+      it("보여 주는 순간 ‘봤다’고 적고 위 띠에 알린다 — 처음 본 것만", async () => {
+        const heard = vi.fn();
+        window.addEventListener(REPLIES_SEEN, heard);
+        counts.lines = [
+          sent({
+            opened: true,
+            replies: [reply("r1", "엄마", "좋구나", true), reply("r2", "아빠", "잘 다녀왔니", false)],
+            hearts: [heart("h1", "엄마", "a.webp", false)],
+          }),
+        ];
+        await open();
+        await waitFor(() => expect(marks.replies).toHaveBeenCalled());
+        expect(marks.replies.mock.calls[0][1]).toEqual(["r2"]);
+        expect(marks.hearts.mock.calls[0][1]).toEqual(["h1"]);
+        await waitFor(() => expect(heard).toHaveBeenCalled());
+        window.removeEventListener(REPLIES_SEEN, heard);
+      });
+
+      it("이미 다 본 반응은 새 표시도, ‘봤다’는 기록도 없다", async () => {
+        counts.lines = [sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", true)], hearts: [heart("h1", "엄마", "a.webp", true)] })];
+        await open();
+        await screen.findByText("엄마가 ‘좋구나’ 하셨어요");
+        await settle();
+        expect(screen.queryByText("새 답장")).toBeNull();
+        expect(screen.queryByText("새 하트")).toBeNull();
+        expect(marks.replies).not.toHaveBeenCalled();
+        expect(marks.hearts).not.toHaveBeenCalled();
+      });
+
+      it("엽서 창을 닫아 다시 읽어도(그새 ‘봤다’고 적혔어도) 이 화면에 머무는 동안은 ‘새 답장’이 남아 있다", async () => {
+        counts.lines = [sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", false)] })];
+        await open();
+        await screen.findByText("새 답장");
+        // 두 번째로 읽을 때는 이미 봤다고 적혀 있다.
+        counts.lines = [sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", true)] })];
+        fireEvent.click(screen.getByRole("button", { name: "공유" }));
+        fireEvent.click(await screen.findByRole("button", { name: /부모님께 엽서 보내기/ }));
+        await screen.findByText("엽서 창이 열렸어요");
+        fireEvent.click(screen.getByRole("button", { name: "엽서 창 닫기" }));
+        await settle();
+        expect(screen.getByText("새 답장")).toBeTruthy();
+      });
+
+      it("가족의 여행을 볼 때는 읽지도, ‘봤다’고 적지도 않는다 — 남의 반응이다", async () => {
+        window.sessionStorage.setItem("family-view", JSON.stringify({ ownerId: "엄마", label: "mom@example.com", role: "full" }));
+        counts.lines = [sent({ opened: true, replies: [reply("r1", "엄마", "좋구나", false)] })];
+        await open();
+        await settle();
+        expect(status()).toBeNull();
+        expect(marks.replies).not.toHaveBeenCalled();
+      });
     });
 
     it("엽서를 보내고 창을 닫으면 줄이 새로 읽혀 바로 나온다", async () => {

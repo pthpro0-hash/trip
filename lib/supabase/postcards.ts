@@ -161,7 +161,7 @@ export async function fetchPostcardCounts(supabase: SupabaseClient, userId: stri
   return counts;
 }
 
-/** 이 여행으로 보낸 엽서의 받는 곳 한 줄. 여행 상세가 "엄마 아빠께 엽서를 보냈어요 · 열어 보셨어요"로 보여 준다. */
+/** 이 여행으로 보낸 엽서의 받는 곳 한 줄. 여행 상세가 "엄마 아빠께 엽서를 보냈어요 · 열어 보셨어요"와 부모님 반응으로 보여 준다. */
 export interface TripPostcardLine {
   mailboxId: string;
   /** 책장 이름("우리 엄마 아빠"). */
@@ -170,34 +170,72 @@ export interface TripPostcardLine {
   greetingName: string | null;
   /** 이 책장에 가장 최근에 보낸 엽서를 받는 분이 열어 봤는가. */
   opened: boolean;
+  /** 이 책장에 가장 최근에 보낸 엽서. 안 열어 보셨을 때 다시 보내는 링크가 이 엽서 것이다. */
+  postcardId: string;
+  /** 그 엽서에 적은 보낸 이름과, 그 책장에 보인 인사말(다시 보낼 때 공유창의 제목·글에 쓴다). */
+  senderName: string;
+  greeting: string;
+  /** 책장 링크의 글자. 엽서 주소(/m/<글자>/p/<엽서 id>)를 만든다. */
+  token: string;
+  /** 부모님이 이 여행의 엽서에 이 책장에서 남긴 답장·하트(오래된 것부터). 못 읽어도 줄은 나온다. */
+  replies: SentReply[];
+  hearts: SentHeart[];
 }
 
 /**
- * 이 여행으로 보낸 엽서를 받는 곳마다 한 줄로. 같은 책장에 여러 번 보냈으면 가장 최근 엽서가 기준이고, 닫은 책장은 뺀다
- * (열어 볼 수 없는 곳에 "아직 안 열어 보셨어요"가 영영 남지 않게). 못 읽으면 빈 목록 — 줄이 안 보일 뿐 여행 상세는 그대로다.
- * 새 표 없이 있는 표(엽서 · 배달 · 책장)만 읽는다.
+ * 이 여행으로 보낸 엽서를 받는 곳마다 한 줄로. 같은 책장에 여러 번 보냈으면 가장 최근 엽서가 기준(열어 봤는지 · 다시 보내는 링크)
+ * 이고, 닫은 책장은 뺀다(열어 볼 수 없는 곳에 "아직 안 열어 보셨어요"가 영영 남지 않게). 부모님의 답장·하트는 이 여행의 엽서
+ * 전부에서 그 책장 몫을 모은다. 못 읽으면 빈 목록 — 줄이 안 보일 뿐 여행 상세는 그대로다(답장·하트 표만 못 읽으면 반응만 빈다).
+ * 새 표 없이 있는 표(엽서 · 배달 · 책장 · 답장 · 하트)만 읽는다.
  */
 export async function fetchTripPostcardLines(supabase: SupabaseClient, userId: string, tripId: string): Promise<TripPostcardLine[]> {
   const cards = await supabase
     .from("postcards")
-    .select("id,created_at")
+    .select("id,created_at,sender_name")
     .eq("sender_id", userId)
     .eq("trip_id", tripId)
     .order("created_at", { ascending: false });
   if (cards.error || !cards.data || cards.data.length === 0) return [];
+  const cardRows = cards.data as { id: string; sender_name: string }[];
   // 최근 엽서가 앞에 오는 차례. 책장마다 처음 만나는 배달이 가장 최근 것이다.
-  const newestFirst = new Map((cards.data as { id: string }[]).map((card, index) => [card.id, index]));
+  const newestFirst = new Map(cardRows.map((card, index) => [card.id, index]));
+  const senderOf = new Map(cardRows.map((card) => [card.id, card.sender_name]));
+  const ids = [...newestFirst.keys()];
 
-  const [deliveries, boxes] = await Promise.all([
-    supabase.from("postcard_deliveries").select("postcard_id,mailbox_id,opened_at").in("postcard_id", [...newestFirst.keys()]),
-    supabase.from("mailboxes").select("id,name,greeting_name,closed_at"),
+  const [deliveries, boxes, replyRows, heartRows] = await Promise.all([
+    supabase.from("postcard_deliveries").select("postcard_id,mailbox_id,opened_at,greeting").in("postcard_id", ids),
+    supabase.from("mailboxes").select("id,name,greeting_name,closed_at,token"),
+    // 답장·하트는 곁다리다. 표가 아직 없거나 못 읽어도 줄은 나온다(fetchSentPostcards 와 같다).
+    Promise.resolve(
+      supabase
+        .from("postcard_replies")
+        .select("id,postcard_id,mailbox_id,who,reaction,created_at,seen_at")
+        .in("postcard_id", ids)
+        .order("created_at", { ascending: true }),
+    ).catch(() => ({ data: null, error: { message: "x" } })),
+    Promise.resolve(
+      supabase
+        .from("postcard_hearts")
+        .select("id,postcard_id,mailbox_id,who,file,created_at,seen_at")
+        .in("postcard_id", ids)
+        .order("created_at", { ascending: true }),
+    ).catch(() => ({ data: null, error: { message: "x" } })),
   ]);
   if (deliveries.error || !deliveries.data || boxes.error || !boxes.data) return [];
   const boxOf = new Map(
-    (boxes.data as { id: string; name: string; greeting_name: string | null; closed_at: string | null }[]).map((box) => [box.id, box]),
+    (boxes.data as { id: string; name: string; greeting_name: string | null; closed_at: string | null; token: string }[]).map((box) => [box.id, box]),
   );
+  const mine = new Set(ids);
+  const replies = (!replyRows.error && Array.isArray(replyRows.data)
+    ? (replyRows.data as { id: string; postcard_id: string; mailbox_id: string; who: string; reaction: string; created_at: string; seen_at: string | null }[])
+    : []
+  ).filter((row) => mine.has(row.postcard_id));
+  const hearts = (!heartRows.error && Array.isArray(heartRows.data)
+    ? (heartRows.data as { id: string; postcard_id: string; mailbox_id: string; who: string; file: string; seen_at: string | null }[])
+    : []
+  ).filter((row) => mine.has(row.postcard_id));
 
-  const rows = (deliveries.data as { postcard_id: string; mailbox_id: string; opened_at: string | null }[])
+  const rows = (deliveries.data as { postcard_id: string; mailbox_id: string; opened_at: string | null; greeting: string | null }[])
     .filter((row) => newestFirst.has(row.postcard_id))
     .sort((a, b) => newestFirst.get(a.postcard_id)! - newestFirst.get(b.postcard_id)!);
   const lines = new Map<string, TripPostcardLine>();
@@ -209,6 +247,16 @@ export async function fetchTripPostcardLines(supabase: SupabaseClient, userId: s
       name: box.name,
       greetingName: box.greeting_name?.trim() || null,
       opened: row.opened_at != null,
+      postcardId: row.postcard_id,
+      senderName: senderOf.get(row.postcard_id) ?? "",
+      greeting: row.greeting ?? "",
+      token: box.token,
+      replies: replies
+        .filter((reply) => reply.mailbox_id === row.mailbox_id)
+        .map((reply) => ({ id: reply.id, mailboxId: reply.mailbox_id, who: reply.who, reaction: reply.reaction, at: reply.created_at, seen: reply.seen_at != null })),
+      hearts: hearts
+        .filter((heart) => heart.mailbox_id === row.mailbox_id)
+        .map((heart) => ({ id: heart.id, mailboxId: heart.mailbox_id, who: heart.who, file: heart.file, seen: heart.seen_at != null })),
     });
   }
   return [...lines.values()];

@@ -68,11 +68,13 @@ interface Options {
   /** 지울 권한이 없을 때처럼 오류 없이 하나도 못 지운다. */
   silentRemove?: boolean;
   selectError?: string;
+  /** 이 표들만 못 읽는다(나머지는 읽힌다). */
+  failTables?: string[];
   postcardsOfTrip?: { id: string }[];
   photoRows?: { postcard_id: string; file: string }[];
   countRows?: { trip_id: string }[];
   /** 이 여행으로 보낸 엽서(최근 것부터). */
-  tripCards?: { id: string; created_at: string }[];
+  tripCards?: { id: string; created_at: string; sender_name: string }[];
   boxRows?: unknown[];
   inPostcards?: { source_photo_id: string }[];
   sentRows?: unknown[];
@@ -98,7 +100,7 @@ function fake(options: Options = {}) {
     if (name === "postcard_hearts") return options.heartRows ?? [];
     if (name === "mailbox_wishes") return options.wishRows ?? [];
     if (name === "postcards" && columns === "id") return options.postcardsOfTrip ?? [];
-    if (name === "postcards" && columns === "id,created_at") return options.tripCards ?? [];
+    if (name === "postcards" && columns === "id,created_at,sender_name") return options.tripCards ?? [];
     if (name === "mailboxes") return options.boxRows ?? [];
     if (name === "postcards") return options.countRows ?? [];
     if (name === "postcard_photos" && columns.includes("postcard_id")) return options.photoRows ?? [];
@@ -115,8 +117,8 @@ function fake(options: Options = {}) {
     },
     select: (columns: string, opts?: { head?: boolean }) => {
       log.push(`select ${name}${opts?.head ? " head" : ""}`);
-      const result = options.selectError
-        ? { data: null, count: null, error: { code: options.selectError, message: "x" } }
+      const result = options.selectError || options.failTables?.includes(name)
+        ? { data: null, count: null, error: { code: options.selectError ?? "500", message: "x" } }
         : { data: rowsFor(name, columns), count: options.unread ?? 0, error: null };
       const chain: Record<string, unknown> = {
         eq: () => chain,
@@ -455,69 +457,93 @@ describe("지울 때 보여 줄 숫자", () => {
 });
 
 /*
-  여행 상세가 "엄마 아빠께 엽서를 보냈어요 · 열어 보셨어요 ✓"를 보여 주려면, 이 여행으로 보낸 엽서가 받는 곳마다 열렸는지를
-  한 줄씩 읽어야 한다. 새 표 없이 있는 표(엽서 · 배달 · 책장)만 읽는다.
+  여행 상세가 "엄마 아빠께 엽서를 보냈어요 · 열어 보셨어요 ✓"와 부모님이 남긴 답장·하트를 보여 주려면, 이 여행으로 보낸 엽서가
+  받는 곳마다 열렸는지와 반응을 한 줄씩 읽어야 한다. 안 열어 보셨을 때 다시 보내려면 그 엽서의 링크 재료(책장 링크 글자 ·
+  엽서 id · 보낸 이름 · 그 책장에 보인 인사말)도 필요하다. 새 표 없이 있는 표(엽서 · 배달 · 책장 · 답장 · 하트)만 읽는다.
 */
-describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’", () => {
+describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’와 부모님 반응", () => {
   const cards = [
-    { id: "pc2", created_at: "2026-10-05T00:00:00Z" },
-    { id: "pc1", created_at: "2026-10-02T00:00:00Z" },
+    { id: "pc2", created_at: "2026-10-05T00:00:00Z", sender_name: "지민" },
+    { id: "pc1", created_at: "2026-10-02T00:00:00Z", sender_name: "지민" },
   ];
   const boxRows = [
-    { id: "m1", name: "우리 엄마 아빠", greeting_name: "엄마 아빠", closed_at: null },
-    { id: "m2", name: "장인 장모님 책장", greeting_name: null, closed_at: null },
-    { id: "m3", name: "닫은 곳", greeting_name: "삼촌", closed_at: "2026-10-01T00:00:00Z" },
+    { id: "m1", name: "우리 엄마 아빠", greeting_name: "엄마 아빠", closed_at: null, token: "T".repeat(43) },
+    { id: "m2", name: "장인 장모님 책장", greeting_name: null, closed_at: null, token: "U".repeat(43) },
+    { id: "m3", name: "닫은 곳", greeting_name: "삼촌", closed_at: "2026-10-01T00:00:00Z", token: "V".repeat(43) },
   ];
+  const delivery = (postcard_id: string, mailbox_id: string, opened_at: string | null = null, greeting = "안녕") => ({
+    postcard_id,
+    mailbox_id,
+    opened_at,
+    greeting,
+  });
 
-  it("받는 곳마다 한 줄 — 이름 · 부르는 말 · 열어 봤는지", async () => {
+  it("받는 곳마다 한 줄 — 이름 · 부르는 말 · 열어 봤는지, 그리고 다시 보낼 때 쓸 링크 재료", async () => {
     const f = fake({
       tripCards: cards,
       boxRows,
       deliveryRows: [
-        { postcard_id: "pc1", mailbox_id: "m1", opened_at: "2026-10-03T00:00:00Z" },
-        { postcard_id: "pc1", mailbox_id: "m2", opened_at: null },
+        delivery("pc1", "m1", "2026-10-03T00:00:00Z", "엄마 아빠, 바다 보고 왔어요"),
+        delivery("pc1", "m2", null, "바다 보고 왔어요"),
       ],
     });
     expect(await fetchTripPostcardLines(f.supabase, "u", "t1")).toEqual([
-      { mailboxId: "m1", name: "우리 엄마 아빠", greetingName: "엄마 아빠", opened: true },
-      { mailboxId: "m2", name: "장인 장모님 책장", greetingName: null, opened: false },
+      {
+        mailboxId: "m1",
+        name: "우리 엄마 아빠",
+        greetingName: "엄마 아빠",
+        opened: true,
+        postcardId: "pc1",
+        senderName: "지민",
+        greeting: "엄마 아빠, 바다 보고 왔어요",
+        token: "T".repeat(43),
+        replies: [],
+        hearts: [],
+      },
+      {
+        mailboxId: "m2",
+        name: "장인 장모님 책장",
+        greetingName: null,
+        opened: false,
+        postcardId: "pc1",
+        senderName: "지민",
+        greeting: "바다 보고 왔어요",
+        token: "U".repeat(43),
+        replies: [],
+        hearts: [],
+      },
     ]);
   });
 
-  it("같은 곳에 여러 번 보냈으면 가장 최근에 보낸 엽서가 기준이다", async () => {
+  it("같은 곳에 여러 번 보냈으면 가장 최근에 보낸 엽서가 기준이다 — 다시 보내는 링크도 그 엽서 것", async () => {
     // pc2 가 더 최근이다. 옛 엽서를 열어 봤어도 새 엽서를 아직 안 열었으면 ‘아직’이다.
     const stale = fake({
       tripCards: cards,
       boxRows,
-      deliveryRows: [
-        { postcard_id: "pc1", mailbox_id: "m1", opened_at: "2026-10-03T00:00:00Z" },
-        { postcard_id: "pc2", mailbox_id: "m1", opened_at: null },
-      ],
+      deliveryRows: [delivery("pc1", "m1", "2026-10-03T00:00:00Z", "옛 글"), delivery("pc2", "m1", null, "새 글")],
     });
-    expect((await fetchTripPostcardLines(stale.supabase, "u", "t1"))[0]).toMatchObject({ mailboxId: "m1", opened: false });
+    expect((await fetchTripPostcardLines(stale.supabase, "u", "t1"))[0]).toMatchObject({
+      mailboxId: "m1",
+      opened: false,
+      postcardId: "pc2",
+      greeting: "새 글",
+    });
     // 받은 차례와 상관없이 — 새 엽서를 열었으면 열었다.
     const fresh = fake({
       tripCards: cards,
       boxRows,
-      deliveryRows: [
-        { postcard_id: "pc2", mailbox_id: "m1", opened_at: "2026-10-06T00:00:00Z" },
-        { postcard_id: "pc1", mailbox_id: "m1", opened_at: null },
-      ],
+      deliveryRows: [delivery("pc2", "m1", "2026-10-06T00:00:00Z", "새 글"), delivery("pc1", "m1", null, "옛 글")],
     });
     const lines = await fetchTripPostcardLines(fresh.supabase, "u", "t1");
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatchObject({ mailboxId: "m1", opened: true });
+    expect(lines[0]).toMatchObject({ mailboxId: "m1", opened: true, postcardId: "pc2" });
   });
 
   it("닫은 책장과, 책장을 찾을 수 없는 배달은 빼고 보여 준다", async () => {
     const f = fake({
       tripCards: cards,
       boxRows,
-      deliveryRows: [
-        { postcard_id: "pc1", mailbox_id: "m3", opened_at: null },
-        { postcard_id: "pc1", mailbox_id: "gone", opened_at: null },
-        { postcard_id: "pc1", mailbox_id: "m1", opened_at: null },
-      ],
+      deliveryRows: [delivery("pc1", "m3"), delivery("pc1", "gone"), delivery("pc1", "m1")],
     });
     expect((await fetchTripPostcardLines(f.supabase, "u", "t1")).map((line) => line.mailboxId)).toEqual(["m1"]);
   });
@@ -526,10 +552,7 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’",
     const f = fake({
       tripCards: cards,
       boxRows,
-      deliveryRows: [
-        { postcard_id: "other", mailbox_id: "m2", opened_at: "2026-10-03T00:00:00Z" },
-        { postcard_id: "pc1", mailbox_id: "m1", opened_at: null },
-      ],
+      deliveryRows: [delivery("other", "m2", "2026-10-03T00:00:00Z"), delivery("pc1", "m1")],
     });
     expect((await fetchTripPostcardLines(f.supabase, "u", "t1")).map((line) => line.mailboxId)).toEqual(["m1"]);
   });
@@ -537,13 +560,81 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’",
   it("부르는 말이 공백뿐이면 없는 것으로 본다", async () => {
     const f = fake({
       tripCards: cards,
-      boxRows: [{ id: "m1", name: "우리 집", greeting_name: "  ", closed_at: null }],
-      deliveryRows: [{ postcard_id: "pc1", mailbox_id: "m1", opened_at: null }],
+      boxRows: [{ id: "m1", name: "우리 집", greeting_name: "  ", closed_at: null, token: "T".repeat(43) }],
+      deliveryRows: [delivery("pc1", "m1")],
     });
     expect((await fetchTripPostcardLines(f.supabase, "u", "t1"))[0].greetingName).toBeNull();
   });
 
-  it("보낸 엽서가 없으면 빈 목록 — 배달도 책장도 읽지 않는다", async () => {
+  describe("부모님이 남긴 답장·하트", () => {
+    const reply = (id: string, postcard_id: string, mailbox_id: string, who: string, reaction: string, seen_at: string | null = null) => ({
+      id,
+      postcard_id,
+      mailbox_id,
+      who,
+      reaction,
+      created_at: `2026-10-06T0${id.slice(-1)}:00:00Z`,
+      seen_at,
+    });
+    const heart = (id: string, postcard_id: string, mailbox_id: string, who: string, file: string, seen_at: string | null = null) => ({
+      id,
+      postcard_id,
+      mailbox_id,
+      who,
+      file,
+      created_at: "2026-10-06T00:00:00Z",
+      seen_at,
+    });
+
+    it("받는 곳 줄에 붙는다 — 그 책장 몫만, 이 여행의 엽서 전부(여러 번 보냈어도), 오래된 것부터", async () => {
+      const f = fake({
+        tripCards: cards,
+        boxRows,
+        deliveryRows: [delivery("pc1", "m1"), delivery("pc2", "m1"), delivery("pc1", "m2")],
+        replyRows: [
+          reply("r1", "pc1", "m1", "엄마", "좋구나", "2026-10-07T00:00:00Z"),
+          reply("r2", "pc2", "m1", "아빠", "잘 다녀왔니"),
+          reply("r3", "pc1", "m2", "장모님", "고맙다"),
+          reply("r9", "other", "m1", "남", "다른 여행의 답장"),
+        ],
+        heartRows: [heart("h1", "pc2", "m1", "엄마", "a.webp"), heart("h2", "pc1", "m2", "장모님", ""), heart("h9", "other", "m1", "남", "x.webp")],
+      });
+      const [first, second] = await fetchTripPostcardLines(f.supabase, "u", "t1");
+      expect(first.mailboxId).toBe("m1");
+      expect(first.replies).toEqual([
+        { id: "r1", mailboxId: "m1", who: "엄마", reaction: "좋구나", at: "2026-10-06T01:00:00Z", seen: true },
+        { id: "r2", mailboxId: "m1", who: "아빠", reaction: "잘 다녀왔니", at: "2026-10-06T02:00:00Z", seen: false },
+      ]);
+      expect(first.hearts).toEqual([{ id: "h1", mailboxId: "m1", who: "엄마", file: "a.webp", seen: false }]);
+      expect(second.mailboxId).toBe("m2");
+      expect(second.replies.map((entry) => entry.id)).toEqual(["r3"]);
+      expect(second.hearts.map((entry) => entry.id)).toEqual(["h2"]);
+    });
+
+    it("닫은 책장의 반응은 보이지 않는다(줄이 없으니)", async () => {
+      const f = fake({
+        tripCards: cards,
+        boxRows,
+        deliveryRows: [delivery("pc1", "m3")],
+        replyRows: [reply("r1", "pc1", "m3", "삼촌", "좋구나")],
+      });
+      expect(await fetchTripPostcardLines(f.supabase, "u", "t1")).toEqual([]);
+    });
+
+    it("답장·하트 표를 못 읽어도(아직 없을 때도) 줄은 나온다 — 반응만 비어 있다", async () => {
+      const f = fake({
+        tripCards: cards,
+        boxRows,
+        deliveryRows: [delivery("pc1", "m1")],
+        failTables: ["postcard_replies", "postcard_hearts"],
+      });
+      const lines = await fetchTripPostcardLines(f.supabase, "u", "t1");
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({ mailboxId: "m1", replies: [], hearts: [] });
+    });
+  });
+
+  it("보낸 엽서가 없으면 빈 목록 — 배달도 책장도 반응도 읽지 않는다", async () => {
     const f = fake({ tripCards: [], boxRows });
     expect(await fetchTripPostcardLines(f.supabase, "u", "t1")).toEqual([]);
     expect(f.log).toEqual(["select postcards"]);
@@ -551,6 +642,9 @@ describe("fetchTripPostcardLines · 여행 상세의 ‘열어 보셨어요’",
 
   it("못 읽으면 빈 목록 — 줄이 안 보일 뿐 여행 상세는 그대로다", async () => {
     expect(await fetchTripPostcardLines(fake({ selectError: "500" }).supabase, "u", "t1")).toEqual([]);
+    // 배달이나 책장을 못 읽은 때도 마찬가지.
+    expect(await fetchTripPostcardLines(fake({ tripCards: cards, boxRows, failTables: ["postcard_deliveries"] }).supabase, "u", "t1")).toEqual([]);
+    expect(await fetchTripPostcardLines(fake({ tripCards: cards, failTables: ["mailboxes"] }).supabase, "u", "t1")).toEqual([]);
   });
 });
 

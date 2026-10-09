@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchUnreadHeartCount, fetchUnreadReplyCount, fetchUnreadWishCount } from "@/lib/supabase/postcards";
+import { REPLIES_SEEN } from "@/lib/mailboxEvents";
 
-/** 책장 화면이 답장·하트를 "봤다"고 표시했음을 위 띠에 알리는 신호. */
-export const REPLIES_SEEN = "postcard-replies-seen";
+// 책장 화면과 여행 상세가 답장·하트를 "봤다"고 표시했음을 알리는 신호(lib/mailboxEvents). 가져다 쓰던 자리를 위해 다시 내보낸다.
+export { REPLIES_SEEN };
 
 /*
   새 소식(답장·하트·가고 싶은 곳)이 왔을 때만 위 띠에 나타나는 편지 표시.

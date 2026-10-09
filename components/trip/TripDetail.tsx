@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
@@ -23,8 +24,12 @@ import {
   fetchPhotosInPostcards,
   fetchPostcardCounts,
   fetchTripPostcardLines,
+  markHeartsSeen,
+  markRepliesSeen,
   type TripPostcardLine,
 } from "@/lib/supabase/postcards";
+import { REPLIES_SEEN } from "@/lib/mailboxEvents";
+import { unseenReactions } from "@/lib/tripPostcards";
 import { canIn, ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
 import { LIST_HREF } from "@/lib/nav";
 import { rememberPlaceName } from "@/lib/supabase/placeNames";
@@ -71,6 +76,26 @@ const placeHref = (name: string) => `/places?name=${encodeURIComponent(name)}`;
 
 function hourMinute(date: Date) {
   return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+}
+
+/*
+  읽어 온 보낸 엽서 줄을 보여 주고, 이번에 처음 본 답장·하트는 "봤다"고 적는다(가족 책장 화면과 같은 규칙 — 위 띠의 새 소식 표시도
+  따라 꺼진다). 봤다고 적고 나면 다음에 읽을 때는 새것이 아니므로, 이 화면에 머무는 동안 '새 답장' 표시가 남도록 처음 본 것의
+  id 를 따로 쥐고 있는다. 적지 못해도(통신) 화면은 그대로다.
+*/
+function showPostcardLines(
+  supabase: SupabaseClient,
+  lines: TripPostcardLine[],
+  setLines: (lines: TripPostcardLine[]) => void,
+  setFresh: Dispatch<SetStateAction<Set<string>>>,
+) {
+  setLines(lines);
+  const unseen = unseenReactions(lines);
+  if (unseen.replies.length === 0 && unseen.hearts.length === 0) return;
+  setFresh((current) => new Set([...current, ...unseen.replies, ...unseen.hearts]));
+  void Promise.all([markRepliesSeen(supabase, unseen.replies), markHeartsSeen(supabase, unseen.hearts)])
+    .then(() => window.dispatchEvent(new Event(REPLIES_SEEN)))
+    .catch(() => undefined);
 }
 
 /** 제목 칸 오른쪽의 연필. 고칠 수 있다는 것을 안내 문장 대신 이것으로 알린다. */
@@ -161,6 +186,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
   const [postcardPhotos, setPostcardPhotos] = useState<Set<string>>(new Set());
   /** 이 여행으로 보낸 엽서가 받는 곳마다 열렸는지. 공유 줄 아래에 한 줄씩 보여 준다. 못 읽으면 줄이 없을 뿐이다. */
   const [postcardLines, setPostcardLines] = useState<TripPostcardLine[]>([]);
+  /** 이번에 처음 본 부모님의 답장·하트 id('새 답장' 표시). 봤다고 적은 뒤에도 이 화면에 머무는 동안 남는다. */
+  const [freshReactions, setFreshReactions] = useState<Set<string>>(new Set());
   /*
     크게 보고 있는 사진. 목록에는 작은 판을 쓰지만 여기서는 보관본을
     그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.
@@ -204,11 +231,13 @@ export function TripDetail({ tripId }: { tripId: string }) {
           if (active) setPostcardCount(counts.get(tripId) ?? 0);
         })
         .catch(() => undefined);
-      void fetchTripPostcardLines(supabase, owner, tripId)
-        .then((lines) => {
-          if (active) setPostcardLines(lines);
-        })
-        .catch(() => undefined);
+      if (owner === data.user.id) {
+        void fetchTripPostcardLines(supabase, owner, tripId)
+          .then((lines) => {
+            if (active) showPostcardLines(supabase, lines, setPostcardLines, setFreshReactions);
+          })
+          .catch(() => undefined);
+      }
       void fetchPhotosInPostcards(
         supabase,
         detail.visits.flatMap((visit) => visit.photos.map((photo) => photo.id)),
@@ -516,7 +545,9 @@ export function TripDetail({ tripId }: { tripId: string }) {
             const supabase = getBrowserClient();
             if (!supabase) return;
             void fetchPostcardCounts(supabase, userId).then((counts) => setPostcardCount(counts.get(tripId) ?? 0)).catch(() => undefined);
-            void fetchTripPostcardLines(supabase, userId, tripId).then(setPostcardLines).catch(() => undefined);
+            void fetchTripPostcardLines(supabase, userId, tripId)
+              .then((lines) => showPostcardLines(supabase, lines, setPostcardLines, setFreshReactions))
+              .catch(() => undefined);
             void fetchPhotosInPostcards(supabase, trip.visits.flatMap((visit) => visit.photos.map((photo) => photo.id)))
               .then(setPostcardPhotos)
               .catch(() => undefined);
@@ -663,7 +694,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
             <span className="text-[13px] text-text-muted">지우지 못했어요. 잠시 후 다시 시도해 주세요.</span>
           )}
           {/* 보낸 엽서를 열어 보셨는지. 줄바꿈되는 이 줄에서 한 줄을 통째로 차지한다. */}
-          {canShare && <TripPostcardStatus lines={postcardLines} />}
+          {canShare && <TripPostcardStatus lines={postcardLines} fresh={freshReactions} />}
         </div>
       )}
 

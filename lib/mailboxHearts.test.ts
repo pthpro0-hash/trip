@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { heartCount, heartedBy, heartNames, isHeartFile, summarizeHearts, withHeart, type Heart } from "./mailboxHearts";
+import { heartCount, heartedBy, heartNames, heartTarget, isHeartFile, summarizeHearts, withHeart, type Heart } from "./mailboxHearts";
 
 const hearts: Heart[] = [
   { who: "엄마", file: "a.webp" },
@@ -72,5 +72,15 @@ describe("summarizeHearts · 보낸 사람이 보는 하트 한 줄", () => {
 
   it("하트가 없으면 빈 목록", () => {
     expect(summarizeHearts([])).toEqual([]);
+  });
+});
+
+describe("heartTarget · 하트를 어디에 눌렀는지", () => {
+  const line = (over: Partial<{ photos: number; book: boolean }>) => ({ mailboxId: "m1", who: "엄마", photos: 0, book: false, ids: [], ...over });
+
+  it("사진에만 눌렀으면 몇 장에, 책에만이면 이 여행에, 둘 다면 이 여행과 사진 몇 장에", () => {
+    expect(heartTarget(line({ photos: 3 }))).toBe("사진 3장에");
+    expect(heartTarget(line({ book: true }))).toBe("이 여행에");
+    expect(heartTarget(line({ book: true, photos: 2 }))).toBe("이 여행과 사진 2장에");
   });
 });

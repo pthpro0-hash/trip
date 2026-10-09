@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { attachParticle } from "@/lib/korean";
 import { postcardUrl } from "@/lib/mailbox";
+import { canShareLink, copiedNote, copyLink, shareCard } from "@/lib/shareLink";
 import type { MailboxItem } from "@/lib/supabase/mailbox";
 
 /*
@@ -34,27 +35,14 @@ export function SentDone({ postcardId, senderName, boxes, onClose }: SentDonePro
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
   const linkOf = (box: MailboxItem) => postcardUrl(window.location.origin, box.token, postcardId);
-  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+  const canShare = canShareLink();
 
-  const share = async (box: MailboxItem, greeting: string) => {
-    try {
-      await navigator.share({
-        title: `${attachParticle(senderName, "이", "가")} 보낸 여행 엽서`,
-        text: greeting,
-        url: linkOf(box),
-      });
-    } catch {
-      // 공유 창을 닫은 것뿐이다.
-    }
-  };
+  // 공유창·복사는 여행 상세에서 다시 보낼 때와 같은 규칙이다(lib/shareLink).
+  const share = (box: MailboxItem, greeting: string) => shareCard({ senderName, greeting, url: linkOf(box) });
 
   const copy = async (box: MailboxItem) => {
-    try {
-      await navigator.clipboard.writeText(linkOf(box));
-      setNote(`${box.name} 링크를 복사했어요. 카카오톡에 붙여 넣어 보내 주세요.`);
-    } catch {
-      setNote(`복사하지 못했어요. 이 주소를 직접 복사해 주세요: ${linkOf(box)}`);
-    }
+    const url = linkOf(box);
+    setNote(copiedNote(await copyLink(url), box.name, url));
   };
 
   return (
