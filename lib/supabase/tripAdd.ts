@@ -179,6 +179,17 @@ export async function addToExistingTrip(
       added.push(...fresh);
     }
 
+    // 새 방문이 맨 뒤에 붙었으니 시각 순서로 번호를 다시 매긴다(바뀐 것만 고친다).
+    if (added.length > 0) {
+      const ordered = [...have].sort((x, y) => stamp(x.started_at).localeCompare(stamp(y.started_at)));
+      for (const [position, visit] of ordered.entries()) {
+        if (visit.position === position) continue;
+        const moved = await supabase.from("visits").update({ position }).eq("id", visit.id);
+        if (moved.error) return fail;
+        visit.position = position;
+      }
+    }
+
     // 여행의 기간은 새 사진이 넓힐 때만 넓힌다.
     if (added.length > 0) {
       const days = added.map((shot) => dayKey(shot.takenAt)).sort();

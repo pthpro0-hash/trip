@@ -110,6 +110,14 @@ describe("addToExistingTrip", () => {
     expect(result.parts[0].visitId).toBe(db.visits[1].id);
   });
 
+  it("새 방문이 시각 순서 가운데 끼면 번호를 시각 순서로 다시 매긴다", async () => {
+    const db = base();
+    // 기존 방문(14일 06:11~08:41)보다 앞선 13일의 먼 곳.
+    await addToExistingTrip(fake(db), "u", [visit(shot("early", "2026-09-13T09:00", 38.4, 128.4))], [place], range);
+    const byPosition = [...db.visits].sort((x, y) => Number(x.position) - Number(y.position)).map((v) => v.id);
+    expect(byPosition).toEqual([db.visits[1].id, "v1"]);
+  });
+
   it("다른 날 사진은 같은 자리여도 새 방문이고, 여행 기간을 넓힌다", async () => {
     const db = base();
     await addToExistingTrip(fake(db), "u", [visit(shot("x", "2026-09-15T09:00"))], [place], { start: "2026-09-14", end: "2026-09-15" });
