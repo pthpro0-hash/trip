@@ -18,19 +18,24 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"));
 
+  /*
+    로그인이 안 됐을 때는 로그인 화면으로 돌려보내되 돌아올 곳은 잃지 않는다 — 다시 시도해서 마치면 처음 가려던 곳으로 간다.
+    사진을 맡겨 두고 로그인하러 온 사람이 '?resume=1' 이 붙은 주소로 돌아오려면 이 값이 끝까지 따라와야 한다.
+  */
+  const retry = (reason: string) =>
+    NextResponse.redirect(`${origin}/login?error=${reason}${next === "/" ? "" : `&next=${encodeURIComponent(next)}`}`);
+
   // 카카오 동의 화면에서 취소하면 코드 대신 error가 온다.
   const oauthError = searchParams.get("error");
-  if (oauthError) {
-    return NextResponse.redirect(`${origin}/login?error=cancelled`);
-  }
+  if (oauthError) return retry("cancelled");
 
-  if (!code) return NextResponse.redirect(`${origin}/login?error=missing_code`);
+  if (!code) return retry("missing_code");
 
   const supabase = await createClient();
-  if (!supabase) return NextResponse.redirect(`${origin}/login?error=not_configured`);
+  if (!supabase) return retry("not_configured");
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
-  if (error) return NextResponse.redirect(`${origin}/login?error=exchange_failed`);
+  if (error) return retry("exchange_failed");
 
   /*
     들어온 것을 남긴다. 어느 제공자로 들어왔는지는 남기지 않는다 —

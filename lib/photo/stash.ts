@@ -205,8 +205,23 @@ export async function beginStash(): Promise<StashWriter | null> {
   };
 }
 
+const isRecord = (value: unknown) => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** 읽어 온 것이 맡길 때의 모양 그대로인가. 깨졌거나 다른 판이면 되살리다 화면이 깨지므로 미리 거른다. */
+function wellFormed(meta: StashMeta): boolean {
+  return (
+    typeof meta.savedAt === "number" &&
+    Array.isArray(meta.trips) &&
+    Array.isArray(meta.places) &&
+    Array.isArray(meta.unsupported) &&
+    Array.isArray(meta.photoIds) &&
+    isRecord(meta.titles) &&
+    isRecord(meta.companions)
+  );
+}
+
 /**
- * 맡겨 둔 여행 정보. 없거나, 맡기다 만 것이거나, 하루가 지났으면 null(지난 것은 사진까지 비운다).
+ * 맡겨 둔 여행 정보. 없거나, 맡기다 만 것이거나, 하루가 지났거나, 모양이 맞지 않으면 null(지난 것·깨진 것은 사진까지 비운다).
  */
 export async function readStash(): Promise<StashMeta | null> {
   if (!stashSupported()) return null;
@@ -215,7 +230,7 @@ export async function readStash(): Promise<StashMeta | null> {
     try {
       const meta = await wrap<StashMeta | undefined>(db.transaction(META, "readonly").objectStore(META).get(CURRENT));
       if (!meta || meta.v !== 1) return null;
-      if (Date.now() - meta.savedAt > STASH_TTL_MS) {
+      if (!wellFormed(meta) || Date.now() - meta.savedAt > STASH_TTL_MS) {
         await wipe(db);
         return null;
       }

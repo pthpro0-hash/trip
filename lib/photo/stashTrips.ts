@@ -31,14 +31,20 @@ export function toStashed(trips: Trip[]): StashedTrip[] {
   }));
 }
 
+/**
+ * 되살린다. 사진이 하나도 없는 방문과, 사진이나 방문이 하나도 없는 여행은 버린다 — 화면은 모든 방문에 첫 사진이 있다고 보고 그리므로,
+ * 깨진 것 하나가 화면 전체를 깨지 않게.
+ */
 export function fromStashed(stashed: StashedTrip[]): Trip[] {
-  return stashed.map((trip) => {
+  return stashed.flatMap((trip) => {
     const byId = new Map<string, Shot>(
       trip.shots.map((shot) => [shot.id, { id: shot.id, takenAt: new Date(shot.takenAt), lat: shot.lat, lng: shot.lng }]),
     );
     const shots = trip.shots.map((shot) => byId.get(shot.id)!);
-    const visits = trip.visits.map((ids) => ({ shots: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])) }));
-    return { shots, visits };
+    const visits = trip.visits
+      .map((ids) => ({ shots: ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])) }))
+      .filter((visit) => visit.shots.length > 0);
+    return shots.length > 0 && visits.length > 0 ? [{ shots, visits }] : [];
   });
 }
 

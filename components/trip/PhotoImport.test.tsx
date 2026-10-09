@@ -207,6 +207,7 @@ describe("PhotoImport", () => {
     stashed.meta = null;
     stashed.clears = 0;
     stashed.gate = Promise.resolve();
+    window.history.replaceState({}, "", "/");
     currentUser = { id: "나" };
     savedRanges = [];
     sessionStorage.clear();
@@ -658,7 +659,7 @@ describe("PhotoImport", () => {
       expect(goTo).not.toHaveBeenCalled();
 
       finish(true);
-      await waitFor(() => expect(goTo).toHaveBeenCalledWith("/login?next=%2Ftrips%2Fnew"));
+      await waitFor(() => expect(goTo).toHaveBeenCalledWith("/login?next=%2Ftrips%2Fnew%3Fresume%3D1"));
       expect(screen.queryByText("로그인 전에 사진을 준비하고 있어요")).toBeNull();
     });
 
@@ -785,6 +786,11 @@ describe("PhotoImport", () => {
   });
 
   describe("로그인하고 돌아왔을 때 — 맡겨 둔 여행을 그 자리에서 이어서", () => {
+    // 우리가 로그인으로 보낼 때 달아 둔 표시가 로그인을 거쳐 돌아온 주소에 붙어 있다(lib/photo/resume).
+    beforeEach(() => {
+      window.history.pushState({}, "", "/trips/new?resume=1");
+    });
+
     const 곳 = (key: string, title: string): [string, { title: string; isCuratedSpot: boolean; spotId: null; dong: null }] => [
       key,
       { title, isCuratedSpot: false, spotId: null, dong: null },
@@ -974,6 +980,90 @@ describe("PhotoImport", () => {
       await waitFor(() =>
         expect(screen.getAllByTestId("thumbs").map((node) => node.textContent)).toEqual(["a.jpg,b.jpg", "c.jpg,d.jpg,e.jpg"]),
       );
+    });
+
+    // 맡겨 둔 여행은 '우리가 로그인으로 보냈다가 돌아온 때'(주소의 ?resume=1)에만 연다. 같은 브라우저에서 다른 사람이 로그인했을 때,
+    // 앞사람이 로그인을 마치지 않고 남긴 사진이 그 사람에게 뜨지 않게.
+    it("돌아왔다는 표시가 없으면 맡겨 둔 것이 있어도 되살리지 않는다 — 다른 사람이 같은 브라우저에서 로그인했을 수 있다", async () => {
+      window.history.replaceState({}, "", "/trips/new");
+      stashed.meta = 맡겨둔것();
+      await 화면열기();
+      expect(await screen.findByRole("button", { name: "사진 고르기" })).toBeTruthy();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(screen.queryByText("방금 고르신 여행이에요")).toBeNull();
+      expect(screen.queryByText(/여행 \d건을 찾았어요/)).toBeNull();
+      // 앞사람의 것을 지우지도 않는다 — 그 사람이 돌아올 수도 있다(하루가 지나면 알아서 사라진다).
+      expect(stashed.meta).not.toBeNull();
+    });
+
+    it("되살리는 동안은 기다린다고 말한다 — 사진 고르기 화면이 번쩍였다 바뀌지 않게", async () => {
+      let open!: () => void;
+      stashed.gate = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      stashed.meta = 맡겨둔것();
+      await 화면열기();
+
+      expect(await screen.findByText("고르신 여행을 이어서 열고 있어요")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "사진 고르기" })).toBeNull();
+
+      open();
+      expect(await screen.findByText("방금 고르신 여행이에요")).toBeTruthy();
+      expect(screen.queryByText("고르신 여행을 이어서 열고 있어요")).toBeNull();
+    });
+
+    it("로그인하지 않은 채 표시만 있는 주소로 열었으면 기다리지 않고 평소 화면이다", async () => {
+      currentUser = null;
+      stashed.meta = 맡겨둔것();
+      await 화면열기();
+      expect(await screen.findByRole("button", { name: "사진 고르기" })).toBeTruthy();
+      expect(screen.queryByText("고르신 여행을 이어서 열고 있어요")).toBeNull();
+      expect(screen.queryByText("방금 고르신 여행이에요")).toBeNull();
+    });
+
+    it("맡겨 둔 것이 없었으면 기다림을 거두고 평소 화면이다", async () => {
+      await 화면열기();
+      expect(await screen.findByRole("button", { name: "사진 고르기" })).toBeTruthy();
+      expect(screen.queryByText("고르신 여행을 이어서 열고 있어요")).toBeNull();
+    });
+
+    it("읽을 수 없는 모양의 맡겨 둔 것은 치우고 평소 화면이다 — 깨진 것 하나가 화면을 깨지 않는다", async () => {
+      stashed.meta = 맡겨둔것({ trips: "깨짐" as unknown as StashMeta["trips"] });
+      await 화면열기();
+      expect(await screen.findByRole("button", { name: "사진 고르기" })).toBeTruthy();
+      await waitFor(() => expect(stashed.meta).toBeNull());
+    });
+
+    it("일부만 저장됐으면 남은 여행만, 맡겨 둔 사진으로 다시 기록한다 — 이미 기록한 여행은 건너뛴다", async () => {
+      // 두 여행: a(고성, 6월) · b(강릉, 9월). 첫째는 저장되고 둘째는 저장되지 못한다.
+      saveTrip
+        .mockResolvedValueOnce({ ok: true, id: "t1", visitIds: ["v1"] })
+        .mockResolvedValueOnce({ ok: false })
+        .mockResolvedValue({ ok: true, id: "t2", visitIds: ["v2"] });
+      await 되살린화면(
+        맡겨둔것({
+          trips: toStashed(groupIntoTrips(두여행)),
+          places: [곳("38.480,128.439", "화진포해변"), 곳("37.773,128.947", "안목해변")],
+          photoIds: ["a.jpg", "b.jpg"],
+        }),
+      );
+      fireEvent.click(await 기록단추(2));
+
+      // 첫 여행의 사진만 올라갔고, 맡겨 둔 것은 남아 있다.
+      await screen.findByRole("heading", { name: "여행 1건을 기록했어요" });
+      expect(screen.getByText(/1건은 저장하지 못했어요/)).toBeTruthy();
+      expect(uploadPrepared).toHaveBeenCalledTimes(1);
+      expect((uploadPrepared.mock.calls[0][2] as { shotId: string }[]).map((target) => target.shotId)).toEqual(["a.jpg"]);
+      expect(stashed.meta).not.toBeNull();
+
+      // 다시 기록하면 이미 기록한 첫 여행은 건너뛰고 둘째만 — 맡겨 둔 사진 b 로.
+      fireEvent.click(screen.getByRole("button", { name: "다시 기록해 보기" }));
+      fireEvent.click(await 기록단추(1));
+      await screen.findByRole("heading", { name: "여행 1건을 기록했어요" });
+      expect(saveTrip).toHaveBeenCalledTimes(3);
+      expect(uploadPrepared).toHaveBeenCalledTimes(2);
+      expect((uploadPrepared.mock.calls[1][2] as { shotId: string }[]).map((target) => target.shotId)).toEqual(["b.jpg"]);
+      await waitFor(() => expect(stashed.meta).toBeNull());
     });
 
     it("맡겨 둔 것이 없으면 평소 그대로다", async () => {

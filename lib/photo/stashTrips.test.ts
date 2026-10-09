@@ -66,6 +66,26 @@ describe("toStashed · fromStashed — 여행을 적었다가 되살린다", () 
     expect(toStashed([])).toEqual([]);
     expect(fromStashed([])).toEqual([]);
   });
+
+  // 화면은 모든 방문에 첫 사진이 있다고 보고 그린다. 깨진 기록 하나가 화면 전체를 깨지 않게 되살릴 때 거른다.
+  describe("깨진 기록은 되살리지 않는다", () => {
+    const stamp = (id: string) => ({ id, takenAt: 1_790_000_000_000, lat: 37.7, lng: 128.9 });
+
+    it("사진이 하나도 없는 방문은 버린다 — 나머지 방문은 그대로", () => {
+      const [trip] = fromStashed([{ shots: [stamp("a.jpg"), stamp("b.jpg")], visits: [["a.jpg"], ["gone.jpg"], ["b.jpg"]] }]);
+      expect(trip.visits.map((visit) => visit.shots.map((member) => member.id))).toEqual([["a.jpg"], ["b.jpg"]]);
+    });
+
+    it("방문이 모두 비었거나 사진이 없는 여행은 통째로 버린다 — 멀쩡한 여행은 남는다", () => {
+      const back = fromStashed([
+        { shots: [stamp("a.jpg")], visits: [["gone.jpg"]] },
+        { shots: [], visits: [] },
+        { shots: [stamp("c.jpg")], visits: [["c.jpg"]] },
+      ]);
+      expect(back).toHaveLength(1);
+      expect(back[0].shots.map((member) => member.id)).toEqual(["c.jpg"]);
+    });
+  });
 });
 
 describe("shotsOf · 사진이 실제로 올라갈 사진들", () => {

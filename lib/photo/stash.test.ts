@@ -192,6 +192,46 @@ describe("맡겨 둔 지 오래되면 — 공용 기기에 사진 조각이 남�
   });
 });
 
+describe("모양이 맞지 않는 것(깨졌거나 다른 판)은 — 되살리다 화면이 깨지지 않게", () => {
+  /** 저장소에 우리가 쓰지 않은 모양을 직접 적어 넣는다. */
+  async function plant(value: unknown) {
+    // 맡기기를 시작했다 그만두어 저장소(표)를 만들어 둔다.
+    await (await beginStash())!.abort();
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("trip-stash", 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const tx = db.transaction("meta", "readwrite");
+    tx.objectStore("meta").put(value, "current");
+    await new Promise<void>((resolve) => {
+      tx.oncomplete = () => resolve();
+    });
+    db.close();
+  }
+
+  const good = { v: 1, savedAt: Date.now(), trips: [], titles: {}, companions: {}, places: [], unsupported: [], photoIds: [] };
+
+  it("여행 목록이 목록이 아니면 없는 것으로 본다 — 치우고 던지지 않는다", async () => {
+    await plant({ ...good, trips: "깨짐" });
+    expect(await readStash()).toBeNull();
+    // 치웠으니 다시 읽어도 없다.
+    expect(await readStash()).toBeNull();
+  });
+
+  it("제목 칸이 글자 모음이 아니어도, 시각이 숫자가 아니어도 마찬가지", async () => {
+    await plant({ ...good, titles: [] });
+    expect(await readStash()).toBeNull();
+    await plant({ ...good, savedAt: "어제" });
+    expect(await readStash()).toBeNull();
+  });
+
+  it("멀쩡한 것은 그대로 읽는다", async () => {
+    await plant(good);
+    expect(await readStash()).toMatchObject({ v: 1, trips: [], places: [] });
+  });
+});
+
 describe("stashHasRoom · 공간이 넉넉한가", () => {
   const withQuota = (quota: number, usage: number) =>
     vi.stubGlobal("navigator", { storage: { estimate: async () => ({ quota, usage }) } });

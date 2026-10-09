@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { rememberedName, type PlaceMemory } from "@/lib/placeMemory";
 import { fetchPlaceNames } from "@/lib/supabase/placeNames";
 import { getBrowserClient } from "@/lib/supabase/client";
@@ -11,6 +11,7 @@ import { canPrepare, prepareForLogin } from "@/lib/photo/prepare";
 import { clearStash, loadStashedPhoto, probeStash, readStash, type StashMeta } from "@/lib/photo/stash";
 import { fromStashed, shotsOf, toStashed } from "@/lib/photo/stashTrips";
 import { goTo } from "@/lib/goTo";
+import { RESUME_LOGIN_HREF, resumeRequested } from "@/lib/photo/resume";
 import {
   canMerge,
   dayBoundaries,
@@ -33,7 +34,7 @@ import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 import type { Shot, Trip } from "@/lib/photo/types";
 import { DoneView } from "./photoImport/DoneView";
 import { ImportSteps } from "./photoImport/ImportSteps";
-import { LOGIN_HREF, SaveBar } from "./photoImport/SaveBar";
+import { SaveBar } from "./photoImport/SaveBar";
 import { DismissedTrip, TripCard } from "./photoImport/TripCard";
 import type { SaveOutcome, VisitLine } from "./photoImport/types";
 
@@ -78,6 +79,10 @@ const PLACE_BATCH = 25;
 const RECENT_MS = 60 * 60 * 1000;
 /** 맡겨 둔 사진에서 카드의 작은 그림을 꺼낼 때 이만큼 모아서 화면에 반영한다(한 장마다 다시 그리지 않게). */
 const PREVIEW_FLUSH = 6;
+/** 돌아왔다고 해 놓고 맡겨 둔 것을 읽지 못하는 채로 기다리는 화면을 이보다 오래 두지 않는다. */
+const RESUME_WAIT_MS = 10_000;
+/** 주소는 우리가 바꾸지 않는 한 바뀌지 않는다 — 구독할 것이 없다. */
+const noSubscribe = () => () => undefined;
 
 /** 좌표를 캐시 열쇠로. 100m 남짓이면 같은 곳으로 본다. */
 const placeKey = (lat: number, lng: number) => `${lat.toFixed(3)},${lng.toFixed(3)}`;
@@ -191,6 +196,18 @@ export function PhotoImport() {
   const epochRef = useRef(0);
   // 맡겨 둔 사진에서 작은 그림을 이미 꺼내 본 것(못 꺼낸 것도 다시 시도하지 않는다).
   const triedPreviews = useRef(new Set<string>());
+  /*
+    로그인하러 갔다 돌아왔다는 표시(?resume=1)가 주소에 있는가(lib/photo/resume). 있어야 맡겨 둔 여행을 되살린다 — 같은 브라우저에서
+    다른 사람이 로그인해 이 화면을 열었을 때, 앞사람이 로그인을 마치지 않고 남긴 사진이 그 사람의 '방금 고르신 여행'으로 뜨지 않게.
+    주소의 쿼리는 브라우저만 안다: 서버가 그린 첫 화면에서는 없다고 보고, 그린 뒤에 안다(useSyncExternalStore 가 둘을 이어 준다).
+  */
+  const resumeAsked = useSyncExternalStore(
+    noSubscribe,
+    () => resumeRequested(window.location.search),
+    () => false,
+  );
+  // 맡겨 둔 것을 읽어 보았는가(있든 없든). 돌아왔다는데 읽지 못하는 채로 기다리는 화면이 영영 남지 않게 시간 제한도 둔다.
+  const [resumeSettled, setResumeSettled] = useState(false);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -237,19 +254,34 @@ export function PhotoImport() {
     };
   }, []);
 
+  // 돌아왔다는 표시가 있는데 기다림이 끝나지 않으면 그만 기다린다.
+  useEffect(() => {
+    if (!resumeAsked) return;
+    const id = setTimeout(() => setResumeSettled(true), RESUME_WAIT_MS);
+    return () => clearTimeout(id);
+  }, [resumeAsked]);
+
   /*
     로그인하고 돌아왔으면 떠나기 전에 맡겨 둔 여행을 그 자리에서 연다 — 찾은 여행 · 고쳐 둔 제목과 동행 · 곳 이름까지.
-    로그인한 사람에게만, 읽어 오는 동안 사람이 먼저 사진을 고르지 않았을 때만 연다.
+    로그인한 사람에게만, 돌아왔다는 표시(?resume=1)가 있을 때만, 읽어 오는 동안 사람이 먼저 사진을 고르지 않았을 때만 연다.
   */
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !resumeAsked) return;
     let active = true;
 
     void readStash().then(async (meta) => {
-      if (!active || !meta || epochRef.current !== 0) return;
-      const savedTrips = fromStashed(meta.trips);
+      if (!active) return;
+      setResumeSettled(true);
+      if (!meta || epochRef.current !== 0) return;
+
+      let savedTrips: Trip[] = [];
+      try {
+        savedTrips = fromStashed(meta.trips);
+      } catch {
+        // 읽을 수 없는 모양이다 — 아래에서 쓸 데 없는 것으로 치운다.
+      }
       if (savedTrips.length === 0) {
-        // 여행이 하나도 없는 맡겨 둔 것은 쓸 데가 없다.
+        // 되살릴 여행이 하나도 없는 맡겨 둔 것은 쓸 데가 없다.
         void clearStash();
         return;
       }
@@ -274,7 +306,7 @@ export function PhotoImport() {
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [userId, resumeAsked]);
 
   /*
     맡겨 둔 여행의 카드에 붙일 작은 그림. 고른 파일은 로그인을 거치며 사라졌으니 맡겨 둔 목록 판으로 만든다. 나누기 · 합치기로
@@ -790,7 +822,7 @@ export function PhotoImport() {
     // 준비하는 사이 이 화면을 떠났으면 로그인으로 끌고 가지 않는다.
     if (!aliveRef.current) return;
     setPreparing(null);
-    if (stashed) goTo(LOGIN_HREF);
+    if (stashed) goTo(RESUME_LOGIN_HREF);
     else setStashFailed(true);
   };
 
@@ -867,6 +899,22 @@ export function PhotoImport() {
       {read.unreadable.length > 0 && ` · 읽지 못함 ${read.unreadable.length}개`}
     </p>
   );
+
+  /*
+    로그인하고 돌아와 맡겨 둔 여행을 읽는 동안. 이 사이에 '사진 고르기' 화면을 보이면 번쩍였다가 여행이 뜬다 — 돌아온 사람이 가장 많이
+    마주치는 순간이라 기다린다고 말한다. 로그인하지 않았거나(이어 갈 수 없다) 읽어 보았으면(없었다) 곧바로 평소 화면이다.
+  */
+  const resuming = resumeAsked && !resumeSettled && !(authChecked && !userId);
+
+  if (!hasTrips && resuming) {
+    return (
+      <>
+        {picker}
+        <ImportSteps current={1} />
+        <Waiting title="고르신 여행을 이어서 열고 있어요" note="로그인하기 전에 고른 사진이에요. 이 기기 안에서만 열어요." />
+      </>
+    );
+  }
 
   if (!hasTrips) {
     return (
