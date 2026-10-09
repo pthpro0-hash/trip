@@ -83,6 +83,15 @@ describe("도움말 내용", () => {
     expect(first.detail).toContain("기록할 때 로그인");
   });
 
+  // 로그인은 화면이 새로 열리는 길인데, 사진을 맡겨 두고 가서 돌아오면 이어진다. 맡지 못하는 브라우저는 예전 길이라는 것까지.
+  it("로그인하러 갔다 와도 사진이 이어진다는 것과 버리는 길, 안 될 때의 길을 알린다", () => {
+    const sketch = CHAPTERS.find((chapter) => chapter.id === "sketch")!;
+    const step = sketch.steps.find((item) => item.title === "로그인하러 갔다 와도 이어져요")!;
+    for (const word of ["로그인하고 기록하기", "방금 고르신 여행이에요", "이어 기록해요", "하루 뒤에 지워지고", "버리기", "한 번 더 골라"]) {
+      expect(step.detail, word).toContain(word);
+    }
+  });
+
   it("아래 탭이 사진을 고르는 화면에서도 숨는다는 것을 알린다", () => {
     const sketch = CHAPTERS.find((chapter) => chapter.id === "sketch")!;
     const tabs = sketch.steps.find((step) => step.title === "폰에서는 아래 탭으로 오가세요");

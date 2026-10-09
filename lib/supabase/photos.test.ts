@@ -14,6 +14,8 @@ import {
   thumbPath,
   thumbUrls,
   uploadPhotos,
+  uploadPrepared,
+  type PreparedTarget,
   type UploadTarget,
 } from "./photos";
 import { MARKER_EDGE, THUMB_EDGE } from "@/lib/photo/resize";
@@ -276,6 +278,121 @@ describe("uploadPhotos", () => {
     expect(seen.at(-1)).toBe(6);
     // 뒤로 가지 않는다.
     expect([...seen].sort((a, b) => a - b)).toEqual(seen);
+  });
+});
+
+/*
+  로그인하러 떠나기 전에 올릴 크기로 줄여 브라우저에 맡겨 둔 사진(lib/photo/stash)을, 로그인하고 돌아와 올린다. 고른 파일은 이미
+  사라지고 없으므로 파일이 아니라 사진 id 로 맡겨 둔 것을 꺼내 와 올린다 — 올리고 표에 잇는 규칙(상한 · 실패 정리 · 차례)은 파일을
+  올릴 때와 같아야 한다.
+*/
+describe("uploadPrepared · 맡겨 둔 사진 올리기", () => {
+  const prepared = (shotId: string): PreparedTarget => ({
+    visitId: "v1",
+    shotId,
+    takenAt: new Date("2026-09-14T09:00"),
+    lat: 37.7728,
+    lng: 128.9474,
+    isCover: false,
+  });
+  const load = vi.fn<(shotId: string) => Promise<{ full: Blob; thumb: Blob; marker: Blob } | null>>();
+
+  beforeEach(() => {
+    shrink.mockReset();
+    load.mockReset();
+    // 사진 id 를 그대로 물고 가야 어느 장이 실패했는지 가릴 수 있다.
+    load.mockImplementation(async (id) => ({
+      full: new Blob([id]),
+      thumb: new Blob([`t:${id}`]),
+      marker: new Blob([`t:m:${id}`]),
+    }));
+  });
+
+  it("맡겨 둔 것을 꺼내 올린다 — 다시 줄이지 않는다(줄이기는 로그인 전에 이미 했다)", async () => {
+    const { supabase, state } = fakeSupabase();
+    const run = uploadPrepared(supabase, "나", ["a.jpg", "b.jpg", "c.jpg"].map(prepared), load);
+    await 끝까지(state, run);
+    const outcome = await run;
+
+    expect(outcome).toEqual({ uploaded: 3, unsupported: [], failed: 0, overLimit: 0 });
+    expect(shrink).not.toHaveBeenCalled();
+    expect(state.inserted).toHaveLength(3);
+    expect(load.mock.calls.map(([id]) => id)).toEqual(["a.jpg", "b.jpg", "c.jpg"]);
+  });
+
+  it("꺼내기는 한 장씩 한다 — 맡긴 사진 전부가 한꺼번에 메모리에 오르지 않게", async () => {
+    const { supabase, state } = fakeSupabase();
+    let loading = 0;
+    let loadPeak = 0;
+    load.mockImplementation(async (id) => {
+      loading += 1;
+      loadPeak = Math.max(loadPeak, loading);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      loading -= 1;
+      return { full: new Blob([id]), thumb: new Blob([`t:${id}`]), marker: new Blob([`t:m:${id}`]) };
+    });
+
+    const run = uploadPrepared(supabase, "나", Array.from({ length: 12 }, (_, i) => prepared(`${i}.jpg`)), load);
+    await 끝까지(state, run);
+    await run;
+
+    expect(loadPeak).toBe(1);
+  });
+
+  it("꺼낼 수 없는 사진(줄이지 못했던 것)은 올리지 못한 사진으로 센다 — 이름은 사진 id", async () => {
+    const { supabase, state } = fakeSupabase();
+    load.mockImplementation(async (id) =>
+      id === "b.jpg" || id === "d.jpg"
+        ? null
+        : { full: new Blob([id]), thumb: new Blob([`t:${id}`]), marker: new Blob([`t:m:${id}`]) },
+    );
+
+    const run = uploadPrepared(supabase, "나", ["a.jpg", "b.jpg", "c.jpg", "d.jpg"].map(prepared), load);
+    await 끝까지(state, run);
+    const outcome = await run;
+
+    expect(outcome.uploaded).toBe(2);
+    expect(outcome.unsupported).toEqual(["b.jpg", "d.jpg"]);
+  });
+
+  it("상한을 넘겨 올리지 않고, 올리지 않을 사진은 꺼내 오지도 않는다", async () => {
+    const { supabase, state } = fakeSupabase({ already: PHOTO_LIMIT - 2 });
+    const run = uploadPrepared(supabase, "나", Array.from({ length: 5 }, (_, i) => prepared(`${i}.jpg`)), load);
+    await 끝까지(state, run);
+    const outcome = await run;
+
+    expect(outcome.uploaded).toBe(2);
+    expect(outcome.overLimit).toBe(3);
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it("표에 넣다 실패하면 방금 올린 파일을 지운다", async () => {
+    const { supabase, state } = fakeSupabase({ rowFails: ["b.jpg"] });
+    const run = uploadPrepared(supabase, "나", ["a.jpg", "b.jpg", "c.jpg"].map(prepared), load);
+    await 끝까지(state, run);
+    const outcome = await run;
+
+    expect(outcome.uploaded).toBe(2);
+    expect(outcome.failed).toBe(1);
+    expect(state.removed).toHaveLength(3);
+  });
+
+  it("몇 장째인지 알린다 — 뒤로 가지 않는다", async () => {
+    const { supabase, state } = fakeSupabase();
+    const seen: number[] = [];
+    const run = uploadPrepared(supabase, "나", Array.from({ length: 6 }, (_, i) => prepared(`${i}.jpg`)), load, (done) => seen.push(done));
+    await 끝까지(state, run);
+    await run;
+
+    expect(seen[0]).toBe(0);
+    expect(seen.at(-1)).toBe(6);
+    expect([...seen].sort((a, b) => a - b)).toEqual(seen);
+  });
+
+  it("빈 목록이면 아무것도 꺼내지 않는다", async () => {
+    const { supabase } = fakeSupabase();
+    expect(await uploadPrepared(supabase, "나", [], load)).toEqual({ uploaded: 0, unsupported: [], failed: 0, overLimit: 0 });
+    expect(load).not.toHaveBeenCalled();
   });
 });
 

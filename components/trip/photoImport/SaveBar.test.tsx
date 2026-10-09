@@ -16,6 +16,22 @@ function bar(props: Partial<ComponentProps<typeof SaveBar>> = {}) {
   return { ...view, onSave, onWithPhotos };
 }
 
+/**
+ * 링크를 눌러 보고, 앱이 이동(기본 동작)을 막았는지 알려 준다. 막지 않은 클릭은 jsdom 이 실제로 이동하려 들어 소리를 내므로,
+ * 앱의 처리가 모두 끝난 맨 마지막에 우리가 막는다.
+ */
+function clickLink(link: HTMLElement): boolean {
+  let prevented = false;
+  const last = (event: Event) => {
+    prevented = event.defaultPrevented;
+    event.preventDefault();
+  };
+  document.addEventListener("click", last);
+  fireEvent.click(link);
+  document.removeEventListener("click", last);
+  return prevented;
+}
+
 describe("SaveBar · 기록하기", () => {
   it("기록할 건수를 단추에 적는다", () => {
     bar({ count: 3 });
@@ -82,5 +98,48 @@ describe("SaveBar · 로그인하고 기록하기", () => {
     bar({ mode: "login" });
     expect(screen.queryByRole("checkbox")).toBeNull();
     expect(screen.queryByRole("button", { name: /기록하기/ })).toBeNull();
+  });
+
+  // 사진을 맡아 둘 수 있으면(onLogin) 로그인 뒤에 그대로 이어서 기록한다. 맡아 둘 수 없으면 예전 길 그대로다 — 링크가 곧바로 로그인으로
+  // 가고, 같은 사진을 한 번 더 골라야 한다고 솔직히 말한다.
+  describe("사진을 맡아 둘 수 있을 때(onLogin)", () => {
+    it("로그인한 뒤 그대로 이어서 기록한다고 말한다 — 같은 사진을 다시 고르라고 하지 않는다", () => {
+      bar({ mode: "login", onLogin: vi.fn() });
+      expect(screen.getByText("로그인한 뒤 이 여행들을 그대로 이어서 기록해요")).toBeTruthy();
+      expect(screen.queryByText(/한 번 더 골라/)).toBeNull();
+    });
+
+    it("누르면 링크가 곧바로 떠나지 않고 먼저 부르는 쪽이 사진을 준비한다", () => {
+      const onLogin = vi.fn();
+      bar({ mode: "login", onLogin });
+      const link = screen.getByRole("link", { name: "로그인하고 기록하기" });
+      expect(clickLink(link)).toBe(true);
+      expect(onLogin).toHaveBeenCalledTimes(1);
+    });
+
+    it("그래도 링크다 — 가야 할 곳(돌아올 곳은 이 화면)이 주소에 있다", () => {
+      bar({ mode: "login", onLogin: vi.fn() });
+      expect(screen.getByRole("link", { name: "로그인하고 기록하기" })).toHaveAttribute("href", "/login?next=%2Ftrips%2Fnew");
+    });
+  });
+
+  it("맡아 두려다 못 했다는 말(notice)은 단추 바로 위에 붙고, 아래 안내는 그대로 남는다", () => {
+    const { container } = bar({ mode: "login", notice: "이 브라우저에서는 사진을 잠깐 맡아 둘 수 없어요" });
+    const notice = screen.getByRole("status");
+    expect(notice.textContent).toBe("이 브라우저에서는 사진을 잠깐 맡아 둘 수 없어요");
+    // 단추보다 앞에 있다.
+    const link = screen.getByRole("link", { name: "로그인하고 기록하기" });
+    expect(notice.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.textContent).toContain("로그인한 뒤 같은 사진을 한 번 더 골라 주세요");
+  });
+
+  it("알릴 말이 없으면 알림 칸을 두지 않는다", () => {
+    bar({ mode: "login" });
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("사진을 맡아 둘 수 없으면(onLogin 없음) 누르면 그대로 로그인으로 간다", () => {
+    bar({ mode: "login" });
+    expect(clickLink(screen.getByRole("link", { name: "로그인하고 기록하기" }))).toBe(false);
   });
 });

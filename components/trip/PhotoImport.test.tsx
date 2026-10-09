@@ -4,6 +4,9 @@ import type { ReadResult } from "@/lib/photo/readShots";
 import type { DateRange } from "@/lib/supabase/trips";
 import { MAP_HREF, SKETCH_HREF } from "@/lib/nav";
 import { readStart } from "@/lib/start";
+import type { StashMeta } from "@/lib/photo/stash";
+import { groupIntoTrips } from "@/lib/photo/grouping";
+import { toStashed } from "@/lib/photo/stashTrips";
 
 /*
   사진을 고른 뒤의 화면을 본다.
@@ -43,6 +46,49 @@ const 두여행 = [shot("a.jpg", "2026-06-13T09:00", 고성), shot("b.jpg", "202
 const readShots = vi.fn<(files: File[]) => Promise<ReadResult>>();
 const saveTrip = vi.fn();
 const uploadPhotos = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+const uploadPrepared = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+
+/*
+  로그인하러 떠나기 전에 사진을 이 브라우저에 맡기고(lib/photo/prepare · stash), 돌아오면 꺼낸다. jsdom 에는 저장소가 없으니 가짜를 끼운다.
+  기본은 '맡을 수 없는 브라우저'다 — 그러면 예전과 똑같이 동작해야 한다.
+*/
+const stashed = {
+  /** 이 브라우저가 사진을 맡아 둘 수 있는가(probe). */
+  available: false,
+  /** 맡아 둔 것(돌아와서 읽는다). */
+  meta: null as StashMeta | null,
+  /** 맡겨 둔 것을 지운 횟수. */
+  clears: 0,
+  /** 읽기를 이것이 풀릴 때까지 늦춘다(읽어 오는 사이 사람이 먼저 손대는 경우를 만든다). */
+  gate: Promise.resolve() as Promise<void>,
+};
+type PrepareInput = {
+  shots: { id: string }[];
+  meta: Record<string, unknown>;
+  onProgress?: (done: number, total: number, elapsedMs: number) => void;
+};
+const prepareForLogin = vi.fn<(input: PrepareInput) => Promise<boolean>>();
+/** 로그인으로 떠나는 일(창의 location 은 시험에서 바꿀 수 없다). */
+const goTo = vi.fn<(href: string) => void>();
+
+vi.mock("@/lib/photo/stash", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/photo/stash")>()),
+  probeStash: async () => stashed.available,
+  readStash: async () => {
+    await stashed.gate;
+    return stashed.meta;
+  },
+  loadStashedPhoto: async (id: string) => ({ full: new Blob([id]), thumb: new Blob([`thumb:${id}`], { type: "image/webp" }), marker: new Blob([id]) }),
+  clearStash: async () => {
+    stashed.clears += 1;
+    stashed.meta = null;
+  },
+}));
+vi.mock("@/lib/photo/prepare", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/photo/prepare")>()),
+  prepareForLogin: (input: PrepareInput) => prepareForLogin(input),
+}));
+vi.mock("@/lib/goTo", () => ({ goTo: (href: string) => goTo(href) }));
 
 let currentUser: { id: string } | null = { id: "나" };
 let savedRanges: DateRange[] = [];
@@ -51,6 +97,7 @@ vi.mock("@/lib/photo/readShots", () => ({ readShots: (files: File[]) => readShot
 
 vi.mock("@/lib/supabase/photos", () => ({
   uploadPhotos: (...args: unknown[]) => uploadPhotos(...args),
+  uploadPrepared: (...args: unknown[]) => uploadPrepared(...args),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -127,6 +174,22 @@ const 지금걸음 = () =>
 
 const 기록단추 = (건수 = 1) => screen.findByRole("button", { name: new RegExp(`여행 ${건수}건 기록하기`) });
 
+/**
+ * 링크를 눌러 보고, 앱이 이동(기본 동작)을 막았는지 알려 준다. 막지 않은 클릭은 jsdom 이 실제로 이동하려 들어 소리를 내므로,
+ * 앱의 처리가 모두 끝난 맨 마지막에 우리가 막는다.
+ */
+function 링크누름(link: HTMLElement): boolean {
+  let 막음 = false;
+  const 마지막 = (event: Event) => {
+    막음 = event.defaultPrevented;
+    event.preventDefault();
+  };
+  document.addEventListener("click", 마지막);
+  fireEvent.click(link);
+  document.removeEventListener("click", 마지막);
+  return 막음;
+}
+
 describe("PhotoImport", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -135,6 +198,15 @@ describe("PhotoImport", () => {
     saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: [] });
     uploadPhotos.mockReset();
     uploadPhotos.mockResolvedValue({ uploaded: 0, unsupported: [], overLimit: 0, failed: 0 });
+    uploadPrepared.mockReset();
+    uploadPrepared.mockResolvedValue({ uploaded: 0, unsupported: [], overLimit: 0, failed: 0 });
+    prepareForLogin.mockReset();
+    prepareForLogin.mockResolvedValue(true);
+    goTo.mockReset();
+    stashed.available = false;
+    stashed.meta = null;
+    stashed.clears = 0;
+    stashed.gate = Promise.resolve();
     currentUser = { id: "나" };
     savedRanges = [];
     sessionStorage.clear();
@@ -534,6 +606,395 @@ describe("PhotoImport", () => {
       // 찾은 결과가 그대로 있어서 다시 누를 수 있다.
       expect(await 기록단추()).toBeEnabled();
       expect(지금걸음()).toBe("2확인");
+    });
+  });
+
+  /*
+    로그인은 카카오 같은 곳으로 갔다 오는 길이라 화면이 새로 열리고, 찾은 여행과 고른 사진이 사라졌다 — 같은 사진을 사진첩에서 처음부터
+    다시 골라야 했다. 그래서 [로그인하고 기록하기]를 누르면 떠나기 전에 올릴 크기로 줄인 사진과 찾은 여행을 이 브라우저에 맡겨 두고
+    (lib/photo/prepare · stash), 로그인하고 돌아오면 그 자리에서 이어 기록한다. 맡아 둘 수 없는 브라우저는 예전 길 그대로다.
+  */
+  describe("로그인 전 — 사진을 맡아 두고 떠나기", () => {
+    const 로그인링크 = () => screen.findByRole("link", { name: "로그인하고 기록하기" });
+    const 맡을수있음 = () => {
+      currentUser = null;
+      stashed.available = true;
+    };
+
+    it("맡아 둘 수 있는 브라우저면 로그인한 뒤 그대로 이어서 기록한다고 말한다", async () => {
+      맡을수있음();
+      await 사진넣기();
+      expect(await screen.findByText("로그인한 뒤 이 여행들을 그대로 이어서 기록해요")).toBeTruthy();
+      expect(screen.queryByText(/한 번 더 골라/)).toBeNull();
+    });
+
+    it("맡아 둘 수 없는 브라우저면 예전 그대로 — 곧바로 로그인으로 가고, 같은 사진을 다시 골라야 한다고 말한다", async () => {
+      currentUser = null;
+      stashed.available = false;
+      await 사진넣기();
+      const link = await 로그인링크();
+      expect(screen.getByText("로그인한 뒤 같은 사진을 한 번 더 골라 주세요")).toBeTruthy();
+      // 기본 동작을 막지 않는다 — 링크가 그대로 로그인으로 간다.
+      expect(링크누름(link)).toBe(false);
+      expect(prepareForLogin).not.toHaveBeenCalled();
+    });
+
+    it("누르면 사진을 준비하고(몇 장째인지 알리며) 끝나면 로그인으로 보낸다", async () => {
+      맡을수있음();
+      let finish!: (ok: boolean) => void;
+      prepareForLogin.mockImplementation(async (input) => {
+        input.onProgress?.(37, 120, 8000);
+        return new Promise<boolean>((resolve) => {
+          finish = resolve;
+        });
+      });
+      await 사진넣기();
+      fireEvent.click(await 로그인링크());
+
+      expect(await screen.findByText("로그인 전에 사진을 준비하고 있어요")).toBeTruthy();
+      expect(screen.getByText(/37장 \/ 120장/)).toBeTruthy();
+      expect(screen.getByText(/사진은 이 기기 안에만 있어요/)).toBeTruthy();
+      // 준비가 끝나기 전에는 떠나지 않는다.
+      expect(goTo).not.toHaveBeenCalled();
+
+      finish(true);
+      await waitFor(() => expect(goTo).toHaveBeenCalledWith("/login?next=%2Ftrips%2Fnew"));
+      expect(screen.queryByText("로그인 전에 사진을 준비하고 있어요")).toBeNull();
+    });
+
+    it("맡기는 것은 찾은 여행 전부다 — 사진은 방문에 든 것을 차례로, 곳 이름과 함께", async () => {
+      맡을수있음();
+      await 사진넣기();
+      fireEvent.click(await 로그인링크());
+      await waitFor(() => expect(prepareForLogin).toHaveBeenCalledTimes(1));
+
+      const input = prepareForLogin.mock.calls[0][0];
+      expect(input.shots.map((shot) => shot.id)).toEqual(["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"]);
+      const meta = input.meta as { trips: unknown[]; places: [string, { title: string }][]; titles: object; companions: object };
+      expect(meta.trips).toEqual(toStashed(groupIntoTrips(이틀)));
+      expect(meta.places.map(([, place]) => place.title).sort()).toEqual(["송정해변", "안목해변", "화진포해변"]);
+      expect(meta.titles).toEqual({});
+      expect(meta.companions).toEqual({});
+    });
+
+    it("누른 단추를 또 눌러도 한 번만 준비한다", async () => {
+      맡을수있음();
+      prepareForLogin.mockImplementation(() => new Promise<boolean>(() => undefined));
+      await 사진넣기();
+      const link = await 로그인링크();
+      fireEvent.click(link);
+      fireEvent.click(link);
+      await waitFor(() => expect(prepareForLogin).toHaveBeenCalled());
+      expect(prepareForLogin).toHaveBeenCalledTimes(1);
+    });
+
+    describe("준비하지 못하면(저장소가 막힘 · 공간 부족)", () => {
+      it("떠나지 않고 이유를 말한다 — 같은 사진을 다시 골라야 한다고", async () => {
+        맡을수있음();
+        prepareForLogin.mockResolvedValue(false);
+        await 사진넣기();
+        fireEvent.click(await 로그인링크());
+
+        expect(await screen.findByText(/이 브라우저에서는 사진을 잠깐 맡아 둘 수 없어요/)).toBeTruthy();
+        expect(goTo).not.toHaveBeenCalled();
+        expect(screen.queryByText("로그인 전에 사진을 준비하고 있어요")).toBeNull();
+      });
+
+      it("그다음부터는 예전 길이다 — 문구도, 링크도(곧바로 로그인으로 간다)", async () => {
+        맡을수있음();
+        prepareForLogin.mockResolvedValue(false);
+        await 사진넣기();
+        fireEvent.click(await 로그인링크());
+        await screen.findByText(/이 브라우저에서는 사진을 잠깐 맡아 둘 수 없어요/);
+
+        expect(screen.getByText("로그인한 뒤 같은 사진을 한 번 더 골라 주세요")).toBeTruthy();
+        expect(screen.queryByText("로그인한 뒤 이 여행들을 그대로 이어서 기록해요")).toBeNull();
+        expect(링크누름(screen.getByRole("link", { name: "로그인하고 기록하기" }))).toBe(false);
+        expect(prepareForLogin).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it("사진이 너무 많으면(500장 넘게) 맡지 않고 예전 길로 간다 — 준비에만 몇 분이 걸린다", async () => {
+      맡을수있음();
+      const many = Array.from({ length: 501 }, (_, i) => shot(`p${i}.jpg`, `2026-09-13T09:${String(i % 60).padStart(2, "0")}`, 고성));
+      await 사진넣기(many);
+      expect(await 로그인링크()).toBeTruthy();
+      expect(screen.getByText("로그인한 뒤 같은 사진을 한 번 더 골라 주세요")).toBeTruthy();
+      expect(링크누름(screen.getByRole("link", { name: "로그인하고 기록하기" }))).toBe(false);
+      expect(prepareForLogin).not.toHaveBeenCalled();
+    });
+
+    it("‘여행 아님’으로 뺀 여행은 맡지 않는다 — 그 사진까지 줄이느라 시간을 쓰지 않는다", async () => {
+      맡을수있음();
+      await 사진넣기(두여행);
+      fireEvent.click(screen.getAllByRole("button", { name: "여행 아님" })[0]);
+      fireEvent.click(await 로그인링크());
+      await waitFor(() => expect(prepareForLogin).toHaveBeenCalledTimes(1));
+
+      const input = prepareForLogin.mock.calls[0][0];
+      expect(input.shots.map((shot) => shot.id)).toEqual(["b.jpg"]);
+      const meta = input.meta as { trips: { shots: { id: string }[] }[]; places: [string, { title: string }][] };
+      expect(meta.trips.map((trip) => trip.shots.map((shot) => shot.id))).toEqual([["b.jpg"]]);
+      // 곳 이름도 맡는 여행의 것만.
+      expect(meta.places.map(([, place]) => place.title)).toEqual(["안목해변"]);
+    });
+
+    it("준비하는 사이 이 화면을 떠났으면 로그인으로 끌고 가지 않는다", async () => {
+      맡을수있음();
+      let finish!: (ok: boolean) => void;
+      prepareForLogin.mockImplementation(
+        () =>
+          new Promise<boolean>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const view = await 사진넣기();
+      fireEvent.click(await 로그인링크());
+      await waitFor(() => expect(prepareForLogin).toHaveBeenCalled());
+
+      view.unmount();
+      finish(true);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(goTo).not.toHaveBeenCalled();
+    });
+
+    it("사진을 새로 고르면 다시 맡아 보려 한다 — 한 번 못 했다고 계속 못 하는 것은 아니다", async () => {
+      맡을수있음();
+      prepareForLogin.mockResolvedValueOnce(false);
+      const view = await 사진넣기();
+      fireEvent.click(await 로그인링크());
+      await screen.findByText(/이 브라우저에서는 사진을 잠깐 맡아 둘 수 없어요/);
+      expect(screen.getByText("로그인한 뒤 같은 사진을 한 번 더 골라 주세요")).toBeTruthy();
+
+      readShots.mockResolvedValue({ shots: 이틀, withoutLocation: [], screenshots: [], unreadable: [] });
+      const input = view.container.querySelector('input[type="file"]')!;
+      Object.defineProperty(input, "files", { value: 이틀.map((s) => new File(["x"], s.id, { type: "image/jpeg" })), configurable: true });
+      fireEvent.change(input);
+
+      expect(await screen.findByText("로그인한 뒤 이 여행들을 그대로 이어서 기록해요")).toBeTruthy();
+      expect(screen.queryByText(/이 브라우저에서는 사진을 잠깐 맡아 둘 수 없어요/)).toBeNull();
+    });
+
+    it("이미 로그인한 사람에게는 아무 일도 없다 — 맡기지도, 안내하지도 않는다", async () => {
+      stashed.available = true;
+      await 사진넣기();
+      await 기록단추();
+      expect(screen.queryByText(/그대로 이어서 기록해요/)).toBeNull();
+      expect(prepareForLogin).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("로그인하고 돌아왔을 때 — 맡겨 둔 여행을 그 자리에서 이어서", () => {
+    const 곳 = (key: string, title: string): [string, { title: string; isCuratedSpot: boolean; spotId: null; dong: null }] => [
+      key,
+      { title, isCuratedSpot: false, spotId: null, dong: null },
+    ];
+    /** 로그인하러 떠날 때 맡긴 모습 — 이틀 치 사진이 한 여행, 세 곳. */
+    const 맡겨둔것 = (over: Partial<StashMeta> = {}): StashMeta => ({
+      v: 1,
+      savedAt: Date.now(),
+      trips: toStashed(groupIntoTrips(이틀)),
+      titles: {},
+      companions: {},
+      places: [곳("38.480,128.439", "화진포해변"), 곳("37.773,128.947", "안목해변"), 곳("37.786,128.930", "송정해변")],
+      unsupported: [],
+      photoIds: ["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"],
+      ...over,
+    });
+    const 되살린화면 = async (meta: StashMeta = 맡겨둔것()) => {
+      stashed.meta = meta;
+      const view = await 화면열기();
+      await screen.findByText("방금 고르신 여행이에요");
+      return view;
+    };
+
+    it("사진을 다시 고르지 않아도 여행 카드가 그대로 나온다 — 이름·곳까지", async () => {
+      await 되살린화면();
+      expect(screen.getByText("여행 1건을 찾았어요")).toBeTruthy();
+      await waitFor(() => expect(제목칸()[0].value).toBe("화진포해변 외 2곳"));
+      expect(지금걸음()).toBe("2확인");
+      expect(await 기록단추()).toBeEnabled();
+    });
+
+    it("떠나기 전에 고쳐 둔 제목과 동행을 그대로 기록한다", async () => {
+      await 되살린화면(맡겨둔것({ titles: { "a.jpg": "민수랑 첫 휴가" }, companions: { "a.jpg": "민수" } }));
+      expect(제목칸()[0].value).toBe("민수랑 첫 휴가");
+      fireEvent.click(await 기록단추());
+      await waitFor(() => expect(saveTrip).toHaveBeenCalled());
+      expect(saveTrip.mock.calls[0][4]).toBe("민수");
+      expect(saveTrip.mock.calls[0].at(-1)).toBe("민수랑 첫 휴가");
+    });
+
+    it("카드의 작은 그림은 맡겨 둔 목록 판으로 만든다 — 고른 파일은 이미 사라졌다", async () => {
+      await 되살린화면();
+      await waitFor(() => expect(screen.getByTestId("thumbs").textContent).toBe("a.jpg,c.jpg,e.jpg"));
+    });
+
+    it("기록하면 맡겨 둔 사진을 바로 올린다 — 파일을 다시 줄이지 않는다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      uploadPrepared.mockResolvedValue({ uploaded: 5, unsupported: [], overLimit: 0, failed: 0 });
+      await 되살린화면();
+      fireEvent.click(await 기록단추());
+
+      await waitFor(() => expect(uploadPrepared).toHaveBeenCalled());
+      expect(uploadPhotos).not.toHaveBeenCalled();
+      const targets = uploadPrepared.mock.calls[0][2] as { visitId: string; shotId: string; isCover: boolean }[];
+      expect(targets.map((target) => [target.shotId, target.visitId])).toEqual([
+        ["a.jpg", "v1"],
+        ["b.jpg", "v1"],
+        ["c.jpg", "v2"],
+        ["d.jpg", "v2"],
+        ["e.jpg", "v3"],
+      ]);
+      // 여행마다 첫 장이 대표다.
+      expect(targets.map((target) => target.isCover)).toEqual([true, false, false, false, false]);
+      expect(typeof uploadPrepared.mock.calls[0][3]).toBe("function");
+      expect(await screen.findByText("사진 5장을 함께 올렸어요")).toBeTruthy();
+    });
+
+    it("다 기록하면 맡겨 둔 것을 지운다 — 기기에 사진 조각이 남지 않게", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      await 되살린화면();
+      fireEvent.click(await 기록단추());
+      await screen.findByRole("heading", { name: "여행 1건을 기록했어요" });
+      expect(stashed.meta).toBeNull();
+      expect(stashed.clears).toBeGreaterThan(0);
+    });
+
+    it("저장하지 못한 여행이 있으면 맡겨 둔 것을 남겨 둔다 — 다시 기록해 볼 수 있게", async () => {
+      saveTrip.mockResolvedValueOnce({ ok: false });
+      await 되살린화면();
+      fireEvent.click(await 기록단추());
+      expect(await screen.findByRole("heading", { name: "새로 기록한 여행이 없어요" })).toBeTruthy();
+      expect(stashed.meta).not.toBeNull();
+
+      // 다시 기록해 보면 맡겨 둔 사진이 아직 있어 올라간다.
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      fireEvent.click(screen.getByRole("button", { name: "다시 기록해 보기" }));
+      fireEvent.click(await 기록단추());
+      await waitFor(() => expect(uploadPrepared).toHaveBeenCalled());
+      await waitFor(() => expect(stashed.meta).toBeNull());
+    });
+
+    it("줄이지 못했던 사진(아이폰 HEIC 등)은 올리지 않고 올리지 못한 사진으로 알린다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      uploadPrepared.mockResolvedValue({ uploaded: 4, unsupported: [], overLimit: 0, failed: 0 });
+      await 되살린화면(맡겨둔것({ unsupported: ["c.jpg"], photoIds: ["a.jpg", "b.jpg", "d.jpg", "e.jpg"] }));
+      fireEvent.click(await 기록단추());
+
+      await waitFor(() => expect(uploadPrepared).toHaveBeenCalled());
+      const targets = uploadPrepared.mock.calls[0][2] as { shotId: string }[];
+      expect(targets.map((target) => target.shotId)).toEqual(["a.jpg", "b.jpg", "d.jpg", "e.jpg"]);
+      expect(await screen.findByText("사진 4장을 함께 올렸어요")).toBeTruthy();
+      expect(screen.getByText(/1장은 이 브라우저가 열지 못하는 형식이라 올리지 못했어요/)).toBeTruthy();
+    });
+
+    it("‘사진도 함께 올리기’를 끄면 사진 없이 기록하고, 맡겨 둔 것도 지운다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      await 되살린화면();
+      fireEvent.click(screen.getByRole("checkbox", { name: /사진도 함께 올리기/ }));
+      fireEvent.click(await 기록단추());
+      await screen.findByRole("heading", { name: "여행 1건을 기록했어요" });
+      expect(uploadPrepared).not.toHaveBeenCalled();
+      expect(stashed.meta).toBeNull();
+    });
+
+    it("[버리기]를 누르면 맡겨 둔 것을 지우고 처음 화면으로 돌아간다", async () => {
+      await 되살린화면();
+      fireEvent.click(screen.getByRole("button", { name: "버리기" }));
+      expect(await screen.findByRole("button", { name: "사진 고르기" })).toBeTruthy();
+      expect(screen.queryByText("방금 고르신 여행이에요")).toBeNull();
+      expect(screen.queryByText(/여행 \d건을 찾았어요/)).toBeNull();
+      expect(stashed.meta).toBeNull();
+      expect(지금걸음()).toBe("1고르기");
+    });
+
+    it("사진을 다시 고르면 맡겨 둔 것은 버리고 새로 고른 것을 보여 준다", async () => {
+      const view = await 되살린화면();
+      readShots.mockResolvedValue({ shots: 두여행, withoutLocation: [], screenshots: [], unreadable: [] });
+      const input = view.container.querySelector('input[type="file"]')!;
+      Object.defineProperty(input, "files", { value: 두여행.map((s) => new File(["x"], s.id, { type: "image/jpeg" })), configurable: true });
+      fireEvent.change(input);
+
+      await screen.findByText("여행 2건을 찾았어요");
+      expect(screen.queryByText("방금 고르신 여행이에요")).toBeNull();
+      expect(stashed.meta).toBeNull();
+    });
+
+    it("맡긴 지 한 시간이 넘었으면 ‘방금’이라 하지 않는다", async () => {
+      stashed.meta = 맡겨둔것({ savedAt: Date.now() - 2 * 60 * 60 * 1000 });
+      await 화면열기();
+      expect(await screen.findByText("전에 고르신 여행이에요")).toBeTruthy();
+      expect(screen.queryByText("방금 고르신 여행이에요")).toBeNull();
+    });
+
+    it("맡길 때 곳 이름을 못 붙였으면 돌아와서 다시 묻는다", async () => {
+      await 되살린화면(맡겨둔것({ places: [] }));
+      await waitFor(() => expect(제목칸()[0].value).toBe("화진포해변 외 2곳"));
+    });
+
+    it("맡겨 둔 것을 읽어 오는 사이 사람이 먼저 사진을 골랐으면, 늦게 온 맡겨 둔 것이 그 위를 덮지 않는다", async () => {
+      let open!: () => void;
+      stashed.gate = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      stashed.meta = 맡겨둔것();
+      readShots.mockResolvedValue({ shots: 두여행, withoutLocation: [], screenshots: [], unreadable: [] });
+      const view = await 화면열기();
+      const input = view.container.querySelector('input[type="file"]')!;
+      Object.defineProperty(input, "files", { value: 두여행.map((s) => new File(["x"], s.id, { type: "image/jpeg" })), configurable: true });
+      fireEvent.change(input);
+      await screen.findByText("여행 2건을 찾았어요");
+
+      open();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(screen.getByText("여행 2건을 찾았어요")).toBeTruthy();
+      expect(screen.queryByText("방금 고르신 여행이에요")).toBeNull();
+    });
+
+    it("기록하지 못한 채 ‘사진 더 고르기’를 누르면 맡겨 둔 것도 접는다 — 이 묶음은 거기서 끝이다", async () => {
+      saveTrip.mockResolvedValueOnce({ ok: false });
+      await 되살린화면();
+      fireEvent.click(await 기록단추());
+      await screen.findByRole("heading", { name: "새로 기록한 여행이 없어요" });
+      expect(stashed.meta).not.toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "사진 더 고르기" }));
+      expect(stashed.meta).toBeNull();
+    });
+
+    it("나누면 새로 생긴 카드의 작은 그림도 맡겨 둔 사진으로 채운다", async () => {
+      await 되살린화면();
+      await waitFor(() => expect(screen.getByTestId("thumbs").textContent).toBe("a.jpg,c.jpg,e.jpg"));
+
+      다듬기열기();
+      fireEvent.click(screen.getByRole("button", { name: "따로 기록하기" }));
+      await screen.findByText(/여행 2건을 찾았어요/);
+
+      await waitFor(() =>
+        expect(screen.getAllByTestId("thumbs").map((node) => node.textContent)).toEqual(["a.jpg,b.jpg", "c.jpg,d.jpg,e.jpg"]),
+      );
+    });
+
+    it("맡겨 둔 것이 없으면 평소 그대로다", async () => {
+      await 화면열기();
+      expect(await screen.findByRole("button", { name: "사진 고르기" })).toBeTruthy();
+      expect(screen.queryByText("방금 고르신 여행이에요")).toBeNull();
+    });
+
+    it("가족의 여행에 더할 권한이 없을 때는 되살리지 않는다 — 올릴 곳이 남의 여행이다", async () => {
+      sessionStorage.setItem("family-view", JSON.stringify({ ownerId: "엄마", label: "mom@example.com", role: "view" }));
+      stashed.meta = 맡겨둔것();
+      await 화면열기();
+      await screen.findByRole("button", { name: "사진 고르기" });
+      expect(screen.queryByText("방금 고르신 여행이에요")).toBeNull();
+      expect(stashed.meta).not.toBeNull();
+    });
+
+    it("이미 기록한 날짜와 겹치면 ‘이미 기록했어요’로 보인다", async () => {
+      savedRanges = [{ start: "2026-09-13", end: "2026-09-14" }];
+      await 되살린화면();
+      expect(await screen.findByRole("button", { name: "모두 이미 기록했어요" })).toBeDisabled();
     });
   });
 

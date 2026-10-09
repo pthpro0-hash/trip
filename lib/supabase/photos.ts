@@ -38,13 +38,26 @@ export const UPLOAD_LANES = 6;
 /** 계정당 사진 수 상한. 비용이 걷잡을 수 없이 늘지 않게 한다. */
 export const PHOTO_LIMIT = 2000;
 
-export interface UploadTarget {
+/** 한 장이 어느 방문의 어느 사진인가 — 올릴 때 표에 적는 것. */
+interface PhotoPlace {
   visitId: string;
-  file: File;
   takenAt: Date;
   lat: number;
   lng: number;
   isCover: boolean;
+}
+
+/** 파일을 줄여서 올릴 사진. */
+export interface UploadTarget extends PhotoPlace {
+  file: File;
+}
+
+/**
+ * 이미 올릴 크기로 줄여 맡겨 둔 사진(로그인하러 떠나기 전에 준비해 둔 것, lib/photo/stash). 파일이 아니라 사진 id(열쇠)로
+ * 찾는다 — 로그인하고 돌아오면 고른 파일은 사라지고 맡겨 둔 사진만 남아 있다.
+ */
+export interface PreparedTarget extends PhotoPlace {
+  shotId: string;
 }
 
 export interface UploadOutcome {
@@ -132,7 +145,7 @@ type Slot =
 async function putOne(
   supabase: SupabaseClient,
   userId: string,
-  target: UploadTarget,
+  target: PhotoPlace,
   shrunk: Shrunk,
 ): Promise<Slot> {
   // 맨 앞 칸이 사용자 id 라야 보관함 정책이 남의 폴더를 막아 준다.
@@ -181,10 +194,49 @@ async function putOne(
  * 올리기(망)는 서로 기다릴 이유가 없으므로, 한 장을 줄이는 동안 앞서
  * 줄여 둔 것들이 망을 타고 간다.
  */
-export async function uploadPhotos(
+export function uploadPhotos(
   supabase: SupabaseClient,
   userId: string,
   targets: UploadTarget[],
+  onProgress?: (done: number, total: number, elapsedMs: number) => void,
+): Promise<UploadOutcome> {
+  return uploadEach(supabase, userId, targets, (target) => shrinkToWebp(target.file), (target) => target.file.name, onProgress);
+}
+
+/**
+ * 이미 줄여 맡겨 둔 사진을 올린다(lib/photo/stash). 같은 올리기 몸통을 쓰되 줄이는 대신 맡겨 둔 것을 꺼내 온다 —
+ * 한 장씩 꺼내므로(펼친 것이 둘 이상 살아 있지 않게 하는 규칙 그대로) 맡긴 사진 전부가 메모리에 오르지 않는다.
+ * 꺼낼 수 없는 사진(줄이지 못했던 것)은 '올리지 못한 사진'(unsupported)으로 센다.
+ */
+export function uploadPrepared(
+  supabase: SupabaseClient,
+  userId: string,
+  targets: PreparedTarget[],
+  load: (shotId: string) => Promise<Shrunk | null>,
+  onProgress?: (done: number, total: number, elapsedMs: number) => void,
+): Promise<UploadOutcome> {
+  return uploadEach(
+    supabase,
+    userId,
+    targets,
+    async (target) => {
+      const shrunk = await load(target.shotId);
+      if (!shrunk) throw new UnsupportedImageError(target.shotId);
+      return shrunk;
+    },
+    (target) => target.shotId,
+    onProgress,
+  );
+}
+
+async function uploadEach<T extends PhotoPlace>(
+  supabase: SupabaseClient,
+  userId: string,
+  targets: T[],
+  /** 한 장을 올릴 크기로 만든다(파일을 줄이거나, 맡겨 둔 것을 꺼내 온다). 못 만들면 던진다. */
+  shrinkOf: (target: T) => Promise<Shrunk>,
+  /** 올리지 못한 사진을 알릴 이름. */
+  nameOf: (target: T) => string,
   onProgress?: (done: number, total: number, elapsedMs: number) => void,
 ): Promise<UploadOutcome> {
   const outcome: UploadOutcome = { uploaded: 0, unsupported: [], failed: 0, overLimit: 0 };
@@ -221,12 +273,12 @@ export async function uploadPhotos(
     // 펼친 그림이 한 번에 하나만 살아 있도록 여기서 기다린다.
     let shrunk: Shrunk;
     try {
-      shrunk = await shrinkToWebp(target.file);
+      shrunk = await shrinkOf(target);
     } catch (error) {
       finish(
         index,
         error instanceof UnsupportedImageError
-          ? { kind: "unsupported", name: target.file.name }
+          ? { kind: "unsupported", name: nameOf(target) }
           : { kind: "failed" },
       );
       continue;

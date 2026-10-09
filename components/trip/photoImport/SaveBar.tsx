@@ -22,6 +22,9 @@ const ROOT =
 const BUTTON =
   "rounded-full bg-accent px-5 py-3 text-[15px] font-semibold text-on-accent transition hover:bg-accent-hover disabled:opacity-60";
 
+/** 로그인하고 이 화면(사진으로 여행 추가)으로 돌아오는 주소. */
+export const LOGIN_HREF = `/login?next=${encodeURIComponent(ADD_HREF)}`;
+
 interface SaveBarProps {
   /** save: 기록할 수 있다. login: 로그인해야 기록할 수 있다. */
   mode: "save" | "login";
@@ -31,20 +34,45 @@ interface SaveBarProps {
   withPhotos: boolean;
   onWithPhotos: (next: boolean) => void;
   onSave: () => void;
+  /**
+   * 로그인하러 떠나기 전에 부르는 쪽이 사진을 맡아 둘 수 있을 때만 준다. 주면 링크가 곧바로 떠나지 않고 이것을 먼저 부른다
+   * (부르는 쪽이 사진을 준비한 뒤 로그인으로 보낸다). 안 주면 예전 길 — 찾은 결과가 로그인을 거치며 사라진다.
+   */
+  onLogin?: () => void;
+  /** 로그인하기 전에 알릴 말 — 사진을 맡아 두려다 못 했을 때. 단추 바로 위에 붙어, 단추를 보는 눈에 함께 들어온다. */
+  notice?: string;
 }
 
-export function SaveBar({ mode, count, saving, withPhotos, onWithPhotos, onSave }: SaveBarProps) {
+export function SaveBar({ mode, count, saving, withPhotos, onWithPhotos, onSave, onLogin, notice }: SaveBarProps) {
   if (mode === "login") {
     return (
       <div className={ROOT}>
+        {notice && (
+          <p role="status" className="mb-2 break-keep text-center text-[13px] leading-snug text-text-muted">
+            {notice}
+          </p>
+        )}
         <Link
-          href={`/login?next=${encodeURIComponent(ADD_HREF)}`}
+          href={LOGIN_HREF}
+          onClick={
+            onLogin
+              ? (event) => {
+                  event.preventDefault();
+                  onLogin();
+                }
+              : undefined
+          }
           className={`${BUTTON} flex w-full items-center justify-center`}
         >
           로그인하고 기록하기
         </Link>
-        {/* 찾은 결과는 로그인을 거치며 사라진다. 모르고 로그인했다가 허탈하지 않게 미리 말한다. */}
-        <p className="mt-1.5 break-keep text-center text-[12px] text-text-faint">로그인한 뒤 같은 사진을 한 번 더 골라 주세요</p>
+        {/*
+          사진을 맡아 둘 수 있으면 그대로 이어진다고 말한다. 맡아 둘 수 없을 때(사생활 보호 모드 · 공간 부족)는 찾은 결과가
+          로그인을 거치며 사라진다 — 모르고 로그인했다가 허탈하지 않게 미리 말한다.
+        */}
+        <p className="mt-1.5 break-keep text-center text-[12px] text-text-faint">
+          {onLogin ? "로그인한 뒤 이 여행들을 그대로 이어서 기록해요" : "로그인한 뒤 같은 사진을 한 번 더 골라 주세요"}
+        </p>
       </div>
     );
   }

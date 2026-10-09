@@ -5,8 +5,12 @@ import { rememberedName, type PlaceMemory } from "@/lib/placeMemory";
 import { fetchPlaceNames } from "@/lib/supabase/placeNames";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
-import { uploadPhotos, type UploadTarget } from "@/lib/supabase/photos";
+import { uploadPhotos, uploadPrepared, type PreparedTarget, type UploadTarget } from "@/lib/supabase/photos";
 import { readShots, type ReadResult } from "@/lib/photo/readShots";
+import { canPrepare, prepareForLogin } from "@/lib/photo/prepare";
+import { clearStash, loadStashedPhoto, probeStash, readStash, type StashMeta } from "@/lib/photo/stash";
+import { fromStashed, shotsOf, toStashed } from "@/lib/photo/stashTrips";
+import { goTo } from "@/lib/goTo";
 import {
   canMerge,
   dayBoundaries,
@@ -29,7 +33,7 @@ import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 import type { Shot, Trip } from "@/lib/photo/types";
 import { DoneView } from "./photoImport/DoneView";
 import { ImportSteps } from "./photoImport/ImportSteps";
-import { SaveBar } from "./photoImport/SaveBar";
+import { LOGIN_HREF, SaveBar } from "./photoImport/SaveBar";
 import { DismissedTrip, TripCard } from "./photoImport/TripCard";
 import type { SaveOutcome, VisitLine } from "./photoImport/types";
 
@@ -40,6 +44,10 @@ import type { SaveOutcome, VisitLine } from "./photoImport/types";
     2 확인     찾은 여행을 카드로 보여 준다(제목 · 기간 · 작은 그림). 곳 목록 · 동행 · 나누기 · 합치기는
                "다듬기" 안에 접는다. 아래에는 기록 막대가 붙는다.
     3 기록     끝났다고 말하고, 결과를 볼 곳 둘(지도 · 한장 요약)을 건넨다.
+
+  로그인 전이어도 여기까지는 같다. 기록하려면 로그인해야 하는데 로그인은 카카오 같은 곳으로 갔다 오는 길이라 화면이 새로 열린다.
+  그래서 [로그인하고 기록하기]를 누르면 떠나기 전에 올릴 크기로 줄인 사진과 찾은 여행을 이 브라우저에 맡겨 두고(lib/photo/stash),
+  로그인하고 돌아오면 그 자리에서 이어 기록한다 — 사진을 처음부터 다시 고르지 않는다. 맡아 둘 수 없는 브라우저는 예전 길 그대로다.
 
   이 컴포넌트는 상태와 저장을 들고, 화면 조각은 photoImport/ 에 있다.
 */
@@ -66,6 +74,10 @@ interface Row {
 }
 
 const PLACE_BATCH = 25;
+/** 맡겨 둔 지 이 안이면 '방금', 넘으면 '전에' 고른 여행이라고 말한다(맡겨 둔 것은 하루까지 남는다). */
+const RECENT_MS = 60 * 60 * 1000;
+/** 맡겨 둔 사진에서 카드의 작은 그림을 꺼낼 때 이만큼 모아서 화면에 반영한다(한 장마다 다시 그리지 않게). */
+const PREVIEW_FLUSH = 6;
 
 /** 좌표를 캐시 열쇠로. 100m 남짓이면 같은 곳으로 본다. */
 const placeKey = (lat: number, lng: number) => `${lat.toFixed(3)},${lng.toFixed(3)}`;
@@ -155,6 +167,38 @@ export function PhotoImport() {
   /** 전에 고쳐 둔 곳 이름. 같은 자리면 지도 서비스의 이름보다 먼저 붙인다. */
   const [memories, setMemories] = useState<PlaceMemory[]>([]);
 
+  /*
+    로그인 전: 로그인하러 떠나기 전에 사진을 이 브라우저에 맡겨 둘 수 있는가(lib/photo/stash). 맡아 둘 수 있어야
+    "로그인한 뒤 그대로 이어서 기록해요"라고 말할 수 있다. 아니면 예전 길 — 같은 사진을 한 번 더 고르게 한다.
+  */
+  const [canStash, setCanStash] = useState(false);
+  // 맡아 두려다 못 했다. 그다음부터는 새로 고르기 전까지 예전 길로 둔다.
+  const [stashFailed, setStashFailed] = useState(false);
+  // 로그인하러 떠나려고 사진을 준비하는 중(몇 장째인지).
+  const [preparing, setPreparing] = useState<{ done: number; total: number; elapsedMs: number } | null>(null);
+  /*
+    로그인하기 전에 맡겨 둔 여행으로 열린 화면이면 그 맡겨 둔 것(recent: 맡긴 지 얼마 안 됐는가).
+    이때 사진은 고른 파일이 아니라 맡겨 둔 사진이다 — 이미 올릴 크기로 줄여 두었고, 기록은 그것을 올린다.
+  */
+  const [restored, setRestored] = useState<{ meta: StashMeta; recent: boolean } | null>(null);
+  // 누른 단추를 또 눌러도 한 번만 준비한다(상태는 다시 그리기 전까지 옛 값이라 ref).
+  const preparingRef = useRef(false);
+  const aliveRef = useRef(true);
+  /*
+    사람이 화면을 새로 시작한 횟수(사진을 고름 · 버림 · 더 고르기). 0 이면 아직 아무 손도 대지 않은 것이다. 맡겨 둔 여행은 0 일
+    때만 연다 — 읽어 오는 동안 사람이 먼저 사진을 골랐으면, 늦게 온 맡겨 둔 것이 그 위를 덮지 않는다.
+  */
+  const epochRef = useRef(0);
+  // 맡겨 둔 사진에서 작은 그림을 이미 꺼내 본 것(못 꺼낸 것도 다시 시도하지 않는다).
+  const triedPreviews = useRef(new Set<string>());
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     const supabase = getBrowserClient();
     if (!supabase) return;
@@ -168,6 +212,11 @@ export function PhotoImport() {
         // 로그인 전이거나 가족 여행에 더할 권한이 없으면 저장할 곳이 없다. 사용자 id 를 비워 두어 저장 길이 열리지 않게 한다.
         if (!data.user || (viewed && !canIn(viewed, "add"))) {
           setAuthChecked(true);
+          // 로그인 전이면 사진을 맡아 둘 수 있는지 미리 알아 둔다.
+          if (!data.user) {
+            const ok = await probeStash();
+            if (active) setCanStash(ok);
+          }
           return;
         }
         const owner = ownerOf(viewed, data.user.id);
@@ -188,6 +237,91 @@ export function PhotoImport() {
     };
   }, []);
 
+  /*
+    로그인하고 돌아왔으면 떠나기 전에 맡겨 둔 여행을 그 자리에서 연다 — 찾은 여행 · 고쳐 둔 제목과 동행 · 곳 이름까지.
+    로그인한 사람에게만, 읽어 오는 동안 사람이 먼저 사진을 고르지 않았을 때만 연다.
+  */
+  useEffect(() => {
+    if (!userId) return;
+    let active = true;
+
+    void readStash().then(async (meta) => {
+      if (!active || !meta || epochRef.current !== 0) return;
+      const savedTrips = fromStashed(meta.trips);
+      if (savedTrips.length === 0) {
+        // 여행이 하나도 없는 맡겨 둔 것은 쓸 데가 없다.
+        void clearStash();
+        return;
+      }
+
+      const known = new Map(meta.places);
+      setTrips(savedTrips);
+      setPlaceCache(known);
+      setTitles(meta.titles);
+      setCompanions(meta.companions);
+      setRestored({ meta, recent: Date.now() - meta.savedAt < RECENT_MS });
+      setStage({ name: "ready" });
+
+      // 맡길 때 이름을 못 붙였던 곳은 다시 물어본다. 다 알고 있으면 묻지 않는다.
+      try {
+        const named = await lookupPlaces(savedTrips, known);
+        if (active && epochRef.current === 0) setPlaceCache(named);
+      } catch {
+        // 이름을 못 붙여도 날짜와 사진은 그대로다.
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  /*
+    맡겨 둔 여행의 카드에 붙일 작은 그림. 고른 파일은 로그인을 거치며 사라졌으니 맡겨 둔 목록 판으로 만든다. 나누기 · 합치기로
+    카드의 사진이 바뀌면 모자란 것을 더 꺼낸다. 한 장씩 차례로 꺼내고, 화면에는 몇 장씩 모아 반영한다.
+  */
+  useEffect(() => {
+    if (!restored) return;
+    let alive = true;
+    const cannotOpen = new Set(restored.meta.unsupported);
+    const wanted = new Set<string>();
+    for (const trip of trips) {
+      for (const shot of pickPreviewShots(trip.shots)) {
+        if (!cannotOpen.has(shot.id) && !triedPreviews.current.has(shot.id)) wanted.add(shot.id);
+      }
+    }
+
+    const load = async () => {
+      let batch: [string, File][] = [];
+      const flush = () => {
+        if (!alive || batch.length === 0) return;
+        const arrived = batch;
+        batch = [];
+        setPicked((now) => {
+          const next = new Map(now);
+          for (const [id, file] of arrived) next.set(id, file);
+          return next;
+        });
+      };
+
+      for (const id of wanted) {
+        if (!alive) return;
+        const shrunk = await loadStashedPhoto(id);
+        if (!alive) return;
+        // 끝까지 해 본 것만 해 본 것으로 센다 — 중간에 끊긴 한 장은 다음에 다시 꺼낸다.
+        triedPreviews.current.add(id);
+        if (shrunk) batch.push([id, new File([shrunk.thumb], id, { type: shrunk.thumb.type })]);
+        if (batch.length >= PREVIEW_FLUSH) flush();
+      }
+      flush();
+    };
+    void load();
+
+    return () => {
+      alive = false;
+    };
+  }, [trips, restored]);
+
   const rows = useMemo<Row[]>(
     () => trips.map((trip, index) => ({ trip, index, key: tripKey(trip) })),
     [trips],
@@ -201,6 +335,9 @@ export function PhotoImport() {
     () => visible.filter(({ trip }) => !overlapsSaved(tripRange(trip), savedRanges)).length,
     [visible, savedRanges],
   );
+
+  // 로그인하러 떠나기 전에 맡아 둘 사진 — 눈에 보이는 여행에 든 것만. 뺀 여행의 사진까지 줄이느라 시간을 쓰지 않는다.
+  const stashShots = useMemo(() => shotsOf(visible.map(({ trip }) => trip)), [visible]);
 
   // 각 여행 바로 위에 보이는 여행. 뺀 여행은 건너뛴다 — 합칠 수 있는지는 눈에 보이는 이웃과 따진다.
   const aboveOf = useMemo(() => {
@@ -252,9 +389,38 @@ export function PhotoImport() {
     };
   }, [picking]);
 
+  /*
+    화면을 처음 상태로 되돌린다(사진을 더 고르려고 · 맡겨 둔 여행을 버리려고). 맡겨 둔 여행으로 열린 화면이었으면 그 흔적도 걷는다.
+    맡겨 둔 것을 지우는 일은 부르는 쪽이 정한다 — 버릴 때와 새로 고를 때만 지운다.
+  */
+  const startOver = () => {
+    epochRef.current += 1;
+    triedPreviews.current.clear();
+    setRestored(null);
+    setStashFailed(false);
+    setOutcome(null);
+    setTrips([]);
+    setRead(null);
+    setDailyShots([]);
+    setStage({ name: "idle" });
+    setPicked(new Map());
+    setDismissed(new Set());
+    setCompanions({});
+    setTitles({});
+    setUploadNote(null);
+  };
+
   const handleFiles = async (files: File[]) => {
     setPicking(false);
     if (files.length === 0) return;
+    epochRef.current += 1;
+    // 맡겨 둔 여행으로 열린 화면에서 사진을 새로 고르면 맡겨 둔 것은 버린다.
+    if (restored) {
+      void clearStash();
+      setRestored(null);
+      triedPreviews.current.clear();
+    }
+    setStashFailed(false);
     setDismissed(new Set());
     setOutcome(null);
     setCompanions({});
@@ -359,6 +525,9 @@ export function PhotoImport() {
       unsupported: [],
       overLimit: 0,
     };
+    // 맡겨 둔 여행으로 열린 화면이면 올릴 사진은 고른 파일이 아니라 맡겨 둔 사진이다. 맡을 때 줄이지 못했던 것은 올릴 수 없다.
+    const fromStash = restored;
+    const cannotOpen = new Set(fromStash?.meta.unsupported ?? []);
 
     for (const { trip, key } of visible) {
       // 같은 날짜의 여행이 이미 있으면 건너뛴다. 사진을 두 번 넣어도
@@ -397,41 +566,54 @@ export function PhotoImport() {
       if (!withPhotos || !saved.visitIds) continue;
 
       const targets: UploadTarget[] = [];
+      const prepared: PreparedTarget[] = [];
+      let lost = 0;
       shaped.visits.forEach((visit, visitIndex) => {
         const visitId = saved.visitIds![visitIndex];
         if (!visitId) return;
         visit.shots.forEach((shot, shotIndex) => {
-          const file = picked.get(shot.id);
-          if (!file) return;
-          targets.push({
+          const place = {
             visitId,
-            file,
             takenAt: shot.takenAt,
             lat: shot.lat,
             lng: shot.lng,
             // 여행마다 첫 장을 대표로 둔다.
             isCover: visitIndex === 0 && shotIndex === 0,
-          });
+          };
+          if (fromStash) {
+            if (cannotOpen.has(shot.id)) {
+              result.unsupported.push(shot.id);
+              lost += 1;
+            } else {
+              prepared.push({ ...place, shotId: shot.id });
+            }
+            return;
+          }
+          const file = picked.get(shot.id);
+          if (file) targets.push({ ...place, file });
         });
       });
 
       // 남은 시간은 실제로 걸린 시간에서 어림한다. 망 사정이 사람마다 다르다.
       // 걸린 시간은 올리는 쪽이 알려 준다. 화면이 시계를 들 일이 아니다.
       let elapsedMs = 0;
-      const uploaded = await uploadPhotos(supabase, userId, targets, (done, total, elapsed) => {
+      const progress = (done: number, total: number, elapsed: number) => {
         elapsedMs = elapsed;
         const left = remainingText(done, total, elapsed);
         setUploadNote(`${done}장 / ${total}장${left ? ` · ${left}` : ""}`);
-      });
+      };
+      const uploaded = fromStash
+        ? await uploadPrepared(supabase, userId, prepared, loadStashedPhoto, progress)
+        : await uploadPhotos(supabase, userId, targets, progress);
       result.photos += uploaded.uploaded;
       result.unsupported.push(...uploaded.unsupported);
       result.overLimit += uploaded.overLimit;
 
       logEvent(supabase, "photos_uploaded", {
-        tried: targets.length,
+        tried: targets.length + prepared.length + lost,
         uploaded: uploaded.uploaded,
-        // 아이폰 HEIC 가 여기로 온다. 이 수가 곧 남은 숙제의 크기다.
-        unsupported: uploaded.unsupported.length,
+        // 아이폰 HEIC 가 여기로 온다(맡길 때 줄이지 못한 것까지). 이 수가 곧 남은 숙제의 크기다.
+        unsupported: uploaded.unsupported.length + lost,
         failed: uploaded.failed,
         overLimit: uploaded.overLimit,
         seconds: Math.round(elapsedMs / 1000),
@@ -452,6 +634,15 @@ export function PhotoImport() {
       선택은 뒤집지 않는다. 하나도 못 기록했으면 기억할 것도 없다.
     */
     if (result.saved > 0) rememberStartIfUnset("sketch");
+
+    /*
+      맡겨 둔 것은 저장하지 못한 여행이 없을 때 지운다 — 기기에 사진 조각을 남기지 않는다. 저장하지 못한 여행이 있으면 남겨 둔다:
+      다시 기록해 볼 때 같은 사진이 필요하다. 화면 쪽 표시도 이때 걷는다(결과 화면이 이미 덮고 있다).
+    */
+    if (fromStash && result.failed === 0) {
+      await clearStash();
+      setRestored(null);
+    }
 
     setSavedRanges([...savedRanges]);
     setOutcome(result);
@@ -551,17 +742,56 @@ export function PhotoImport() {
 
   /** 사진을 더 고른다 — 처음 화면으로 돌아가 곧바로 고르는 창을 연다(누른 바로 그 순간이어야 창이 열린다). */
   const more = () => {
-    setOutcome(null);
-    setTrips([]);
-    setRead(null);
-    setDailyShots([]);
-    setStage({ name: "idle" });
-    setPicked(new Map());
-    setDismissed(new Set());
-    setCompanions({});
-    setTitles({});
-    setUploadNote(null);
+    // 맡겨 둔 여행을 다 기록하지 못한 채 더 고르려는 것이면, 이 묶음은 여기서 끝이다 — 맡겨 둔 것도 접는다.
+    if (restored) void clearStash();
+    startOver();
     pick();
+  };
+
+  /** 맡겨 둔 여행을 버린다 — 맡겨 둔 것을 지우고 처음 화면으로 돌아간다. 원본 사진은 그대로다. */
+  const discard = () => {
+    void clearStash();
+    startOver();
+  };
+
+  /*
+    [로그인하고 기록하기]. 사진을 맡아 둘 수 있으면 떠나기 전에 올릴 크기로 줄여 이 브라우저에 맡기고, 찾은 여행을 적어 둔 뒤
+    로그인으로 보낸다. 돌아오면 그 자리에서 이어진다. 맡지 못했으면 떠나지 않고 말한다 — 같은 사진을 다시 골라야 하니, 모르고
+    로그인했다가 허탈하지 않게.
+  */
+  const login = async () => {
+    if (preparingRef.current) return;
+    preparingRef.current = true;
+    const kept = visible.map(({ trip }) => trip);
+    const usedPlaces = new Set(
+      kept.flatMap((trip) => trip.visits).map((visit) => placeKey(visit.shots[0].lat, visit.shots[0].lng)),
+    );
+    setPreparing({ done: 0, total: stashShots.length, elapsedMs: 0 });
+
+    let stashed = false;
+    try {
+      stashed = await prepareForLogin({
+        shots: stashShots,
+        files: picked,
+        meta: {
+          trips: toStashed(kept),
+          titles,
+          companions,
+          places: [...placeCache].filter(([key]) => usedPlaces.has(key)),
+        },
+        onProgress: (done, total, elapsedMs) => {
+          if (aliveRef.current) setPreparing({ done, total, elapsedMs });
+        },
+      });
+    } catch {
+      stashed = false;
+    }
+    preparingRef.current = false;
+    // 준비하는 사이 이 화면을 떠났으면 로그인으로 끌고 가지 않는다.
+    if (!aliveRef.current) return;
+    setPreparing(null);
+    if (stashed) goTo(LOGIN_HREF);
+    else setStashFailed(true);
   };
 
   /*
@@ -623,6 +853,9 @@ export function PhotoImport() {
   const hasTrips = trips.length > 0;
   // 로그인 전이다. 알아보기 전에는 모른다고 본다.
   const signedOut = authChecked && !userId && !noAdd;
+  // 사진을 맡아 두고 떠날 수 있다 — 저장소가 되고, 아직 못 한 적이 없고, 맡을 만한 양일 때.
+  const canLeaveWithPhotos = canStash && !stashFailed && canPrepare(stashShots.length);
+  const preparingLeft = preparing ? remainingText(preparing.done, preparing.total, preparing.elapsedMs) : null;
 
   /** 읽은 사진이 어떻게 갈렸는지. 무엇이 빠졌는지 알아야 "내 사진이 왜 없지?" 하지 않는다. */
   const readSummary = read && (
@@ -708,6 +941,24 @@ export function PhotoImport() {
 
       {readSummary}
 
+      {restored && (
+        <div className="flex items-start justify-between gap-3 rounded-xl bg-accent-soft px-4 py-3 text-[14px] text-text">
+          <p className="min-w-0 break-keep">
+            <span className="block font-semibold">
+              {restored.recent ? "방금 고르신 여행이에요" : "전에 고르신 여행이에요"}
+            </span>
+            <span className="block text-[13px] text-text-muted">로그인하기 전에 고른 사진을 이 기기에 맡겨 두었어요.</span>
+          </p>
+          <button
+            type="button"
+            onClick={discard}
+            className="shrink-0 text-[13px] font-medium text-text-muted underline underline-offset-2 transition hover:text-text"
+          >
+            버리기
+          </button>
+        </div>
+      )}
+
       {stage.message && (
         <p className="break-keep rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">{stage.message}</p>
       )}
@@ -748,6 +999,15 @@ export function PhotoImport() {
         />
       )}
 
+      {/* 로그인하러 떠나기 전에 사진을 줄여 맡기는 동안도 덮는다 — 중간에 만지면 맡기다 만 채로 떠난다. */}
+      {preparing && (
+        <WaitingOverlay
+          title="로그인 전에 사진을 준비하고 있어요"
+          detail={`${preparing.done}장 / ${preparing.total}장${preparingLeft ? ` · ${preparingLeft}` : ""}`}
+          note="사진은 이 기기 안에만 있어요. 로그인하고 돌아오면 이어서 기록해요. 끝날 때까지 이 창을 닫지 마세요."
+        />
+      )}
+
       {visible.length > 0 && !noAdd && authChecked && (
         <SaveBar
           mode={signedOut ? "login" : "save"}
@@ -756,6 +1016,8 @@ export function PhotoImport() {
           withPhotos={withPhotos}
           onWithPhotos={setWithPhotos}
           onSave={save}
+          onLogin={signedOut && canLeaveWithPhotos ? () => void login() : undefined}
+          notice={signedOut && stashFailed ? "이 브라우저에서는 사진을 잠깐 맡아 둘 수 없어요" : undefined}
         />
       )}
     </>
