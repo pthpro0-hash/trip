@@ -95,12 +95,12 @@ describe("TripCard · 겉모습", () => {
 
   it("이미 기록한 날짜와 겹치면 접혀 있어도 알린다", () => {
     card({ alreadySaved: true, editable: false });
-    expect(screen.getByText("이미 기록한 날짜와 겹쳐요.")).toBeTruthy();
+    expect(screen.getByText("이미 기록한 여행과 겹쳐요. 새 사진만 그 여행에 더해요.")).toBeTruthy();
   });
 
   it("겹치지 않으면 그 말이 없다", () => {
     card();
-    expect(screen.queryByText("이미 기록한 날짜와 겹쳐요.")).toBeNull();
+    expect(screen.queryByText("이미 기록한 여행과 겹쳐요. 새 사진만 그 여행에 더해요.")).toBeNull();
   });
 
   it("작은 그림으로 쓸 사진을 건넨다", () => {

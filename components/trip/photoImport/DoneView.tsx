@@ -36,7 +36,9 @@ export function DoneView({ outcome, onMore, onRetry }: DoneViewProps) {
   }, []);
 
   const lines: string[] = [];
-  if (outcome.photos > 0) lines.push(`사진 ${outcome.photos}장을 함께 올렸어요`);
+  if (outcome.photos > 0) lines.push(`사진 ${outcome.photos}장을 ${outcome.saved > 0 ? "함께 올렸어요" : "더했어요"}`);
+  if (outcome.merged > 0 && outcome.saved > 0) lines.push(`기존 여행 ${outcome.merged}건에는 새 사진만 더했어요`);
+  if (outcome.duplicates > 0) lines.push(`이미 있던 사진 ${outcome.duplicates}장은 건너뛰었어요`);
   if (outcome.skipped > 0) lines.push(`이미 있던 ${outcome.skipped}건은 건너뛰었어요`);
   if (outcome.failed > 0) lines.push(`${outcome.failed}건은 저장하지 못했어요`);
   if (outcome.unsupported.length > 0) {
@@ -48,7 +50,7 @@ export function DoneView({ outcome, onMore, onRetry }: DoneViewProps) {
 
   return (
     <section className="flex flex-col items-center gap-5 rounded-2xl bg-bg-subtle px-6 py-10 text-center">
-      {outcome.saved > 0 && (
+      {(outcome.saved > 0 || outcome.merged > 0) && (
         <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-full bg-accent-soft text-accent">
           <svg
             viewBox="0 0 24 24"
@@ -66,7 +68,11 @@ export function DoneView({ outcome, onMore, onRetry }: DoneViewProps) {
 
       <div className="flex flex-col gap-2">
         <h2 ref={heading} tabIndex={-1} className="text-[22px] font-bold tracking-tight text-text outline-none">
-          {outcome.saved > 0 ? `여행 ${outcome.saved}건을 기록했어요` : "새로 기록한 여행이 없어요"}
+          {outcome.saved > 0
+            ? `여행 ${outcome.saved}건을 기록했어요`
+            : outcome.merged > 0
+              ? `기존 여행 ${outcome.merged}건에 사진을 더했어요`
+              : "새로 기록한 여행이 없어요"}
         </h2>
         {lines.length > 0 && (
           <ul className="flex flex-col gap-1 break-keep text-[14px] leading-relaxed text-text-muted">

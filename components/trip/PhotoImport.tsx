@@ -5,6 +5,7 @@ import { rememberedName, type PlaceMemory } from "@/lib/placeMemory";
 import { fetchPlaceNames } from "@/lib/supabase/placeNames";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
+import { addToExistingTrip } from "@/lib/supabase/tripAdd";
 import { uploadPhotos, uploadPrepared, type PreparedTarget, type UploadTarget } from "@/lib/supabase/photos";
 import { readShots, type ReadResult } from "@/lib/photo/readShots";
 import { canPrepare, prepareForLogin } from "@/lib/photo/prepare";
@@ -362,12 +363,17 @@ export function PhotoImport() {
 
   const visible = useMemo(() => rows.filter(({ key }) => !dismissed.has(key)), [rows, dismissed]);
 
-  // 이미 저장한 날짜는 건너뛴다. 버튼에도 실제로 기록될 건수를 적어야
+  // 새로 기록될 여행 수와, 이미 기록한 여행에 사진을 더할 여행 수(사진을 올릴 때만). 버튼에도 실제로 할 일의 수를 적어야
   // "3건 기록하기"를 눌렀는데 아무것도 안 늘어나는 일이 없다.
   const unsavedCount = useMemo(
     () => visible.filter(({ trip }) => !overlapsSaved(tripRange(trip), savedRanges)).length,
     [visible, savedRanges],
   );
+  // 이 화면에서 방금 기록한(또는 더한) 여행은 다시 더하지 않는다 — 저장하지 못한 다른 여행만 다시 해 볼 때.
+  const [justSaved, setJustSaved] = useState<Set<string>>(new Set());
+  const addingCount = withPhotos
+    ? visible.filter(({ trip, key }) => overlapsSaved(tripRange(trip), savedRanges) && !justSaved.has(key)).length
+    : 0;
 
   // 로그인하러 떠나기 전에 맡아 둘 사진 — 눈에 보이는 여행에 든 것만. 뺀 여행의 사진까지 줄이느라 시간을 쓰지 않는다.
   const stashShots = useMemo(() => shotsOf(visible.map(({ trip }) => trip)), [visible]);
@@ -431,6 +437,7 @@ export function PhotoImport() {
     triedPreviews.current.clear();
     setRestored(null);
     setStashFailed(false);
+    setJustSaved(new Set());
     setOutcome(null);
     setTrips([]);
     setRead(null);
@@ -454,6 +461,7 @@ export function PhotoImport() {
       triedPreviews.current.clear();
     }
     setStashFailed(false);
+    setJustSaved(new Set());
     setDismissed(new Set());
     setOutcome(null);
     setCompanions({});
@@ -598,15 +606,20 @@ export function PhotoImport() {
       photos: 0,
       unsupported: [],
       overLimit: 0,
+      merged: 0,
+      duplicates: 0,
     };
     // 맡겨 둔 여행으로 열린 화면이면 올릴 사진은 고른 파일이 아니라 맡겨 둔 사진이다. 맡을 때 줄이지 못했던 것은 올릴 수 없다.
     const fromStash = restored;
     const cannotOpen = new Set(fromStash?.meta.unsupported ?? []);
 
+    const done = new Set(justSaved);
     for (const { trip, key } of visible) {
-      // 같은 날짜의 여행이 이미 있으면 건너뛴다. 사진을 두 번 넣어도
-      // 같은 여행이 두 건으로 남지 않는다.
-      if (overlapsSaved(tripRange(trip), savedRanges)) {
+      const range = tripRange(trip);
+      // 같은 날짜의 여행이 이미 있으면 새 여행을 또 만들지 않고 그 여행에 새 사진만 더한다(lib/supabase/tripAdd).
+      // 사진을 올리지 않는다면 더할 것이 없다.
+      const overlapped = overlapsSaved(range, savedRanges);
+      if (justSaved.has(key) || (overlapped && !withPhotos)) {
         result.skipped += 1;
         continue;
       }
@@ -621,38 +634,60 @@ export function PhotoImport() {
           dong: place?.dong ?? null,
         };
       });
-      const saved = await saveTrip(
-        supabase,
-        userId,
-        toSave,
-        visitPlaces,
-        companions[key] ?? "",
-        titleOf(trip),
-      );
-      if (!saved.ok) {
-        result.failed += 1;
-        continue;
+
+      // 사진이 어느 방문에 붙는가. 새 여행이면 방문마다 전부, 기존 여행에 더하면 이미 있던 것을 뺀 새 사진만.
+      let placed: { visitId: string; shots: Shot[]; cover: boolean }[];
+      if (overlapped) {
+        const added = await addToExistingTrip(supabase, userId, shaped.visits, visitPlaces, range);
+        if (!added.ok) {
+          result.failed += 1;
+          continue;
+        }
+        if (!added.found) {
+          result.skipped += 1;
+          continue;
+        }
+        result.merged += 1;
+        done.add(key);
+        result.duplicates += added.duplicates;
+        placed = added.parts.map((part) => ({ visitId: part.visitId, shots: part.shots, cover: false }));
+      } else {
+        const saved = await saveTrip(
+          supabase,
+          userId,
+          toSave,
+          visitPlaces,
+          companions[key] ?? "",
+          titleOf(trip),
+        );
+        if (!saved.ok) {
+          result.failed += 1;
+          continue;
+        }
+
+        result.saved += 1;
+        done.add(key);
+        savedRanges.push(range);
+
+        if (!withPhotos || !saved.visitIds) continue;
+        placed = shaped.visits.flatMap((visit, visitIndex) => {
+          const visitId = saved.visitIds![visitIndex];
+          // 여행마다 첫 방문의 첫 장을 대표로 둔다.
+          return visitId ? [{ visitId, shots: visit.shots, cover: visitIndex === 0 }] : [];
+        });
       }
-
-      result.saved += 1;
-      savedRanges.push(tripRange(trip));
-
-      if (!withPhotos || !saved.visitIds) continue;
 
       const targets: UploadTarget[] = [];
       const prepared: PreparedTarget[] = [];
       let lost = 0;
-      shaped.visits.forEach((visit, visitIndex) => {
-        const visitId = saved.visitIds![visitIndex];
-        if (!visitId) return;
-        visit.shots.forEach((shot, shotIndex) => {
+      placed.forEach(({ visitId, shots, cover }) => {
+        shots.forEach((shot, shotIndex) => {
           const place = {
             visitId,
             takenAt: shot.takenAt,
             lat: shot.lat,
             lng: shot.lng,
-            // 여행마다 첫 장을 대표로 둔다.
-            isCover: visitIndex === 0 && shotIndex === 0,
+            isCover: cover && shotIndex === 0,
           };
           if (fromStash) {
             if (cannotOpen.has(shot.id)) {
@@ -719,6 +754,7 @@ export function PhotoImport() {
     }
 
     setSavedRanges([...savedRanges]);
+    setJustSaved(done);
     setOutcome(result);
     setSaving(false);
   };
@@ -1102,6 +1138,7 @@ export function PhotoImport() {
         <SaveBar
           mode={signedOut ? "login" : "save"}
           count={unsavedCount}
+          adding={addingCount}
           saving={saving}
           withPhotos={withPhotos}
           onWithPhotos={setWithPhotos}

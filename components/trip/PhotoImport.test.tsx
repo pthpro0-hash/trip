@@ -47,6 +47,9 @@ const readShots = vi.fn<(files: File[]) => Promise<ReadResult>>();
 const saveTrip = vi.fn();
 const uploadPhotos = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 const uploadPrepared = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+const addToExisting = vi.fn<(...args: unknown[]) => Promise<unknown>>();
+
+vi.mock("@/lib/supabase/tripAdd", () => ({ addToExistingTrip: (...args: unknown[]) => addToExisting(...args) }));
 
 /*
   로그인하러 떠나기 전에 사진을 이 브라우저에 맡기고(lib/photo/prepare · stash), 돌아오면 꺼낸다. jsdom 에는 저장소가 없으니 가짜를 끼운다.
@@ -525,11 +528,11 @@ describe("PhotoImport", () => {
       expect(screen.queryByLabelText("여행 제목")).toBeNull();
     });
 
-    it("이미 기록한 날짜와 겹치면 알리고, 기록할 것이 없다고 말한다", async () => {
+    it("이미 기록한 날짜와 겹치면 알리고, 그 여행에 사진을 더한다고 말한다", async () => {
       savedRanges = [{ start: "2026-09-13", end: "2026-09-14" }];
       await 사진넣기();
-      await waitFor(() => expect(screen.getByText("이미 기록한 날짜와 겹쳐요.")).toBeTruthy());
-      expect(await screen.findByRole("button", { name: "모두 이미 기록했어요" })).toBeDisabled();
+      await waitFor(() => expect(screen.getByText(/이미 기록한 여행과 겹쳐요/)).toBeTruthy());
+      expect(await screen.findByRole("button", { name: "기존 여행에 사진 더하기" })).toBeEnabled();
       // 이미 기록한 여행은 제목을 고치는 칸이 아니다.
       expect(screen.queryByLabelText("여행 제목")).toBeNull();
     });
@@ -1081,10 +1084,10 @@ describe("PhotoImport", () => {
       expect(stashed.meta).not.toBeNull();
     });
 
-    it("이미 기록한 날짜와 겹치면 ‘이미 기록했어요’로 보인다", async () => {
+    it("이미 기록한 날짜와 겹치면 ‘기존 여행에 사진 더하기’로 보인다", async () => {
       savedRanges = [{ start: "2026-09-13", end: "2026-09-14" }];
       await 되살린화면();
-      expect(await screen.findByRole("button", { name: "모두 이미 기록했어요" })).toBeDisabled();
+      expect(await screen.findByRole("button", { name: "기존 여행에 사진 더하기" })).toBeEnabled();
     });
   });
 
@@ -1122,6 +1125,57 @@ describe("PhotoImport", () => {
       expect(await screen.findByText("고르신 사진을 불러오고 있어요")).toBeTruthy();
       L.cancelLaunch();
       expect(await screen.findByRole("button", { name: "사진 고르기" })).toBeTruthy();
+    });
+  });
+
+  /*
+    같은 날짜의 여행이 이미 있으면 새 여행을 또 만들지 않고 그 여행에 새 사진만 더한다(lib/supabase/tripAdd).
+  */
+  describe("이미 기록한 여행에 사진 더하기", () => {
+    beforeEach(() => {
+      savedRanges = [{ start: "2026-09-13", end: "2026-09-14" }];
+      addToExisting.mockReset();
+      addToExisting.mockResolvedValue({ ok: true, found: true, duplicates: 2, parts: [{ visitId: "v9", shots: [shot("c.jpg", "2026-09-14T06:11", 강릉), shot("e.jpg", "2026-09-14T10:02", 송정)] }] });
+    });
+
+    it("새 여행을 만들지 않고, 새 사진만 그 여행의 방문에 올린다 — 대표는 바꾸지 않는다", async () => {
+      await 사진넣기();
+      fireEvent.click(await screen.findByRole("button", { name: "기존 여행에 사진 더하기" }));
+      await waitFor(() => expect(uploadPhotos).toHaveBeenCalled());
+      expect(saveTrip).not.toHaveBeenCalled();
+      expect(addToExisting).toHaveBeenCalledTimes(1);
+      const targets = uploadPhotos.mock.calls[0][2] as { visitId: string; isCover: boolean; file: File }[];
+      expect(targets.map((t) => [t.visitId, t.file.name, t.isCover])).toEqual([["v9", "c.jpg", false], ["v9", "e.jpg", false]]);
+    });
+
+    it("끝나면 몇 건에 더했고 몇 장은 이미 있었는지 말한다", async () => {
+      uploadPhotos.mockResolvedValue({ uploaded: 2, unsupported: [], overLimit: 0, failed: 0 });
+      await 사진넣기();
+      fireEvent.click(await screen.findByRole("button", { name: "기존 여행에 사진 더하기" }));
+      expect(await screen.findByRole("heading", { name: "기존 여행 1건에 사진을 더했어요" })).toBeTruthy();
+      expect(screen.getByText("사진 2장을 더했어요")).toBeTruthy();
+      expect(screen.getByText("이미 있던 사진 2장은 건너뛰었어요")).toBeTruthy();
+    });
+
+    it("사진도 함께 올리기를 끄면 더할 것이 없어 건너뛴다", async () => {
+      await 사진넣기();
+      fireEvent.click(await screen.findByRole("checkbox", { name: /사진도 함께 올리기/ }));
+      expect(await screen.findByRole("button", { name: "모두 이미 기록했어요" })).toBeDisabled();
+    });
+
+    it("더하다 막히면 저장하지 못했다고 센다", async () => {
+      addToExisting.mockResolvedValue({ ok: false, found: false, parts: [], duplicates: 0 });
+      await 사진넣기();
+      fireEvent.click(await screen.findByRole("button", { name: "기존 여행에 사진 더하기" }));
+      expect(await screen.findByText("1건은 저장하지 못했어요")).toBeTruthy();
+      expect(uploadPhotos).not.toHaveBeenCalled();
+    });
+
+    it("새 여행과 기존 여행이 섞여 있으면 둘 다 한다", async () => {
+      await 사진넣기([...이틀, shot("z.jpg", "2026-11-01T09:00", { lat: 33.458, lng: 126.9425 })]);
+      fireEvent.click(await screen.findByRole("button", { name: "여행 2건 기록하기" }));
+      await waitFor(() => expect(saveTrip).toHaveBeenCalledTimes(1));
+      expect(addToExisting).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -30,6 +30,8 @@ interface SaveBarProps {
   mode: "save" | "login";
   /** 실제로 새로 기록될 여행 수(이미 기록한 날짜는 뺀다). */
   count: number;
+  /** 이미 기록한 여행에 사진을 더할 여행 수. */
+  adding?: number;
   saving: boolean;
   withPhotos: boolean;
   onWithPhotos: (next: boolean) => void;
@@ -43,7 +45,7 @@ interface SaveBarProps {
   notice?: string;
 }
 
-export function SaveBar({ mode, count, saving, withPhotos, onWithPhotos, onSave, onLogin, notice }: SaveBarProps) {
+export function SaveBar({ mode, count, adding = 0, saving, withPhotos, onWithPhotos, onSave, onLogin, notice }: SaveBarProps) {
   if (mode === "login") {
     return (
       <div className={ROOT}>
@@ -78,7 +80,13 @@ export function SaveBar({ mode, count, saving, withPhotos, onWithPhotos, onSave,
   }
 
   // 이미 저장한 날짜는 건너뛴다. 단추에도 실제로 기록될 건수를 적어야 눌렀는데 아무것도 안 늘어나는 일이 없다.
-  const label = saving ? "기록하는 중…" : count === 0 ? "모두 이미 기록했어요" : `여행 ${count}건 기록하기`;
+  const label = saving
+    ? "기록하는 중…"
+    : count + adding === 0
+      ? "모두 이미 기록했어요"
+      : count === 0
+        ? "기존 여행에 사진 더하기"
+        : `여행 ${count + adding}건 기록하기`;
 
   return (
     <div className={ROOT}>
@@ -95,7 +103,7 @@ export function SaveBar({ mode, count, saving, withPhotos, onWithPhotos, onSave,
             <span className="block break-keep text-[12px] text-text-faint [text-wrap:balance]">줄여서 올리고 원본은 보관하지 않아요</span>
           </span>
         </label>
-        <button type="button" onClick={onSave} disabled={saving || count === 0} className={`${BUTTON} shrink-0`}>
+        <button type="button" onClick={onSave} disabled={saving || count + adding === 0} className={`${BUTTON} shrink-0`}>
           {label}
         </button>
       </div>

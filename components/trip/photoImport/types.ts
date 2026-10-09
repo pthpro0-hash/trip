@@ -12,6 +12,10 @@ export interface SaveOutcome {
   unsupported: string[];
   /** 보관할 수 있는 수를 넘어 올리지 못한 사진 수. */
   overLimit: number;
+  /** 이미 기록한 여행에 사진을 더한 여행 수. */
+  merged: number;
+  /** 더하다가 이미 있어서 건너뛴 사진 수. */
+  duplicates: number;
 }
 
 /** 확인 화면에서 한 방문(들른 곳) 줄에 필요한 것. */

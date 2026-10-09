@@ -15,6 +15,8 @@ const outcome = (partial: Partial<SaveOutcome> = {}): SaveOutcome => ({
   photos: 0,
   unsupported: [],
   overLimit: 0,
+  merged: 0,
+  duplicates: 0,
   ...partial,
 });
 

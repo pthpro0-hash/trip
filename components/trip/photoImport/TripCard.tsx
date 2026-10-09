@@ -105,7 +105,7 @@ export function TripCard({
         <p className="mt-1.5 text-[13px] text-text-faint">
           {span} · 사진 {photos}장 · 방문 {places}곳
         </p>
-        {alreadySaved && <p className="mt-0.5 text-[13px] text-text-faint">이미 기록한 날짜와 겹쳐요.</p>}
+        {alreadySaved && <p className="mt-0.5 text-[13px] text-text-faint">이미 기록한 여행과 겹쳐요. 새 사진만 그 여행에 더해요.</p>}
       </div>
 
       {files.length > 0 && <TripThumbs key={thumbsKey} files={files} />}
