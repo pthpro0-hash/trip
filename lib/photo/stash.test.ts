@@ -175,14 +175,14 @@ describe("맡겨 둔 지 오래되면 — 공용 기기에 사진 조각이 남�
     spy.mockRestore();
   };
 
-  it("하루 안에는 그대로 있다", async () => {
+  it("여섯 시간 안에는 그대로 있다", async () => {
     const start = 1_790_000_000_000;
     await commitAt(start);
     vi.spyOn(Date, "now").mockReturnValue(start + STASH_TTL_MS - 1000);
     expect(await readStash()).not.toBeNull();
   });
 
-  it("하루가 지나면 읽는 순간 비워 버린다 — 사진까지", async () => {
+  it("여섯 시간이 지나면 읽는 순간 비워 버린다 — 사진까지", async () => {
     const start = 1_790_000_000_000;
     await commitAt(start);
     vi.spyOn(Date, "now").mockReturnValue(start + STASH_TTL_MS + 1000);

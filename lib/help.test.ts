@@ -87,7 +87,7 @@ describe("도움말 내용", () => {
   it("로그인하러 갔다 와도 사진이 이어진다는 것과 버리는 길, 안 될 때의 길을 알린다", () => {
     const sketch = CHAPTERS.find((chapter) => chapter.id === "sketch")!;
     const step = sketch.steps.find((item) => item.title === "로그인하러 갔다 와도 이어져요")!;
-    for (const word of ["로그인하고 기록하기", "방금 고르신 여행이에요", "이어 기록해요", "하루 뒤에 지워지고", "버리기", "한 번 더 골라"]) {
+    for (const word of ["로그인하고 기록하기", "방금 고르신 여행이에요", "이어 기록해요", "여섯 시간 뒤에 지워지고", "버리기", "한 번 더 골라"]) {
       expect(step.detail, word).toContain(word);
     }
   });

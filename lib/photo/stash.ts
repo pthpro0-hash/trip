@@ -12,7 +12,7 @@ import type { StashedTrip } from "./stashTrips";
   지켜야 할 것:
     - 한 번에 한 벌만 맡는다(새로 맡으면 이전 것은 지운다).
     - 여행 정보(meta)를 마지막에 적는다. 사진만 몇 장 맡다 끊긴 조각은 '맡겨 둔 것'으로 읽히지 않는다.
-    - 하루(STASH_TTL_MS)가 지나면 읽는 순간 비운다 — 공용 기기에 사진 조각이 남지 않게.
+    - 여섯 시간(STASH_TTL_MS)이 지나면 읽는 순간 비운다 — 공용 기기에 사진 조각이 남지 않게.
     - 어떤 함수도 던지지 않는다. 저장소를 못 쓰는 때(사생활 보호 모드 · 공간 부족 · 거절)에는 "못 했다"만 돌려줘 부르는 쪽이
       예전 길(같은 사진을 한 번 더 고르기)로 물러난다.
     - 사진은 Blob 이 아니라 ArrayBuffer 로 맡긴다. 오래된 사파리는 IndexedDB 에 Blob 을 넣다 탈이 난 적이 있어서, 어느
@@ -25,7 +25,7 @@ const PHOTOS = "photos";
 const CURRENT = "current";
 
 /** 맡겨 둔 것을 남겨 두는 시간. 지나면 읽는 순간 비운다. */
-export const STASH_TTL_MS = 24 * 60 * 60 * 1000;
+export const STASH_TTL_MS = 6 * 60 * 60 * 1000;
 /** 사진 한 장을 맡는 데 드는 크기의 어림 — 보관본(≤600KB) + 목록 판(≤150KB) + 핀. */
 export const STASH_BYTES_PER_PHOTO = 800 * 1024;
 /** 이보다 많으면 맡지 않고 예전처럼 한다 — 줄이는 데만 몇 분이 걸리고 저장소도 크게 잡는다. */
@@ -221,7 +221,7 @@ function wellFormed(meta: StashMeta): boolean {
 }
 
 /**
- * 맡겨 둔 여행 정보. 없거나, 맡기다 만 것이거나, 하루가 지났거나, 모양이 맞지 않으면 null(지난 것·깨진 것은 사진까지 비운다).
+ * 맡겨 둔 여행 정보. 없거나, 맡기다 만 것이거나, 여섯 시간이 지났거나, 모양이 맞지 않으면 null(지난 것·깨진 것은 사진까지 비운다).
  */
 export async function readStash(): Promise<StashMeta | null> {
   if (!stashSupported()) return null;
@@ -275,6 +275,6 @@ export async function clearStash(): Promise<void> {
       db.close();
     }
   } catch {
-    // 지우지 못했다. 하루가 지나면 읽는 순간 비워진다.
+    // 지우지 못했다. 여섯 시간이 지나면 읽는 순간 비워진다.
   }
 }
