@@ -24,6 +24,8 @@ import { SketchCard } from "./SketchCard";
 import { CollageCard } from "./CollageCard";
 import { LineCard } from "./LineCard";
 import { StoryScenes } from "./StoryScenes";
+import { YearMoments } from "./YearMoments";
+import { yearMoments } from "@/lib/sketchMoments";
 import { FootprintPlayer } from "./FootprintPlayer";
 import { footprintSteps, tripsPerMonth } from "@/lib/footprint";
 import { WaitingOverlay } from "@/components/layout/Waiting";
@@ -95,6 +97,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
   const sketch = useMemo(() => buildSketch(trips), [trips]);
   const shapes = useMemo(() => sketchShapes(trips), [trips]);
   const months = useMemo(() => monthStrip(trips), [trips]);
+  const moments = useMemo(() => yearMoments(trips), [trips]);
   const story = useMemo(() => yearStory(all, year, sidoOf), [all, year, sidoOf]);
   const made = useMemo(() => headline(sketch, "year"), [sketch]);
   /*
@@ -287,6 +290,9 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
           />
         )}
       </div>
+
+      {/* 올해의 순간 — 기록에서 계산한 세 가지. 카드 바로 아래. */}
+      <YearMoments moments={moments} />
 
       {/*
         카드 아래 한 줄 — 카드 모양 고르기와 한 줄 고쳐 쓰기. 같은 한 해라도 보여 줄 곳에 따라 어울리는
