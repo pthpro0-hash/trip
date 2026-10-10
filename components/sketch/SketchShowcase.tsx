@@ -25,6 +25,7 @@ import { CollageCard } from "./CollageCard";
 import { LineCard } from "./LineCard";
 import { StoryScenes } from "./StoryScenes";
 import { YearMoments } from "./YearMoments";
+import { Dex } from "./Dex";
 import { yearMoments } from "@/lib/sketchMoments";
 import { FootprintPlayer } from "./FootprintPlayer";
 import { footprintSteps, tripsPerMonth } from "@/lib/footprint";
@@ -293,6 +294,9 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
 
       {/* 올해의 순간 — 기록에서 계산한 세 가지. 카드 바로 아래. */}
       <YearMoments moments={moments} />
+
+      {/* 내 도감 — 해를 가리지 않은 시도·100선 도장과 빈칸. */}
+      <Dex all={all} />
 
       {/*
         카드 아래 한 줄 — 카드 모양 고르기와 한 줄 고쳐 쓰기. 같은 한 해라도 보여 줄 곳에 따라 어울리는
