@@ -236,6 +236,33 @@ describe("PhotoImport", () => {
     await waitFor(() => expect(제목칸()[0].value).toBe("화진포해변 외 2곳"));
   });
 
+  it("해외에서 찍은 사진은 한국 장소 조회가 아니라 해외 조회로 물어, 나라와 지역 이름이 붙는다", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      urls.push(url);
+      const points = JSON.parse(String(init.body)).points as { lat: number; lng: number }[];
+      return {
+        ok: true,
+        json: async () => (url.includes("place-abroad") ? { places: points.map(() => ({ title: "영국 런던", isCuratedSpot: false, spotId: null, dong: "영국 런던" })) } : 장소응답(points)),
+      };
+    });
+    await 사진넣기([shot("a.jpg", "2026-09-13T09:21", 고성), shot("b.jpg", "2026-10-20T14:00", { lat: 51.5, lng: -0.17 })]);
+    await waitFor(() => expect(제목칸().map((input) => input.value)).toContain("영국 런던"));
+    expect(제목칸().map((input) => input.value)).toContain("화진포해변");
+    expect(urls.filter((url) => url === "/api/place")).toHaveLength(1);
+    expect(urls.filter((url) => url === "/api/place-abroad")).toHaveLength(1);
+  });
+
+  it("해외 이름을 못 얻어도 한국 쪽 이름과 사진은 그대로다", async () => {
+    vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+      if (url.includes("place-abroad")) return { ok: false, json: async () => ({}) };
+      return { ok: true, json: async () => 장소응답(JSON.parse(String(init.body)).points) };
+    });
+    await 사진넣기([shot("a.jpg", "2026-09-13T09:21", 고성), shot("b.jpg", "2026-10-20T14:00", { lat: 51.5, lng: -0.17 })]);
+    await waitFor(() => expect(제목칸().map((input) => input.value)).toContain("화진포해변"));
+    expect(screen.queryByText(/장소 이름을 가져오지 못했어요/)).toBeNull();
+  });
+
   it("고쳐 쓴 제목 그대로 기록한다", async () => {
     await 사진넣기();
     await waitFor(() => expect(제목칸()[0].value).not.toBe(""));

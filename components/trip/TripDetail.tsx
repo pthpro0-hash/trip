@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { isInKorea } from "@/lib/weatherGrid";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -201,6 +202,51 @@ export function TripDetail({ tripId }: { tripId: string }) {
       mounted.current = false;
     };
   }, []);
+
+  /*
+    해외에서 찍어 '알 수 없는 곳'으로 남은 들른 곳에 나라와 지역 이름("영국 런던")을 붙인다. 카카오 장소 조회는 한국 안만 알아
+    그동안 해외 사진은 이름을 못 얻었다. 고칠 수 있는 사람이 열었을 때만, 한 곳을 한 번만 묻고, 알아낸 이름은 기록에 저장한다
+    (사람이 고친 이름은 '알 수 없는 곳'이 아니므로 건드리지 않는다).
+  */
+  const askedAbroad = useRef(new Set<string>());
+  useEffect(() => {
+    if (!trip || !userId || !canEdit) return;
+    const unknown = trip.visits
+      .filter((visit) => visit.placeName === "알 수 없는 곳" && !isInKorea(visit.lat, visit.lng) && !askedAbroad.current.has(visit.id))
+      .slice(0, 10);
+    if (unknown.length === 0) return;
+    for (const visit of unknown) askedAbroad.current.add(visit.id);
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/place-abroad", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ points: unknown.map((visit) => ({ lat: visit.lat, lng: visit.lng })) }),
+        });
+        if (!response.ok) return;
+        const body: { places: { title: string }[] } = await response.json();
+        const supabase = getBrowserClient();
+        if (!supabase) return;
+        const names = new Map<string, string>();
+        for (const [index, visit] of unknown.entries()) {
+          const title = body.places[index]?.title;
+          // 못 알아낸 곳('해외')은 이름으로 굳히지 않는다 — 다음에 열 때 다시 물을 수 있게.
+          if (!title || title === "해외") {
+            askedAbroad.current.delete(visit.id);
+            continue;
+          }
+          if (await saveVisitName(supabase, userId, visit.id, title)) names.set(visit.id, title);
+        }
+        if (!mounted.current || names.size === 0) return;
+        setTrip((now) =>
+          now ? { ...now, visits: now.visits.map((visit) => (names.has(visit.id) ? { ...visit, placeName: names.get(visit.id)! } : visit)) } : now,
+        );
+      } catch {
+        // 이름을 못 붙여도 날짜와 사진은 그대로다.
+      }
+    })();
+  }, [trip, userId, canEdit]);
   /*
     크게 보고 있는 사진. 목록에는 작은 판을 쓰지만 여기서는 보관본을
     그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.

@@ -105,6 +105,56 @@ async function 상세(
   return (await screen.findByLabelText("여행 제목")) as HTMLInputElement;
 }
 
+describe("TripDetail · 해외에서 찍어 '알 수 없는 곳'이 된 곳", () => {
+  const london = (visit: Detail["visits"][number]) => {
+    visit.placeName = "알 수 없는 곳";
+    visit.lat = 51.5;
+    visit.lng = -0.17;
+  };
+  const stubAbroad = (title: string) => {
+    const fetched: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      fetched.push(url);
+      return { ok: true, json: async () => ({ places: [{ title }] }) };
+    });
+    return fetched;
+  };
+  beforeEach(() => {
+    for (const spy of [saveTripTitle, saveTripSubtitle, saveVisitName]) {
+      spy.mockReset();
+      spy.mockResolvedValue(true);
+    }
+  });
+
+  it("나라와 지역 이름을 붙이고 기록에 저장한다", async () => {
+    const fetched = stubAbroad("영국 런던");
+    await 상세("여행", null, (trip) => london(trip.visits[1]));
+    await waitFor(() => expect(saveVisitName).toHaveBeenCalled());
+    expect(saveVisitName.mock.calls[0].slice(-2)).toEqual(["v2", "영국 런던"]);
+    expect(fetched).toEqual(["/api/place-abroad"]);
+    expect(await screen.findByText("영국 런던")).toBeTruthy();
+  });
+
+  it("못 알아낸 곳('해외')은 이름으로 굳히지 않는다", async () => {
+    stubAbroad("해외");
+    await 상세("여행", null, (trip) => london(trip.visits[1]));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(saveVisitName).not.toHaveBeenCalled();
+  });
+
+  it("한국 안의 곳이나 사람이 이름을 붙인 곳은 묻지 않는다", async () => {
+    const fetched = stubAbroad("영국 런던");
+    await 상세("여행", null, (trip) => {
+      trip.visits[0].placeName = "알 수 없는 곳"; // 한국(고성) — 카카오가 못 찾은 곳. 해외 조회로 묻지 않는다.
+      trip.visits[1].lat = 51.5;
+      trip.visits[1].lng = -0.17; // 이름이 있는 해외 곳.
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(fetched).toEqual([]);
+    expect(saveVisitName).not.toHaveBeenCalled();
+  });
+});
+
 describe("TripDetail 이름 바꾸기", () => {
   beforeEach(() => {
     for (const spy of [saveTripTitle, saveTripSubtitle, saveVisitName]) {

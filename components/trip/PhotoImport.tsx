@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { rememberedName, type PlaceMemory } from "@/lib/placeMemory";
+import { isInKorea } from "@/lib/weatherGrid";
 import { fetchPlaceNames } from "@/lib/supabase/placeNames";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
@@ -77,6 +78,8 @@ interface Row {
 }
 
 const PLACE_BATCH = 25;
+/** 해외 이름은 초당 한 번씩 묻는 곳이라 한 번에 적게 보낸다(/api/place-abroad 의 한도와 같다). */
+const ABROAD_BATCH = 10;
 /** 맡겨 둔 지 이 안이면 '방금', 넘으면 '전에' 고른 여행이라고 말한다(맡겨 둔 것은 여섯 시간까지 남는다). */
 const RECENT_MS = 60 * 60 * 1000;
 /** 맡겨 둔 사진에서 카드의 작은 그림을 꺼낼 때 이만큼 모아서 화면에 반영한다(한 장마다 다시 그리지 않게). */
@@ -119,16 +122,28 @@ async function lookupPlaces(
   const points = [...wanted.values()];
   const keys = [...wanted.keys()];
 
-  for (let start = 0; start < points.length; start += PLACE_BATCH) {
-    const slice = points.slice(start, start + PLACE_BATCH);
-    const response = await fetch("/api/place", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ points: slice }),
-    });
-    if (!response.ok) throw new Error("place lookup failed");
-    const body: { places: PlaceAnswer[] } = await response.json();
-    body.places.forEach((place, i) => next.set(keys[start + i], place));
+  // 한국 안은 카카오(/api/place), 한국 밖은 따로(/api/place-abroad) 묻는다. 한 곳이 막혀도 다른 쪽 이름은 살린다.
+  const at = points.map((point, index) => ({ point, key: keys[index], abroad: !isInKorea(point.lat, point.lng) }));
+  for (const abroad of [false, true]) {
+    const group = at.filter((item) => item.abroad === abroad);
+    const url = abroad ? "/api/place-abroad" : "/api/place";
+    const batch = abroad ? ABROAD_BATCH : PLACE_BATCH;
+    for (let start = 0; start < group.length; start += batch) {
+      const slice = group.slice(start, start + batch);
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ points: slice.map((item) => item.point) }),
+        });
+        if (!response.ok) throw new Error("place lookup failed");
+        const body: { places: PlaceAnswer[] } = await response.json();
+        body.places.forEach((place, i) => next.set(slice[i].key, place));
+      } catch (error) {
+        // 해외 이름을 못 얻어도 한국 쪽 이름과 날짜·사진은 그대로다. 한국 쪽이 막히면 예전처럼 알린다.
+        if (!abroad) throw error;
+      }
+    }
   }
   return next;
 }
