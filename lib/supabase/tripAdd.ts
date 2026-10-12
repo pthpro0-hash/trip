@@ -85,17 +85,22 @@ export async function addToExistingTrip(
     const have = (existingVisits.data ?? []) as ExistingVisit[];
 
     // 이미 있는 사진의 열쇠(시각+자리). 천 장씩 나눠 읽는다.
-    const seen = new Set<string>();
+    // 같은 시각·같은 자리의 사진이 여럿일 수 있다(연사) — 키마다 몇 장이 이미 있는지 센다.
+    const seen = new Map<string, number>();
     if (have.length > 0) {
       for (let from = 0; ; from += PAGE) {
         const page = await supabase
           .from("trip_photos")
           .select("taken_at,lat,lng")
           .in("visit_id", have.map((visit) => visit.id))
+          .order("id", { ascending: true })
           .range(from, from + PAGE - 1);
         if (page.error) return fail;
         const rows = (page.data ?? []) as { taken_at: string; lat: number | null; lng: number | null }[];
-        for (const row of rows) seen.add(`${stamp(row.taken_at)}|${spot(row.lat, row.lng)}`);
+        for (const row of rows) {
+          const key = `${stamp(row.taken_at)}|${spot(row.lat, row.lng)}`;
+          seen.set(key, (seen.get(key) ?? 0) + 1);
+        }
         if (rows.length < PAGE) break;
       }
     }
@@ -108,11 +113,12 @@ export async function addToExistingTrip(
     for (const [index, visit] of visits.entries()) {
       const fresh = visit.shots.filter((shot) => {
         const key = `${wall(shot.takenAt)}|${spot(shot.lat, shot.lng)}`;
-        if (seen.has(key)) {
+        const left = seen.get(key) ?? 0;
+        if (left > 0) {
+          seen.set(key, left - 1);
           duplicates += 1;
           return false;
         }
-        seen.add(key);
         return true;
       });
       if (fresh.length === 0) continue;
@@ -134,15 +140,15 @@ export async function addToExistingTrip(
       if (near) {
         const startedAt = wall(first.takenAt) < stamp(near.started_at) ? wall(first.takenAt) : stamp(near.started_at);
         const endedAt = wall(last.takenAt) > stamp(near.ended_at) ? wall(last.takenAt) : stamp(near.ended_at);
-        const count = near.photo_count + fresh.length;
         const updated = await supabase
           .from("visits")
-          .update({ started_at: startedAt, ended_at: endedAt, photo_count: count })
-          .eq("id", near.id);
-        if (updated.error) return fail;
+          .update({ started_at: startedAt, ended_at: endedAt })
+          .eq("id", near.id)
+          .select("id");
+        // 권한 때문에 한 줄도 바뀌지 않았으면 조용히 넘어가지 않는다.
+        if (updated.error || !updated.data?.length) return fail;
         near.started_at = startedAt;
         near.ended_at = endedAt;
-        near.photo_count = count;
         parts.push({ visitId: near.id, shots: fresh });
       } else {
         const place = places[index];
@@ -159,7 +165,8 @@ export async function addToExistingTrip(
             dong: place?.dong ?? null,
             started_at: wall(first.takenAt),
             ended_at: wall(last.takenAt),
-            photo_count: fresh.length,
+            // 사진 수는 올린 뒤 recountVisits 가 센다.
+            photo_count: 0,
           })
           .select("id")
           .single();
@@ -171,7 +178,7 @@ export async function addToExistingTrip(
           lng: first.lng,
           started_at: wall(first.takenAt),
           ended_at: wall(last.takenAt),
-          photo_count: fresh.length,
+          photo_count: 0,
         };
         have.push(created);
         parts.push({ visitId: created.id, shots: fresh });
@@ -204,5 +211,20 @@ export async function addToExistingTrip(
     return { ok: true, found: true, parts, duplicates };
   } catch {
     return fail;
+  }
+}
+
+/**
+ * 올린 뒤 방문의 사진 수를 실제 올라간 사진 수로 맞춘다. 올리다 막혀도 수가 어긋나지 않게(미리 더해 두지 않는다).
+ */
+export async function recountVisits(supabase: SupabaseClient, visitIds: string[]): Promise<void> {
+  for (const id of new Set(visitIds)) {
+    try {
+      const counted = await supabase.from("trip_photos").select("id", { count: "exact", head: true }).eq("visit_id", id);
+      if (counted.error || counted.count == null) continue;
+      await supabase.from("visits").update({ photo_count: counted.count }).eq("id", id);
+    } catch {
+      // 세지 못해도 기록은 남아 있다. 다음에 더할 때 다시 맞춘다.
+    }
   }
 }

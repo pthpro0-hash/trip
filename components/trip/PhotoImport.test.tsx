@@ -49,7 +49,7 @@ const uploadPhotos = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 const uploadPrepared = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 const addToExisting = vi.fn<(...args: unknown[]) => Promise<unknown>>();
 
-vi.mock("@/lib/supabase/tripAdd", () => ({ addToExistingTrip: (...args: unknown[]) => addToExisting(...args) }));
+vi.mock("@/lib/supabase/tripAdd", () => ({ addToExistingTrip: (...args: unknown[]) => addToExisting(...args), recountVisits: async () => undefined }));
 
 /*
   로그인하러 떠나기 전에 사진을 이 브라우저에 맡기고(lib/photo/prepare · stash), 돌아오면 꺼낸다. jsdom 에는 저장소가 없으니 가짜를 끼운다.
@@ -1169,6 +1169,13 @@ describe("PhotoImport", () => {
       fireEvent.click(await screen.findByRole("button", { name: "기존 여행에 사진 더하기" }));
       expect(await screen.findByText("1건은 저장하지 못했어요")).toBeTruthy();
       expect(uploadPhotos).not.toHaveBeenCalled();
+    });
+
+    it("그 사이 겹치던 여행이 없어졌으면 새 여행으로 기록한다", async () => {
+      addToExisting.mockResolvedValue({ ok: true, found: false, parts: [], duplicates: 0 });
+      await 사진넣기();
+      fireEvent.click(await screen.findByRole("button", { name: "기존 여행에 사진 더하기" }));
+      await waitFor(() => expect(saveTrip).toHaveBeenCalledTimes(1));
     });
 
     it("새 여행과 기존 여행이 섞여 있으면 둘 다 한다", async () => {

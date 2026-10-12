@@ -5,7 +5,7 @@ import { rememberedName, type PlaceMemory } from "@/lib/placeMemory";
 import { fetchPlaceNames } from "@/lib/supabase/placeNames";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
-import { addToExistingTrip } from "@/lib/supabase/tripAdd";
+import { addToExistingTrip, recountVisits } from "@/lib/supabase/tripAdd";
 import { uploadPhotos, uploadPrepared, type PreparedTarget, type UploadTarget } from "@/lib/supabase/photos";
 import { readShots, type ReadResult } from "@/lib/photo/readShots";
 import { canPrepare, prepareForLogin } from "@/lib/photo/prepare";
@@ -636,22 +636,22 @@ export function PhotoImport() {
       });
 
       // 사진이 어느 방문에 붙는가. 새 여행이면 방문마다 전부, 기존 여행에 더하면 이미 있던 것을 뺀 새 사진만.
-      let placed: { visitId: string; shots: Shot[]; cover: boolean }[];
+      let placed: { visitId: string; shots: Shot[]; cover: boolean }[] | null = null;
       if (overlapped) {
         const added = await addToExistingTrip(supabase, userId, shaped.visits, visitPlaces, range);
         if (!added.ok) {
           result.failed += 1;
           continue;
         }
-        if (!added.found) {
-          result.skipped += 1;
-          continue;
+        // 그 사이 다른 곳에서 지워져 겹치는 여행이 없어졌다면 새 여행으로 기록한다.
+        if (added.found) {
+          result.merged += 1;
+          result.duplicates += added.duplicates;
+          done.add(key);
+          placed = added.parts.map((part) => ({ visitId: part.visitId, shots: part.shots, cover: false }));
         }
-        result.merged += 1;
-        done.add(key);
-        result.duplicates += added.duplicates;
-        placed = added.parts.map((part) => ({ visitId: part.visitId, shots: part.shots, cover: false }));
-      } else {
+      }
+      if (!placed) {
         const saved = await saveTrip(
           supabase,
           userId,
@@ -676,6 +676,7 @@ export function PhotoImport() {
           return visitId ? [{ visitId, shots: visit.shots, cover: visitIndex === 0 }] : [];
         });
       }
+      const merging = overlapped && placed.every((part) => !part.cover);
 
       const targets: UploadTarget[] = [];
       const prepared: PreparedTarget[] = [];
@@ -717,6 +718,9 @@ export function PhotoImport() {
       result.photos += uploaded.uploaded;
       result.unsupported.push(...uploaded.unsupported);
       result.overLimit += uploaded.overLimit;
+
+      // 기존 여행에 더했다면 방문의 사진 수를 실제 올라간 수로 맞춘다(올리다 막혀도 어긋나지 않게).
+      if (merging) await recountVisits(supabase, placed.map((part) => part.visitId));
 
       logEvent(supabase, "photos_uploaded", {
         tried: targets.length + prepared.length + lost,
