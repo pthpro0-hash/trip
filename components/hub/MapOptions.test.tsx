@@ -19,6 +19,29 @@ function options(props: Partial<ComponentProps<typeof MapOptions>> = {}) {
 const trigger = () => screen.getByRole("button", { name: "지도 옵션" });
 const open = () => fireEvent.click(trigger());
 
+describe("MapOptions · 해외 보기", () => {
+  it("해외 곳이 없으면 해외 줄을 두지 않는다", () => {
+    options({ overseasCount: 0, onAbroad: vi.fn() });
+    open();
+    expect(screen.queryByRole("button", { name: /해외 보기/ })).toBeNull();
+  });
+
+  it("해외 곳이 있으면 몇 곳인지 적은 줄이 있고, 누르면 알리고 닫는다", () => {
+    const onAbroad = vi.fn();
+    options({ overseasCount: 4, onAbroad });
+    open();
+    fireEvent.click(screen.getByRole("button", { name: "해외 보기 · 4곳" }));
+    expect(onAbroad).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("group", { name: "지도 옵션" })).toBeNull();
+  });
+
+  it("해외 지도를 보는 중이면 한국 지도로 돌아가는 줄이 된다", () => {
+    options({ overseasCount: 4, abroad: true, onAbroad: vi.fn() });
+    open();
+    expect(screen.getByRole("button", { name: "한국 지도 보기" })).toBeTruthy();
+  });
+});
+
 describe("MapOptions", () => {
   it("처음에는 단추 하나만 있다 — 칩 둘이 지도를 가리지 않는다", () => {
     options();

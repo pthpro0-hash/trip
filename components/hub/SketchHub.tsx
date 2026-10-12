@@ -1,7 +1,7 @@
 "use client";
 
 import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
@@ -9,11 +9,13 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { ownerOf, readFamilyView } from "@/lib/familyView";
 import { markerUrls, visitCovers } from "@/lib/supabase/photos";
-import { hubPlaces, placesIn, tripsIn, type Bounds, type HubPlace, type TripInView } from "@/lib/hub";
+import { hubPlaces, inKorea, placesIn, tripsIn, type Bounds, type HubPlace, type TripInView } from "@/lib/hub";
 import { tripFocus } from "@/lib/scrollMemory";
 import { ADD_HREF, SKETCH_HREF, hubHref, viewOf, type MyView } from "@/lib/nav";
 import { useWide } from "@/lib/useWide";
 import { Waiting } from "@/components/layout/Waiting";
+import dynamic from "next/dynamic";
+import type { OverseasMap as OverseasMapType } from "./OverseasMap";
 import { HubMap, type CuratedPin, type FlyTarget, type HubMapHandle, type PaintedSido } from "./HubMap";
 import { CollectionPanel } from "./CollectionPanel";
 import { EchoCard } from "./EchoCard";
@@ -81,6 +83,9 @@ interface SketchHubProps {
  * 먼저 바뀌고 주소는 조금 늦게 따라오는데, 현재 값끼리 견주면 그 사이의 어긋남을 밖에서
  * 바뀐 것으로 읽어 도로 되돌린다.
  */
+// 해외 지도는 해외 곳을 볼 때만 필요하다 — 라이브러리를 그때 불러온다.
+const OverseasMap = dynamic<ComponentProps<typeof OverseasMapType>>(() => import("./OverseasMap").then((module) => module.OverseasMap), { ssr: false });
+
 export function SketchHub({ switcher, initialYear, initialView = "map" }: SketchHubProps) {
   const params = useSearchParams();
   const urlView: MyView = params ? viewOf(params.get("view")) : initialView;
@@ -341,6 +346,12 @@ export function HubView({
   const totals = useMemo(() => monthTotals(places), [places]);
   /** 기간으로 거른 것. 지도와 목록은 이것을 본다. */
   const shown = useMemo(() => withinMonths(places, range), [places, range]);
+  /*
+    해외 곳. 카카오 지도에는 한국 밖 그림이 없어, 해외 곳은 따로 해외 지도(OverseasMap)로 본다. 지도 옵션에서 오간다.
+    다시 걷기(replay)는 한국 지도의 손잡이로 하므로 걷는 동안에는 한국 지도로 돌아온다.
+  */
+  const [abroad, setAbroad] = useState(false);
+  const overseas = useMemo(() => shown.filter((place) => !inKorea(place)), [shown]);
 
   const inView = useMemo(() => (view ? placesIn(shown, view) : shown), [shown, view]);
   const startedOn = useMemo(() => new Map(trips.map((trip) => [trip.id, trip.startedOn])), [trips]);
@@ -647,7 +658,19 @@ export function HubView({
       </>
     );
 
-  const map = (
+  const abroadNow = abroad && overseas.length > 0 && !replay;
+  const map = abroadNow ? (
+    <OverseasMap
+      places={overseas}
+      photoUrls={pinUrls}
+      pickedIds={pickedIds}
+      flyTo={flyTo}
+      bottomInset={inset}
+      viewInset={viewInset}
+      onView={setView}
+      onPick={pick}
+    />
+  ) : (
     <HubMap
       ref={mapHandle}
       places={shown}
@@ -677,6 +700,9 @@ export function HubView({
         curatedOn={showCurated}
         onSido={openCollection}
         onCurated={toggleCurated}
+        overseasCount={overseas.length}
+        abroad={abroadNow}
+        onAbroad={() => setAbroad(!abroadNow)}
       />
     </div>
   );

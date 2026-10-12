@@ -24,11 +24,17 @@ interface MapOptionsProps {
   onSido: () => void;
   /** 100선 겹쳐 보기를 켜고 끈다. */
   onCurated: () => void;
+  /** 해외 곳의 수. 0 이거나 없으면 해외 보기 줄을 두지 않는다. */
+  overseasCount?: number;
+  /** 지금 해외 지도를 보고 있는가. */
+  abroad?: boolean;
+  /** 해외 지도와 한국 지도를 오간다. */
+  onAbroad?: () => void;
 }
 
 const CARD = "pointer-events-auto shadow-[0_2px_10px_rgba(0,0,0,0.15)]";
 
-export function MapOptions({ sidoCount, curatedOn, onSido, onCurated }: MapOptionsProps) {
+export function MapOptions({ sidoCount, curatedOn, onSido, onCurated, overseasCount = 0, abroad = false, onAbroad }: MapOptionsProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -89,6 +95,18 @@ export function MapOptions({ sidoCount, curatedOn, onSido, onCurated }: MapOptio
             aria-label="지도 옵션"
             className="pointer-events-auto absolute left-0 top-full z-10 mt-2 w-[228px] overflow-hidden rounded-2xl bg-surface shadow-[0_6px_24px_rgba(0,0,0,0.18)] ring-1 ring-line"
           >
+            {(overseasCount > 0 || abroad) && onAbroad && (
+              <button
+                type="button"
+                onClick={choose(onAbroad)}
+                className="flex w-full items-center justify-between gap-3 border-b border-line px-4 py-3 text-left text-[14px] font-medium text-text transition hover:bg-bg-subtle"
+              >
+                <span>{abroad ? "한국 지도 보기" : `해외 보기 · ${overseasCount}곳`}</span>
+                <span aria-hidden="true" className="text-[16px] text-text-faint">
+                  ›
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={choose(onSido)}

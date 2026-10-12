@@ -507,7 +507,7 @@ export function HubMap({
   핀 하나. React 가 아니라 손으로 만든다 — 카카오 지도의 겹쳐 얹기는
   DOM 조각을 받는다. 확대할 때마다 새로 만들므로 가볍게 둔다.
 */
-function pinElement({
+export function pinElement({
   members,
   lead,
   photo,
