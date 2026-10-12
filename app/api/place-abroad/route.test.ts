@@ -42,6 +42,12 @@ describe("POST /api/place-abroad", () => {
     expect((await response.json()).places[0].title).toBe("모나코");
   }, 10_000);
 
+  it("런던의 구(시티오브웨스트민스터 등)는 사람이 부르는 이름 '런던'으로", async () => {
+    answer = { address: { country: "영국", city: "시티오브웨스트민스터", state_district: "그레이터런던" } };
+    const response = await call([{ lat: 51.5014, lng: -0.1775 }]);
+    expect((await response.json()).places[0].title).toBe("영국 런던");
+  }, 10_000);
+
   it("같은 곳(1km 안)은 한 번만 묻는다", async () => {
     await call([{ lat: 35.6595, lng: 139.7005 }]);
     const before = asked.length;

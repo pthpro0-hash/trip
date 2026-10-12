@@ -49,7 +49,9 @@ async function ask(lat: number, lng: number): Promise<Answer | null> {
 
   const country = address.country ?? "";
   // 사람이 기억하는 단위로: 도시 > 읍 > 마을 > 구역 > 군 > 주(도).
-  const local = address.city ?? address.town ?? address.village ?? address.suburb ?? address.county ?? address.state ?? "";
+  // 런던처럼 큰 도시가 구(시티오브웨스트민스터 등)로 쪼개져 나오는 곳은 사람이 부르는 이름(런던)을 쓴다.
+  const metro = /런던/.test(address.state_district ?? "") ? "런던" : "";
+  const local = metro || (address.city ?? address.town ?? address.village ?? address.suburb ?? address.county ?? address.state ?? "");
   const title = [country, local].filter((part, index, all) => part && all.indexOf(part) === index).join(" ");
   if (!title) return null;
   return { title, isCuratedSpot: false, spotId: null, dong: title };
