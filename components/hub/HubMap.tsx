@@ -3,7 +3,7 @@
 import { fitBottomPadding } from "./fitPadding";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { loadKakaoMaps } from "@/lib/kakaoLoader";
-import { groupPins, inseparable, type Bounds, type HubPlace } from "@/lib/hub";
+import { fitTargets, groupPins, inseparable, type Bounds, type HubPlace } from "@/lib/hub";
 
 /*
   내 사진이 얹힌 지도.
@@ -162,8 +162,10 @@ export function HubMap({
   };
 
   /** 곳들이 다 들어오게 맞춘다. 시트가 덮은 만큼 아래를 비워 둔다. */
-  const fit = (targets: Point[]) => {
+  const fit = (given: Point[]) => {
     const map = mapRef.current;
+    // 해외 곳이 섞여 있으면 한국 안의 곳만 맞춘다(그림이 없는 땅으로 나가지 않게).
+    const targets = fitTargets(given);
     if (!map || targets.length === 0) return;
     const kakao: Kakao = (window as Kakao).kakao;
 

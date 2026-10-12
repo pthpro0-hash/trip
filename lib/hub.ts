@@ -187,6 +187,22 @@ export function groupPins(pins: ScreenPin[], reach: number): PinGroup[] {
  * 때마다 확대하면 끝까지 당겨도 풀리지 않는다. 좌표가 사실상 같으면
  * 확대하지 않고 곧장 펼쳐 보인다.
  */
+/** 한국 지도가 그려지는 범위(제주·독도 포함). 지도 서비스는 이 밖의 땅에는 그림이 없다. */
+const KOREA_BOX = { south: 32.5, north: 39, west: 123.5, east: 132.5 };
+
+export function inKorea(place: { lat: number; lng: number }): boolean {
+  return place.lat >= KOREA_BOX.south && place.lat <= KOREA_BOX.north && place.lng >= KOREA_BOX.west && place.lng <= KOREA_BOX.east;
+}
+
+/**
+ * 지도를 맞출 곳들. 한국 안과 밖(해외 여행)이 섞여 있으면 한국 안의 곳만 — 전부 들어오게 맞추면 한국 지도 밖(그림이 없는 하얀
+ * 땅)으로 나가 첫 화면이 텅 빈다. 해외 곳만 있으면 그대로 둔다.
+ */
+export function fitTargets<T extends { lat: number; lng: number }>(places: T[]): T[] {
+  const home = places.filter(inKorea);
+  return home.length > 0 && home.length < places.length ? home : places;
+}
+
 export function inseparable(places: { lat: number; lng: number }[]): boolean {
   if (places.length < 2) return true;
   const lats = places.map((place) => place.lat);

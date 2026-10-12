@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  fitTargets,
+  inKorea,
   groupPins,
   hubPlaces,
   inseparable,
@@ -146,5 +148,31 @@ describe("inseparable", () => {
         { lat: 37.7863, lng: 128.9303 },
       ]),
     ).toBe(false);
+  });
+});
+
+describe("fitTargets · 해외 곳이 섞인 여행을 맞출 때", () => {
+  const seoul = { lat: 37.57, lng: 126.98 };
+  const jeju = { lat: 33.46, lng: 126.94 };
+  const tokyo = { lat: 35.68, lng: 139.69 };
+  const paris = { lat: 48.86, lng: 2.35 };
+
+  it("제주·독도까지 한국 안이다", () => {
+    expect(inKorea(seoul)).toBe(true);
+    expect(inKorea(jeju)).toBe(true);
+    expect(inKorea({ lat: 37.24, lng: 131.87 })).toBe(true);
+    expect(inKorea(tokyo)).toBe(false);
+  });
+
+  it("한국과 해외가 섞이면 한국 안의 곳만 맞춘다 — 하얀 땅으로 나가 지도가 비지 않게", () => {
+    expect(fitTargets([seoul, tokyo, paris, jeju])).toEqual([seoul, jeju]);
+  });
+
+  it("한국만 있으면 그대로", () => {
+    expect(fitTargets([seoul, jeju])).toEqual([seoul, jeju]);
+  });
+
+  it("해외 곳만 있으면 그대로 둔다 — 그 여행을 보려는 것이다", () => {
+    expect(fitTargets([tokyo, paris])).toEqual([tokyo, paris]);
   });
 });
