@@ -70,6 +70,14 @@ describe("OverseasMap", () => {
     expect(calls.markers[0].html.querySelector("button")?.getAttribute("aria-label")).toBe("곳a, 사진 3장");
   });
 
+  it("지도 칸이 자기 층을 만든다 — 지도 라이브러리의 높은 층이 시트·지도 옵션 단추를 덮어 가리지 않게", async () => {
+    const view = render(<OverseasMap {...props([place("a", 10, 10)])} />);
+    await waitFor(() => expect(calls.markers.length).toBe(1));
+    const box = view.getByRole("application");
+    expect(box.className).toContain("relative");
+    expect(box.className).toContain("z-0");
+  });
+
   it("떠날 때 지도를 거둔다", async () => {
     const view = render(<OverseasMap {...props([place("a", 10, 10)])} />);
     await waitFor(() => expect(calls.markers.length).toBe(1));

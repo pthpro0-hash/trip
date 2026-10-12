@@ -187,5 +187,6 @@ export function OverseasMap({ places, photoUrls, pickedIds, flyTo, bottomInset, 
     );
   }
 
-  return <div ref={containerRef} className="h-full w-full" aria-label="해외 여행 지도" role="application" />;
+  // relative z-0: 지도 라이브러리의 층(400~1000)이 지도 칸 안에 갇히게 한다 — 그러지 않으면 시트·지도 옵션 단추 같은 앱 화면을 덮어 가린다.
+  return <div ref={containerRef} className="relative z-0 h-full w-full" aria-label="해외 여행 지도" role="application" />;
 }

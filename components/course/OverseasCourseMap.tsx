@@ -85,5 +85,6 @@ export function OverseasCourseMap({ spots, connect = true }: { spots: MapStop[];
       </div>
     );
   }
-  return <div ref={boxRef} className="h-full w-full" aria-label="코스 지도" role="application" />;
+  // relative z-0: 지도 라이브러리의 층이 이 칸 안에 갇히게 한다(위 띠·창 같은 앞 화면을 덮지 않게).
+  return <div ref={boxRef} className="relative z-0 h-full w-full" aria-label="코스 지도" role="application" />;
 }
