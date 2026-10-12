@@ -1,6 +1,7 @@
 "use client";
 
 import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
+import { SuggestSpot } from "@/components/spots/SuggestSpot";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import spotsData from "@/lib/data/spots.json";
@@ -238,6 +239,11 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
         >
           <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
         </div>
+      </div>
+
+      {/* 목록 맨 아래 — 빠진 곳을 알려 주는 길. */}
+      <div className="flex justify-center pb-24 pt-2">
+        <SuggestSpot />
       </div>
 
       {/*

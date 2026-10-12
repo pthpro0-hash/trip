@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { SPOTS } from "@/lib/curatedData";
+import { SuggestSpot } from "@/components/spots/SuggestSpot";
 import { SIDO_NAMES, buildDex, type Dex as DexData } from "@/lib/sketchDex";
 import type { SketchTrip } from "@/lib/sketch";
 
@@ -83,6 +84,10 @@ export function Dex({ all }: { all: SketchTrip[] }) {
               </details>
             );
           })}
+      </div>
+
+      <div className="flex justify-center pt-1">
+        <SuggestSpot />
       </div>
     </section>
   );
