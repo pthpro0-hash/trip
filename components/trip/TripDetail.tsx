@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { isInKorea } from "@/lib/weatherGrid";
+import { OverseasCourseMap } from "@/components/course/OverseasCourseMap";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -570,6 +571,10 @@ export function TripDetail({ tripId }: { tripId: string }) {
     lng: visit.lng,
     name: visit.placeName,
   }));
+  const abroadStops = stops.filter((stop) => !isInKorea(stop.lat, stop.lng));
+  const homeStops = stops.filter((stop) => isInKorea(stop.lat, stop.lng));
+  // 해외 곳이 더 많으면(같으면 한국) 해외 지도. 섞인 여행은 많은 쪽만 그린다.
+  const abroadTrip = abroadStops.length > homeStops.length;
   /** 맨 위에 올릴 사진. 사진이 하나도 없는 여행에는 없다. */
   const cover = coverPhotoOf(trip);
   // 링크와 엽서는 내 여행으로만 보낸다. 가족의 여행을 보는 중에는 단추를 내지 않는다.
@@ -768,7 +773,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
 
       {stops.length > 0 && (
         <div className="h-[320px] overflow-hidden rounded-2xl ring-1 ring-line">
-          <CourseMap spots={stops} />
+          {/* 해외에서 다녀온 여행이면 한국 밖에도 그림이 있는 해외 지도로, 아니면 한국 지도로 — 카카오 지도는 해외에서 하얗게 빈다. */}
+          {abroadTrip ? <OverseasCourseMap spots={abroadStops} /> : <CourseMap spots={homeStops} />}
         </div>
       )}
 

@@ -2,6 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
+import { OSM_ATTRIBUTION, OSM_TILE_URL } from "@/lib/osmTiles";
 import { fitTargets, groupPins, inKorea, inseparable, type Bounds, type HubPlace } from "@/lib/hub";
 import { fitBottomPadding } from "./fitPadding";
 import { pinElement, type FlyTarget } from "./HubMap";
@@ -13,11 +14,9 @@ import { pinElement, type FlyTarget } from "./HubMap";
   범위 알림은 한국 지도(HubMap)와 같게 해서, 아래 시트의 목록과 카드가 똑같이 따라온다.
 
   바탕 그림은 외부(OpenStreetMap 재단)에서 받는다. 보는 지역의 좌표 범위가 그 서버에 전달되고 사진·기록은 가지 않는다(방침에 적음).
-  이용 조건은 가볍게 쓸 때만 허락한다 — 많이 쓰게 되면 TILE_URL 한 줄을 다른 제공처로 바꾼다.
+  이용 조건은 가볍게 쓸 때만 허락한다 — 많이 쓰게 되면 lib/osmTiles 한 줄을 다른 제공처로 바꾼다.
 */
 
-const TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-const ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> 기여자';
 /** 이 정도 가까우면 한 무리로 접는다(HubMap 과 같다). */
 const REACH = 52;
 const EDGE = 36;
@@ -136,7 +135,7 @@ export function OverseasMap({ places, photoUrls, pickedIds, flyTo, bottomInset, 
         const L = module.default ?? module;
         libRef.current = L;
         const map = L.map(containerRef.current, { zoomControl: false, attributionControl: false, worldCopyJump: true });
-        L.tileLayer(TILE_URL, { maxZoom: 18, attribution: ATTRIBUTION }).addTo(map);
+        L.tileLayer(OSM_TILE_URL, { maxZoom: 18, attribution: OSM_ATTRIBUTION }).addTo(map);
         // 시트가 아래를 덮으므로 저작자 표시는 위 오른쪽에 둔다(가려지면 표시한 것이 아니다).
         L.control.attribution({ position: "topright", prefix: false }).addTo(map);
         mapRef.current = map;

@@ -26,12 +26,13 @@ const call = async (points: unknown) => {
 };
 
 describe("POST /api/place-abroad", () => {
-  it("나라와 지역을 합쳐 이름으로 돌려준다 — 좌표는 소수 둘째 자리로 뭉개 묻고, 앱을 알아볼 이름을 단다", async () => {
+  it("나라와 지역을 합쳐 이름으로 돌려준다 — 좌표는 뭉개지 않고 그대로 묻고, 앱을 알아볼 이름을 단다", async () => {
     const response = await call([{ lat: 51.50123, lng: -0.17456 }]);
     expect(response.status).toBe(200);
     expect((await response.json()).places[0]).toEqual({ title: "영국 런던", isCuratedSpot: false, spotId: null, dong: "영국 런던" });
-    expect(asked[0]).toContain("lat=51.50");
-    expect(asked[0]).toContain("lon=-0.17");
+    expect(asked[0]).toContain("lat=51.50123");
+    expect(asked[0]).toContain("lon=-0.17456");
+    expect(asked[0]).toContain("zoom=18");
     expect(asked[0]).toContain("accept-language=ko");
     expect(asked[0]).toContain("yeohaeng-sesang");
   });
@@ -48,11 +49,27 @@ describe("POST /api/place-abroad", () => {
     expect((await response.json()).places[0].title).toBe("영국 런던");
   }, 10_000);
 
-  it("같은 곳(1km 안)은 한 번만 묻는다", async () => {
+  it("세부 지역명 — 구역과 그 자리의 이름(명소·건물)까지 붙인다", async () => {
+    answer = { name: "로열 앨버트 홀", display_name: "로열 앨버트 홀, 켄싱턴, 그레이터런던, 영국", address: { country: "영국", city: "시티오브웨스트민스터", suburb: "켄싱턴", road: "케닝턴 로드" } };
+    const response = await call([{ lat: 51.50102, lng: -0.17737 }]);
+    const place = (await response.json()).places[0];
+    expect(place.title).toBe("영국 런던 켄싱턴 로열 앨버트 홀");
+    expect(place.dong).toBe("영국 런던 켄싱턴");
+  }, 10_000);
+
+  it("이름 있는 곳이 아니면 길 이름으로", async () => {
+    answer = { name: "", address: { country: "일본", city: "시부야구", road: "메이지도리" } };
+    const response = await call([{ lat: 35.6702, lng: 139.7027 }]);
+    expect((await response.json()).places[0].title).toBe("일본 시부야구 메이지도리");
+  }, 10_000);
+
+  it("똑같은 좌표는 한 번만 묻고, 조금이라도 다른 좌표는 따로 묻는다 — 뭉개서 같은 곳으로 보지 않는다", async () => {
     await call([{ lat: 35.6595, lng: 139.7005 }]);
     const before = asked.length;
-    await call([{ lat: 35.6601, lng: 139.7011 }]);
+    await call([{ lat: 35.6595, lng: 139.7005 }]);
     expect(asked.length).toBe(before);
+    await call([{ lat: 35.6601, lng: 139.7011 }]);
+    expect(asked.length).toBe(before + 1);
   }, 10_000);
 
   it("못 알아내면 '해외'로 알린다 — 한국의 '알 수 없는 곳'보다 낫다", async () => {

@@ -4,13 +4,13 @@ import { isInKorea } from "@/lib/weatherGrid";
   해외 좌표를 "영국 런던"처럼 나라와 지역 이름으로 바꾼다.
 
   카카오 장소 조회는 한국 안만 안다. 한국 밖은 OpenStreetMap 의 Nominatim(역지오코딩)에 묻는다 — 우리 서버가 대신 묻고(브라우저의
-  접속 정보는 가지 않는다), 좌표는 1km 남짓으로 뭉개 보내며(정확한 자리를 건네지 않는다), 한 번 물은 곳은 기억한다. Nominatim 은
+  접속 정보는 가지 않는다), 좌표는 뭉개지 않고 그대로 보내(세부 지역명을 얻으려고), 한 번 물은 곳은 기억한다. Nominatim 은
   초당 한 번만 허락하고 앱을 알아볼 이름을 요구한다. 가볍게 쓰는 서비스를 위한 것이라, 이용이 늘면 다른 제공처로 바꾼다.
 */
 const MAX_POINTS = 10;
 const UPSTREAM_TIMEOUT_MS = 8000;
-/** 소수 둘째 자리 — 1km 남짓. 이보다 가까운 좌표는 같은 곳으로 본다. */
-const PRECISION = 2;
+/** 한 번 물은 곳을 기억해 둘 때만 쓰는 자리수(소수 다섯째 — 1m 남짓). 묻는 좌표는 뭉개지 않는다. */
+const PRECISION = 5;
 /** 연달아 묻는 사이의 간격(초당 한 번 규칙). */
 const GAP_MS = 1100;
 
@@ -31,9 +31,9 @@ async function ask(lat: number, lng: number): Promise<Answer | null> {
 
   const params = new URLSearchParams({
     format: "jsonv2",
-    lat: lat.toFixed(PRECISION),
-    lon: lng.toFixed(PRECISION),
-    zoom: "10",
+    lat: String(lat),
+    lon: String(lng),
+    zoom: "18",
     addressdetails: "1",
     "accept-language": "ko",
   });
@@ -43,7 +43,7 @@ async function ask(lat: number, lng: number): Promise<Answer | null> {
     cache: "no-store",
   });
   if (!response.ok) return null;
-  const body = (await response.json()) as { address?: Record<string, string>; display_name?: string };
+  const body = (await response.json()) as { address?: Record<string, string>; display_name?: string; name?: string };
   const address = body.address;
   if (!address) return null;
 
@@ -52,9 +52,15 @@ async function ask(lat: number, lng: number): Promise<Answer | null> {
   // 런던처럼 큰 도시가 구(시티오브웨스트민스터 등)로 쪼개져 나오는 곳은 사람이 부르는 이름(런던)을 쓴다.
   const metro = /그레이터런던/.test(`${address.state_district ?? ""} ${body.display_name ?? ""}`) ? "런던" : "";
   const local = metro || (address.city ?? address.town ?? address.village ?? address.suburb ?? address.county ?? address.state ?? "");
-  const title = [country, local].filter((part, index, all) => part && all.indexOf(part) === index).join(" ");
+  // 세부 지역: 구역(동네) → 그 자리의 이름(건물·명소) 또는 길 이름. 사람이 "어디쯤"을 알아보는 단위까지 내려간다.
+  const area = address.suburb ?? address.neighbourhood ?? address.city_district ?? address.quarter ?? "";
+  const poi = body.name && !/^[\d\s-]+$/.test(body.name) ? body.name : (address.road ?? "");
+  const part = (...names: string[]) => names.filter((name, index, all) => name && all.indexOf(name) === index);
+  const title = part(country, local, area, poi).join(" ");
   if (!title) return null;
-  return { title, isCuratedSpot: false, spotId: null, dong: title };
+  // 상세에는 도시까지의 묶음만이 아니라 우편번호를 뺀 전체 주소의 앞부분을 함께 둔다.
+  const dong = part(country, local, area).join(" ");
+  return { title, isCuratedSpot: false, spotId: null, dong: dong || title };
 }
 
 export async function POST(request: Request) {
