@@ -7,6 +7,7 @@ import { signOutAndReload } from "@/lib/signOut";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchMailboxes } from "@/lib/supabase/mailbox";
 import { mailboxPath } from "@/lib/mailbox";
+import { countPendingSuggestions, isAdmin } from "@/lib/supabase/spotSuggestions";
 import { fetchUnreadHeartCount, fetchUnreadReplyCount, fetchUnreadWishCount } from "@/lib/supabase/postcards";
 
 /*
@@ -89,11 +90,14 @@ export function MyInfoView({
   state,
   unread,
   shelves = [],
+  waiting = null,
   signingOut,
   onSignOut,
 }: {
   state: MyInfoState;
   unread: number;
+  /** 관리자일 때 검토 전인 빠진 곳 추천 수(관리자가 아니면 null — 관리 줄을 내지 않는다). */
+  waiting?: number | null;
   /** 들어가 볼 수 있는 내 책장들(닫은 것·남의 것은 빠진다). 못 읽었으면 빈 목록. */
   shelves?: ShelfLink[];
   signingOut: boolean;
@@ -150,6 +154,16 @@ export function MyInfoView({
           <Group title="내 자료">
             <Row href="/help#data" title="보관함 정리" hint="사진 용량을 확인하고 줄여요" />
           </Group>
+          {waiting !== null && (
+            <Group title="관리">
+              <Row
+                href="/admin/suggestions"
+                title="빠진 곳 추천 관리"
+                hint="이용자가 보낸 추천을 보고 반영 여부를 정해요"
+                badge={waiting > 0 ? `검토 전 ${waiting}` : undefined}
+              />
+            </Group>
+          )}
         </>
       )}
 
@@ -174,6 +188,7 @@ export function MyInfo() {
   const [unread, setUnread] = useState(0);
   const [shelves, setShelves] = useState<ShelfLink[]>([]);
   const [signingOut, setSigningOut] = useState(false);
+  const [waiting, setWaiting] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -191,6 +206,8 @@ export function MyInfo() {
           fetchMailboxes(supabase, data.user.id).catch(() => "failed" as const),
         ]);
         setUnread(replies + hearts + wishes);
+        // 관리자라면 관리 줄을 낸다. 관리자가 아니거나 못 알아보면 아무것도 내지 않는다.
+        if (await isAdmin(supabase, data.user.id)) setWaiting((await countPendingSuggestions(supabase)) ?? 0);
         if (boxes !== "failed") {
           setShelves(boxes.owned.filter((box) => !box.closed).map((box) => ({ id: box.id, name: box.name, token: box.token })));
         }
@@ -213,5 +230,5 @@ export function MyInfo() {
     }
   };
 
-  return <MyInfoView state={state} unread={unread} shelves={shelves} signingOut={signingOut} onSignOut={() => void signOut()} />;
+  return <MyInfoView state={state} unread={unread} shelves={shelves} waiting={waiting} signingOut={signingOut} onSignOut={() => void signOut()} />;
 }

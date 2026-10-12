@@ -123,6 +123,16 @@ export async function isAdmin(supabase: SupabaseClient, userId: string): Promise
   }
 }
 
+/** 관리자: 검토 전인 추천 수. 못 세면 null. */
+export async function countPendingSuggestions(supabase: SupabaseClient): Promise<number | null> {
+  try {
+    const { count, error } = await supabase.from("spot_suggestions").select("id", { count: "exact", head: true }).eq("status", "new");
+    return error || count == null ? null : count;
+  } catch {
+    return null;
+  }
+}
+
 /** 관리자: 모든 추천(검토 전 먼저, 그다음 최신순). 못 읽으면 null. */
 export async function fetchAllSuggestions(supabase: SupabaseClient): Promise<Suggestion[] | null> {
   try {

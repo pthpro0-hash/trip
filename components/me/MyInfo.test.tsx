@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   hearts: 0,
   wishes: 0,
   signOut: vi.fn(),
+  admin: false,
+  waiting: 0,
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -30,6 +32,10 @@ vi.mock("@/lib/supabase/mailbox", () => ({
   },
 }));
 vi.mock("@/lib/signOut", () => ({ signOutAndReload: state.signOut }));
+vi.mock("@/lib/supabase/spotSuggestions", () => ({
+  isAdmin: async () => state.admin,
+  countPendingSuggestions: async () => state.waiting,
+}));
 
 const { MyInfo } = await import("./MyInfo");
 
@@ -44,9 +50,35 @@ describe("MyInfo · 내 정보 메뉴", () => {
     state.hearts = 0;
     state.wishes = 0;
     state.signOut.mockReset();
+    state.admin = false;
+    state.waiting = 0;
   });
 
   describe("로그인했을 때", () => {
+    describe("관리자에게만", () => {
+      it("관리자가 아니면 관리 줄이 없다", async () => {
+        render(<MyInfo />);
+        await screen.findByRole("link", { name: /가족 책장/ });
+        expect(screen.queryByRole("link", { name: /빠진 곳 추천 관리/ })).toBeNull();
+      });
+
+      it("관리자면 '관리' 묶음에 추천 관리 줄이 있고 검토 전 수를 알린다", async () => {
+        state.admin = true;
+        state.waiting = 3;
+        render(<MyInfo />);
+        const link = await screen.findByRole("link", { name: /빠진 곳 추천 관리/ });
+        expect(link.getAttribute("href")).toBe("/admin/suggestions");
+        expect(link.textContent).toContain("검토 전 3");
+      });
+
+      it("검토 전이 없으면 숫자 없이 줄만 있다", async () => {
+        state.admin = true;
+        render(<MyInfo />);
+        const link = await screen.findByRole("link", { name: /빠진 곳 추천 관리/ });
+        expect(link.textContent).not.toContain("검토 전");
+      });
+    });
+
     it("누구로 들어와 있는지 이름과 사진을 보여 준다", async () => {
       const { container } = render(<MyInfo />);
       expect(await screen.findByText("김지민")).toBeTruthy();
