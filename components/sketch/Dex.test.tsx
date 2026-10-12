@@ -25,14 +25,14 @@ describe("Dex · 내 도감", () => {
 
   it("시도 칸과 100선 숫자를 보인다", async () => {
     render(<Dex all={trips} />);
-    expect(await screen.findByText("시도 1/17 · 100선 1/2")).toBeTruthy();
+    expect(await screen.findByText("시도 1/17 · 1/2선")).toBeTruthy();
     expect(screen.getByText(/서울/, { selector: "li" }).textContent).toContain("다녀옴");
     expect(screen.getByText(/부산/, { selector: "li" }).textContent).toContain("아직");
   });
 
   it("다녀온 곳은 도장, 빈칸은 그 곳의 100선 상세로 가는 링크다", async () => {
     render(<Dex all={trips} />);
-    const group = (await screen.findByText("서울 100선")).closest("details")!;
+    const group = (await screen.findByText("1/2선", { selector: "summary span" })).closest("details")!;
     expect(within(group).getByText("✓ 경복궁")).toBeTruthy();
     expect(within(group).getByRole("link", { name: "북촌" })).toHaveAttribute("href", `/spots/${encodeURIComponent("북촌")}`);
   });

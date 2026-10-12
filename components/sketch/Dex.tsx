@@ -31,7 +31,7 @@ export function Dex({ all }: { all: SketchTrip[] }) {
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-[13px] font-semibold text-text-muted">내 도감</h3>
         <p className="text-[12px] text-text-faint">
-          시도 {dex.sidoDone}/{dex.sidos.length} · 100선 {dex.spotDone}/{dex.spotTotal}
+          시도 {dex.sidoDone}/{dex.sidos.length} · {dex.spotDone}/{dex.spotTotal}선
         </p>
       </div>
 
@@ -57,9 +57,9 @@ export function Dex({ all }: { all: SketchTrip[] }) {
             return (
               <details key={sido.name} className="rounded-xl bg-bg-subtle px-3.5 py-2.5">
                 <summary className="flex cursor-pointer items-center justify-between text-[14px] font-medium text-text">
-                  <span>{sido.name} 100선</span>
+                  <span>{sido.name}</span>
                   <span className="text-[12px] text-text-faint">
-                    {done}/{sido.spots.length}
+                    {done}/{sido.spots.length}선
                   </span>
                 </summary>
                 <ul className="mt-2 flex flex-wrap gap-1.5">

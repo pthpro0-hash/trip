@@ -51,11 +51,11 @@ export function buildDex(all: SketchTrip[], spots: DexSpot[], sidoNames: string[
   }
 
   const sidos = sidoNames.map((name) => ({ name, visited: visitedSido.has(name), spots: bySido.get(name)! }));
-  const listed = sidos.flatMap((sido) => sido.spots);
   return {
     sidos,
     sidoDone: sidos.filter((sido) => sido.visited).length,
-    spotTotal: listed.length,
-    spotDone: listed.filter((spot) => spot.done).length,
+    // 시도를 가리지 못한 곳(섬 등)까지 포함한 전체 — 이름의 '○○선'이 이 수다.
+    spotTotal: spots.length,
+    spotDone: spots.filter((spot) => doneSpots.has(spot.id)).length,
   };
 }

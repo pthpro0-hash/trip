@@ -27,7 +27,7 @@ describe("buildDex · 내 도감", () => {
     const dex = buildDex([], spots, names, sidoOf);
     expect(dex.sidoDone).toBe(0);
     expect(dex.spotDone).toBe(0);
-    expect(dex.spotTotal).toBe(3);
+    expect(dex.spotTotal).toBe(4);
   });
 
   it("밟은 시도에 도장을 찍는다 — 해가 달라도 모든 여행에서", () => {
