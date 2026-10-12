@@ -21,7 +21,27 @@ interface Answer {
   dong: string | null;
 }
 
+/** 기억해 둘 곳의 수 상한. 넘으면 가장 오래된 것부터 버린다(주소가 열려 있어 무한히 자라지 않게). */
+const MEMO_MAX = 2000;
 const memo = new Map<string, Answer>();
+function remember(key: string, answer: Answer) {
+  if (memo.size >= MEMO_MAX) memo.delete(memo.keys().next().value as string);
+  memo.set(key, answer);
+}
+
+/*
+  이 서버 자리에서 1분에 바깥에 물을 수 있는 수. 주소가 열려 있어 누가 마구 불러도 OpenStreetMap 의 이용 한도를 다 쓰지 못하게 한다.
+  넘으면 묻지 않고 '해외'로 답한다(기억해 둔 곳은 그대로 답한다). 서버 자리가 여럿이면 자리마다 따로 센다 — 낮은 이용량을 위한 안전장치다.
+*/
+const ASKS_PER_MINUTE = 40;
+const askedAt: number[] = [];
+function withinBudget(): boolean {
+  const now = Date.now();
+  while (askedAt.length > 0 && now - askedAt[0] > 60_000) askedAt.shift();
+  if (askedAt.length >= ASKS_PER_MINUTE) return false;
+  askedAt.push(now);
+  return true;
+}
 let lastAskedAt = 0;
 
 async function ask(lat: number, lng: number): Promise<Answer | null> {
@@ -92,8 +112,8 @@ export async function POST(request: Request) {
       const key = `${point.lat.toFixed(PRECISION)},${point.lng.toFixed(PRECISION)}`;
       let answer = memo.get(key) ?? null;
       if (!answer) {
-        answer = await ask(point.lat, point.lng);
-        if (answer) memo.set(key, answer);
+        answer = withinBudget() ? await ask(point.lat, point.lng) : null;
+        if (answer) remember(key, answer);
       }
       // 못 알아낸 곳은 '해외'로라도 알린다 — 한국의 '알 수 없는 곳'보다 낫다.
       places.push(answer ?? { title: "해외", isCuratedSpot: false, spotId: null, dong: null });

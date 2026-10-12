@@ -142,6 +142,14 @@ describe("TripDetail · 해외에서 찍어 '알 수 없는 곳'이 된 곳", ()
     expect(saveVisitName).not.toHaveBeenCalled();
   });
 
+  it("한국과 해외가 섞인 여행은 많은 쪽만 지도에 그리고, 안 그린 곳이 있다고 알린다", async () => {
+    await 상세("여행", null, (trip) => {
+      trip.visits[1].lat = 51.5;
+      trip.visits[1].lng = -0.17; // 한국 곳 하나(고성) + 해외 곳 하나(런던) — 같으면 한국 지도.
+    });
+    expect(await screen.findByText("해외 1곳은 이 지도에 그리지 않았어요. 아래 목록에서 볼 수 있어요.")).toBeTruthy();
+  });
+
   it("한국 안의 곳이나 사람이 이름을 붙인 곳은 묻지 않는다", async () => {
     const fetched = stubAbroad("영국 런던");
     await 상세("여행", null, (trip) => {

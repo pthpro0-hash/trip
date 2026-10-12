@@ -176,3 +176,12 @@ describe("fitTargets · 해외 곳이 섞인 여행을 맞출 때", () => {
     expect(fitTargets([tokyo, paris])).toEqual([tokyo, paris]);
   });
 });
+
+describe("inKorea · 이름을 묻는 쪽과 같은 기준", () => {
+  it("경계 가까이의 자리도 장소 이름 조회(isInKorea)와 같게 가른다", async () => {
+    const { isInKorea } = await import("./weatherGrid");
+    for (const [lat, lng] of [[32.8, 126], [32.9, 124.5], [33.11, 126.27], [37.24, 131.87], [37.5, 132.4], [35.1, 123.8], [33.0, 126]]) {
+      expect(inKorea({ lat, lng }), `${lat},${lng}`).toBe(isInKorea(lat, lng));
+    }
+  });
+});

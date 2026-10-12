@@ -1,3 +1,5 @@
+import { isInKorea } from "./weatherGrid";
+
 /*
   지도 허브의 계산.
 
@@ -187,11 +189,9 @@ export function groupPins(pins: ScreenPin[], reach: number): PinGroup[] {
  * 때마다 확대하면 끝까지 당겨도 풀리지 않는다. 좌표가 사실상 같으면
  * 확대하지 않고 곧장 펼쳐 보인다.
  */
-/** 한국 지도가 그려지는 범위(제주·독도 포함). 지도 서비스는 이 밖의 땅에는 그림이 없다. */
-const KOREA_BOX = { south: 32.5, north: 39, west: 123.5, east: 132.5 };
-
+/** 한국 지도가 그려지는 범위(제주·독도 포함). 장소 이름을 묻는 쪽(lib/weatherGrid)과 같은 기준을 쓴다 — 어느 쪽에서는 한국이고 다른 쪽에서는 해외인 자리가 없게. */
 export function inKorea(place: { lat: number; lng: number }): boolean {
-  return place.lat >= KOREA_BOX.south && place.lat <= KOREA_BOX.north && place.lng >= KOREA_BOX.west && place.lng <= KOREA_BOX.east;
+  return isInKorea(place.lat, place.lng);
 }
 
 /**

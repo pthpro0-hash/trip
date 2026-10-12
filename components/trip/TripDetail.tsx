@@ -777,6 +777,12 @@ export function TripDetail({ tripId }: { tripId: string }) {
           {abroadTrip ? <OverseasCourseMap spots={abroadStops} /> : <CourseMap spots={homeStops} />}
         </div>
       )}
+      {/* 한국과 해외가 섞인 여행은 많은 쪽만 지도에 그린다 — 안 그린 곳이 있다는 것을 알린다. */}
+      {(abroadTrip ? homeStops : abroadStops).length > 0 && (
+        <p className="-mt-3 break-keep text-[13px] text-text-faint">
+          {abroadTrip ? "한국" : "해외"} {(abroadTrip ? homeStops : abroadStops).length}곳은 이 지도에 그리지 않았어요. 아래 목록에서 볼 수 있어요.
+        </p>
+      )}
 
       {visitFailed && (
         <p className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">
