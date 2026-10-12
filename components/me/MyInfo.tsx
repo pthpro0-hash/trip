@@ -7,6 +7,7 @@ import { signOutAndReload } from "@/lib/signOut";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchMailboxes } from "@/lib/supabase/mailbox";
 import { mailboxPath } from "@/lib/mailbox";
+import { AbroadNamesRow } from "./AbroadNamesRow";
 import { countPendingSuggestions, isAdmin } from "@/lib/supabase/spotSuggestions";
 import { fetchUnreadHeartCount, fetchUnreadReplyCount, fetchUnreadWishCount } from "@/lib/supabase/postcards";
 
@@ -153,6 +154,7 @@ export function MyInfoView({
           </Group>
           <Group title="내 자료">
             <Row href="/help#data" title="보관함 정리" hint="사진 용량을 확인하고 줄여요" />
+            <AbroadNamesRow />
           </Group>
           {waiting !== null && (
             <Group title="관리">
