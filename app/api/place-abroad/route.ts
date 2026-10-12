@@ -43,14 +43,14 @@ async function ask(lat: number, lng: number): Promise<Answer | null> {
     cache: "no-store",
   });
   if (!response.ok) return null;
-  const body = (await response.json()) as { address?: Record<string, string> };
+  const body = (await response.json()) as { address?: Record<string, string>; display_name?: string };
   const address = body.address;
   if (!address) return null;
 
   const country = address.country ?? "";
   // 사람이 기억하는 단위로: 도시 > 읍 > 마을 > 구역 > 군 > 주(도).
   // 런던처럼 큰 도시가 구(시티오브웨스트민스터 등)로 쪼개져 나오는 곳은 사람이 부르는 이름(런던)을 쓴다.
-  const metro = /런던/.test(address.state_district ?? "") ? "런던" : "";
+  const metro = /그레이터런던/.test(`${address.state_district ?? ""} ${body.display_name ?? ""}`) ? "런던" : "";
   const local = metro || (address.city ?? address.town ?? address.village ?? address.suburb ?? address.county ?? address.state ?? "");
   const title = [country, local].filter((part, index, all) => part && all.indexOf(part) === index).join(" ");
   if (!title) return null;

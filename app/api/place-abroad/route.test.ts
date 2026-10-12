@@ -43,7 +43,7 @@ describe("POST /api/place-abroad", () => {
   }, 10_000);
 
   it("런던의 구(시티오브웨스트민스터 등)는 사람이 부르는 이름 '런던'으로", async () => {
-    answer = { address: { country: "영국", city: "시티오브웨스트민스터", state_district: "그레이터런던" } };
+    answer = { display_name: "시티오브웨스트민스터, 그레이터런던, 잉글랜드, 영국", address: { country: "영국", city: "시티오브웨스트민스터" } };
     const response = await call([{ lat: 51.5014, lng: -0.1775 }]);
     expect((await response.json()).places[0].title).toBe("영국 런던");
   }, 10_000);
