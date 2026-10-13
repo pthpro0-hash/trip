@@ -11,6 +11,7 @@ import {
 } from "@/lib/supabase/storageSweep";
 import { reshrinkPhotos, type ReshrinkOutcome } from "@/lib/supabase/photos";
 import { WaitingOverlay } from "@/components/layout/Waiting";
+import { logUse } from "@/lib/usage";
 
 /*
   사진 보관함 정리.
@@ -79,6 +80,7 @@ export function StorageTidy() {
     if (!supabase || !report) return;
     const { data } = await supabase.auth.getUser();
     if (!data.user) return;
+    logUse("storage_cleanup");
     setPhase({ kind: "working", title: "쓰지 않는 파일을 지우고 있어요" });
     const removed = await sweepOrphans(supabase, data.user.id, report.orphans, (done, total) =>
       setPhase({ kind: "working", title: "쓰지 않는 파일을 지우고 있어요", detail: `${done} / ${total}` }),
@@ -90,6 +92,7 @@ export function StorageTidy() {
   const reshrinkAll = async () => {
     const supabase = getBrowserClient();
     if (!supabase || !report) return;
+    logUse("storage_cleanup");
     const title = "사진을 다시 줄이고 있어요";
     setPhase({ kind: "working", title, detail: "화면을 끄거나 닫지 마세요" });
     /*

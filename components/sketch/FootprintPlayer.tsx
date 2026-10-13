@@ -18,6 +18,7 @@ import {
   tripsPerMonth,
   type FootprintStep,
 } from "@/lib/footprint";
+import { logUse } from "@/lib/usage";
 
 /*
   발자취 — 한 해를 날짜순으로 지도에 찍어 본다.
@@ -180,6 +181,7 @@ export function FootprintPlayer({ steps, monthCounts, totals, photoUrls, shared 
               type="button"
               onClick={() => {
                 if (!canPlay) return dispatch({ type: "pause" });
+                logUse("footprint_play");
                 setPicked(null);
                 dispatch({ type: "play", count });
               }}

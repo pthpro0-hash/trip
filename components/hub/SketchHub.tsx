@@ -41,6 +41,7 @@ import { TripCards } from "./TripCards";
 import { MapOptions } from "./MapOptions";
 import { PeriodChip } from "./PeriodChip";
 import { TripArchive } from "@/components/trip/TripArchive";
+import { logUse } from "@/lib/usage";
 
 /*
   내 여행의 첫 화면. 지도 하나에 내 사진이 다 얹힌다.
@@ -399,6 +400,7 @@ export function HubView({
       setPeriodOpen(false);
       return;
     }
+    logUse("hub_period");
     setPeriodOpen(true);
     if (!wide && snap === "peek") setSnap("half");
   };
@@ -485,6 +487,7 @@ export function HubView({
   };
 
   const openCollection = () => {
+    logUse("hub_sido");
     setPicked(null);
     setPickedSpot(null);
     setPanel("collection");
@@ -492,6 +495,7 @@ export function HubView({
 
   const toggleCurated = () => {
     if (showCurated) setPickedSpot(null);
+    else logUse("hub_curated");
     setShowCurated(!showCurated);
   };
 
@@ -600,6 +604,7 @@ export function HubView({
             echo={echo}
             photo={echoPhoto}
             onOpen={(place) => {
+              logUse("hub_echo");
               pick([place]);
               fly([place]);
             }}
@@ -657,7 +662,10 @@ export function HubView({
         onCurated={toggleCurated}
         overseasCount={overseas.length}
         abroad={abroadNow}
-        onAbroad={() => setAbroad(!abroadNow)}
+        onAbroad={() => {
+          if (!abroadNow) logUse("hub_abroad");
+          setAbroad(!abroadNow);
+        }}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import { RegisterServiceWorker } from "@/components/layout/RegisterServiceWorker
 import { FamilyBanner } from "@/components/family/FamilyBanner";
 import { BottomNav, BottomNavSpace } from "@/components/layout/BottomNav";
 import { PhotoLauncher } from "@/components/photo/PhotoLauncher";
+import { UsageTracker } from "@/components/layout/UsageTracker";
 import "./globals.css";
 
 const SITE_NAME = "내 여행 스케치";
@@ -63,6 +64,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <CollectionSync />
         {/* [사진 고르기]를 누르면 사진첩이 곧바로 열리게 하는 숨은 입력칸. */}
         <PhotoLauncher />
+        {/* 어떤 화면을 여는지 센다(로그인한 사람만, 이름만). 그리는 것은 없다. */}
+        <UsageTracker />
         <Analytics />
         <RegisterServiceWorker />
       </body>

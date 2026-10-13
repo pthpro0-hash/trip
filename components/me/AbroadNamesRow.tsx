@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchOverseasVisits, refreshAbroadNames, type OverseasVisit } from "@/lib/supabase/abroadNames";
+import { logUse } from "@/lib/usage";
 
 /*
   내 정보 › 내 자료의 한 줄 — 해외에서 다녀온 곳의 이름을 세부 지역명으로 새로 붙인다. 해외 곳이 하나도 없으면 줄을 두지 않는다.
@@ -37,6 +38,7 @@ export function AbroadNamesRow() {
   const run = async () => {
     const supabase = getBrowserClient();
     if (!supabase || progress) return;
+    logUse("abroad_rename");
     setResult(null);
     setProgress({ done: 0, total: visits.length });
     try {

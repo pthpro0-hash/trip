@@ -16,6 +16,7 @@ import { PhotoPicker } from "./send/PhotoPicker";
 import { PostcardPreview } from "./send/PostcardPreview";
 import { SentDone } from "./send/SentDone";
 import { ShelfList } from "./send/ShelfList";
+import { logUse } from "@/lib/usage";
 
 /*
   엽서 보내기 — 이 여행을 부모님께.
@@ -255,6 +256,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
       setFailure(REASON[result.reason]);
       return;
     }
+    logUse("postcard_sent");
     try {
       window.localStorage.setItem(NAME_KEY, senderName.trim());
     } catch {

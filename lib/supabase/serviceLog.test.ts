@@ -16,6 +16,11 @@ const 아무_말도 = () => {
   return spy;
 };
 
+/** 로그인한 사람의 client. 로그인했는지는 getSession 으로 본다. */
+const signedIn = { getSession: () => Promise.resolve({ data: { session: { user: { id: "u" } } } }) };
+const guest = { getSession: () => Promise.resolve({ data: { session: null } }) };
+const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
+
 describe("logEvent", () => {
   it("남길 곳이 없으면 조용히 넘어간다", () => {
     expect(() => logEvent(null, "signed_in")).not.toThrow();
@@ -28,6 +33,7 @@ describe("logEvent", () => {
 
   it("rpc 가 던져도 던지지 않는다", () => {
     const supabase = {
+      auth: signedIn,
       rpc: () => {
         throw new Error("망가짐");
       },
@@ -37,6 +43,7 @@ describe("logEvent", () => {
 
   it("rpc 가 실패한 약속을 돌려줘도 잡히지 않은 거절이 남지 않는다", async () => {
     const supabase = {
+      auth: signedIn,
       rpc: () => Promise.reject(new Error("망가짐")),
     } as unknown as SupabaseClient;
 
@@ -50,11 +57,12 @@ describe("logEvent", () => {
     expect(unhandled).not.toHaveBeenCalled();
   });
 
-  it("이름과 내용을 그대로 실어 보낸다", () => {
+  it("이름과 내용을 그대로 실어 보낸다", async () => {
     const rpc = vi.fn(() => Promise.resolve({ data: null, error: null }));
-    const supabase = { rpc } as unknown as SupabaseClient;
+    const supabase = { auth: signedIn, rpc } as unknown as SupabaseClient;
 
     logEvent(supabase, "photos_uploaded", { uploaded: 87, unsupported: 13 });
+    await settle();
 
     expect(rpc).toHaveBeenCalledWith("log_event", {
       p_event: "photos_uploaded",
@@ -65,6 +73,7 @@ describe("logEvent", () => {
   it("기다리게 하지 않는다 — 부르고 바로 돌아온다", () => {
     let settled = false;
     const supabase = {
+      auth: signedIn,
       rpc: () =>
         new Promise((resolve) => {
           setTimeout(() => {
@@ -77,5 +86,20 @@ describe("logEvent", () => {
     logEvent(supabase, "trip_renamed", { title: true });
     // 돌아왔을 때 rpc 는 아직 끝나지 않았다.
     expect(settled).toBe(false);
+  });
+
+  it("로그인하지 않았으면 남기지 않는다 — 방침: 둘러보실 때는 아무것도 모으지 않는다", async () => {
+    const rpc = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    logEvent({ auth: guest, rpc } as unknown as SupabaseClient, "photos_read", { picked: 3 });
+    await settle();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("로그인했는지 보다가 실패해도 던지지 않고 남기지 않는다", async () => {
+    const rpc = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const broken = { getSession: () => Promise.reject(new Error("망가짐")) };
+    expect(() => logEvent({ auth: broken, rpc } as unknown as SupabaseClient, "signed_in")).not.toThrow();
+    await settle();
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

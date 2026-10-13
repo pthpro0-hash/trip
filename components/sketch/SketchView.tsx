@@ -15,6 +15,7 @@ import { tripFocus } from "@/lib/scrollMemory";
 import { SketchShowcase } from "./SketchShowcase";
 import { AllYearsShowcase } from "./AllYearsShowcase";
 import { Waiting } from "@/components/layout/Waiting";
+import { logUse } from "@/lib/usage";
 
 /*
   한장 요약 — 남에게 보여 주는 얼굴.
@@ -228,6 +229,7 @@ export function SketchView() {
   };
 
   const pick = (entry: number | "all") => {
+    if (entry === "all" && year !== "all") logUse("sketch_all_tab");
     setYear(entry);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };

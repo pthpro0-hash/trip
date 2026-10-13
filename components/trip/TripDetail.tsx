@@ -48,6 +48,7 @@ import { coverPhotoOf } from "@/lib/tripCover";
 import { stayLabel, tripClues } from "@/lib/photo/clues";
 import { CourseMap } from "@/components/course/CourseMap";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
+import { logUse } from "@/lib/usage";
 
 /* 링크 창은 누를 때만 받는다. */
 const TripShareDialog = dynamic(
@@ -591,6 +592,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
         <ShareChooser
           title={trip.title?.trim() || formatSpan(trip.startedOn, trip.endedOn)}
           onLink={() => {
+            logUse("trip_share");
             setPicking(false);
             setSharing(true);
           }}

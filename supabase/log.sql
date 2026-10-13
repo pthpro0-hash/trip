@@ -94,5 +94,10 @@ grant execute on function public.log_event(text, jsonb) to anon, authenticated;
 --   where detail ? 'failed' and (detail->>'failed')::int > 0
 --   order by at desc;
 
+-- 어떤 화면·기능을 몇 명이 몇 번 썼나 (lib/usage — 'use.' 으로 시작한다. 로그인한 사람만 센다)
+--   select replace(event, 'use.', '') as 기능, count(distinct user_id) as 사람, count(*) as 횟수
+--   from public.service_log where event like 'use.%'
+--   group by 1 order by 2 desc, 3 desc;
+
 -- 가장 오래된 기록이 언제 것인지 (한 달을 넘기지 않아야 한다)
 --   select min(at), max(at), count(*) from public.service_log;

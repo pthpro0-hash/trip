@@ -15,6 +15,7 @@ import {
   submitSuggestion,
   type Suggestion,
 } from "@/lib/supabase/spotSuggestions";
+import { logUse } from "@/lib/usage";
 
 /*
   빠진 곳 추천하기 — "이 곳이 목록에 있으면 좋겠어요". 보내면 관리자가 보고 반영 여부를 정한다. 목록에 넣는 일은 개발로 하니, 보낸 사람에게
@@ -63,6 +64,7 @@ export function SuggestSpot({ label = "빠진 곳이 있나요? 추천하기" }:
     setNotice(null);
     const result = await submitSuggestion(supabase, userId, { name, place, reason });
     if (result === "ok") {
+      logUse("spot_suggest");
       setName("");
       setPlace("");
       setReason("");

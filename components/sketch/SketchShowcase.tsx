@@ -28,6 +28,7 @@ import { StoryScenes } from "./StoryScenes";
 import { FootprintPlayer } from "./FootprintPlayer";
 import { footprintSteps, tripsPerMonth } from "@/lib/footprint";
 import { WaitingOverlay } from "@/components/layout/Waiting";
+import { logUse } from "@/lib/usage";
 
 /*
   링크 창은 누를 때만 받는다. 시도 칠하기 경계(60KB)가 딸려 있어,
@@ -241,6 +242,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
   const save = async () => {
     const svg = holder.current?.querySelector("svg");
     if (!svg) return;
+    logUse("sketch_save");
     setSaving(true);
     setFailed(false);
     const ok = await downloadSvgAsPng(svg, `여행스케치-${title}${styleSuffix(style)}.png`);
@@ -342,7 +344,10 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
                 {userId && (
                   <button
                     type="button"
-                    onClick={() => setSharing(true)}
+                    onClick={() => {
+                      logUse("sketch_share");
+                      setSharing(true);
+                    }}
                     disabled={saving || waitingPhotos}
                     aria-label={`${year}년 링크로 보여 주기`}
                     className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-accent transition hover:bg-line disabled:opacity-60"
@@ -371,7 +376,10 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
                       role="radio"
                       aria-checked={option.id === style}
                       disabled={blocked}
-                      onClick={() => keepCardStyle(option.id)}
+                      onClick={() => {
+                        if (option.id !== style) logUse("sketch_shape");
+                        keepCardStyle(option.id);
+                      }}
                       className={`min-w-0 flex-1 rounded-xl px-1.5 py-2 text-[14px] font-medium transition disabled:opacity-40 ${
                         option.id === style
                           ? "bg-text text-bg"
@@ -392,7 +400,10 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
               {canEdit && (
                 <button
                   type="button"
-                  onClick={() => setEditing(true)}
+                  onClick={() => {
+                    logUse("sketch_line");
+                    setEditing(true);
+                  }}
                   aria-label="한 줄 고쳐 쓰기"
                   className="shrink-0 rounded-xl px-2 py-1 text-[14px] font-medium text-accent transition hover:bg-bg-subtle"
                 >
@@ -419,6 +430,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
 
       <Link
         href={`/?v=sketch&y=${year}`}
+        onClick={() => logUse("sketch_to_map")}
         className="-mt-2 self-start rounded-full bg-bg-subtle px-4 py-2.5 text-[15px] font-medium text-accent transition hover:bg-accent-soft"
       >
         {year}년을 지도에서 보기

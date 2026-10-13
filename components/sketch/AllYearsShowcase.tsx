@@ -11,6 +11,7 @@ import { downloadSvgAsPng } from "@/lib/svgToPng";
 import { WaitingOverlay } from "@/components/layout/Waiting";
 import { YearsCard } from "./YearsCard";
 import { YearsScenes } from "./YearsScenes";
+import { logUse } from "@/lib/usage";
 
 /* 링크 창은 누를 때만 받는다(SketchShowcase 와 같은 까닭). */
 const ShareDialog = dynamic(() => import("@/components/share/ShareDialog").then((module) => module.ShareDialog), {
@@ -50,6 +51,7 @@ export function AllYearsShowcase({ all, sidoOf, onPickYear, userId = null }: All
   const save = async () => {
     const svg = holder.current?.querySelector("svg");
     if (!svg) return;
+    logUse("sketch_save");
     setSaving(true);
     setFailed(false);
     if (!(await downloadSvgAsPng(svg, "여행스케치-지금까지.png"))) setFailed(true);
@@ -82,7 +84,10 @@ export function AllYearsShowcase({ all, sidoOf, onPickYear, userId = null }: All
           {userId && (
             <button
               type="button"
-              onClick={() => setSharing(true)}
+              onClick={() => {
+                logUse("sketch_share");
+                setSharing(true);
+              }}
               disabled={saving}
               aria-label="지금까지 링크로 보여 주기"
               className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-accent transition hover:bg-line disabled:opacity-60"
