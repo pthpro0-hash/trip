@@ -152,11 +152,10 @@ describe("HubView · 시트의 첫 모습(살짝 올림)", () => {
       expect(screen.queryByText("이 화면 2곳")).toBeNull();
     });
 
-    it("그 여행을 다시 걸을 수 있게 된다", () => {
+    it("다시 걷기 단추는 없다 — 기능을 뺐다", () => {
       sheet();
-      expect(screen.queryByRole("button", { name: /다시 걷기/ })).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: /강릉 바다/ }));
-      expect(screen.getByRole("button", { name: /이 여행 다시 걷기/ })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /다시 걷기/ })).toBeNull();
     });
 
     it("선택 풀기를 누르면 처음으로", () => {

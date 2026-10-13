@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  dwellMs,
   echoLabel,
   echoOf,
   indexAt,
@@ -8,8 +7,6 @@ import {
   monthSpan,
   monthTotals,
   rangeLabel,
-  replayOrder,
-  trailSegments,
   withinMonths,
   yearRange,
 } from "./timeline";
@@ -90,54 +87,9 @@ describe("rangeLabel", () => {
   });
 });
 
-describe("replayOrder", () => {
-  it("찍은 때 순서대로", () => {
-    expect(replayOrder([봄, 여름, 봄둘째, 가을]).map((p) => p.visitId)).toEqual(["v1", "v2", "v3", "v4"]);
-  });
-
-  it("같은 때면 늘 같은 순서 — 두 번 걸어도 같은 길", () => {
-    const a = at("a", "2026-01-01 10:00:00");
-    const b = at("b", "2026-01-01 10:00:00");
-    expect(replayOrder([b, a])).toEqual(replayOrder([a, b]));
-  });
-
-  it("건네받은 목록을 건드리지 않는다", () => {
-    const list = [봄, 여름];
-    replayOrder(list);
-    expect(list[0]).toBe(봄);
-  });
-});
-
-describe("dwellMs", () => {
-  it("곳이 많을수록 걸음을 재촉한다", () => {
-    expect(dwellMs(5)).toBeGreaterThan(dwellMs(20));
-    expect(dwellMs(20)).toBeGreaterThan(dwellMs(50));
-  });
-});
-
 describe("monthOf", () => {
   it("벽시계 시각에서 달만", () => {
     expect(monthOf("2026-09-14 06:11:00")).toBe("2026-09");
-  });
-});
-
-describe("trailSegments", () => {
-  const stop = (tripId: string, lat: number) => ({ tripId, lat, lng: 127 });
-  const stops = [stop("t1", 37.5), stop("t1", 37.4), stop("t2", 36.3), stop("t2", 36.2)];
-
-  it("여행이 바뀌는 자리에서 끊는다 — 가지 않은 길을 긋지 않게", () => {
-    expect(trailSegments(stops, 4)).toEqual([
-      [{ lat: 37.5, lng: 127 }, { lat: 37.4, lng: 127 }],
-      [{ lat: 36.3, lng: 127 }, { lat: 36.2, lng: 127 }],
-    ]);
-  });
-
-  it("앞의 몇 곳까지만", () => {
-    expect(trailSegments(stops, 3)).toEqual([
-      [{ lat: 37.5, lng: 127 }, { lat: 37.4, lng: 127 }],
-      [{ lat: 36.3, lng: 127 }],
-    ]);
-    expect(trailSegments(stops, 0)).toEqual([]);
   });
 });
 

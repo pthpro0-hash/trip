@@ -2,8 +2,7 @@
   시간으로 거르고, 시간으로 되짚는다.
 
   지도는 "어디"를 보여 주고, 이 파일은 "언제"를 맡는다. 월별 막대로
-  기간을 고르면 지도가 그 기간만 남기고, 다시 걷기는 고른 여행을 찍은
-  순서대로 따라간다.
+  기간을 고르면 지도가 그 기간만 남긴다.
 */
 
 /** 찍은 때가 있는 것. HubPlace 가 이 꼴을 갖췄다. */
@@ -80,52 +79,6 @@ export function indexAt(x: number, width: number, count: number): number {
 export function rangeLabel(range: MonthRange): string {
   const dot = (month: string) => month.replace("-", ".");
   return range[0] === range[1] ? dot(range[0]) : `${dot(range[0])} ~ ${dot(range[1])}`;
-}
-
-/**
- * 다시 걸을 순서. 찍은 때 순서대로.
- *
- * 같은 때면 방문 id 로 가른다 — 되풀이할 때마다 순서가 바뀌면 같은
- * 여행을 두 번 걸어도 다른 길이 된다.
- */
-export function replayOrder<T extends Dated>(places: T[]): T[] {
-  return [...places].sort(
-    (a, b) => a.startedAt.localeCompare(b.startedAt) || a.visitId.localeCompare(b.visitId),
-  );
-}
-
-/**
- * 한 곳에 머무는 시간.
- *
- * 몇 곳 안 되면 사진을 들여다볼 틈을 넉넉히 준다. 전부를 걸을 때 한
- * 곳에 2초 반씩 머물면 쉰 곳에 2분이 넘는다 — 그때는 걸음을 재촉한다.
- */
-export function dwellMs(stops: number): number {
-  if (stops <= 12) return 2600;
-  if (stops <= 30) return 1900;
-  return 1300;
-}
-
-interface Stop {
-  tripId: string;
-  lat: number;
-  lng: number;
-}
-
-/**
- * 앞의 몇 곳까지 걸은 자국. 여행이 바뀌는 자리에서 끊는다.
- *
- * 전부를 걸을 때 4월의 서울 여행 끝과 7월의 수원 여행 처음을 이으면,
- * 아무도 가지 않은 길이 지도에 그려진다. 한 여행 안에서만 잇는다.
- */
-export function trailSegments(stops: Stop[], upTo: number): { lat: number; lng: number }[][] {
-  const segments: { lat: number; lng: number }[][] = [];
-  for (let i = 0; i < Math.min(upTo, stops.length); i += 1) {
-    const { lat, lng } = stops[i];
-    if (i === 0 || stops[i - 1].tripId !== stops[i].tripId) segments.push([]);
-    segments.at(-1)!.push({ lat, lng });
-  }
-  return segments;
 }
 
 /** 몇 해 전 오늘 다녀온 곳. */

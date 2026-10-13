@@ -16,7 +16,7 @@ import { useWide } from "@/lib/useWide";
 import { Waiting } from "@/components/layout/Waiting";
 import dynamic from "next/dynamic";
 import type { OverseasMap as OverseasMapType } from "./OverseasMap";
-import { HubMap, type CuratedPin, type FlyTarget, type HubMapHandle, type PaintedSido } from "./HubMap";
+import { HubMap, type CuratedPin, type FlyTarget, type PaintedSido } from "./HubMap";
 import { CollectionPanel } from "./CollectionPanel";
 import { EchoCard } from "./EchoCard";
 import { SpotPeek } from "./SpotPeek";
@@ -24,12 +24,10 @@ import { HubDialog } from "./HubDialog";
 import { thumbUrls } from "@/lib/supabase/photos";
 import { useWishlist } from "@/lib/collections";
 import { MonthBars } from "./MonthBars";
-import { REPLAY_HEIGHT, ReplayPanel } from "./ReplayPanel";
 import {
   monthSpan,
   monthTotals,
   rangeLabel,
-  replayOrder,
   withinMonths,
   echoOf,
   yearRange,
@@ -263,7 +261,6 @@ export function HubView({
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const flights = useRef(0);
-  const mapHandle = useRef<HubMapHandle>(null);
   /** 달 막대로 고른 기간. 지도와 목록이 이 기간만 남긴다. */
   /*
     한장 요약에서 "그해를 지도에서 보기"로 넘어오면 그해가 골라진 채로
@@ -272,9 +269,6 @@ export function HubView({
   const [range, setRange] = useState<MonthRange | null>(() =>
     initialYear ? yearRange(monthSpan(places), initialYear) : null,
   );
-  /** 다시 걷는 중이면 걸을 곳들. */
-  const [replay, setReplay] = useState<HubPlace[] | null>(null);
-  const [walkingAt, setWalkingAt] = useState<HubPlace | null>(null);
   /** 시트 속에 무엇을 펼쳤나. 칠한 곳 모음은 목록 대신 들어선다. */
   const [panel, setPanel] = useState<"trips" | "collection">("trips");
   /** 100선 겹쳐 보기. */
@@ -326,17 +320,16 @@ export function HubView({
   const empty = places.length === 0;
   const heights = useMemo(() => snapHeights(frame, empty ? PEEK_EMPTY : PEEK), [frame, empty]);
   /*
-    지도 아래를 덮은 높이. 걷는 중이면 걷기 판이, 아니면 시트가 덮는다.
-    넓은 화면에서 시트는 옆에 서므로 0.
+    지도 아래를 덮은 높이. 시트가 덮는다. 넓은 화면에서 시트는 옆에 서므로 0.
   */
-  const inset = replay ? REPLAY_HEIGHT : wide ? 0 : (dragHeight ?? heights[snap]);
+  const inset = wide ? 0 : (dragHeight ?? heights[snap]);
   /*
     목록이 셀 범위는 시트를 가장 낮게 내렸을 때 보이는 땅이다. 시트를
     올리는 것은 목록을 읽으려는 것인데, 올린 만큼 범위를 줄이면 위쪽
     얇은 띠만 남아 "이 화면에는 다녀온 곳이 없어요"가 떴다 — 지도에는
     분명 핀이 보이는데. 올려도 목록은 그대로 둔다.
   */
-  const viewInset = replay || wide ? inset : Math.min(inset, heights.peek);
+  const viewInset = wide ? inset : Math.min(inset, heights.peek);
 
   /*
     막대는 언제나 전체 기간을 보여 준다. 고른 기간만 남기면 막대가 줄어
@@ -348,7 +341,6 @@ export function HubView({
   const shown = useMemo(() => withinMonths(places, range), [places, range]);
   /*
     해외 곳. 카카오 지도에는 한국 밖 그림이 없어, 해외 곳은 따로 해외 지도(OverseasMap)로 본다. 지도 옵션에서 오간다.
-    다시 걷기(replay)는 한국 지도의 손잡이로 하므로 걷는 동안에는 한국 지도로 돌아온다.
   */
   const [abroad, setAbroad] = useState(false);
   const overseas = useMemo(() => shown.filter((place) => !inKorea(place)), [shown]);
@@ -381,8 +373,8 @@ export function HubView({
     [places, focused],
   );
   const pickedIds = useMemo(
-    () => new Set(walkingAt ? [walkingAt.visitId] : (picked ?? []).map((place) => place.visitId)),
-    [picked, walkingAt],
+    () => new Set((picked ?? []).map((place) => place.visitId)),
+    [picked],
   );
 
   const shownTrips = new Set(shown.map((place) => place.tripId)).size;
@@ -419,29 +411,6 @@ export function HubView({
   const compact = !wide && snap === "peek";
   const showCards = compact;
   const showList = !compact || dragHeight !== null;
-
-  /*
-    다시 걸을 것은 지금 고른 여행이다. 따로 묻지 않는다 — 무엇을 걷고
-    싶은지는 이미 화면에 골라 두었다.
-
-    "전부 다시 걷기"와 "이 기간 다시 걷기"는 뺐다. 여러 여행을 이어
-    걷는 것은 너무 길어 쓰이지 않았다. 여행을 고르지 않았으면 걷기
-    단추를 두지 않는다.
-  */
-  const walkable = route ?? [];
-  const walkLabel = route ? "이 여행 다시 걷기" : null;
-
-  const startWalk = () => {
-    if (walkable.length === 0) return;
-    setPicked(null);
-    setReplay(replayOrder(walkable));
-  };
-
-  const stopWalk = () => {
-    mapHandle.current?.clearTrail();
-    setWalkingAt(null);
-    setReplay(null);
-  };
 
   const chooseRange = (next: MonthRange | null) => {
     setRange(next);
@@ -593,19 +562,7 @@ export function HubView({
       timeline={
         barsShown ? <MonthBars months={months} totals={totals} range={range} onRange={chooseRange} /> : null
       }
-      walkLabel={walkable.length > 0 ? walkLabel : null}
-      onWalk={startWalk}
       onList={onList}
-    />
-  );
-
-  const walking = replay && (
-    <ReplayPanel
-      userId={userId}
-      stops={replay}
-      map={mapHandle}
-      onAt={setWalkingAt}
-      onClose={stopWalk}
     />
   );
 
@@ -614,7 +571,7 @@ export function HubView({
     사진이 잘려, 보려면 시트 안을 굴려야 했다. 시트는 목록만 맡는다.
   */
   const detail: { label: string; content: ReactNode } | null =
-    status !== "ready" || replay
+    status !== "ready"
       ? null
       : spot
         ? { label: spot.name, content: <SpotPeek spot={spot} thumbnail={curated?.thumbnailOf(spot.id)} /> }
@@ -658,7 +615,7 @@ export function HubView({
       </>
     );
 
-  const abroadNow = abroad && overseas.length > 0 && !replay;
+  const abroadNow = abroad && overseas.length > 0;
   const map = abroadNow ? (
     <OverseasMap
       places={overseas}
@@ -672,11 +629,9 @@ export function HubView({
     />
   ) : (
     <HubMap
-      ref={mapHandle}
       places={shown}
       photoUrls={pinUrls}
-      // 걷는 동안에는 걸음 자국이 선을 대신한다.
-      route={replay ? null : route}
+      route={route}
       pickedIds={pickedIds}
       flyTo={flyTo}
       bottomInset={inset}
@@ -684,7 +639,7 @@ export function HubView({
       onView={setView}
       onPick={pick}
       painted={painted}
-      curated={replay ? null : curatedPins}
+      curated={curatedPins}
       onPickSpot={pickSpot}
     />
   );
@@ -693,7 +648,7 @@ export function HubView({
     지도 위 왼쪽에 띄우는 단추 하나. 칠한 곳 모음(다녀온 시도)과 100선 겹쳐 보기가 이 안에 있다 — 예전에는 칩 둘이
     늘 떠 있어 무엇인지 알기 어렵고 지도를 가렸다. 아직 얹을 것이 없으면 띄우지 않는다.
   */
-  const controls = !empty && !replay && (
+  const controls = !empty && (
     <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col items-start gap-2 sm:top-[68px]">
       <MapOptions
         sidoCount={sido ? tally.size : null}
@@ -722,7 +677,6 @@ export function HubView({
             {map}
             <Floating>{switcher}</Floating>
             {controls}
-            {walking && <div className="absolute inset-x-4 bottom-0 z-20 mx-auto max-w-xl">{walking}</div>}
           </div>
           <aside aria-label="내 여행 목록" className="flex min-h-0 flex-col border-l border-line bg-surface">
             <div className="shrink-0 border-b border-line px-5 py-4">{header}</div>
@@ -734,9 +688,6 @@ export function HubView({
           {map}
           <Floating>{switcher}</Floating>
           {controls}
-          {walking ? (
-            <div className="absolute inset-x-0 bottom-0 z-20">{walking}</div>
-          ) : (
           <HubSheet
             snap={snap}
             onSnap={(next) => {
@@ -749,7 +700,6 @@ export function HubView({
           >
             {body}
           </HubSheet>
-          )}
         </>
       )}
       {detail && (
@@ -794,9 +744,6 @@ interface SheetHeaderProps {
   periodChip: ReactNode;
   /** 펼친 달 막대. "기간"을 눌러야 있다. */
   timeline: ReactNode;
-  /** 다시 걷기 단추의 이름. 걸을 것이 없으면 null. */
-  walkLabel: string | null;
-  onWalk: () => void;
   /** 목록 모습으로 넘어간다. 주지 않으면 스위치를 두지 않는다. */
   onList?: () => void;
 }
@@ -818,8 +765,6 @@ function SheetHeader({
   cards,
   periodChip,
   timeline,
-  walkLabel,
-  onWalk,
   onList,
 }: SheetHeaderProps) {
   if (status === "guest") {
@@ -904,19 +849,6 @@ function SheetHeader({
       <div
         className={`flex items-center gap-2 pb-0.5 ${wide ? "flex-wrap" : "overflow-x-auto [scrollbar-width:none]"}`}
       >
-        {/*
-          다시 걷기가 맨 앞이다. 이 화면에서 다른 데서는 못 하는 일이
-          이것이다.
-        */}
-        {walkLabel && (
-          <button
-            type="button"
-            onClick={onWalk}
-            className="shrink-0 rounded-full bg-accent px-3.5 py-1.5 text-[13px] font-medium text-on-accent transition hover:bg-accent-hover"
-          >
-            ▶ {walkLabel}
-          </button>
-        )}
         {/* 달 막대를 여닫는다. 거른 기간이 있으면 이 단추가 말한다. */}
         {periodChip}
         {/* 같은 여행을 목록으로도 본다. 검색하고 거르고 지우는 것은 그쪽이 한다. */}

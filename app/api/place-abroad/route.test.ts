@@ -37,6 +37,12 @@ describe("POST /api/place-abroad", () => {
     expect(asked[0]).toContain("yeohaeng-sesang");
   });
 
+  it("나라 이름이 영어로 와도 나라 코드로 한글을 쓴다", async () => {
+    answer = { address: { country: "United States", country_code: "us", city: "뉴욕" } };
+    const body = await (await call([{ lat: 40.71, lng: -74.01 }])).json();
+    expect(body.places[0].title).toBe("미국 뉴욕");
+  });
+
   it("도시가 없으면 읍·마을·구역·군·주 순으로, 나라와 같은 이름은 한 번만", async () => {
     answer = { address: { country: "모나코", suburb: "모나코" } };
     const response = await call([{ lat: 43.7384, lng: 7.4246 }]);

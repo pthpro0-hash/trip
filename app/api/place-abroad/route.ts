@@ -67,7 +67,16 @@ async function ask(lat: number, lng: number): Promise<Answer | null> {
   const address = body.address;
   if (!address) return null;
 
-  const country = address.country ?? "";
+  // 나라 이름은 OpenStreetMap 에 한글이 없어도 나라 코드로 한글을 얻는다(영어로 남지 않게).
+  const code = address.country_code?.toUpperCase();
+  let country = address.country ?? "";
+  if (code && code.length === 2) {
+    try {
+      country = new Intl.DisplayNames(["ko"], { type: "region" }).of(code) ?? country;
+    } catch {
+      // 모르는 코드면 받은 이름을 쓴다.
+    }
+  }
   // 사람이 기억하는 단위로: 도시 > 읍 > 마을 > 구역 > 군 > 주(도).
   // 런던처럼 큰 도시가 구(시티오브웨스트민스터 등)로 쪼개져 나오는 곳은 사람이 부르는 이름(런던)을 쓴다.
   const metro = /그레이터런던/.test(`${address.state_district ?? ""} ${body.display_name ?? ""}`) ? "런던" : "";
