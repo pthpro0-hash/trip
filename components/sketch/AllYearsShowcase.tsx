@@ -67,9 +67,7 @@ export function AllYearsShowcase({ all, sidoOf, onPickYear, userId = null }: All
         <YearsCard stats={story.total} headline={line} layers={story.layers} rows={story.rows} />
       </div>
 
-      <YearsScenes story={story} onPickYear={onPickYear} />
-
-      <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex flex-col gap-1.5 border-t border-line bg-bg/95 px-5 py-3 backdrop-blur-md [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="-mt-2 flex flex-col gap-1.5">
         {failed && <p className="text-[13px] text-text-muted">저장하지 못했어요.</p>}
         <div className="flex gap-2">
           <button
@@ -94,6 +92,8 @@ export function AllYearsShowcase({ all, sidoOf, onPickYear, userId = null }: All
           )}
         </div>
       </div>
+
+      <YearsScenes story={story} onPickYear={onPickYear} />
 
       {sharing && userId && (
         <ShareDialog

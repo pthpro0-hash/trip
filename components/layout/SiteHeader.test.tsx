@@ -76,7 +76,7 @@ describe("SiteHeader", () => {
       },
     );
 
-    it.each(["/sketch", "/trips/new", "/s/abc", "/t/abc", "/login"])(
+    it.each(["/trips/new", "/s/abc", "/t/abc", "/login"])(
       "%s — 아래 탭이 없으니 위 띠의 갈래를 접지 않는다",
       async (at) => {
         await 머리띠(at);
@@ -98,7 +98,7 @@ describe("SiteHeader", () => {
     });
 
     it("아래 탭이 없는 화면에서는 이름을 폰에서 접는다 — 갈래와 계정 칩이 들어가야 한다", async () => {
-      await 머리띠("/sketch");
+      await 머리띠("/trips/new");
       const name = screen.getAllByText("내 여행 스케치").find((node) => !node.className.includes("sr-only"))!;
       expect(name.className).toContain("hidden");
       expect(name.className).toContain("sm:inline");

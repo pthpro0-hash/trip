@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { buildSketch, monthStrip, sketchShapes, type SketchTrip } from "@/lib/sketch";
@@ -86,6 +87,7 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [shapeOpen, setShapeOpen] = useState(false);
   const [writeFailed, setWriteFailed] = useState(false);
   /** Escape 로 버리는 중이면 손을 뗄 때 저장하지 않는다. */
   const cancelling = useRef(false);
@@ -289,9 +291,8 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
       </div>
 
       {/*
-        카드 아래 한 줄 — 카드 모양 고르기와 한 줄 고쳐 쓰기. 같은 한 해라도 보여 줄 곳에 따라 어울리는
-        모양이 다르고, 고른 모양 그대로 저장된다. 바로 위 카드의 것이라 카드에 붙여 둔다. 모양 이름은
-        지도·사진 콜라주·선 그림이면 뜻이 읽혀서 설명 문장은 달지 않는다.
+        카드 바로 아래 — 저장·공유가 카드 곁에 있어 아래까지 내려가지 않는다. 모양은 접어 두었다가 [모양]을 누르면
+        펼친다(고른 모양 그대로 저장된다). 모양 이름은 지도·사진 콜라주·선 그림이면 뜻이 읽혀서 설명 문장은 달지 않는다.
 
         그해의 한 줄은 화면이 먼저 지어 두지만 그해가 어땠는지는 본인만 안다 — 고쳐 쓰면 그 말이 카드에도
         들어간다. 고치는 중에는 이 줄이 입력칸으로 바뀐다.
@@ -325,40 +326,81 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
             <p className="text-[13px] text-text-faint">비우면 화면이 지은 말로 돌아가요. Esc 로 취소.</p>
           </>
         ) : (
-          <div className="flex items-center gap-1.5">
-            <div role="radiogroup" aria-label="카드 모양" className="flex min-w-0 flex-1 gap-1.5">
-              {CARD_STYLES.map((option) => {
-                const blocked = option.id === "collage" && picks.length === 0;
-                return (
+          <>
+            {failed && <p className="text-[13px] text-text-muted">저장하지 못했어요.</p>}
+            <div className="flex items-center gap-1.5">
+              <div className="flex min-w-0 flex-1 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => void save()}
+                  disabled={saving || waitingPhotos}
+                  aria-label={`${year}년 이미지 저장`}
+                  className="flex-1 rounded-full bg-accent px-1.5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
+                >
+                  이미지 저장
+                </button>
+                {userId && (
                   <button
-                    key={option.id}
                     type="button"
-                    role="radio"
-                    aria-checked={option.id === style}
-                    disabled={blocked}
-                    onClick={() => keepCardStyle(option.id)}
-                    className={`min-w-0 flex-1 rounded-xl px-1.5 py-2 text-[14px] font-medium transition disabled:opacity-40 ${
-                      option.id === style
-                        ? "bg-text text-bg"
-                        : "bg-bg-subtle text-text-muted hover:bg-line hover:text-text"
-                    }`}
+                    onClick={() => setSharing(true)}
+                    disabled={saving || waitingPhotos}
+                    aria-label={`${year}년 링크로 보여 주기`}
+                    className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-accent transition hover:bg-line disabled:opacity-60"
                   >
-                    {option.label}
+                    링크 공유
                   </button>
-                );
-              })}
-            </div>
-            {canEdit && (
+                )}
+              </div>
               <button
                 type="button"
-                onClick={() => setEditing(true)}
-                aria-label="한 줄 고쳐 쓰기"
-                className="shrink-0 rounded-xl bg-bg-subtle px-3 py-2 text-[14px] font-medium text-accent transition hover:bg-line"
+                aria-expanded={shapeOpen}
+                onClick={() => setShapeOpen((open) => !open)}
+                className="shrink-0 rounded-full bg-bg-subtle px-3.5 py-2.5 text-[14px] font-medium text-text transition hover:bg-line"
               >
-                <span aria-hidden="true">✎</span> 한 줄
+                모양 {shapeOpen ? "▴" : "▾"}
               </button>
+            </div>
+            {shapeOpen && (
+              <div role="radiogroup" aria-label="카드 모양" className="flex gap-1.5">
+                {CARD_STYLES.map((option) => {
+                  const blocked = option.id === "collage" && picks.length === 0;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={option.id === style}
+                      disabled={blocked}
+                      onClick={() => keepCardStyle(option.id)}
+                      className={`min-w-0 flex-1 rounded-xl px-1.5 py-2 text-[14px] font-medium transition disabled:opacity-40 ${
+                        option.id === style
+                          ? "bg-text text-bg"
+                          : "bg-bg-subtle text-text-muted hover:bg-line hover:text-text"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
             )}
-          </div>
+            {/* 숫자 한 줄 — 카드를 보고 바로 읽는 그해의 크기. 한 줄 고쳐 쓰기는 같은 줄 끝에 둔다. */}
+            <div className="flex items-center justify-between gap-2 text-[13px] text-text-muted">
+              <p>
+                여행 {story.tripCount}번 · 곳 {story.placeCount} · 사진 {story.photoCount.toLocaleString("ko-KR")}장
+              </p>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  aria-label="한 줄 고쳐 쓰기"
+                  className="shrink-0 rounded-xl px-2 py-1 text-[14px] font-medium text-accent transition hover:bg-bg-subtle"
+                >
+                  <span aria-hidden="true">✎</span> 한 줄
+                </button>
+              )}
+            </div>
+          </>
         )}
         {writeFailed && <p className="text-[13px] text-text-muted">적어두지 못했어요.</p>}
         {picks.length === 0 && chosen === "collage" && (
@@ -375,38 +417,15 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
         backHref={`/sketch?y=${year}`}
       />
 
+      <Link
+        href={`/?v=sketch&y=${year}`}
+        className="-mt-2 self-start rounded-full bg-bg-subtle px-4 py-2.5 text-[15px] font-medium text-accent transition hover:bg-accent-soft"
+      >
+        {year}년을 지도에서 보기
+      </Link>
+
       {/* 곳을 눌러 상세로 갔다가 돌아오면 보던 해의 한장 요약으로 선다. */}
       <StoryScenes story={story} photoUrls={NO_PHOTOS} placeUrls={placeUrls} backHref={`/sketch?y=${year}`} />
-
-      {/*
-        저장은 늘 손 닿는 데. 어디까지 읽어 내려가든 그 자리에서 저장한다.
-        그림 대신 링크로 보내면 받는 사람이 그해 이야기까지 넘겨 볼 수 있다.
-      */}
-      <div className="sticky bottom-0 z-10 -mx-5 mt-2 flex flex-col gap-1.5 border-t border-line bg-bg/95 px-5 py-3 backdrop-blur-md [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
-        {failed && <p className="text-[13px] text-text-muted">저장하지 못했어요.</p>}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={saving || waitingPhotos}
-            aria-label={`${year}년 이미지 저장`}
-            className="flex-1 rounded-full bg-accent px-1.5 py-2.5 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
-          >
-            이미지 저장
-          </button>
-          {userId && (
-            <button
-              type="button"
-              onClick={() => setSharing(true)}
-              disabled={saving || waitingPhotos}
-              aria-label={`${year}년 링크로 보여 주기`}
-              className="flex-1 rounded-full bg-bg-subtle px-1.5 py-2.5 text-[14px] font-medium text-accent transition hover:bg-line disabled:opacity-60"
-            >
-              링크 공유
-            </button>
-          )}
-        </div>
-      </div>
 
       {sharing && userId && (
         <ShareDialog

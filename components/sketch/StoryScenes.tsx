@@ -101,40 +101,8 @@ export function StoryScenes({ story, photoUrls, placeUrls, backHref, shared = fa
         </Scene>
       )}
 
-      <Scene label={`${story.year}년의 나`}>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-          <Stat big={times(story.tripCount)} small="떠났어요" />
-          <Stat big={`${story.photoCount.toLocaleString("ko-KR")}장`} small="사진을 남겼어요" />
-          <Stat big={`${story.placeCount}곳`} small="들렀어요" />
-          {story.distanceKm > 0 && (
-            <Stat
-              big={`${story.distanceKm.toLocaleString("ko-KR")}km`}
-              small={story.distanceWords ?? "옮겨 다녔어요 (직선거리)"}
-            />
-          )}
-        </div>
-      </Scene>
-
-      {story.seasonLine && (
-        <Scene label="계절">
-          <div className="flex h-24 items-end gap-3">
-            {story.seasons.map((bar) => (
-              <div key={bar.season} className="flex flex-1 flex-col items-center gap-1.5">
-                <span className="text-[12px] tabular-nums text-text-faint">{bar.trips || ""}</span>
-                <span
-                  className={`w-full rounded-t-md ${bar.trips === mostSeason ? "bg-accent" : "bg-line-strong"}`}
-                  style={{ height: bar.trips > 0 ? `${Math.max(12, (bar.trips / mostSeason) * 56)}px` : "3px" }}
-                />
-                <span className="text-[13px] font-medium text-text-muted">{bar.season}</span>
-              </div>
-            ))}
-          </div>
-          <p className="mt-3 text-[16px] font-semibold text-text">{story.seasonLine}</p>
-        </Scene>
-      )}
-
       {sido.length > 0 && (
-        <Scene label={`밟은 시도 ${sido.length}곳`}>
+        <Scene label={`밟은 시도 ${sido.length}곳`} joined>
           <ul className="flex flex-wrap gap-2">
             {sido.map((name) => (
               <li
@@ -158,17 +126,40 @@ export function StoryScenes({ story, photoUrls, placeUrls, backHref, shared = fa
         </Scene>
       )}
 
-      {story.compare && (
-        <Scene label={`${story.compare.previousYear}년과 견주면`}>
-          <p className="text-[18px] font-semibold text-text">{story.compare.tripsLine}</p>
-          {story.compare.photosLine && (
-            <p className="mt-1 text-[15px] text-text-muted">{story.compare.photosLine}</p>
+      <Scene label={`${story.year}년의 나`}>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-4">
+          <Stat big={times(story.tripCount)} small="떠났어요" />
+          <Stat big={`${story.photoCount.toLocaleString("ko-KR")}장`} small="사진을 남겼어요" />
+          <Stat big={`${story.placeCount}곳`} small="들렀어요" />
+          {story.distanceKm > 0 && (
+            <Stat
+              big={`${story.distanceKm.toLocaleString("ko-KR")}km`}
+              small={story.distanceWords ?? "옮겨 다녔어요 (직선거리)"}
+            />
           )}
+        </div>
+      </Scene>
+
+      {story.seasonLine && (
+        <Scene label="계절" joined>
+          <div className="flex h-24 items-end gap-3">
+            {story.seasons.map((bar) => (
+              <div key={bar.season} className="flex flex-1 flex-col items-center gap-1.5">
+                <span className="text-[12px] tabular-nums text-text-faint">{bar.trips || ""}</span>
+                <span
+                  className={`w-full rounded-t-md ${bar.trips === mostSeason ? "bg-accent" : "bg-line-strong"}`}
+                  style={{ height: bar.trips > 0 ? `${Math.max(12, (bar.trips / mostSeason) * 56)}px` : "3px" }}
+                />
+                <span className="text-[13px] font-medium text-text-muted">{bar.season}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[16px] font-semibold text-text">{story.seasonLine}</p>
         </Scene>
       )}
 
       {story.companions.length > 0 && (
-        <Scene label="누구와">
+        <Scene label="누구와" joined>
           <ul className="flex flex-wrap gap-2">
             {story.companions.map((entry) => (
               <li key={entry.label} className="rounded-full bg-bg-subtle px-3 py-1.5 text-[14px] text-text">
@@ -180,18 +171,12 @@ export function StoryScenes({ story, photoUrls, placeUrls, backHref, shared = fa
         </Scene>
       )}
 
-      {/*
-        읽고 나면 걷고 싶어진다. 그해가 골라진 채로 지도로 넘어간다 —
-        거기서 그해가 찍힌 곳만 남아 보인다.
-      */}
-      {!shared && (
-        <Scene label="지도에서 보기">
-          <Link
-            href={`/?v=sketch&y=${story.year}`}
-            className="inline-flex items-center gap-2 rounded-full bg-bg-subtle px-4 py-2.5 text-[15px] font-medium text-accent transition hover:bg-accent-soft"
-          >
-            {story.year}년을 지도에서 보기
-          </Link>
+      {story.compare && (
+        <Scene label={`${story.compare.previousYear}년과 견주면`}>
+          <p className="text-[18px] font-semibold text-text">{story.compare.tripsLine}</p>
+          {story.compare.photosLine && (
+            <p className="mt-1 text-[15px] text-text-muted">{story.compare.photosLine}</p>
+          )}
         </Scene>
       )}
     </div>
@@ -274,9 +259,10 @@ function PlaceRow({
   );
 }
 
-function Scene({ label, children }: { label: string; children: ReactNode }) {
+/* joined: 앞 장면과 한 묶음 — 구분선 없이 바로 이어 읽는다(어디를 / 언제·누구와 / 견주기 세 묶음). */
+function Scene({ label, children, joined = false }: { label: string; children: ReactNode; joined?: boolean }) {
   return (
-    <section className="border-t border-line py-6">
+    <section className={joined ? "pb-6" : "border-t border-line py-6"}>
       <h2 className="mb-4 text-[13px] font-semibold text-text-faint">{label}</h2>
       {children}
     </section>

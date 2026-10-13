@@ -124,8 +124,8 @@ describe("showsBottomNav · 폰 하단 탭을 보일 화면", () => {
     },
   );
 
-  it("한장 요약에서는 숨긴다 — 저장 막대가 그 자리를 쓴다", () => {
-    expect(showsBottomNav("/sketch")).toBe(false);
+  it("한장 요약에서도 보인다 — 저장·공유는 카드 아래로 옮겼으므로 하단 탭이 늘 떠 있다", () => {
+    expect(showsBottomNav("/sketch")).toBe(true);
   });
 
   it("사진으로 여행 추가에서는 숨긴다 — 아래 기록 막대가 그 자리를 쓴다", () => {

@@ -93,6 +93,8 @@ const withPhotos: SketchTrip[] = [
 
 const show = (trips: SketchTrip[]) =>
   render(<SketchShowcase year={2026} all={trips} written={undefined} onWrite={async () => true} sidoOf={undefined} />);
+/* 카드 모양은 접혀 있다 — [모양]을 눌러 펼친다. */
+const openShape = () => fireEvent.click(screen.getByRole("button", { name: /^모양/ }));
 
 /*
   같은 한 해라도 보여 줄 곳에 따라 어울리는 모양이 다르다. 고른 모양
@@ -103,6 +105,7 @@ describe("SketchShowcase · 카드 모양", () => {
 
   it("세 모양 가운데 처음에는 지도", () => {
     show(withPhotos);
+    openShape();
     const radios = screen.getAllByRole("radio");
     expect(radios.map((radio) => radio.textContent)).toEqual(["지도", "사진 콜라주", "선 그림"]);
     expect(screen.getByRole("radio", { name: "지도" }).getAttribute("aria-checked")).toBe("true");
@@ -110,16 +113,19 @@ describe("SketchShowcase · 카드 모양", () => {
 
   it("선 그림을 고르면 선 그림 카드가 보이고, 다음에도 기억한다", () => {
     const { unmount } = show(withPhotos);
+    openShape();
     fireEvent.click(screen.getByRole("radio", { name: "선 그림" }));
     expect(screen.getByRole("img", { name: /선 그림/ })).toBeTruthy();
     unmount();
 
     show(withPhotos);
+    openShape();
     expect(screen.getByRole("radio", { name: "선 그림" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("사진이 있는 해는 콜라주를 고를 수 있다 — 칸마다 그곳 여행으로 이어진다", () => {
     show(withPhotos);
+    openShape();
     fireEvent.click(screen.getByRole("radio", { name: "사진 콜라주" }));
     expect(screen.getByRole("img", { name: /사진 콜라주, 안목해변, 속초해변/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: "안목해변 여행 열기" }).getAttribute("href")).toBe("/trips/t1");
@@ -127,12 +133,14 @@ describe("SketchShowcase · 카드 모양", () => {
 
   it("사진이 없는 해는 콜라주를 고를 수 없다", () => {
     show(all);
+    openShape();
     expect((screen.getByRole("radio", { name: "사진 콜라주" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("콜라주를 골라 뒀어도 사진이 없는 해는 지도로 보이고 그 까닭을 말한다", () => {
     window.localStorage.setItem("sketch:cardStyle", "collage");
     show(all);
+    openShape();
     expect(screen.getByRole("radio", { name: "지도" }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByText("이 해에는 올린 사진이 없어 지도로 보여 드려요.")).toBeTruthy();
   });
@@ -182,19 +190,34 @@ describe("SketchShowcase · 순서", () => {
   const after = (first: Element, second: Element) =>
     Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
 
-  it("카드가 먼저고, 카드 모양 고르기는 카드 아래에 있다", () => {
+  it("카드가 먼저고, 저장·공유·모양은 카드 바로 아래에 있다", () => {
     const { container } = open();
     const card = container.querySelector("svg")!;
-    expect(after(card, screen.getByRole("radiogroup", { name: "카드 모양" }))).toBe(true);
+    expect(after(card, screen.getByRole("button", { name: "2026년 이미지 저장" }))).toBe(true);
+    expect(after(card, screen.getByRole("button", { name: /^모양/ }))).toBe(true);
   });
 
-  it("한 줄 고쳐 쓰기는 카드 아래, 카드 모양 고르기와 같은 줄에 있다 — 카드가 맨 위로 올라온다", () => {
+  it("카드 모양은 접혀 있다가 [모양]을 누르면 펼쳐진다", () => {
+    open();
+    expect(screen.queryByRole("radiogroup", { name: "카드 모양" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^모양/ }));
+    expect(screen.getByRole("radiogroup", { name: "카드 모양" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^모양/ }));
+    expect(screen.queryByRole("radiogroup", { name: "카드 모양" })).toBeNull();
+  });
+
+  it("카드 아래에 그해의 숫자 한 줄이 있고, 지도로 보는 길도 있다", () => {
+    open();
+    expect(screen.getByText(/여행 \d+번 · 곳 \d+ · 사진 [\d,]+장/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /2026년을 지도에서 보기/ })).toHaveAttribute("href", "/?v=sketch&y=2026");
+  });
+
+  it("한 줄 고쳐 쓰기는 카드 아래, 숫자 한 줄과 같은 줄에 있다 — 카드가 맨 위로 올라온다", () => {
     const { container } = open();
     const card = container.querySelector("svg")!;
     const edit = screen.getByRole("button", { name: /한 줄 고쳐 쓰기/ });
-    const group = screen.getByRole("radiogroup", { name: "카드 모양" });
     expect(after(card, edit)).toBe(true);
-    expect(group.parentElement).toBe(edit.parentElement);
+    expect(edit.parentElement).toBe(screen.getByText(/여행 \d+번/).parentElement);
   });
 
   it("카드 위에는 카드 말고 아무것도 없다", () => {
@@ -217,8 +240,8 @@ describe("SketchShowcase · 순서", () => {
     expect(screen.queryByRole("radiogroup", { name: "카드 모양" })).toBeNull();
   });
 
-  it("카드 모양 고르기는 그해의 이야기보다 위다 — 카드를 바꾸고 바로 이어 읽는다", () => {
+  it("저장·공유·모양은 그해의 이야기보다 위다 — 카드를 바꾸고 바로 이어 읽는다", () => {
     open();
-    expect(after(screen.getByRole("radiogroup", { name: "카드 모양" }), screen.getByText("2026년의 나"))).toBe(true);
+    expect(after(screen.getByRole("button", { name: /^모양/ }), screen.getByText("2026년의 나"))).toBe(true);
   });
 });

@@ -50,7 +50,7 @@ describe("StoryScenes", () => {
 
   it("장면을 차례로 그린다", () => {
     render(<StoryScenes story={full} photoUrls={new Map()} />);
-    for (const label of ["그해의 곳들", "2026년의 나", "계절", "밟은 시도 2곳", "2025년과 견주면", "누구와", "지도에서 보기"]) {
+    for (const label of ["그해의 곳들", "2026년의 나", "계절", "밟은 시도 2곳", "2025년과 견주면", "누구와"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
   });
@@ -73,12 +73,18 @@ describe("StoryScenes", () => {
     expect(screen.getByText("제주를 처음 밟았어요")).toBeTruthy();
   });
 
-  it("그해를 지도에서 보는 길을 낸다", () => {
-    render(<StoryScenes story={full} photoUrls={new Map()} />);
-    expect(screen.getByRole("link", { name: /2026년을 지도에서 보기/ })).toHaveAttribute(
-      "href",
-      "/?v=sketch&y=2026",
-    );
+  it("장면은 세 묶음 — 어디를(곳·시도) / 언제·누구와(나·계절·누구와) / 견주기", () => {
+    const { container } = render(<StoryScenes story={full} photoUrls={new Map()} />);
+    expect([...container.querySelectorAll("h2")].map((h) => h.textContent)).toEqual([
+      "그해의 곳들",
+      "밟은 시도 2곳",
+      "2026년의 나",
+      "계절",
+      "누구와",
+      "2025년과 견주면",
+    ]);
+    // 구분선은 묶음이 시작하는 곳에만 — 곳들 / 나 / 견주기.
+    expect(container.querySelectorAll("section.border-t").length).toBe(3);
   });
 
   /*

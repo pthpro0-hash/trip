@@ -126,7 +126,7 @@ describe("BottomNav", () => {
 
   describe("숨길 때", () => {
     // 사진으로 여행 추가: 아래에는 기록 막대가 선다. 탭과 막대가 같은 자리에 쌓이지 않는다.
-    it.each(["/sketch", "/trips/new", "/login", "/auth/callback", "/s/abcdefghijklmnop", "/t/abcdefghijklmnop"])(
+    it.each(["/trips/new", "/login", "/auth/callback", "/s/abcdefghijklmnop", "/t/abcdefghijklmnop"])(
       "%s 에서는 없다",
       (pathname) => {
         at(pathname);
@@ -212,7 +212,7 @@ describe("BottomNavSpace", () => {
   });
 
   it("탭이 없는 화면에서는 높이를 0 으로 돌려준다 — 그 안의 셈이 탭을 빼지 않게", () => {
-    path = "/sketch";
+    path = "/trips/new";
     const { container } = render(
       <BottomNavSpace>
         <p>내용</p>
