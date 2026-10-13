@@ -11,10 +11,12 @@ import {
   markerUrls,
   missingThumbs,
   reshrinkPhotos,
+  signedUrls,
   thumbPath,
   thumbUrls,
   uploadPhotos,
   uploadPrepared,
+  visitCovers,
   type PreparedTarget,
   type UploadTarget,
 } from "./photos";
@@ -589,7 +591,11 @@ describe("missingThumbs", () => {
     return {
       from: () => ({
         select: () => ({
-          eq: async () => ({ data: 경로.map((storage_path) => ({ storage_path })), error: null }),
+          eq: () => ({
+            order: () => ({
+              range: async (from: number, to: number) => ({ data: 경로.slice(from, to + 1).map((storage_path) => ({ storage_path })), error: null }),
+            }),
+          }),
         }),
       }),
       storage: {
@@ -732,5 +738,66 @@ describe("reshrinkPhotos · 무거운 사진 다시 줄이기", () => {
     expect(state.uploaded.filter((u) => !u.path.includes(".t")).map((u) => u.path).sort()).toEqual(
       ["나/v1/a.webp", "나/v1/c.webp", "나/v1/d.webp", "나/v1/e.webp"],
     );
+  });
+});
+
+/*
+  서버는 한 번에 1000줄까지만 준다. 사진이 천 장을 넘으면 앞의 1000장만 읽혀, 늦게 찍은(최근) 사진의 대표·작은 판이 빠졌다 —
+  내 여행 지도의 핀과 카드에 최근 여행의 사진이 안 뜨던 까닭이다.
+*/
+describe("천 장이 넘는 사진", () => {
+  const rows = Array.from({ length: 1186 }, (_, i) => ({
+    id: `p${String(i).padStart(4, "0")}`,
+    visit_id: `v${Math.floor(i / 5)}`,
+    storage_path: `u/v${Math.floor(i / 5)}/${i}.webp`,
+  }));
+  const pagedClient = () => {
+    const ranges: number[][] = [];
+    const client = {
+      from: () => {
+        const api: Record<string, unknown> = {};
+        for (const op of ["select", "eq", "order"]) api[op] = () => api;
+        api.range = async (from: number, to: number) => (ranges.push([from, to]), { data: rows.slice(from, to + 1), error: null });
+        return api;
+      },
+    } as unknown as SupabaseClient;
+    return { client, ranges };
+  };
+
+  it("대표 사진을 천 줄씩 나눠 읽어 뒤쪽(최근) 방문의 것까지 얻는다", async () => {
+    const { client, ranges } = pagedClient();
+    const covers = await visitCovers(client, "u");
+    expect(ranges).toEqual([[0, 999], [1000, 1999]]);
+    expect(covers.size).toBe(Math.ceil(1186 / 5));
+    // 맨 끝 방문(1185번째 사진)의 대표도 있다.
+    expect(covers.get("v237")).toBe("u/v237/1185.webp");
+  });
+
+  it("서명 주소는 나눠서 달라고 한다 — 한 번에 수천 개를 달라고 하지 않는다", async () => {
+    const sizes: number[] = [];
+    const client = {
+      storage: {
+        from: () => ({
+          createSignedUrls: async (paths: string[]) => (sizes.push(paths.length), { data: paths.map((path) => ({ path, signedUrl: `https://x/${path}` })), error: null }),
+        }),
+      },
+    } as unknown as SupabaseClient;
+    const urls = await signedUrls(client, Array.from({ length: 1000 }, (_, i) => `a/${i}.webp`), 60);
+    expect(urls.size).toBe(1000);
+    expect(Math.max(...sizes)).toBeLessThanOrEqual(300);
+    expect(sizes.length).toBeGreaterThan(1);
+  });
+
+  it("한 묶음이 실패해도 나머지 묶음은 받는다", async () => {
+    let call = 0;
+    const client = {
+      storage: {
+        from: () => ({
+          createSignedUrls: async (paths: string[]) => (++call === 1 ? { data: null, error: { message: "x" } } : { data: paths.map((path) => ({ path, signedUrl: `https://x/${path}` })), error: null }),
+        }),
+      },
+    } as unknown as SupabaseClient;
+    const urls = await signedUrls(client, Array.from({ length: 700 }, (_, i) => `b/${i}.webp`), 60);
+    expect(urls.size).toBe(400);
   });
 });

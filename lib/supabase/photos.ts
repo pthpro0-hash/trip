@@ -37,6 +37,10 @@ const typeOf = (blob: Blob) => (blob.type.startsWith("image/") ? blob.type : "im
 export const UPLOAD_LANES = 6;
 /** 계정당 사진 수 상한. 비용이 걷잡을 수 없이 늘지 않게 한다. */
 export const PHOTO_LIMIT = 2000;
+/** 서명 주소를 한 번에 달라고 하는 경로 수의 상한. */
+const SIGN_CHUNK = 300;
+/** 표에서 한 번에 읽는 줄 수. 서버는 한 번에 1000줄까지만 주므로 그 안에서 나눠 읽는다. */
+const ROWS_PER_PAGE = 1000;
 
 /** 한 장이 어느 방문의 어느 사진인가 — 올릴 때 표에 적는 것. */
 interface PhotoPlace {
@@ -403,13 +407,15 @@ export async function signedUrls(
   }
   if (wanted.length === 0) return urls;
 
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(wanted, seconds);
-  if (error || !data) return urls;
-
-  for (const item of data) {
-    if (!item.path || !item.signedUrl) continue;
-    urls.set(item.path, item.signedUrl);
-    memo?.set(item.path, { url: item.signedUrl, until: now + seconds * 1000 });
+  // 한 번에 너무 많이 달라고 하면 요청이 커져 통째로 실패한다(사진이 천 장을 넘으면 핀 판·목록 판이 모두 안 오던 것). 나눠서 받는다.
+  for (let start = 0; start < wanted.length; start += SIGN_CHUNK) {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrls(wanted.slice(start, start + SIGN_CHUNK), seconds);
+    if (error || !data) continue;
+    for (const item of data) {
+      if (!item.path || !item.signedUrl) continue;
+      urls.set(item.path, item.signedUrl);
+      memo?.set(item.path, { url: item.signedUrl, until: now + seconds * 1000 });
+    }
   }
   if (memo) keepMemo(memo, now);
   return urls;
@@ -429,18 +435,26 @@ export async function visitCovers(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Map<string, string>> {
-  const { data, error } = await supabase
-    .from("trip_photos")
-    .select("visit_id,storage_path")
-    .eq("user_id", userId)
-    .order("taken_at", { ascending: true });
-
-  if (error || !data) return new Map();
-
+  /*
+    천 줄씩 나눠 읽는다. 한 번에 읽으면 서버가 앞의 1000줄만 주어, 사진이 천 장을 넘으면 늦게 찍은(최근) 방문에는 대표 사진이
+    없었다 — 내 여행 지도의 핀과 카드에 최근 여행의 사진이 안 뜨던 까닭이다. 순서가 흔들리면 나눠 읽을 때 줄이 빠지거나
+    겹치므로 찍은 시각 다음에 id 로 늘 같은 차례를 만든다.
+  */
   const first = new Map<string, string>();
-  for (const row of data) {
-    const visitId = String(row.visit_id);
-    if (!first.has(visitId)) first.set(visitId, String(row.storage_path));
+  for (let from = 0; ; from += ROWS_PER_PAGE) {
+    const { data, error } = await supabase
+      .from("trip_photos")
+      .select("visit_id,storage_path")
+      .eq("user_id", userId)
+      .order("taken_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + ROWS_PER_PAGE - 1);
+    if (error || !data) return first;
+    for (const row of data) {
+      const visitId = String(row.visit_id);
+      if (!first.has(visitId)) first.set(visitId, String(row.storage_path));
+    }
+    if (data.length < ROWS_PER_PAGE) break;
   }
   return first;
 }
@@ -555,13 +569,19 @@ export async function missingThumbs(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("trip_photos")
-    .select("storage_path")
-    .eq("user_id", userId);
-
-  if (error || !data) return [];
-  const paths = data.map((row) => String(row.storage_path));
+  // 천 줄씩 나눠 읽는다(한 번에 읽으면 앞의 1000장만 와서 그 뒤 사진의 작은 판은 챙기지 못한다).
+  const paths: string[] = [];
+  for (let from = 0; ; from += ROWS_PER_PAGE) {
+    const { data, error } = await supabase
+      .from("trip_photos")
+      .select("storage_path")
+      .eq("user_id", userId)
+      .order("id", { ascending: true })
+      .range(from, from + ROWS_PER_PAGE - 1);
+    if (error || !data) return [];
+    paths.push(...data.map((row) => String(row.storage_path)));
+    if (data.length < ROWS_PER_PAGE) break;
+  }
   if (paths.length === 0) return [];
 
   /*
