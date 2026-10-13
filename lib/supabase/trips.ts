@@ -4,6 +4,7 @@ import type { Trip } from "@/lib/photo/types";
 import { BUCKET, legacyThumbPath, markerPath, thumbPath } from "./photos";
 import { removeCopiesOfTrip } from "./postcardCleanup";
 import { fetchOwnTripShare, revokeTripShare } from "./tripShares";
+import { readAll } from "./readAll";
 
 /** 저장할 때 방문마다 붙여 둔 장소 정보. */
 export interface VisitPlace {
@@ -224,11 +225,15 @@ export async function fetchTrips(
     대표 사진만 따로 가져온다. 방문에 딸린 사진을 통째로 끌어오면 수백 줄이
     딸려 오는데, 목록에서 쓰는 것은 여행마다 한 장뿐이다.
   */
-  const { data: covers } = await supabase
-    .from("trip_photos")
-    .select("storage_path, visits!inner(trip_id)")
-    .eq("user_id", userId)
-    .eq("is_cover", true);
+  const covers = await readAll<Record<string, unknown>>((from, to) =>
+    supabase
+      .from("trip_photos")
+      .select("storage_path, visits!inner(trip_id)")
+      .eq("user_id", userId)
+      .eq("is_cover", true)
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
   const coverByTrip = new Map<string, string>();
   for (const cover of covers ?? []) {

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   SIGNED_URL_SECONDS,
   backfillThumbs,
+  fetchPlacePhotos,
   PHOTO_LIMIT,
   UPLOAD_LANES,
   legacyThumbPath,
@@ -799,5 +800,23 @@ describe("천 장이 넘는 사진", () => {
     } as unknown as SupabaseClient;
     const urls = await signedUrls(client, Array.from({ length: 700 }, (_, i) => `b/${i}.webp`), 60);
     expect(urls.size).toBe(400);
+  });
+
+  it("한 곳(무리)의 사진이 천 장을 넘어도 전부 읽는다", async () => {
+    const { client, ranges } = pagedClient();
+    const all = rows.map((row) => ({ ...row, taken_at: "2026-05-01T00:00:00Z" }));
+    const paged = {
+      from: () => {
+        const api: Record<string, unknown> = {};
+        for (const op of ["select", "eq", "in", "order"]) api[op] = () => api;
+        api.range = async (from: number, to: number) => (ranges.push([from, to]), { data: all.slice(from, to + 1), error: null });
+        return api;
+      },
+    } as unknown as SupabaseClient;
+    void client;
+    const photos = await fetchPlacePhotos(paged, "u", ["v0", "v1"]);
+    expect(photos).toHaveLength(1186);
+    expect(photos[1185].id).toBe("p1185");
+    expect(ranges).toEqual([[0, 999], [1000, 1999]]);
   });
 });

@@ -10,6 +10,7 @@ import {
   type Shrunk,
 } from "@/lib/photo/resize";
 import { removeCopiesOfPhoto } from "./postcardCleanup";
+import { readAll } from "./readAll";
 
 export const BUCKET = "trip-photos";
 /*
@@ -540,14 +541,19 @@ export async function fetchPlacePhotos(
   visitIds: string[],
 ): Promise<PlacePhoto[]> {
   if (visitIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from("trip_photos")
-    .select("id,visit_id,storage_path,taken_at")
-    .eq("user_id", userId)
-    .in("visit_id", visitIds)
-    .order("taken_at", { ascending: true });
+  // 한 무리의 사진이 천 장을 넘어도 빠지지 않게 나눠 읽는다(같은 시각이 많아도 겹치지 않게 id 까지 순서에 건다).
+  const data = await readAll<Record<string, unknown>>((from, to) =>
+    supabase
+      .from("trip_photos")
+      .select("id,visit_id,storage_path,taken_at")
+      .eq("user_id", userId)
+      .in("visit_id", visitIds)
+      .order("taken_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, to),
+  );
 
-  if (error || !data) return [];
+  if (!data) return [];
   return data.map((row) => ({
     id: String(row.id),
     visitId: String(row.visit_id),
