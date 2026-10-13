@@ -1,5 +1,6 @@
 import { KOREA_FULL_VIEWBOX, project, type ViewBox } from "@/lib/koreaMap";
 import type { Region } from "@/lib/types";
+import { isInKorea } from "@/lib/weatherGrid";
 
 /*
   권역을 고르면 그쪽으로 당겨 본다.
@@ -52,7 +53,7 @@ export function regionViewBox(
     { lat: bounds.minLat, lng: bounds.minLng },
     { lat: bounds.maxLat, lng: bounds.maxLng },
     // 눈대중이 빗나가도 다녀온 곳은 반드시 담기게 한다.
-    ...dots.filter((dot) => Number.isFinite(dot.lat) && Number.isFinite(dot.lng)),
+    ...dots.filter((dot) => isInKorea(dot.lat, dot.lng)),
   ];
 
   const points = corners.map((point) => project(point.lat, point.lng));
@@ -78,7 +79,7 @@ export function dotsViewBox(
   margin = MARGIN,
 ): ViewBox {
   const points = dots
-    .filter((dot) => Number.isFinite(dot.lat) && Number.isFinite(dot.lng))
+    .filter((dot) => isInKorea(dot.lat, dot.lng))
     .map((dot) => project(dot.lat, dot.lng));
   if (points.length === 0) return KOREA_FULL_VIEWBOX;
 

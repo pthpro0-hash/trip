@@ -1,5 +1,6 @@
 import { seasonOf, type Season, type SketchTrip } from "./sketch";
 import type { ShareSnapshot } from "./share";
+import { isInKorea } from "./weatherGrid";
 
 /*
   발자취 — 한 해를 날짜순으로 찍어 본다.
@@ -35,7 +36,8 @@ export function footprintSteps(trips: SketchTrip[]): FootprintStep[] {
   const found: { step: FootprintStep; key: string }[] = [];
   for (const trip of trips) {
     trip.visits.forEach((visit, index) => {
-      if (!Number.isFinite(visit.lat) || !Number.isFinite(visit.lng)) return;
+      // 지도는 한국만 그린다(해외 곳은 찍지 않는다).
+      if (!isInKorea(visit.lat, visit.lng)) return;
       // 그곳에 간 날. 모르면 여행 시작일로 갈음한다.
       const date = visit.visitedOn || trip.startedOn;
       const month = Number(date.slice(5, 7));
@@ -70,7 +72,7 @@ export function tripsPerMonth(steps: FootprintStep[]): number[] {
  */
 export function footprintStepsOfShare(snapshot: ShareSnapshot): FootprintStep[] {
   return snapshot.dots
-    .filter((dot) => dot.placeName && Number.isFinite(dot.lat) && Number.isFinite(dot.lng))
+    .filter((dot) => dot.placeName && isInKorea(dot.lat, dot.lng))
     .map((dot) => ({
       placeName: dot.placeName,
       lat: dot.lat,

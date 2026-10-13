@@ -378,3 +378,18 @@ describe("스냅샷에서 되짚기", () => {
     expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 });
+
+describe("해외 곳은 지도에 그리지 않는다 — 지도는 한국만", () => {
+  const mixed = [
+    trip("a", "2025-04-01", [visit("남산", 37.55, 126.98, 5), visit("런던 아이", 51.503, -0.119, 9)]),
+    trip("b", "2025-09-01", [visit("도쿄타워", 35.658, 139.745, 4)]),
+  ];
+
+  it("발자취는 한국 곳만 찍는다", () => {
+    expect(footprintSteps(mixed).map((step) => step.placeName)).toEqual(["남산"]);
+  });
+
+  it("그림(점)도 한국 곳만 — 해외 점이 그해 지도를 일그러뜨리지 않는다", () => {
+    expect(sketchShapes(mixed).dots.map((dot) => dot.placeName)).toEqual(["남산"]);
+  });
+});

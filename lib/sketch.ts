@@ -1,4 +1,5 @@
 import { distanceKm } from "./geo";
+import { isInKorea } from "./weatherGrid";
 
 /*
   쌓인 기록을 한 장으로 접는다.
@@ -258,8 +259,8 @@ export interface SketchShapes {
   paths: SketchPath[];
 }
 
-const drawable = (visit: { lat: number; lng: number }) =>
-  Number.isFinite(visit.lat) && Number.isFinite(visit.lng);
+// 지도 그림은 한국만 그린다. 해외 좌표를 그대로 그리면 그림 밖으로 나가 그해의 지도가 일그러진다.
+const drawable = (visit: { lat: number; lng: number }) => isInKorea(visit.lat, visit.lng);
 
 /**
  * 지도에 그릴 것들.
