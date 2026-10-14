@@ -16,7 +16,7 @@ import { toStashed } from "@/lib/photo/stashTrips";
   실제 파일 대신 읽어낸 결과를 바로 끼워 넣는다.
 
   길은 세 걸음이다 — 고르기 · 확인 · 기록. 확인 화면의 여행 카드는 곳 목록 · 동행 · 나누기 · 합치기를
-  "다듬기" 안에 접어 두고, 아래에는 기록 막대가 붙는다.
+  "고치기" 안에 접어 두고, 아래에는 기록 막대가 붙는다.
 */
 
 const 고성 = { lat: 38.4798, lng: 128.4391 };
@@ -165,9 +165,9 @@ async function 사진넣기(shots = 이틀) {
 
 const 제목칸 = () => screen.getAllByLabelText("여행 제목") as HTMLInputElement[];
 
-/** 접혀 있는 카드의 "다듬기"를 모두 연다. */
+/** 접혀 있는 카드의 "고치기"를 모두 연다. */
 function 다듬기열기() {
-  for (const button of screen.getAllByRole("button", { name: /^(다듬기|방문한 곳 보기)/ })) {
+  for (const button of screen.getAllByRole("button", { name: /^(고치기|방문한 곳 보기)/ })) {
     if (button.getAttribute("aria-expanded") === "false") fireEvent.click(button);
   }
 }
@@ -341,7 +341,7 @@ describe("PhotoImport", () => {
 
     it("나눌 자리가 있으면 접힌 단추에 제안으로 알린다", async () => {
       await 사진넣기();
-      expect(screen.getByRole("button", { name: /^다듬기/ })).toHaveTextContent("제안 1");
+      expect(screen.getByRole("button", { name: /^고치기/ })).toHaveTextContent("제안 1");
     });
 
     it("기간은 사람이 읽는 말로 적는다", async () => {
@@ -389,7 +389,7 @@ describe("PhotoImport", () => {
     });
   });
 
-  describe("다듬기 · 나누기와 합치기", () => {
+  describe("고치기 · 나누기와 합치기", () => {
     it("멀리 떨어진 날 경계에서만 나누기를 묻는다", async () => {
       await 사진넣기();
       다듬기열기();
@@ -407,7 +407,7 @@ describe("PhotoImport", () => {
       다듬기열기();
       expect(screen.queryByRole("button", { name: "따로 기록하기" })).toBeNull();
       // 제안도 없다.
-      expect(screen.getByRole("button", { name: /^다듬기/ })).not.toHaveTextContent("제안");
+      expect(screen.getByRole("button", { name: /^고치기/ })).not.toHaveTextContent("제안");
     });
 
     it("나누면 두 건이 되고, 앞 여행의 제목은 그대로 남는다", async () => {
@@ -430,7 +430,7 @@ describe("PhotoImport", () => {
       fireEvent.click(screen.getByRole("button", { name: "따로 기록하기" }));
       await screen.findByText(/여행 2건을 찾았어요/);
 
-      const [, 둘째] = screen.getAllByRole("button", { name: /^다듬기/ });
+      const [, 둘째] = screen.getAllByRole("button", { name: /^고치기/ });
       expect(둘째).toHaveTextContent("제안 1");
     });
 
@@ -470,7 +470,7 @@ describe("PhotoImport", () => {
       expect(screen.getByText("송정해변")).toBeTruthy();
     });
 
-    it("함께 간 사람은 다듬기 안에서 적고, 기록에 담긴다", async () => {
+    it("함께 간 사람은 고치기 안에서 적고, 기록에 담긴다", async () => {
       await 사진넣기();
       다듬기열기();
       fireEvent.change(screen.getByLabelText("누구와 가셨나요?"), { target: { value: "민수" } });

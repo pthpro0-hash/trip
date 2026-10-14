@@ -11,7 +11,7 @@ vi.mock("./TripThumbs", () => ({
 
 /*
   사진을 고른 뒤 가장 먼저 하는 일은 "이게 내 어느 여행이지?" 알아보는 것이다. 카드는 그것을 먼저 보여 주고
-  (제목 · 기간 · 작은 그림), 곳 목록 · 동행 · 나누기 · 합치기는 "다듬기" 안으로 접는다 — 대부분의 사람은
+  (제목 · 기간 · 작은 그림), 곳 목록 · 동행 · 나누기 · 합치기는 "고치기" 안으로 접는다 — 대부분의 사람은
   그것을 건드리지 않고 지나간다.
 */
 const visit = (partial: Partial<VisitLine> = {}): VisitLine => ({
@@ -54,7 +54,7 @@ function card(partial: Partial<ComponentProps<typeof TripCard>> = {}) {
   return { ...view, ...fns };
 }
 
-const toggle = () => screen.getByRole("button", { name: /다듬기|방문한 곳 보기/ });
+const toggle = () => screen.getByRole("button", { name: /고치기|방문한 곳 보기/ });
 
 describe("TripCard · 겉모습", () => {
   it("제목은 바로 고칠 수 있는 칸이다", () => {
@@ -115,7 +115,7 @@ describe("TripCard · 겉모습", () => {
   });
 });
 
-describe("TripCard · 다듬기", () => {
+describe("TripCard · 고치기", () => {
   it("처음에는 접혀 있다 — 곳 목록도 동행 칸도 보이지 않는다", () => {
     card();
     expect(toggle()).toHaveAttribute("aria-expanded", "false");

@@ -8,7 +8,7 @@ import type { VisitLine } from "./types";
   확인 화면의 여행 카드 하나.
 
   사진을 고른 사람이 가장 먼저 하는 일은 "이게 내 어느 여행이지?" 알아보는 것이다. 카드는 그것을 먼저
-  보여 주고(제목 · 기간 · 작은 그림), 곳 목록 · 동행 · 나누기 · 합치기는 "다듬기" 안으로 접는다 — 대부분의
+  보여 주고(제목 · 기간 · 작은 그림), 곳 목록 · 동행 · 나누기 · 합치기는 "고치기" 안으로 접는다 — 대부분의
   사람은 그것을 건드리지 않고 지나간다. 다듬을 만한 것이 있으면(멀리 떨어진 날 경계, 합칠 수 있는 이웃 여행)
   접힌 단추에 "제안 N" 으로 알려, 열어 볼 까닭을 준다.
 
@@ -118,7 +118,7 @@ export function TripCard({
           onClick={() => setOpen(!open)}
           className="flex items-center gap-1.5 rounded-full py-1 pr-1 text-[14px] font-medium text-text-muted transition hover:text-text"
         >
-          {editable ? "다듬기" : "방문한 곳 보기"}
+          {editable ? "고치기" : "방문한 곳 보기"}
           {suggestions > 0 && (
             <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[12px] font-semibold text-accent">
               제안 {suggestions}
