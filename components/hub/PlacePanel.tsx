@@ -91,17 +91,7 @@ export function PlacePanel({ userId, places }: PlacePanelProps) {
       <div className="pr-10">
         <div className="min-w-0">
           <h2 className="truncate text-[20px] font-bold tracking-tight text-text">
-            {/* 한 이름이면 누르면 그 이름으로 다녀온 때를 모두 모아 본다. */}
-            {title === lead.placeName ? (
-              <Link
-                href={`/places?name=${encodeURIComponent(lead.placeName)}`}
-                className="underline decoration-line-strong underline-offset-4 hover:text-accent hover:decoration-accent"
-              >
-                {title}
-              </Link>
-            ) : (
-              title
-            )}
+            {title}
           </h2>
           <p className="mt-0.5 text-[13px] text-text-muted">
             {places.length > 1 ? `${places.length}번 다녀왔어요` : day(lead.startedAt)}

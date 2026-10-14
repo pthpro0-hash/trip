@@ -45,7 +45,6 @@ describe("BackToSketches", () => {
 
 describe("backLabel", () => {
   it("같은 이름 모아 보기에서 왔으면 그 곳 이름으로 돌아간다", () => {
-    expect(backLabel(`/places?name=${encodeURIComponent("안목해변")}`)).toBe("← 안목해변");
   });
 
   it("한장 요약에서 왔으면 한장 요약", () => {

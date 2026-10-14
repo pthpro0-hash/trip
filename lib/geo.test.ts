@@ -1,13 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import {
-  distanceKm,
-  formatDistance,
-  legDistancesKm,
-  moveItem,
-  orderByProximity,
-  totalDistanceKm,
-} from "./geo";
+import { distanceKm, formatDistance, moveItem } from "./geo";
 
 const SEOUL = { lat: 37.5665, lng: 126.978 };
 const BUSAN = { lat: 35.1796, lng: 129.0756 };
@@ -47,57 +40,6 @@ describe("formatDistance", () => {
 
   it("값이 없으면 빈 문자열", () => {
     expect(formatDistance(Number.NaN)).toBe("");
-  });
-});
-
-describe("legDistancesKm / totalDistanceKm", () => {
-  const points = [SEOUL, BUSAN, SEOUL];
-
-  it("구간 수는 지점 수보다 하나 적다", () => {
-    expect(legDistancesKm(points)).toHaveLength(2);
-  });
-
-  it("한 곳뿐이면 구간이 없다", () => {
-    expect(legDistancesKm([SEOUL])).toEqual([]);
-    expect(totalDistanceKm([SEOUL])).toBe(0);
-  });
-
-  it("합계는 각 구간의 합", () => {
-    const legs = legDistancesKm(points);
-    expect(totalDistanceKm(points)).toBeCloseTo(legs[0] + legs[1], 9);
-  });
-});
-
-describe("orderByProximity", () => {
-  const a = { id: "a", lat: 37, lng: 127 };
-  const b = { id: "b", lat: 38, lng: 127 };
-  const c = { id: "c", lat: 39, lng: 127 };
-
-  it("출발점이 없으면 목록의 첫 곳부터 잇는다", () => {
-    expect(orderByProximity([c, a, b]).map((s) => s.id)).toEqual(["c", "b", "a"]);
-  });
-
-  it("출발점을 주면 거기서 가장 가까운 곳부터 잇는다", () => {
-    expect(orderByProximity([c, a, b], { lat: 37, lng: 127 }).map((s) => s.id)).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
-  });
-
-  it("한 곳 이하면 그대로 둔다", () => {
-    expect(orderByProximity([a]).map((s) => s.id)).toEqual(["a"]);
-    expect(orderByProximity([])).toEqual([]);
-  });
-
-  it("어느 곳도 잃거나 늘지 않는다", () => {
-    expect(orderByProximity([c, a, b])).toHaveLength(3);
-  });
-
-  it("원본을 건드리지 않는다", () => {
-    const input = [c, a, b];
-    orderByProximity(input);
-    expect(input.map((s) => s.id)).toEqual(["c", "a", "b"]);
   });
 });
 

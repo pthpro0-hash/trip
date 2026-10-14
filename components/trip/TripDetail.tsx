@@ -75,7 +75,6 @@ function formatSpan(startedOn: string, endedOn: string) {
 }
 
 /** 같은 이름으로 다녀온 때를 모아 보는 화면. */
-const placeHref = (name: string) => `/places?name=${encodeURIComponent(name)}`;
 
 function hourMinute(date: Date) {
   return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
@@ -833,16 +832,8 @@ export function TripDetail({ tripId }: { tripId: string }) {
                   />
                 ) : (
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-                    {/*
-                      이름을 누르면 같은 이름으로 다녀온 때를 모두 모아 본다.
-                      100선이면 그 소개는 옆의 작은 링크로.
-                    */}
-                    <Link
-                      href={placeHref(visit.placeName)}
-                      className="text-[17px] font-semibold tracking-tight text-text underline decoration-line-strong underline-offset-4 hover:text-accent hover:decoration-accent"
-                    >
-                      {visit.placeName}
-                    </Link>
+                    {/* 100선이면 그 소개는 옆의 작은 링크로. */}
+                    <span className="text-[17px] font-semibold tracking-tight text-text">{visit.placeName}</span>
                     {visit.spotId && (
                       <Link
                         href={`/spots/${visit.spotId}`}
@@ -851,10 +842,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
                         100선
                       </Link>
                     )}
-                    {/*
-                      이름 자체가 링크라, 눌러서 고치게 하면 링크와 부딪힌다.
-                      고치는 손잡이를 따로 둔다.
-                    */}
+                    {/* 이름 고치기는 작은 손잡이로 둔다 — 이름을 잘못 눌러 고치는 칸이 열리지 않게. */}
                     {canEdit && (
                       <button
                         type="button"

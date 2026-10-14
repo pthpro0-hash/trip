@@ -166,12 +166,6 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
             >
               가고 싶은 곳 {wishlist.ids.length}
             </button>
-            <Link
-              href="/course"
-              className="text-[13px] font-medium text-accent hover:text-accent-hover"
-            >
-              이번 여행 →
-            </Link>
           </>
         )}
       </div>

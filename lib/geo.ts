@@ -33,48 +33,6 @@ export function formatDistance(km: number): string {
   return `${Math.round(km)}km`;
 }
 
-export function legDistancesKm(points: Point[]): number[] {
-  const legs: number[] = [];
-  for (let i = 1; i < points.length; i += 1) legs.push(distanceKm(points[i - 1], points[i]));
-  return legs;
-}
-
-export function totalDistanceKm(points: Point[]): number {
-  return legDistancesKm(points).reduce((sum, leg) => sum + leg, 0);
-}
-
-/**
- * 가까운 곳부터 차례로 잇는다(최근접 이웃). 최단 경로를 보장하지는 않지만,
- * 담은 순서대로 전국을 지그재그로 오가는 것보다는 늘 낫고, 왜 이 순서인지
- * 사람이 바로 이해할 수 있다.
- *
- * `start`를 주면 거기서 가장 가까운 곳부터, 없으면 목록의 첫 곳부터 시작한다.
- */
-export function orderByProximity<T extends Point>(items: T[], start?: Point): T[] {
-  if (items.length <= 1) return [...items];
-
-  const remaining = [...items];
-  const ordered: T[] = [];
-  let cursor: Point = start ?? remaining[0];
-
-  while (remaining.length > 0) {
-    let bestIndex = 0;
-    let bestDistance = Infinity;
-    for (let i = 0; i < remaining.length; i += 1) {
-      const candidate = distanceKm(cursor, remaining[i]);
-      if (candidate < bestDistance) {
-        bestDistance = candidate;
-        bestIndex = i;
-      }
-    }
-    const [next] = remaining.splice(bestIndex, 1);
-    ordered.push(next);
-    cursor = next;
-  }
-
-  return ordered;
-}
-
 /** 한 칸 위/아래로 옮긴 새 배열. 끝을 벗어나면 원본 그대로 돌려준다. */
 export function moveItem<T>(items: T[], from: number, to: number): T[] {
   if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) {

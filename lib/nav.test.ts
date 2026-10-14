@@ -69,13 +69,11 @@ describe("activeNav · 켜질 갈래", () => {
     expect(activeNav("/trips", null)).toBe("trips");
     expect(activeNav("/trips/abc", null)).toBe("trips");
     expect(activeNav("/trips/new", null)).toBe("trips");
-    expect(activeNav("/places", null)).toBe("trips");
   });
 
   it("여행지·권역·이번 여행은 '여행 100선'", () => {
     expect(activeNav("/spots/경복궁", null)).toBe("spots");
     expect(activeNav("/regions/강원권", null)).toBe("spots");
-    expect(activeNav("/course", null)).toBe("spots");
   });
 
   it("내 정보와 그 안의 가족 공유·가족 책장은 '내 정보'", () => {
@@ -117,7 +115,7 @@ describe("isReceiverPath · 가족 책장 받는 쪽", () => {
 });
 
 describe("showsBottomNav · 폰 하단 탭을 보일 화면", () => {
-  it.each(["/", "/trips", "/trips/abc", "/spots/경복궁", "/regions/강원권", "/course", "/places", "/help", "/privacy", "/me", "/family", "/mailboxes"])(
+  it.each(["/", "/trips", "/trips/abc", "/spots/경복궁", "/regions/강원권", "/help", "/privacy", "/me", "/family", "/mailboxes"])(
     "%s 에서는 보인다",
     (path) => {
       expect(showsBottomNav(path)).toBe(true);

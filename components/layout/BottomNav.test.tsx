@@ -67,10 +67,8 @@ describe("BottomNav", () => {
   describe("켜진 곳", () => {
     it.each([
       ["/trips/abc", "", "내 여행"],
-      ["/places", "", "내 여행"],
       ["/spots/경복궁", "", "여행 100선"],
       ["/regions/강원권", "", "여행 100선"],
-      ["/course", "", "여행 100선"],
       ["/me", "", "내 정보"],
       ["/family", "", "내 정보"],
       ["/mailboxes", "", "내 정보"],

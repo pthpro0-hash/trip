@@ -52,10 +52,8 @@ describe("SiteHeader", () => {
   it.each([
     ["/spots/경복궁", "여행 100선"],
     ["/regions/강원권", "여행 100선"],
-    ["/course", "여행 100선"],
     ["/trips/abc", "내 여행"],
     ["/trips/new", "내 여행"],
-    ["/places", "내 여행"],
     ["/sketch", "한장 요약"],
   ])("%s 에서는 '%s' 가 켜진다", async (at, expected) => {
     await 머리띠(at);

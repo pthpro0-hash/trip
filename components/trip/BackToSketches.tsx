@@ -24,12 +24,8 @@ function backTo(from: string | null): string {
   return from && from.startsWith("/") && !from.startsWith("//") ? from : LIST;
 }
 
-/** 돌아갈 곳의 이름. 같은 이름 모아 보기에서 왔으면 그 곳 이름. */
+/** 돌아갈 곳의 이름. */
 export function backLabel(from: string | null): string {
-  if (from?.startsWith("/places?")) {
-    const name = new URLSearchParams(from.slice("/places?".length)).get("name");
-    if (name) return `← ${name}`;
-  }
   // 한장 요약의 "그해의 곳들"에서 왔으면 그 해의 한장 요약으로.
   if (from === "/sketch" || from?.startsWith("/sketch?")) return "← 한장 요약";
   return "← 내 여행";

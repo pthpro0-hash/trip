@@ -58,8 +58,8 @@ const under = (pathname: string, segment: string) => pathname === segment || pat
 export function activeNav(pathname: string, start: Start | null): NavId | null {
   if (pathname === "/") return start === "sketch" ? "trips" : start === "spots" ? "spots" : null;
   if (under(pathname, "/sketch")) return "sketch";
-  if (under(pathname, "/trips") || under(pathname, "/places")) return "trips";
-  if (["/spots", "/regions", "/course"].some((segment) => under(pathname, segment))) return "spots";
+  if (under(pathname, "/trips")) return "trips";
+  if (["/spots", "/regions"].some((segment) => under(pathname, segment))) return "spots";
   // 내 정보와 그 한 칸인 가족 공유·가족 책장(부모님이 보는 /m 은 따로 — 거기엔 이 띠가 없다).
   if (["/me", "/family", "/mailboxes"].some((segment) => under(pathname, segment))) return "me";
   return null;

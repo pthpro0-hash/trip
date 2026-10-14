@@ -103,12 +103,6 @@ export default async function SpotDetailPage({ params }: { params: Promise<{ slu
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <SaveButton spotId={spot.id} spotName={spot.name} variant="inline" />
           <ShareSpotButton spotId={spot.id} spotName={spot.name} summary={spot.summary} />
-          <Link
-            href="/course"
-            className="text-[13px] font-medium text-accent hover:text-accent-hover"
-          >
-            내 코스 →
-          </Link>
         </div>
       </div>
 

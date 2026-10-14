@@ -37,10 +37,8 @@ export const SCREENS = [
   "sketch",
   "add_photos",
   "trip_detail",
-  "places",
   "spot_detail",
   "region",
-  "course",
   "me",
   "family",
   "mailboxes",
@@ -107,10 +105,8 @@ export function screenOf(
   if (pathname === "/trips") return "my_list";
   if (under(pathname, "/trips")) return "trip_detail";
   if (under(pathname, "/sketch")) return "sketch";
-  if (under(pathname, "/places")) return "places";
   if (under(pathname, "/spots")) return "spot_detail";
   if (under(pathname, "/regions")) return "region";
-  if (under(pathname, "/course")) return "course";
   if (under(pathname, "/mailboxes")) return "mailboxes";
   if (under(pathname, "/family")) return "family";
   if (under(pathname, "/me")) return "me";
