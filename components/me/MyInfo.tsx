@@ -7,7 +7,6 @@ import { signOutAndReload } from "@/lib/signOut";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { fetchMailboxes } from "@/lib/supabase/mailbox";
 import { mailboxPath } from "@/lib/mailbox";
-import { AbroadNamesRow } from "./AbroadNamesRow";
 import { countPendingSuggestions, isAdmin } from "@/lib/supabase/spotSuggestions";
 import { fetchUnreadHeartCount, fetchUnreadReplyCount } from "@/lib/supabase/postcards";
 
@@ -129,7 +128,7 @@ export function MyInfoView({
 
       {state === "login" ? (
         <section className="flex flex-col items-start gap-3 rounded-2xl bg-accent-soft p-4">
-          <p className="text-[15px] leading-relaxed text-text">로그인하면 가족 공유·가족 책장·보관함 정리를 쓸 수 있어요.</p>
+          <p className="text-[15px] leading-relaxed text-text">로그인하면 가족 공유·가족 책장을 쓸 수 있어요.</p>
           <Link
             href="/login?next=/me"
             className="rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-on-accent transition hover:bg-accent-hover"
@@ -151,10 +150,6 @@ export function MyInfoView({
               // 미리보기 방식으로 들어간다 — 열어 본 표시·답장·하트는 부모님께 가지 않고, 안 열어 본 책도 책꽂이에 꽂혀 보인다.
               <Row key={shelf.id} nested href={mailboxPath(shelf.token, "all")} title={shelf.name} hint="책꽂이 안으로 들어가기" />
             ))}
-          </Group>
-          <Group title="내 자료">
-            <Row href="/help#data" title="보관함 정리" hint="사진 용량을 확인하고 줄여요" />
-            <AbroadNamesRow />
           </Group>
           {waiting !== null && (
             <Group title="관리">

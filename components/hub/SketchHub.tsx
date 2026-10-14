@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
+import { autoRefreshAbroadNames } from "@/lib/supabase/abroadNames";
 import { ownerOf, readFamilyView } from "@/lib/familyView";
 import { markerUrls, visitCovers } from "@/lib/supabase/photos";
 import { hubPlaces, inKorea, placesIn, tripsIn, type Bounds, type HubPlace, type TripInView } from "@/lib/hub";
@@ -179,6 +180,19 @@ function MapHub({ switcher, initialYear, onList }: MapHubProps) {
       const paths = [...new Set(laid.map((place) => place.coverPath).filter((p): p is string => !!p))];
       const urls = await markerUrls(supabase, paths);
       if (active) setPinUrls(urls);
+
+      /*
+        해외 곳의 거친 이름("영국 런던", "알 수 없는 곳")을 세부 지역명으로 저절로 새로 붙인다 — 예전에는 내 정보의 단추를
+        눌러야 했다. 내 여행일 때만(가족의 여행은 건드리지 않는다). 바뀐 것이 있으면 이름만 다시 읽어 온다.
+      */
+      if (owner !== data.user.id) return;
+      const renamed = await autoRefreshAbroadNames(supabase, owner).catch(() => null);
+      if (!active || !renamed || renamed.renamed === 0) return;
+      const fresh = await fetchTrips(supabase, owner);
+      if (active && fresh) {
+        setTrips(fresh);
+        setPlaces(hubPlaces(fresh, covers));
+      }
     });
 
     return () => {

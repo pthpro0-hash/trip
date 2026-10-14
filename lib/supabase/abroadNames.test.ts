@@ -9,7 +9,7 @@ vi.mock("./tripDetail", () => ({
     return true;
   },
 }));
-const { fetchOverseasVisits, refreshAbroadNames, shouldRename } = await import("./abroadNames");
+const { AUTO_MAX, autoRefreshAbroadNames, fetchOverseasVisits, isRough, refreshAbroadNames, shouldRename } = await import("./abroadNames");
 
 /* 해외 곳 이름 새로 붙이기 — 사람이 붙인 이름은 지키고, 못 붙었거나 거친 이름만 세부 이름으로. */
 describe("shouldRename", () => {
@@ -87,5 +87,85 @@ describe("refreshAbroadNames", () => {
     const outcome = await refreshAbroadNames({} as SupabaseClient, "u", visits);
     expect(outcome).toEqual({ checked: 3, renamed: 0, failed: 3 });
     expect(saved).toEqual([]);
+  });
+});
+
+/* 내 여행을 열 때 저절로 — 거친 이름만, 이 기기에서 아직 물어보지 않은 곳만, 한 번에 AUTO_MAX 곳까지. */
+describe("isRough", () => {
+  it("못 붙었거나 나라·도시까지만 있는 이름", () => {
+    for (const name of ["알 수 없는 곳", "해외", "영국 런던", "일본"]) expect(isRough(name), name).toBe(true);
+  });
+
+  it("세부 지역명까지 있는 이름은 거칠지 않다", () => {
+    expect(isRough("영국 런던 켄싱턴 로열 앨버트 홀")).toBe(false);
+    expect(isRough("프랑스 파리 에펠탑")).toBe(false);
+  });
+});
+
+describe("autoRefreshAbroadNames", () => {
+  beforeEach(() => {
+    saved.length = 0;
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const client = (rows: { id: string; place_name: string; lat: number; lng: number }[]) =>
+    ({
+      from: () => {
+        const api: Record<string, unknown> = {};
+        for (const op of ["select", "eq", "order"]) api[op] = () => api;
+        api.range = () => Promise.resolve({ data: rows, error: null });
+        return api;
+      },
+    }) as unknown as SupabaseClient;
+  const memory = (start: string[] = []) => {
+    let ids = [...start];
+    return { read: () => ids, write: (next: string[]) => void (ids = next), get: () => ids };
+  };
+  const rows = [
+    { id: "a", place_name: "영국 런던", lat: 51.5, lng: -0.17 },
+    { id: "b", place_name: "영국 런던 켄싱턴 로열 앨버트 홀", lat: 51.5, lng: -0.18 },
+    { id: "c", place_name: "알 수 없는 곳", lat: 48.86, lng: 2.35 },
+    { id: "k", place_name: "남산", lat: 37.55, lng: 126.98 },
+  ];
+
+  it("해외 곳 중 거친 이름만 묻고, 물어본 곳은 기억한다", async () => {
+    const asked: number[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      const points = JSON.parse(init.body).points as unknown[];
+      asked.push(points.length);
+      return { ok: true, json: async () => ({ places: [{ title: "영국 런던 켄싱턴" }, { title: "프랑스 파리 에펠탑" }] }) };
+    });
+    const store = memory();
+    const outcome = await autoRefreshAbroadNames(client(rows), "u", store);
+    expect(asked).toEqual([2]); // a, c — b 는 이미 세부, k 는 한국
+    expect(saved).toEqual([["a", "영국 런던 켄싱턴"], ["c", "프랑스 파리 에펠탑"]]);
+    expect(outcome).toEqual({ checked: 2, renamed: 2, failed: 0 });
+    expect(store.get().sort()).toEqual(["a", "c"]);
+  });
+
+  it("이 기기에서 이미 물어본 곳은 다시 묻지 않는다 — 물을 곳이 없으면 null", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    expect(await autoRefreshAbroadNames(client(rows), "u", memory(["a", "c"]))).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("조회하지 못한 곳은 기억하지 않는다 — 다음에 다시 묻는다", async () => {
+    vi.stubGlobal("fetch", async () => ({ ok: false, json: async () => ({}) }));
+    const store = memory();
+    await autoRefreshAbroadNames(client(rows), "u", store);
+    expect(store.get()).toEqual([]);
+  });
+
+  it("한 번에 AUTO_MAX 곳까지만 묻는다", async () => {
+    let total = 0;
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      const points = JSON.parse(init.body).points as unknown[];
+      total += points.length;
+      return { ok: true, json: async () => ({ places: points.map(() => ({ title: "해외" })) }) };
+    });
+    const many = Array.from({ length: AUTO_MAX + 7 }, (_, i) => ({ id: `v${i}`, place_name: "알 수 없는 곳", lat: 48, lng: 2 }));
+    await autoRefreshAbroadNames(client(many), "u", memory());
+    expect(total).toBe(AUTO_MAX);
   });
 });

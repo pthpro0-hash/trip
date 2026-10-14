@@ -66,7 +66,6 @@ export const ACTIONS = [
   // 여행 100선
   "spot_suggest",
   // 내 정보
-  "abroad_rename",
   "storage_cleanup",
 ] as const;
 export type UsageAction = (typeof ACTIONS)[number];

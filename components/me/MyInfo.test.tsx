@@ -82,21 +82,23 @@ describe("MyInfo · 내 정보 메뉴", () => {
       expect(container.querySelector("img")?.getAttribute("src")).toBe("https://img.example/a.png");
     });
 
-    it("가족 · 내 자료 · 안내의 길이 한 곳에 모여 있다", async () => {
+    it("가족 · 안내의 길이 한 곳에 모여 있다 — 보관함 정리·해외 이름은 앱이 알아서 해 줄이 없다", async () => {
       render(<MyInfo />);
       await screen.findByText("김지민");
       expect(hrefOf(/^가족 공유/)).toBe("/family");
       expect(hrefOf(/^가족 책장/)).toBe("/mailboxes");
-      expect(hrefOf(/^보관함 정리/)).toBe("/help#data");
+      expect(screen.queryByRole("link", { name: /^보관함 정리/ })).toBeNull();
+      expect(screen.queryByText(/해외 장소 이름/)).toBeNull();
       expect(hrefOf(/^도움말/)).toBe("/help");
       expect(hrefOf(/^개인정보처리방침/)).toBe("/privacy");
       expect(hrefOf(/^이용약관/)).toBe("/terms");
     });
 
-    it("묶음마다 이름이 있다 — 가족 / 내 자료 / 안내", async () => {
+    it("묶음마다 이름이 있다 — 가족 / 안내", async () => {
       render(<MyInfo />);
       await screen.findByText("김지민");
-      for (const title of ["가족", "내 자료", "안내"]) expect(screen.getByRole("heading", { name: title })).toBeTruthy();
+      for (const title of ["가족", "안내"]) expect(screen.getByRole("heading", { name: title })).toBeTruthy();
+      expect(screen.queryByRole("heading", { name: "내 자료" })).toBeNull();
     });
 
     it("길마다 한 줄 설명이 있어 무엇인지 알 수 있다", async () => {
@@ -237,7 +239,7 @@ describe("MyInfo · 내 정보 메뉴", () => {
 
     it("로그인하면 무엇을 쓸 수 있는지 알리고 로그인으로 보낸다 — 돌아올 곳은 내 정보", async () => {
       render(<MyInfo />);
-      expect(await screen.findByText(/로그인하면 가족 공유·가족 책장·보관함 정리를 쓸 수 있어요/)).toBeTruthy();
+      expect(await screen.findByText(/로그인하면 가족 공유·가족 책장을 쓸 수 있어요/)).toBeTruthy();
       expect(screen.getByRole("link", { name: "로그인하기" })).toHaveAttribute("href", "/login?next=/me");
     });
 
