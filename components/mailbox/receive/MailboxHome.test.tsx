@@ -4,8 +4,8 @@ import type { MailboxView } from "@/lib/supabase/mailboxPublic";
 import { RECOMMENDED } from "@/lib/mailboxSettings";
 
 // 지도 그림은 시험 안에서 잴 것이 아니다. 무엇을 받았는지만 본다.
-vi.mock("@/components/sketch/FootprintPlayer", () => ({
-  FootprintPlayer: ({
+vi.mock("@/components/sketch/FootprintMap", () => ({
+  FootprintMap: ({
     heading,
     shared,
     showMonths,

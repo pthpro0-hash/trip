@@ -57,10 +57,8 @@ export const ACTIONS = [
   "sketch_line",
   "sketch_all_tab",
   "sketch_to_map",
-  "footprint_play",
   // 내 여행 지도
   "hub_period",
-  "hub_sido",
   "hub_curated",
   "hub_abroad",
   "hub_echo",

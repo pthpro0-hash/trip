@@ -5,23 +5,16 @@ import { useEffect, useRef, useState } from "react";
 /*
   지도 위 왼쪽의 "지도 옵션".
 
-  예전에는 칩 둘("시도 3/17", "100선 겹쳐 보기")이 늘 떠 있었다. 처음 보는 사람에게는 "시도 3/17"이 무엇을 세는 것인지,
-  "100선 겹쳐 보기"가 켜고 끄는 것인지 알기 어렵고, 지도를 가리는 것이 둘이었다. 지금은 단추 하나다. 눌러야 두 가지가
-  나온다 — 다녀온 시도(밟은 시도를 세어 본다)와 100선 겹쳐 보기(스위치).
-
-  시도 수는 단추 옆이 아니라 눌러서 나오는 첫 줄에 둔다. 한 번만 누르면 보인다.
+  눌러야 나온다 — 100선 겹쳐 보기(스위치), 해외 사진이 있으면 해외 보기. 예전에 있던 '다녀온 시도'(지도를 칠하고
+  세어 보기)는 한장 요약의 '밟은 시도'와 겹쳐 뺐다(2026-10-14).
 
   100선을 겹쳐 보는 동안에는 창이 닫혀 있어도 범례가 남는다 — 지도에 뜬 빈 동그라미와 채운 동그라미가 무엇인지
   알려야 하고, 켜 둔 것이 단추의 켜진 모습으로도 보인다. 고르면 창은 닫는다(지도를 가리지 않게).
 */
 
 interface MapOptionsProps {
-  /** 다녀온 시도 수. 경계를 아직 받아 오는 중이면 null. */
-  sidoCount: number | null;
   /** 100선 겹쳐 보기가 켜져 있는가. */
   curatedOn: boolean;
-  /** 다녀온 시도를 펼친다. */
-  onSido: () => void;
   /** 100선 겹쳐 보기를 켜고 끈다. */
   onCurated: () => void;
   /** 해외 곳의 수. 0 이거나 없으면 해외 보기 줄을 두지 않는다. */
@@ -34,7 +27,7 @@ interface MapOptionsProps {
 
 const CARD = "pointer-events-auto shadow-[0_2px_10px_rgba(0,0,0,0.15)]";
 
-export function MapOptions({ sidoCount, curatedOn, onSido, onCurated, overseasCount = 0, abroad = false, onAbroad }: MapOptionsProps) {
+export function MapOptions({ curatedOn, onCurated, overseasCount = 0, abroad = false, onAbroad }: MapOptionsProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -109,20 +102,10 @@ export function MapOptions({ sidoCount, curatedOn, onSido, onCurated, overseasCo
             )}
             <button
               type="button"
-              onClick={choose(onSido)}
-              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[14px] font-medium text-text transition hover:bg-bg-subtle"
-            >
-              <span>다녀온 시도 {sidoCount ?? "…"}/17</span>
-              <span aria-hidden="true" className="text-[16px] text-text-faint">
-                ›
-              </span>
-            </button>
-            <button
-              type="button"
               role="switch"
               aria-checked={curatedOn}
               onClick={choose(onCurated)}
-              className="flex w-full items-center justify-between gap-3 border-t border-line px-4 py-3 text-left text-[14px] font-medium text-text transition hover:bg-bg-subtle"
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[14px] font-medium text-text transition hover:bg-bg-subtle"
             >
               <span>100선 겹쳐 보기</span>
               <span

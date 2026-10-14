@@ -4,16 +4,14 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MapOptions } from "./MapOptions";
 
 /*
-  지도 위 왼쪽에 칩 둘("시도 3/17", "100선 겹쳐 보기")이 늘 떠 있었다. 처음 보는 사람에게는 "시도 3/17"이 무엇을 세는
-  것인지, "100선 겹쳐 보기"가 켜고 끄는 것인지 알기 어렵고, 지도를 가리는 것이 둘이다. 단추 하나("지도 옵션")로 합치고
-  눌러야 두 가지가 나온다. 지도 위에는 단추 하나만 남는다.
+  지도 위에는 단추 하나("지도 옵션")만 둔다. 눌러야 100선 겹쳐 보기(와 해외 사진이 있으면 해외 보기)가 나온다.
+  '다녀온 시도'(칠하고 세기)는 한장 요약의 '밟은 시도'와 겹쳐 뺐다(2026-10-14).
 */
 
 function options(props: Partial<ComponentProps<typeof MapOptions>> = {}) {
-  const onSido = vi.fn();
   const onCurated = vi.fn();
-  const view = render(<MapOptions sidoCount={3} curatedOn={false} onSido={onSido} onCurated={onCurated} {...props} />);
-  return { ...view, onSido, onCurated };
+  const view = render(<MapOptions curatedOn={false} onCurated={onCurated} {...props} />);
+  return { ...view, onCurated };
 }
 
 const trigger = () => screen.getByRole("button", { name: "지도 옵션" });
@@ -43,33 +41,18 @@ describe("MapOptions · 해외 보기", () => {
 });
 
 describe("MapOptions", () => {
-  it("처음에는 단추 하나만 있다 — 칩 둘이 지도를 가리지 않는다", () => {
+  it("처음에는 단추 하나만 있다", () => {
     options();
     expect(trigger()).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("button", { name: /다녀온 시도/ })).toBeNull();
     expect(screen.queryByRole("switch")).toBeNull();
   });
 
-  it("누르면 두 가지가 나온다 — 다녀온 시도, 100선 겹쳐 보기", () => {
+  it("누르면 100선 겹쳐 보기가 나온다 — '다녀온 시도'는 없다", () => {
     options();
     open();
     expect(trigger()).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: /다녀온 시도 3\/17/ })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "100선 겹쳐 보기" })).toHaveAttribute("aria-checked", "false");
-  });
-
-  it("시도 수를 아직 모르면 …로 보인다 — 경계를 받아 오는 동안", () => {
-    options({ sidoCount: null });
-    open();
-    expect(screen.getByRole("button", { name: /다녀온 시도 …\/17/ })).toBeTruthy();
-  });
-
-  it("다녀온 시도를 누르면 알리고 닫는다", () => {
-    const { onSido } = options();
-    open();
-    fireEvent.click(screen.getByRole("button", { name: /다녀온 시도/ }));
-    expect(onSido).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByRole("button", { name: /다녀온 시도/ })).toBeNull();
   });
 
   it("100선 겹쳐 보기는 켜고 끄는 스위치다 — 누르면 알리고 닫는다", () => {

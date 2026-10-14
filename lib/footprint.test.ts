@@ -5,22 +5,17 @@ import { buildSketch, monthStrip, sketchShapes } from "./sketch";
 import { yearStory } from "./sketchStory";
 import { buildSnapshot, sharePhotoPaths } from "./share";
 import {
-  CURRENT_R,
   DONE_R,
   PICK_R,
-  TRAIL_R,
-  dotLook,
+  dotRadius,
   footprintSteps,
   footprintStepsOfShare,
-  initialPlay,
   labelOf,
   monthCountsOfShare,
-  playReducer,
-  stepDelayMs,
   stepTitle,
+  toggleMonth,
   tripsPerMonth,
   type FootprintStep,
-  type PlayState,
 } from "./footprint";
 
 /*
@@ -139,86 +134,18 @@ describe("tripsPerMonth · 월별 여행 수", () => {
   });
 });
 
-describe("stepDelayMs · 재생 속도", () => {
-  it("곳이 몇이든 곳당 1초다 — 전체 시간 제한은 없다", () => {
-    expect(stepDelayMs()).toBe(1000);
-  });
-});
-
-describe("playReducer · 재생 상태", () => {
-  const N = 4;
-  const at = (state: Partial<PlayState>): PlayState => ({ ...initialPlay, ...state });
-
-  it("재생을 누르면 첫 곳부터 곧바로 찍는다", () => {
-    expect(playReducer(initialPlay, { type: "play", count: N })).toEqual({ cur: 0, playing: true, done: false, sel: null });
-  });
-
-  it("곳이 하나뿐이면 찍고 곧 끝난다", () => {
-    expect(playReducer(initialPlay, { type: "play", count: 1 })).toEqual({ cur: 0, playing: false, done: true, sel: null });
-  });
-
-  it("곳이 없으면 아무 일도 없다", () => {
-    expect(playReducer(initialPlay, { type: "play", count: 0 })).toEqual(initialPlay);
-  });
-
-  it("한 걸음씩 나아가다 마지막에서 끝난다", () => {
-    let state = playReducer(initialPlay, { type: "play", count: N });
-    for (let i = 1; i < N; i += 1) {
-      state = playReducer(state, { type: "tick", count: N });
-      expect(state.cur).toBe(i);
-      expect(state.done).toBe(false);
-    }
-    state = playReducer(state, { type: "tick", count: N });
-    expect(state).toEqual({ cur: N - 1, playing: false, done: true, sel: null });
-  });
-
-  it("재생 중이 아니면 tick 은 아무것도 바꾸지 않는다", () => {
-    const paused = at({ cur: 1, playing: false });
-    expect(playReducer(paused, { type: "tick", count: N })).toBe(paused);
-  });
-
-  it("멈췄다가 다시 누르면 그 자리에서 이어 간다", () => {
-    const paused = playReducer(at({ cur: 2, playing: true }), { type: "pause" });
-    expect(paused).toEqual({ cur: 2, playing: false, done: false, sel: null });
-    expect(playReducer(paused, { type: "play", count: N })).toEqual({ cur: 2, playing: true, done: false, sel: null });
-  });
-
-  it("끝난 뒤 다시 누르면 처음부터", () => {
-    const finished = at({ cur: N - 1, done: true });
-    expect(playReducer(finished, { type: "play", count: N })).toEqual({ cur: 0, playing: true, done: false, sel: null });
-  });
-
-  it("끝으로 건너뛰면 다 찍힌 채 멈춘다", () => {
-    expect(playReducer(at({ cur: 1, playing: true }), { type: "skip", count: N })).toEqual({
-      cur: N - 1,
-      playing: false,
-      done: true,
-      sel: null,
-    });
-  });
-
-  it("달을 누르면 재생이 멈추고 그 달만 남는다", () => {
-    const state = playReducer(at({ cur: 1, playing: true }), { type: "month", month: 8 });
-    expect(state.sel).toBe(8);
-    expect(state.playing).toBe(false);
-  });
-
-  it("같은 달을 다시 누르면 전체로 돌아간다", () => {
-    const state = playReducer(at({ cur: 1, sel: 8 }), { type: "month", month: 8 });
-    expect(state.sel).toBeNull();
+describe("toggleMonth · 달 고르기", () => {
+  it("달을 누르면 그 달만, 같은 달을 다시 누르면 전부로", () => {
+    expect(toggleMonth(null, 8)).toBe(8);
+    expect(toggleMonth(8, 8)).toBeNull();
   });
 
   it("다른 달을 누르면 그 달로 옮겨 간다", () => {
-    expect(playReducer(at({ sel: 8 }), { type: "month", month: 5 }).sel).toBe(5);
-  });
-
-  it("달을 고른 채 재생을 누르면 전체를 처음부터 다시 찍는다", () => {
-    const state = playReducer(at({ cur: 2, sel: 8 }), { type: "play", count: N });
-    expect(state).toEqual({ cur: 0, playing: true, done: false, sel: null });
+    expect(toggleMonth(8, 5)).toBe(5);
   });
 });
 
-describe("dotLook · 점의 모양", () => {
+describe("dotRadius · 점의 크기", () => {
   const step = (month: number): FootprintStep => ({
     placeName: "가",
     lat: 37,
@@ -230,39 +157,15 @@ describe("dotLook · 점의 모양", () => {
     photoPath: null,
   });
 
-  it("재생 전에는 아무것도 찍지 않는다", () => {
-    expect(dotLook(0, step(3), initialPlay).r).toBe(0);
-  });
-
-  it("현재 점은 크게 테를 두르고, 지나온 점은 작고 옅게, 아직인 점은 없다", () => {
-    const state = at(2);
-    expect(dotLook(2, step(3), state)).toMatchObject({ r: CURRENT_R, ring: expect.any(Number) });
-    expect(dotLook(2, step(3), state).ring).toBeGreaterThan(CURRENT_R);
-    const trail = dotLook(0, step(3), state);
-    expect(trail.r).toBe(TRAIL_R);
-    expect(trail.opacity).toBeLessThan(1);
-    expect(dotLook(3, step(3), state).r).toBe(0);
-  });
-
-  it("끝나면 모두 같은 크기로 남고 테는 없다", () => {
-    const state: PlayState = { cur: 3, playing: false, done: true, sel: null };
-    for (const i of [0, 1, 2, 3]) {
-      const look = dotLook(i, step(3), state);
-      expect(look.r).toBe(DONE_R);
-      expect(look.ring).toBe(0);
-      expect(look.opacity).toBe(1);
-    }
+  it("처음부터 모든 점이 같은 크기로 찍혀 있다 — 재생은 없다", () => {
+    expect(dotRadius(step(3), null)).toBe(DONE_R);
+    expect(dotRadius(step(8), null)).toBe(DONE_R);
   });
 
   it("달을 고르면 그 달의 점만 남는다", () => {
-    const state: PlayState = { cur: 3, playing: false, done: true, sel: 8 };
-    expect(dotLook(0, step(8), state).r).toBe(PICK_R);
-    expect(dotLook(1, step(5), state).r).toBe(0);
+    expect(dotRadius(step(8), 8)).toBe(PICK_R);
+    expect(dotRadius(step(5), 8)).toBe(0);
   });
-
-  function at(cur: number): PlayState {
-    return { cur, playing: true, done: false, sel: null };
-  }
 });
 
 describe("stepTitle · 날짜와 장소명", () => {
@@ -291,24 +194,14 @@ describe("labelOf · 지도 아래 띠", () => {
   const totals = { trips: 3, places: 5, photos: 91 };
   const counts = tripsPerMonth(steps);
 
-  it("처음에는 재생을 권한다 — 부연 없이 한 줄만", () => {
-    expect(labelOf(steps, initialPlay, counts, totals)).toEqual({ title: "재생을 눌러 보세요", sub: "" });
-  });
-
-  it("재생 중에는 지금 곳의 날짜·장소명과 사진 수", () => {
-    const label = labelOf(steps, { cur: 3, playing: true, done: false, sel: null }, counts, totals);
-    expect(label.title).toBe("8월 13일 · 안목해변");
-    expect(label.sub).toBe("사진 31장");
-  });
-
-  it("끝나면 한 해를 말한다", () => {
-    const label = labelOf(steps, { cur: 4, playing: false, done: true, sel: null }, counts, totals);
+  it("달을 고르지 않았으면 한 해를 말한다", () => {
+    const label = labelOf(steps, null, counts, totals);
     expect(label.title).toBe("다녀온 곳 5곳");
     expect(label.sub).toBe("여행 3번 · 사진 91장");
   });
 
   it("달을 고르면 그 달의 여행 수와 곳들을 나열한다", () => {
-    const label = labelOf(steps, { cur: 4, playing: false, done: true, sel: 8 }, counts, totals);
+    const label = labelOf(steps, 8, counts, totals);
     expect(label.title).toBe("8월 · 여행 1번");
     expect(label.sub).toBe("13일 안목해변 · 14일 속초해변");
   });
@@ -321,13 +214,13 @@ describe("labelOf · 지도 아래 띠", () => {
         Array.from({ length: 9 }, (_, i) => visit(`곳${i + 1}`, 37 + i * 0.1, 127 + i * 0.1, 1, { visitedOn: `2026-06-${String(i + 1).padStart(2, "0")}` })),
       ),
     ]);
-    const label = labelOf(many, { cur: 8, playing: false, done: true, sel: 6 }, tripsPerMonth(many), { trips: 1, places: 9, photos: 9 });
+    const label = labelOf(many, 6, tripsPerMonth(many), { trips: 1, places: 9, photos: 9 });
     expect(label.sub).toBe("1일 곳1 · 2일 곳2 · 3일 곳3 · 4일 곳4 · 5일 곳5 · 6일 곳6 외 3곳");
   });
 
   it("링크로 받은 것은 날 없이 이름만", () => {
     const shared = steps.map((step) => ({ ...step, day: null, tripId: "" }));
-    const label = labelOf(shared, { cur: 4, playing: false, done: true, sel: 8 }, counts, totals);
+    const label = labelOf(shared, 8, counts, totals);
     expect(label.sub).toBe("안목해변 · 속초해변");
   });
 });

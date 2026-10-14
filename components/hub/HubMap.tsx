@@ -39,19 +39,6 @@ export interface CuratedPin {
   wished: boolean;
 }
 
-/** 칠할 시도. 조각마다 [바깥 고리, ...구멍], 점은 [경도, 위도]. */
-export interface PaintedSido {
-  name: string;
-  polygons: [number, number][][][];
-}
-
-/*
-  이만큼 멀리서 볼 때만 칠한다. 동네를 볼 때 도 하나가 화면을 온통
-  파랗게 덮으면 지도가 안 보인다. 칠하기는 "어디를 밟았나"를 한눈에
-  보는 일이라 멀리서 볼 때의 것이다.
-*/
-const PAINT_FROM_LEVEL = 9;
-
 export interface FlyTarget {
   /** 같은 곳으로 두 번 날아가도 알아듣도록 매번 바꾼다. */
   key: number;
@@ -78,8 +65,6 @@ interface HubMapProps {
   viewInset?: number;
   onView: (bounds: Bounds) => void;
   onPick: (places: HubPlace[]) => void;
-  /** 다녀온 시도. 멀리서 볼 때만 칠한다. */
-  painted: PaintedSido[];
   /** 100선 겹쳐 보기. 꺼져 있으면 null. */
   curated: CuratedPin[] | null;
   onPickSpot: (id: string) => void;
@@ -95,7 +80,6 @@ export function HubMap({
   viewInset,
   onView,
   onPick,
-  painted,
   curated,
   onPickSpot,
 }: HubMapProps) {
@@ -105,8 +89,6 @@ export function HubMap({
   const overlaysRef = useRef<Kakao[]>([]);
   const lineRef = useRef<Kakao>(null);
   const [failed, setFailed] = useState(false);
-  /** 지도가 섰는가. 칠하기처럼 지도가 있어야 하는 일은 이것을 기다린다. */
-  const [ready, setReady] = useState(false);
 
   /*
     지도의 행사(idle)는 한 번 걸어 두고 끝까지 쓴다. 그 안에서 읽는 값이
@@ -117,7 +99,6 @@ export function HubMap({
   useEffect(() => {
     latest.current = { places, photoUrls, pickedIds, bottomInset, viewBottom, onView, onPick, flyTo, curated, onPickSpot };
   });
-  const paintRef = useRef<Kakao[]>([]);
 
   /** 지금 시트 위로 보이는 땅의 범위. */
   const reportView = () => {
@@ -165,10 +146,6 @@ export function HubMap({
     if (!map || !box) return;
     const kakao: Kakao = (window as Kakao).kakao;
     const { places: all, photoUrls: urls, pickedIds: picked, curated: spots } = latest.current;
-
-    // 칠한 시도는 멀리서 볼 때만 보인다.
-    const far = map.getLevel() >= PAINT_FROM_LEVEL;
-    for (const polygon of paintRef.current) polygon.setMap(far ? map : null);
 
     for (const overlay of overlaysRef.current) overlay.setMap(null);
     overlaysRef.current = [];
@@ -272,7 +249,6 @@ export function HubMap({
         */
         const start = latest.current.flyTo?.places ?? latest.current.places;
         if (start.length > 0) fit(start);
-        setReady(true);
         redraw();
         reportView();
       })
@@ -292,36 +268,6 @@ export function HubMap({
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [places, photoUrls, pickedIds, curated]);
-
-  /*
-    다녀온 시도를 칠한다. 기간을 고르면 그 기간에 밟은 시도만 남는다.
-    바다 위 섬까지 조각마다 따로 칠한다.
-  */
-  useEffect(() => {
-    const map = mapRef.current;
-    for (const polygon of paintRef.current) polygon.setMap(null);
-    paintRef.current = [];
-    if (!map) return;
-    const kakao: Kakao = (window as Kakao).kakao;
-    const far = map.getLevel() >= PAINT_FROM_LEVEL;
-
-    for (const sido of painted) {
-      for (const polygon of sido.polygons) {
-        paintRef.current.push(
-          new kakao.maps.Polygon({
-            map: far ? map : null,
-            path: polygon.map((ring) => ring.map(([lng, lat]) => new kakao.maps.LatLng(lat, lng))),
-            strokeWeight: 1.5,
-            strokeColor: LINE_COLOR,
-            strokeOpacity: 0.55,
-            fillColor: LINE_COLOR,
-            fillOpacity: 0.14,
-            zIndex: 0,
-          }),
-        );
-      }
-    }
-  }, [painted, ready]);
 
   // 고른 여행을 들른 순서대로 잇는다.
   useEffect(() => {

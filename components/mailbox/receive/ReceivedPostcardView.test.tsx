@@ -12,8 +12,8 @@ vi.mock("@/lib/supabase/mailboxPublic", async () => ({
   toggleHeart: calls.heart,
 }));
 // 지도 그림은 시험 안에서 잴 것이 아니다.
-vi.mock("@/components/sketch/FootprintPlayer", () => ({
-  FootprintPlayer: ({ heading, showMonths, shared }: { heading: string; showMonths: boolean; shared: boolean }) => (
+vi.mock("@/components/sketch/FootprintMap", () => ({
+  FootprintMap: ({ heading, showMonths, shared }: { heading: string; showMonths: boolean; shared: boolean }) => (
     <p>
       지도:{heading}:{String(showMonths)}:{String(shared)}
     </p>

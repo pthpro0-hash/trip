@@ -4,8 +4,8 @@ import type { InboxCard, MailboxView } from "@/lib/supabase/mailboxPublic";
 import { RECOMMENDED } from "@/lib/mailboxSettings";
 
 // 지도 그림은 시험 안에서 잴 것이 아니다. 무엇을 받았는지만 본다.
-vi.mock("@/components/sketch/FootprintPlayer", () => ({
-  FootprintPlayer: ({ heading, shared, steps }: { heading: string; shared: boolean; steps: unknown[] }) => (
+vi.mock("@/components/sketch/FootprintMap", () => ({
+  FootprintMap: ({ heading, shared, steps }: { heading: string; shared: boolean; steps: unknown[] }) => (
     <p>
       지도:{heading}:{String(shared)}:곳{steps.length}
     </p>

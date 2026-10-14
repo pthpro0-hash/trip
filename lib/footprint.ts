@@ -3,11 +3,10 @@ import type { ShareSnapshot } from "./share";
 import { isInKorea } from "./weatherGrid";
 
 /*
-  발자취 — 한 해를 날짜순으로 찍어 본다.
+  발자취 — 다녀온 곳을 지도에 찍어 본다(부모님이 보는 엽서·올해의 책의 지도).
 
-  한장 요약의 카드는 그해를 한눈에 보여 주지만, 언제 어디를 다녀왔는지의 "순서"는
-  사라진다. 여기서는 그 순서를 되살린다. 곳을 날짜순으로 하나씩 지도에 찍고, 현재
-  점은 크게, 지나온 점은 작게 남긴다. 달을 누르면 그 달만 남는다.
+  곳마다 점 하나를 찍고, 달을 누르면 그 달에 간 곳만 남는다. 예전에는 곳을 하나씩
+  찍어 나가는 '재생'이 있었는데, 쓰는 사람에게 복잡하기만 해서 뺐다(2026-10-14).
 
   선은 잇지 않는다. 여행과 여행 사이에는 실제로 걸은 길이 없어, 이으면 없는 동선이
   생긴다(sketchShapes 가 같은 까닭으로 여행 안에서만 잇는다).
@@ -97,86 +96,23 @@ export function seasonOfMonth(month: number): Season {
   return seasonOf(`2000-${String(month).padStart(2, "0")}-01`);
 }
 
-/** 곳 하나를 찍는 데 걸리는 시간. 곳이 몇이든 1초 — 전체 시간에는 제한을 두지 않는다. */
-export function stepDelayMs(): number {
-  return 1000;
+/** 달을 골랐으면 그 달(1~12). null 이면 전부 보인다. */
+export type MonthPick = number | null;
+
+/** 달을 누른다. 같은 달을 다시 누르면 전부로 돌아간다. */
+export function toggleMonth(sel: MonthPick, month: number): MonthPick {
+  return sel === month ? null : month;
 }
 
-/*
-  재생 상태.
-
-    cur      지금 찍은 곳의 차례. 아직 시작하지 않았으면 -1.
-    playing  타이머가 돌고 있는가.
-    done     끝까지 찍었는가.
-    sel      달을 골랐으면 그 달(1~12). 고르면 재생은 멈추고 그 달만 남는다.
-*/
-export interface PlayState {
-  cur: number;
-  playing: boolean;
-  done: boolean;
-  sel: number | null;
-}
-
-export const initialPlay: PlayState = { cur: -1, playing: false, done: false, sel: null };
-
-export type PlayAction =
-  | { type: "play"; count: number }
-  | { type: "tick"; count: number }
-  | { type: "pause" }
-  | { type: "skip"; count: number }
-  | { type: "month"; month: number };
-
-export function playReducer(state: PlayState, action: PlayAction): PlayState {
-  switch (action.type) {
-    case "play": {
-      if (action.count <= 0) return state;
-      // 멈춘 자리에서만 이어 간다. 끝났거나 달을 골랐거나 아직 시작 전이면 처음부터.
-      if (state.sel === null && !state.done && state.cur >= 0) return { ...state, playing: true };
-      const done = action.count === 1;
-      return { cur: 0, playing: !done, done, sel: null };
-    }
-    case "tick": {
-      if (!state.playing) return state;
-      const next = state.cur + 1;
-      if (next >= action.count) return { cur: action.count - 1, playing: false, done: true, sel: null };
-      return { ...state, cur: next };
-    }
-    case "pause":
-      return { ...state, playing: false };
-    case "skip":
-      if (action.count <= 0) return state;
-      return { cur: action.count - 1, playing: false, done: true, sel: null };
-    case "month":
-      return { ...state, playing: false, sel: state.sel === action.month ? null : action.month };
-  }
-}
-
-export const CURRENT_R = 9;
-export const RING_R = 13;
-/** 지나온 점. 작고 옅게 남는다. */
-export const TRAIL_R = 4;
-export const TRAIL_OPACITY = 0.55;
-/** 끝까지 찍은 뒤 모든 점. */
+/** 모든 점. */
 export const DONE_R = 5;
 /** 달을 골랐을 때 그 달의 점. */
 export const PICK_R = 6;
 
-export interface DotLook {
-  r: number;
-  /** 현재 점을 두르는 테. 없으면 0. */
-  ring: number;
-  opacity: number;
-}
-
-const HIDDEN: DotLook = { r: 0, ring: 0, opacity: 1 };
-
-/** 이 순간 점 하나의 모양. */
-export function dotLook(index: number, step: FootprintStep, state: PlayState): DotLook {
-  if (state.sel !== null) return step.month === state.sel ? { r: PICK_R, ring: 0, opacity: 1 } : HIDDEN;
-  if (state.done) return { r: DONE_R, ring: 0, opacity: 1 };
-  if (state.cur < 0 || index > state.cur) return HIDDEN;
-  if (index === state.cur) return { r: CURRENT_R, ring: RING_R, opacity: 1 };
-  return { r: TRAIL_R, ring: 0, opacity: TRAIL_OPACITY };
+/** 점 하나의 크기. 0 이면 그리지 않는다. */
+export function dotRadius(step: FootprintStep, sel: MonthPick): number {
+  if (sel !== null) return step.month === sel ? PICK_R : 0;
+  return DONE_R;
 }
 
 /** "8월 13일 · 안목해변". 링크로 받은 것은 날을 몰라 "8월 · 안목해변". */
@@ -190,12 +126,12 @@ const LISTED = 6;
 /** 지도 아래 띠에 적을 두 줄. */
 export function labelOf(
   steps: FootprintStep[],
-  state: PlayState,
+  sel: MonthPick,
   monthCounts: number[],
   totals: { trips: number; places: number; photos: number },
 ): { title: string; sub: string } {
-  if (state.sel !== null) {
-    const month = state.sel;
+  if (sel !== null) {
+    const month = sel;
     const listed = steps.filter((step) => step.month === month);
     const names = listed.slice(0, LISTED).map((step) => `${step.day ? `${step.day}일 ` : ""}${step.placeName}`);
     const rest = listed.length - LISTED;
@@ -204,11 +140,5 @@ export function labelOf(
       sub: `${names.join(" · ")}${rest > 0 ? ` 외 ${rest}곳` : ""}`,
     };
   }
-  if (state.done) {
-    return { title: `다녀온 곳 ${totals.places}곳`, sub: `여행 ${totals.trips}번 · 사진 ${totals.photos.toLocaleString("ko-KR")}장` };
-  }
-  const step = steps[state.cur];
-  if (step) return { title: stepTitle(step), sub: `사진 ${step.photoCount}장` };
-  // 부연은 두지 않는다 — 제목 한 줄과 깜빡이는 재생 단추로 충분하다.
-  return { title: "재생을 눌러 보세요", sub: "" };
+  return { title: `다녀온 곳 ${totals.places}곳`, sub: `여행 ${totals.trips}번 · 사진 ${totals.photos.toLocaleString("ko-KR")}장` };
 }

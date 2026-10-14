@@ -240,10 +240,10 @@ describe("HubView · 시트의 첫 모습(살짝 올림)", () => {
       expect(screen.queryByText("100선 겹쳐 보기")).toBeNull();
     });
 
-    it("누르면 다녀온 시도와 100선 겹쳐 보기가 나온다", () => {
+    it("누르면 100선 겹쳐 보기가 나온다 — '다녀온 시도'(칠한 곳)는 뺐다", () => {
       sheet();
       fireEvent.click(screen.getByRole("button", { name: "지도 옵션" }));
-      expect(screen.getByRole("button", { name: /다녀온 시도/ })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /다녀온 시도/ })).toBeNull();
       expect(screen.getByRole("switch", { name: "100선 겹쳐 보기" })).toHaveAttribute("aria-checked", "false");
     });
 
@@ -257,13 +257,6 @@ describe("HubView · 시트의 첫 모습(살짝 올림)", () => {
       expect(screen.getByRole("switch", { name: "100선 겹쳐 보기" })).toHaveAttribute("aria-checked", "true");
       fireEvent.click(screen.getByRole("switch", { name: "100선 겹쳐 보기" }));
       expect(container).not.toHaveTextContent("아직 안 간 곳");
-    });
-
-    it("다녀온 시도를 누르면 칠한 곳 창이 열린다", async () => {
-      sheet();
-      fireEvent.click(screen.getByRole("button", { name: "지도 옵션" }));
-      fireEvent.click(screen.getByRole("button", { name: /다녀온 시도/ }));
-      expect(await screen.findByRole("dialog", { name: "칠한 곳" })).toBeTruthy();
     });
   });
 

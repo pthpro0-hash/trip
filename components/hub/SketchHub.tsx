@@ -16,8 +16,7 @@ import { useWide } from "@/lib/useWide";
 import { Waiting } from "@/components/layout/Waiting";
 import dynamic from "next/dynamic";
 import type { OverseasMap as OverseasMapType } from "./OverseasMap";
-import { HubMap, type CuratedPin, type FlyTarget, type PaintedSido } from "./HubMap";
-import { CollectionPanel } from "./CollectionPanel";
+import { HubMap, type CuratedPin, type FlyTarget } from "./HubMap";
 import { EchoCard } from "./EchoCard";
 import { SpotPeek } from "./SpotPeek";
 import { HubDialog } from "./HubDialog";
@@ -27,7 +26,6 @@ import { MonthBars } from "./MonthBars";
 import {
   monthSpan,
   monthTotals,
-  rangeLabel,
   withinMonths,
   echoOf,
   yearRange,
@@ -270,8 +268,6 @@ export function HubView({
   const [range, setRange] = useState<MonthRange | null>(() =>
     initialYear ? yearRange(monthSpan(places), initialYear) : null,
   );
-  /** 시트 속에 무엇을 펼쳤나. 칠한 곳 모음은 목록 대신 들어선다. */
-  const [panel, setPanel] = useState<"trips" | "collection">("trips");
   /** 100선 겹쳐 보기. */
   const [showCurated, setShowCurated] = useState(false);
   const [pickedSpot, setPickedSpot] = useState<string | null>(null);
@@ -279,21 +275,8 @@ export function HubView({
   const [periodOpen, setPeriodOpen] = useState(false);
   const wishlist = useWishlist();
 
-  /*
-    시도 경계(60KB)와 100선 자료(370KB)는 지도를 여는 데 필요 없다. 경계는
-    곧바로, 100선은 겹쳐 보기를 켤 때 따로 불러온다.
-  */
-  const [sido, setSido] = useState<typeof import("@/lib/sido") | null>(null);
+  /* 100선 자료(370KB)는 지도를 여는 데 필요 없다. 겹쳐 보기를 켤 때 따로 불러온다. */
   const [curated, setCurated] = useState<typeof import("@/lib/curatedData") | null>(null);
-  useEffect(() => {
-    let active = true;
-    void import("@/lib/sido").then((module) => {
-      if (active) setSido(module);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
   useEffect(() => {
     if (!showCurated || curated) return;
     let active = true;
@@ -423,25 +406,6 @@ export function HubView({
   };
 
   /*
-    칠하기와 셈은 지금 보는 것(기간으로 거른 것)을 따른다. 기간을 골랐는데
-    칠한 곳이 그대로면 무엇을 센 것인지 헷갈린다.
-  */
-  const tally = useMemo(() => (sido ? sido.sidoTally(shown) : new Map<string, number>()), [sido, shown]);
-  const painted: PaintedSido[] = useMemo(
-    () =>
-      sido
-        ? sido.SIDO.filter((entry) => tally.has(entry.name)).map((entry) => ({
-            name: entry.name,
-            polygons: entry.polygons,
-          }))
-        : [],
-    [sido, tally],
-  );
-  const curatedSeen = useMemo(
-    () => new Set(shown.map((place) => place.spotId).filter((id): id is string => !!id)),
-    [shown],
-  );
-  /*
     100선 겹쳐 보기에서 빼는 것은 평생 다녀온 곳이다. 작년에 간 곳을 올해
     기간으로 걸렀다고 빈 동그라미로 되살리면 안 간 곳처럼 보인다.
   */
@@ -483,38 +447,12 @@ export function HubView({
   const backToList = () => {
     setPicked(null);
     setPickedSpot(null);
-    setPanel("trips");
-  };
-
-  const openCollection = () => {
-    logUse("hub_sido");
-    setPicked(null);
-    setPickedSpot(null);
-    setPanel("collection");
   };
 
   const toggleCurated = () => {
     if (showCurated) setPickedSpot(null);
     else logUse("hub_curated");
     setShowCurated(!showCurated);
-  };
-
-  /*
-    밟은 시도는 그곳 여행으로 날아간다. 안 밟은 시도는 그리로 날아가
-    100선을 겹쳐 보인다 — 다음에 갈 곳이 거기 있다. 지도가 보이게
-    시트는 내린다.
-  */
-  const flyToSido = (name: string, visited: boolean) => {
-    if (!sido) return;
-    backToList();
-    if (visited) {
-      fly(shown.filter((place) => sido.sidoOf(place) === name));
-    } else {
-      setShowCurated(true);
-      flights.current += 1;
-      setFlyTo({ key: flights.current, places: sido.sidoBounds(name) });
-    }
-    changeSnap("peek");
   };
 
   const pickSpot = (id: string) => {
@@ -581,20 +519,7 @@ export function HubView({
         ? { label: spot.name, content: <SpotPeek spot={spot} thumbnail={curated?.thumbnailOf(spot.id)} /> }
         : picked && userId
           ? { label: picked[0].placeName, content: <PlacePanel userId={userId} places={picked} /> }
-          : panel === "collection"
-            ? {
-                label: "칠한 곳",
-                content: (
-                  <CollectionPanel
-                    tally={tally}
-                    rangeText={range ? rangeLabel(range) : null}
-                    curatedVisited={curatedSeen.size}
-                    curatedTotal={121}
-                    onSido={flyToSido}
-                  />
-                ),
-              }
-            : null;
+          : null;
 
   const body =
     status !== "ready" || places.length === 0 || !showList ? null : (
@@ -643,22 +568,18 @@ export function HubView({
       viewInset={viewInset}
       onView={setView}
       onPick={pick}
-      painted={painted}
       curated={curatedPins}
       onPickSpot={pickSpot}
     />
   );
 
   /*
-    지도 위 왼쪽에 띄우는 단추 하나. 칠한 곳 모음(다녀온 시도)과 100선 겹쳐 보기가 이 안에 있다 — 예전에는 칩 둘이
-    늘 떠 있어 무엇인지 알기 어렵고 지도를 가렸다. 아직 얹을 것이 없으면 띄우지 않는다.
+    지도 위 왼쪽에 띄우는 단추 하나. 100선 겹쳐 보기(와 해외 보기)가 이 안에 있다. 아직 얹을 것이 없으면 띄우지 않는다.
   */
   const controls = !empty && (
     <div className="pointer-events-none absolute left-3 top-3 z-20 flex flex-col items-start gap-2 sm:top-[68px]">
       <MapOptions
-        sidoCount={sido ? tally.size : null}
         curatedOn={showCurated}
-        onSido={openCollection}
         onCurated={toggleCurated}
         overseasCount={overseas.length}
         abroad={abroadNow}

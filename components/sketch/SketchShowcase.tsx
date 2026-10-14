@@ -25,8 +25,6 @@ import { SketchCard } from "./SketchCard";
 import { CollageCard } from "./CollageCard";
 import { LineCard } from "./LineCard";
 import { StoryScenes } from "./StoryScenes";
-import { FootprintPlayer } from "./FootprintPlayer";
-import { footprintSteps, tripsPerMonth } from "@/lib/footprint";
 import { WaitingOverlay } from "@/components/layout/Waiting";
 import { logUse } from "@/lib/usage";
 
@@ -195,18 +193,9 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
     그대로 쓴다. 큰 판을 열 장씩 받으면 한장 요약을 열 때마다 1MB 가까이 든다.
     "더 보기"에 숨은 곳까지 주소만 미리 받아 둔다(사진은 펼칠 때 받는다).
   */
-  const steps = useMemo(() => footprintSteps(trips), [trips]);
-  const stepMonths = useMemo(() => tripsPerMonth(steps), [steps]);
-  // 발자취의 점을 눌렀을 때 보이는 사진도 같은 작은 판이다.
   const placePaths = useMemo(
-    () => [
-      ...new Set(
-        [...story.places.map((place) => place.photoPath), ...steps.map((step) => step.photoPath)].filter(
-          (path): path is string => !!path,
-        ),
-      ),
-    ],
-    [story, steps],
+    () => [...new Set(story.places.map((place) => place.photoPath).filter((path): path is string => !!path))],
+    [story],
   );
   const [placeUrls, setPlaceUrls] = useState<Map<string, string>>(new Map());
   useEffect(() => {
@@ -420,18 +409,14 @@ export function SketchShowcase({ year, all, written, onWrite, sidoOf, userId = n
         {style === "collage" && collageBusy && <p className="text-[13px] text-text-faint">사진을 얹고 있어요…</p>}
       </div>
 
-      <FootprintPlayer
-        steps={steps}
-        monthCounts={stepMonths}
-        totals={{ trips: story.tripCount, places: story.placeCount, photos: story.photoCount }}
-        photoUrls={placeUrls}
-        backHref={`/sketch?y=${year}`}
-      />
-
+      {/*
+        발자취(곳을 하나씩 찍어 나가는 재생)는 뺐다(2026-10-14) — 위 카드가 같은 지도를 이미 보여 준다.
+        그해를 큰 지도에서 보려면 내 여행 지도로 넘어간다.
+      */}
       <Link
         href={`/?v=sketch&y=${year}`}
         onClick={() => logUse("sketch_to_map")}
-        className="-mt-2 self-start rounded-full bg-bg-subtle px-4 py-2.5 text-[15px] font-medium text-accent transition hover:bg-accent-soft"
+        className="self-start rounded-full bg-bg-subtle px-4 py-2.5 text-[15px] font-medium text-accent transition hover:bg-accent-soft"
       >
         {year}년을 지도에서 보기
       </Link>

@@ -323,7 +323,7 @@ export function postcardSpan(snapshot: PostcardSnapshot): string {
 }
 
 /**
- * 발자취 재생(FootprintPlayer)에 쓸 점들. 들른 차례 그대로이고, 링크로 받은 것과 같은 모양이라
+ * 발자취 지도(FootprintMap)에 쓸 점들. 들른 차례 그대로이고, 링크로 받은 것과 같은 모양이라
  * 눌러도 갈 곳이 없다(tripId 가 비어 있다). 날을 못 읽는 곳은 건너뛴다.
  */
 export function postcardSteps(snapshot: PostcardSnapshot): FootprintStep[] {

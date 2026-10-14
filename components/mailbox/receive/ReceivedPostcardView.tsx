@@ -17,7 +17,7 @@ import { mailboxPath, postcardSpan, postcardSteps, postcardTitle, type PreviewMo
 import { heartCount, heartedBy, heartNames, withHeart, type Heart } from "@/lib/mailboxHearts";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
 import { keepWho, useWho } from "@/lib/mailboxWho";
-import { FootprintPlayer } from "@/components/sketch/FootprintPlayer";
+import { FootprintMap } from "@/components/sketch/FootprintMap";
 import { PhotoAlbum, type AlbumHearts } from "./PhotoAlbum";
 import { PreviewBanner } from "./PreviewBanner";
 import { WhoPicker } from "./WhoPicker";
@@ -189,7 +189,7 @@ export function ReceivedPostcardView({ token, card, preview = false }: { token: 
       )}
 
       {steps.length > 0 && (
-        <FootprintPlayer
+        <FootprintMap
           shared
           steps={steps}
           monthCounts={Array.from({ length: 12 }, () => 0)}
