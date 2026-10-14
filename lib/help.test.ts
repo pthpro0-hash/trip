@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { CHAPTERS, DETAIL_MAX, SUMMARY_MAX } from "./help";
+import { CHAPTERS, DETAIL_MAX, FAQ, SUMMARY_MAX } from "./help";
 
 /*
   안내가 화면보다 앞서 나가면 사람은 없는 단추를 찾아 헤매고, 그때부터
@@ -62,13 +62,13 @@ describe("도움말 내용", () => {
 
   /*
     사진으로 여행 추가 화면은 세 걸음(고르기 · 확인 · 기록)이고, 확인 화면의 카드는 곳 목록 · 동행 · 나누기 · 합치기를
-    "다듬기" 안에 접고 아래에 기록 막대가 붙는다. 안내가 화면보다 앞서거나 뒤처지면 없는 단추를 찾아 헤맨다.
+    "고치기" 안에 접고 아래에 기록 막대가 붙는다. 안내가 화면보다 앞서거나 뒤처지면 없는 단추를 찾아 헤맨다.
   */
   it("사진을 고르는 화면의 안내가 지금 화면의 이름을 쓴다", () => {
     const sketch = CHAPTERS.find((chapter) => chapter.id === "sketch")!;
     const text = sketch.steps.map((step) => `${step.title} ${step.summary} ${step.detail}`).join(" ");
     // 지금 화면에 있는 단추들.
-    for (const word of ["여행 아님", "되돌리기", "다듬기", "제안", "위 여행과 한 여행이었어요", "따로 기록하기", "사진도 함께 올리기", "기록하기", "지도에서 보기", "한장 요약 보기"]) {
+    for (const word of ["여행 아님", "되돌리기", "고치기", "제안", "위 여행과 한 여행이었어요", "따로 기록하기", "사진도 함께 올리기", "기록하기", "지도에서 보기", "한장 요약 보기"]) {
       expect(text, word).toContain(word);
     }
     // 없어진 이름과 보이지 않게 된 기술 용어.
@@ -107,9 +107,9 @@ describe("도움말 내용", () => {
     const text = () => sketch().map((step) => `${step.title} ${step.summary} ${step.detail}`).join(" ");
     const stepOf = (title: string) => sketch().find((step) => step.title === title)!;
 
-    it("지도 위 단추는 '지도 옵션' 하나이고, 그 안에 다녀온 시도와 100선 겹쳐 보기가 있다고 알린다", () => {
-      expect(stepOf("밟은 시도를 세어 보세요").detail).toContain("'지도 옵션'");
-      expect(stepOf("밟은 시도를 세어 보세요").detail).toContain("'다녀온 시도 N/17'");
+    it("지도 위 단추는 '지도 옵션' 하나이고, 그 안에 100선 겹쳐 보기가 있다고 알린다 — '다녀온 시도'는 뺐다", () => {
+      expect(sketch().find((step) => step.title === "밟은 시도를 세어 보세요")).toBeUndefined();
+      expect(text()).not.toContain("다녀온 시도");
       expect(stepOf("100선을 겹쳐 보세요").detail).toContain("'지도 옵션'");
       expect(stepOf("100선을 겹쳐 보세요").detail).toContain("'100선 겹쳐 보기'");
     });
@@ -210,8 +210,8 @@ describe("도움말 내용", () => {
     });
   });
 
-  it("가족 책장은 계정과 보관에서 갈래를 따로 떼어 냈다 — 순서는 스케치·이번 여행·100선·가족 책장·계정", () => {
-    expect(CHAPTERS.map((chapter) => chapter.id)).toEqual(["sketch", "trip", "browse", "shelf", "account"]);
+  it("갈래 순서는 스케치·100선·가족 책장·계정 — '이번 여행'(코스 짜기)은 뺐다", () => {
+    expect(CHAPTERS.map((chapter) => chapter.id)).toEqual(["sketch", "browse", "shelf", "account"]);
     const shelf = CHAPTERS.find((chapter) => chapter.id === "shelf")!;
     expect(shelf.title).toBe("가족 책장");
     expect(shelf.href).toBe("/mailboxes");
@@ -232,5 +232,40 @@ describe("도움말 내용", () => {
     expect(text).toContain("해 제목 바로 아래 '올해의 책 보기'");
     expect(text).toContain("해 제목 바로 아래 '지도로 보기'");
     expect(text).not.toContain("다녀온 곳 지도로 보기");
+  });
+
+  /*
+    도움말을 줄였다(2026-10-14) — 자주 묻는 열 가지만 먼저 보이고, 뺀 기능의 설명은 남기지 않는다.
+  */
+  describe("줄인 도움말", () => {
+    const all = () =>
+      CHAPTERS.flatMap((chapter) => chapter.steps)
+        .map((step) => `${step.title} ${step.summary} ${step.detail}`)
+        .join(" ");
+
+    it("자주 묻는 것은 열 개다", () => {
+      expect(FAQ).toHaveLength(10);
+      expect(FAQ.map((step) => step.title)).toContain("사진을 고르세요");
+      expect(FAQ.map((step) => step.title)).toContain("엽서 보내기");
+    });
+
+    it("뺀 기능을 말하지 않는다 — 코스 짜기·칠한 시도·발자취 재생·가고 싶은 곳 받기·같은 이름 모아 보기·해외 이름 단추", () => {
+      for (const gone of ["이번 여행", "순서를 정하세요", "가까운 순으로 정렬", "다녀온 시도", "발자취", "재생", "가고 싶은 곳 받기", "가고 싶은 곳 보내기", "같은 이름으로 다녀온 때", "해외 장소 이름 새로 붙이기", "보관함 정리"]) {
+        expect(all(), gone).not.toContain(gone);
+      }
+    });
+
+    it("가고 싶은 곳에 담는 법은 여행 100선 갈래에 있다", () => {
+      const browse = CHAPTERS.find((chapter) => chapter.id === "browse")!;
+      expect(browse.steps.map((step) => step.title)).toContain("가고 싶은 곳에 담으세요");
+    });
+
+    it("책장 카드의 단추는 '더 보기' 안에 있다고 알린다", () => {
+      const shelf = CHAPTERS.find((chapter) => chapter.id === "shelf")!;
+      const text = shelf.steps.map((step) => step.detail).join(" ");
+      for (const word of ["'더 보기'를 열고 '보내는 사람 초대'", "'더 보기' → '설정'", "'더 보기'를 열고 '링크 새로 만들기'", "'더 보기'에서 먼저 '책장 닫기'"]) {
+        expect(text, word).toContain(word);
+      }
+    });
   });
 });
