@@ -29,7 +29,10 @@ export interface MailboxSettings {
   past: boolean;
   /** 연말에 "올해의 책"을 저절로 만들지. */
   year: boolean;
-  /** 부모님 화면에 '가고 싶은 곳 보내기'를 둘지. */
+  /**
+   * 부모님 화면에 '가고 싶은 곳 보내기'를 둘지. 그 기능은 2026-10-14 화면에서 뺐다 — 저장된 설정과 서버(mailbox.sql)가 이 칸을
+   * 쓰므로 값은 남겨 두고, 고르는 칸만 없앴다.
+   */
   wish: boolean;
 }
 

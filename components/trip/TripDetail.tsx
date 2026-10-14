@@ -74,8 +74,6 @@ function formatSpan(startedOn: string, endedOn: string) {
   return `${year}년 ${short(startedOn)} ~ ${short(endedOn)}`;
 }
 
-/** 같은 이름으로 다녀온 때를 모아 보는 화면. */
-
 function hourMinute(date: Date) {
   return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 }

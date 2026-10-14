@@ -76,7 +76,6 @@ export const yearBookPath = (token: string, year: string, preview: PreviewMode =
 /** 받는 쪽 올해의 책을 쪽으로 나눠 PDF 로 저장하는 화면의 길. */
 export const yearBookPrintPath = (token: string, year: string, preview: PreviewMode = false): string =>
   `/m/${token}/year/${year}/book${previewSuffix(preview)}`;
-/** 받는 쪽 '가고 싶은 곳 보내기'의 길. */
 /** 주소의 ?preview= 값. 1 은 지금 모습, all 은 모두 열어 본 것처럼, 그 밖은 평소 화면(false). */
 export const isPreview = (value: string | string[] | undefined): PreviewMode => (value === "all" ? "all" : value === "1");
 

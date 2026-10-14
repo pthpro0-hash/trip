@@ -71,7 +71,7 @@ describe("activeNav · 켜질 갈래", () => {
     expect(activeNav("/trips/new", null)).toBe("trips");
   });
 
-  it("여행지·권역·이번 여행은 '여행 100선'", () => {
+  it("여행지·권역은 '여행 100선'", () => {
     expect(activeNav("/spots/경복궁", null)).toBe("spots");
     expect(activeNav("/regions/강원권", null)).toBe("spots");
   });

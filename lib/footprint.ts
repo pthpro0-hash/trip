@@ -11,7 +11,7 @@ import { isInKorea } from "./weatherGrid";
   선은 잇지 않는다. 여행과 여행 사이에는 실제로 걸은 길이 없어, 이으면 없는 동선이
   생긴다(sketchShapes 가 같은 까닭으로 여행 안에서만 잇는다).
 
-  이 파일은 셈만 한다. 그리는 것은 components/sketch/FootprintPlayer 가 한다.
+  이 파일은 셈만 한다. 그리는 것은 components/sketch/FootprintMap 이 한다.
 */
 
 /** 찍을 곳 하나. 방문 하나가 한 걸음이다 — 같은 곳을 두 번 갔으면 두 번 찍는다. */
