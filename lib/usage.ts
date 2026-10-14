@@ -15,12 +15,12 @@ import type { Start } from "@/lib/start";
 
   기록은 service_log 에 "use.<이름>" 으로 쌓인다. 보는 법은 supabase/log.sql 아래쪽에 적어 두었다.
 
-  아직 꺼 두었다. 방침은 이용 내역을 "무엇이 고장 났는지 확인하는 데에만" 쓴다고 약속하고, 방침을 바꿀 때는
-  시행 7일 전부터 화면에 알린다고 약속한다. 방침 문구를 바꾸고 알린 뒤, 시행일을 USAGE_STARTS 에 적으면 그날부터 센다.
+  방침(1항 마지막 줄, 4항)에 "어떤 화면을 열고 어떤 기능을 썼는지"를 적은 날(2026-10-14)부터 센다. 세는 것을 늘리거나
+  쓰임새를 바꿀 때는 방침도 함께 고친다. 끄려면 USAGE_STARTS 를 null 로.
 */
 
 /** 세기 시작하는 날("YYYY-MM-DD", 한국 날짜). null 이면 세지 않는다. */
-export const USAGE_STARTS: string | null = null;
+export const USAGE_STARTS: string | null = "2026-10-14";
 
 /** 그날이 되었는가. 한국 날짜로 견준다. */
 export function usageOn(starts: string | null, now: Date = new Date()): boolean {

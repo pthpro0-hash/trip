@@ -73,11 +73,14 @@ describe("logUse", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("지금은 꺼져 있다 — 방침을 바꾸고 알리기 전에는 세지 않는다", async () => {
-    expect(USAGE_STARTS).toBeNull();
-    logUse("sketch_save");
+  it("방침에 적은 날(2026-10-14)부터 센다 — 그 전에는 세지 않는다", async () => {
+    expect(USAGE_STARTS).toBe("2026-10-14");
+    logUse("sketch_save", USAGE_STARTS, new Date("2026-10-13T12:00:00Z"));
     await settle();
     expect(rpc).not.toHaveBeenCalled();
+    logUse("sketch_save", USAGE_STARTS, new Date("2026-10-14T03:00:00Z"));
+    await settle();
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it("시행일 전에는 세지 않고, 그날(한국 날짜)부터 센다", () => {

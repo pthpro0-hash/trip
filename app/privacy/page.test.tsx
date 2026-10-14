@@ -89,11 +89,21 @@ describe("개인정보처리방침 · 가족 책장", () => {
 
 describe("시행일", () => {
   it("방침과 약관 모두 시행일이 적혀 있고, 빈칸 안내가 남아 있지 않다", () => {
-    for (const Page of [PrivacyPage, TermsPage]) {
+    for (const [Page, date] of [
+      [PrivacyPage, "2026년 10월 14일"],
+      [TermsPage, "2026년 10월 1일"],
+    ] as const) {
       const t = render(<Page />).container.textContent ?? "";
-      expect(t).toContain("시행일 2026년 10월 1일");
+      expect(t).toContain(`시행일 ${date}`);
       expect(t).not.toContain("정해 적어주세요");
     }
+  });
+
+  it("이용 내역에 어떤 화면·기능을 썼는지 센다고 적고, 로그인한 동안의 것만이며 내용은 담지 않는다고 적는다", () => {
+    const t = render(<PrivacyPage />).container.textContent ?? "";
+    expect(t).toContain("어떤 화면을 열고 어떤 기능을 썼는지");
+    expect(t).toContain("로그인하신 동안의 것만 남기며");
+    expect(t).toContain("어떤 기능이 쓰이는지 확인하는 데에만 쓰며");
   });
 });
 
