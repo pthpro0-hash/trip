@@ -14,6 +14,7 @@ const { MailboxBell, REPLIES_SEEN } = await import("./MailboxBell");
 
 describe("MailboxBell · 새 소식(답장·하트) 알림", () => {
   beforeEach(() => {
+    document.cookie = "sb-test-auth-token=x; path=/";
     state.user = { id: "me" };
     state.unread = 0;
     state.hearts = 0;
@@ -50,6 +51,14 @@ describe("MailboxBell · 새 소식(답장·하트) 알림", () => {
     state.hearts = 1;
     render(<MailboxBell />);
     expect(await screen.findByRole("link", { name: "가족 책장 새 소식 1개" })).toBeTruthy();
+  });
+
+  it("세션 쿠키가 없으면(둘러보는 사람) 서버에 묻지도 않고 없다", async () => {
+    document.cookie = "sb-test-auth-token=; path=/; max-age=0";
+    state.unread = 3;
+    const { container } = render(<MailboxBell />);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(container.firstChild).toBeNull();
   });
 
   it("로그인하지 않았으면 없다", async () => {

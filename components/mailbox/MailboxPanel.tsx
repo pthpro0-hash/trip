@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import {
   cancelMailboxInvite,
   createMailbox,
@@ -114,7 +115,7 @@ export function MailboxPanel() {
   const load = useCallback(async () => {
     const supabase = getBrowserClient();
     if (!supabase) return setState("failed");
-    const { data } = await supabase.auth.getUser();
+    const { data } = await currentUser(supabase);
     if (!data.user) return setState("login");
     const [list, invites, sent] = await Promise.all([
       fetchMailboxes(supabase, data.user.id),

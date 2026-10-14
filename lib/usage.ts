@@ -1,4 +1,4 @@
-import { getBrowserClient } from "@/lib/supabase/client";
+import { clientIfSignedIn } from "@/lib/supabase/lazy";
 import { logEvent } from "@/lib/supabase/serviceLog";
 import { homeStart } from "@/lib/nav";
 import type { Start } from "@/lib/start";
@@ -75,12 +75,14 @@ export type UsageName = UsageScreen | UsageAction;
 /** 이 하나만 남긴다. 절대 던지지 않고, 기다리게 하지도 않는다. 로그인하지 않았으면 남기지 않는다. */
 export function logUse(name: UsageName, starts: string | null = USAGE_STARTS, now: Date = new Date()): void {
   if (!usageOn(starts, now)) return;
-  try {
-    // 로그인했는지는 logEvent 가 본다.
-    logEvent(getBrowserClient(), `use.${name}`);
-  } catch {
-    // 세지 못한 것뿐이다.
-  }
+  // 로그인 세션 쿠키가 없으면(둘러보는 사람) 세지 않고, 로그인 연결 코드도 받지 않는다. 로그인했는지는 logEvent 가 한 번 더 본다.
+  void clientIfSignedIn()
+    .then((supabase) => {
+      if (supabase) logEvent(supabase, `use.${name}`);
+    })
+    .catch(() => {
+      // 세지 못한 것뿐이다.
+    });
 }
 
 const under = (pathname: string, segment: string) => pathname === segment || pathname.startsWith(`${segment}/`);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { accountOf, type Account } from "@/lib/account";
 import { signOutAndReload } from "@/lib/signOut";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import { fetchMailboxes } from "@/lib/supabase/mailbox";
 import { mailboxPath } from "@/lib/mailbox";
 import { countPendingSuggestions, isAdmin } from "@/lib/supabase/spotSuggestions";
@@ -192,7 +193,7 @@ export function MyInfo() {
       const supabase = getBrowserClient();
       if (!supabase) return setState("login");
       try {
-        const { data } = await supabase.auth.getUser();
+        const { data } = await currentUser(supabase);
         if (!data.user) return setState("login");
         setState(accountOf(data.user));
         // 새 소식과 책장 줄은 곁다리다. 못 세고 못 읽으면 숫자·줄 없이 조용히 둔다(관리 줄은 그대로 남는다).

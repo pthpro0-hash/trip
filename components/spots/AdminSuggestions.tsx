@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import {
   fetchAllSuggestions,
   isAdmin,
@@ -87,7 +88,7 @@ export function AdminSuggestions() {
       const supabase = getBrowserClient();
       if (!supabase) return alive && setPhase("denied");
       try {
-        const { data } = await supabase.auth.getUser();
+        const { data } = await currentUser(supabase);
         if (!data.user || !(await isAdmin(supabase, data.user.id))) return alive && setPhase("denied");
         const all = await fetchAllSuggestions(supabase);
         if (!alive) return;

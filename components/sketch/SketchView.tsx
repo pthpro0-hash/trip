@@ -4,6 +4,7 @@ import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
@@ -80,7 +81,7 @@ export function SketchView() {
     if (!supabase) return;
     let active = true;
 
-    supabase.auth.getUser().then(async ({ data }) => {
+    currentUser(supabase).then(async ({ data }) => {
       if (!active) return;
       if (!data.user) {
         setStatus("guest");

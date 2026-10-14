@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { clientIfSignedIn, currentUser } from "@/lib/supabase/lazy";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { accountOf, type Account } from "@/lib/account";
 import { ME_HREF, activeNav } from "@/lib/nav";
@@ -22,9 +22,8 @@ export function AccountChip() {
   const [ready, setReady] = useState(!isSupabaseConfigured);
 
   useEffect(() => {
-    const supabase = getBrowserClient();
-    if (!supabase) return;
     let active = true;
+    let stop = () => {};
 
     const apply = (user: { user_metadata?: Record<string, unknown>; email?: string } | null) => {
       if (!active) return;
@@ -32,12 +31,22 @@ export function AccountChip() {
       setAccount(user ? accountOf(user) : null);
     };
 
-    supabase.auth.getUser().then(({ data }) => apply(data.user));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => apply(session?.user ?? null));
+    void (async () => {
+      // 로그인 세션 쿠키가 없으면(둘러보는 사람) 로그인 연결 코드를 받지 않고 곧바로 "로그인"을 보인다.
+      const supabase = await clientIfSignedIn();
+      if (!active) return;
+      if (!supabase) {
+        apply(null);
+        return;
+      }
+      void currentUser(supabase).then(({ data }) => apply(data.user));
+      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => apply(session?.user ?? null));
+      stop = () => listener.subscription.unsubscribe();
+    })();
 
     return () => {
       active = false;
-      listener.subscription.unsubscribe();
+      stop();
     };
   }, []);
 

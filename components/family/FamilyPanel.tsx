@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import {
   cancelInvite,
   changeRole,
@@ -91,7 +92,7 @@ export function FamilyPanel() {
   const load = useCallback(async () => {
     const supabase = getBrowserClient();
     if (!supabase) return setState("failed");
-    const { data } = await supabase.auth.getUser();
+    const { data } = await currentUser(supabase);
     if (!data.user) return setState("login");
     const [circle, invites] = await Promise.all([fetchCircle(supabase), fetchInvites(supabase, data.user.id)]);
     if (circle === "failed" || invites === "failed") return setState("failed");

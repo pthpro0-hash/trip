@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import { createMailbox, fetchMailboxes, type MailboxInput, type MailboxItem } from "@/lib/supabase/mailbox";
 import { sendPostcard, type SendPostcardResult } from "@/lib/supabase/postcards";
 import type { TripDetail } from "@/lib/supabase/tripDetail";
@@ -107,7 +108,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
     let active = true;
     void (async () => {
       try {
-        const { data } = await supabase.auth.getUser();
+        const { data } = await currentUser(supabase);
         const meta = data.user?.user_metadata ?? {};
         // 로그인 수단마다 이름이 들어 있는 칸이 다르다(카카오는 nickname 만 있기도 하다). 없으면 이메일 앞부분.
         const account = String(meta.full_name ?? meta.name ?? meta.nickname ?? meta.preferred_username ?? data.user?.email?.split("@")[0] ?? "")

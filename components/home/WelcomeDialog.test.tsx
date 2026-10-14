@@ -34,6 +34,7 @@ describe("WelcomeDialog", () => {
     failToAsk = false;
     window.localStorage.clear();
     window.sessionStorage.clear();
+    document.cookie = "sb-test-auth-token=; path=/; max-age=0";
     setReferrer("");
     document.body.style.overflow = "";
   });
@@ -105,6 +106,7 @@ describe("WelcomeDialog", () => {
 
   describe("안 뜰 때", () => {
     it("로그인한 사람에게는 안 뜬다", async () => {
+      document.cookie = "sb-test-auth-token=x; path=/";
       user = { id: "나" };
       render(<WelcomeDialog />);
       // 로그인 여부를 묻는 것이 끝날 때까지 기다린 뒤에도 없어야 한다.
@@ -113,6 +115,7 @@ describe("WelcomeDialog", () => {
     });
 
     it("로그인 여부를 못 물었으면 안 뜬다 — 쓰는 사람을 귀찮게 하는 쪽이 더 나쁘다", async () => {
+      document.cookie = "sb-test-auth-token=x; path=/";
       failToAsk = true;
       render(<WelcomeDialog />);
       await new Promise((resolve) => setTimeout(resolve, 50));

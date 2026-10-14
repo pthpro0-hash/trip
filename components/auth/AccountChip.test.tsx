@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 const state = vi.hoisted(() => ({
+  asked: 0,
   configured: true,
   user: null as null | { user_metadata?: Record<string, unknown>; email?: string },
   path: "/",
@@ -16,7 +17,10 @@ vi.mock("@/lib/supabase/config", () => ({
 vi.mock("@/lib/supabase/client", () => ({
   getBrowserClient: () => ({
     auth: {
-      getUser: async () => ({ data: { user: state.user } }),
+      getUser: async () => {
+        state.asked += 1;
+        return { data: { user: state.user } };
+      },
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => undefined } } }),
     },
   }),
@@ -30,6 +34,9 @@ const { AccountChip } = await import("./AccountChip");
 */
 describe("AccountChip", () => {
   beforeEach(() => {
+    // 로그인한 사람의 브라우저에는 세션 쿠키가 있다 — 없으면 서버에 묻지 않고 곧바로 "로그인"을 보인다.
+    document.cookie = "sb-test-auth-token=x; path=/";
+    state.asked = 0;
     state.configured = true;
     state.path = "/";
     state.user = { user_metadata: { full_name: "김지민", avatar_url: "https://img.example/a.png" }, email: "jimin@example.com" };
@@ -46,6 +53,13 @@ describe("AccountChip", () => {
     render(<AccountChip />);
     await screen.findByRole("link", { name: "내 정보" });
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
+  });
+
+  it("세션 쿠키가 없으면(둘러보는 사람) 서버에 묻지 않고 곧바로 로그인 길", async () => {
+    document.cookie = "sb-test-auth-token=; path=/; max-age=0";
+    render(<AccountChip />);
+    expect(await screen.findByRole("link", { name: "로그인" })).toHaveAttribute("href", "/login");
+    expect(state.asked).toBe(0);
   });
 
   it("로그인하지 않았으면 로그인 길", async () => {

@@ -12,7 +12,7 @@ vi.mock("next/headers", () => ({
 
 const sketchProps = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }));
 const spotsProps = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }));
-vi.mock("@/components/hub/SketchHub", () => ({
+vi.mock("@/components/hub/SketchHubLazy", () => ({
   SketchHub: (props: Record<string, unknown>) => {
     sketchProps.current = props;
     return <p>지도 허브</p>;

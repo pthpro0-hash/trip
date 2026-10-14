@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { rememberStart, rememberStartIfUnset, startHref } from "@/lib/start";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser, loadClient } from "@/lib/supabase/lazy";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { thumbUrls } from "@/lib/supabase/photos";
@@ -44,43 +44,49 @@ export function HomeIntro({ maybeSignedIn = false }: { maybeSignedIn?: boolean }
   const [covers, setCovers] = useState<string[]>([]);
 
   useEffect(() => {
-    const supabase = getBrowserClient();
-    if (!supabase) return;
+    // 로그인 쿠키가 없으면(둘러보는 사람) 물을 것이 없다 — 처음 값이 이미 "none" 이다.
+    if (!isSupabaseConfigured || !maybeSignedIn) return;
     let active = true;
 
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (!active) return;
-      if (!data.user) {
-        setPhase("none");
-        return;
-      }
-      const rows = (await fetchTrips(supabase, data.user.id)) ?? [];
-      if (!active) return;
-      setTrips(rows);
-      /*
-        여행을 남긴 사람에게 이 화면의 여행 100선은 문 앞에서 한 번 돌아가는 일이다.
-        갈래를 눌러 본 적이 없어도(새 폰, 지워진 쿠키) 다음부터는 내 여행으로 열리게
-        기억해 둔다. 이번 화면은 그대로 두니 번쩍이지 않는다. 눌러서 고른 사람의
-        선택은 뒤집지 않는다.
-      */
-      if (rows.length > 0) rememberStartIfUnset("sketch");
-      setPhase(rows.length > 0 ? "trips" : "none");
+    void loadClient().then(async (supabase) => {
+      if (!supabase || !active) return;
+      const { data } = await currentUser(supabase);
+    if (!active) return;
+    if (!data.user) {
+      setPhase("none");
+      return;
+    }
+    const rows = (await fetchTrips(supabase, data.user.id)) ?? [];
+    if (!active) return;
+    setTrips(rows);
+    /*
+      여행을 남긴 사람에게 이 화면의 여행 100선은 문 앞에서 한 번 돌아가는 일이다.
+      갈래를 눌러 본 적이 없어도(새 폰, 지워진 쿠키) 다음부터는 내 여행으로 열리게
+      기억해 둔다. 이번 화면은 그대로 두니 번쩍이지 않는다. 눌러서 고른 사람의
+      선택은 뒤집지 않는다.
+    */
+    if (rows.length > 0) rememberStartIfUnset("sketch");
+    setPhase(rows.length > 0 ? "trips" : "none");
 
-      const paths = rows
-        .map((trip) => trip.coverPath)
-        .filter((path): path is string => !!path)
-        .slice(0, COVERS);
-      if (paths.length === 0) return;
+    const paths = rows
+      .map((trip) => trip.coverPath)
+      .filter((path): path is string => !!path)
+      .slice(0, COVERS);
+    if (paths.length === 0) return;
 
-      const urls = await thumbUrls(supabase, paths);
-      if (active) {
-        setCovers(paths.map((path) => urls.get(path)).filter((url): url is string => !!url));
-      }
+    const urls = await thumbUrls(supabase, paths);
+    if (active) {
+      setCovers(paths.map((path) => urls.get(path)).filter((url): url is string => !!url));
+    }
+    }).catch(() => {
+      if (active) setPhase("none");
     });
 
     return () => {
       active = false;
     };
+    // maybeSignedIn 은 서버가 처음 그릴 때 정한 값이라 바뀌지 않는다. 한 번만 묻는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /*

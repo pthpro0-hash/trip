@@ -2,7 +2,8 @@
 
 import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser, loadClient } from "@/lib/supabase/lazy";
+import { hasSessionCookieHere } from "@/lib/sessionCookie";
 import {
   fromSearchEngine,
   markWelcomeShown,
@@ -27,10 +28,12 @@ import {
 
 /** 아직 로그인하지 않았나. 물어볼 수 없는 곳이면 로그인이 없는 곳이라 로그인 전으로 본다. 물었다가 실패하면 모른다 — 내밀지 않는다. */
 async function isLoggedOut(): Promise<boolean> {
-  const supabase = getBrowserClient();
-  if (!supabase) return true;
+  // 로그인 세션 쿠키가 없으면 서버에 물을 것도 없이 로그인 전이다(0.1~0.2초와 로그인 연결 코드를 아낀다).
+  if (!hasSessionCookieHere()) return true;
   try {
-    const { data } = await supabase.auth.getUser();
+    const supabase = await loadClient();
+    if (!supabase) return true;
+    const { data } = await currentUser(supabase);
     return !data.user;
   } catch {
     return false;

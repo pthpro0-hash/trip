@@ -5,6 +5,7 @@ import { rememberedName, type PlaceMemory } from "@/lib/placeMemory";
 import { isInKorea } from "@/lib/weatherGrid";
 import { fetchPlaceNames } from "@/lib/supabase/placeNames";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
 import { addToExistingTrip, recountVisits } from "@/lib/supabase/tripAdd";
 import { uploadPhotos, uploadPrepared, type PreparedTarget, type UploadTarget } from "@/lib/supabase/photos";
@@ -238,8 +239,7 @@ export function PhotoImport() {
     if (!supabase) return;
     let active = true;
 
-    supabase.auth
-      .getUser()
+    currentUser(supabase)
       .then(async ({ data }) => {
         if (!active) return;
         const viewed = readFamilyView();

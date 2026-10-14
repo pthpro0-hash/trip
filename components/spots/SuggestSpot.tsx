@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { HubDialog } from "@/components/hub/HubDialog";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser, loadClient } from "@/lib/supabase/lazy";
 import {
   NAME_MAX,
   PENDING_MAX,
@@ -33,13 +33,13 @@ export function SuggestSpot({ label = "빠진 곳이 있나요? 추천하기" }:
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = async () => {
-    const supabase = getBrowserClient();
+    const supabase = await loadClient();
     if (!supabase) {
       setReady(true);
       return;
     }
     try {
-      const { data } = await supabase.auth.getUser();
+      const { data } = await currentUser(supabase);
       const id = data.user?.id ?? null;
       setUserId(id);
       if (id) setMine(await fetchMySuggestions(supabase, id));
@@ -58,7 +58,7 @@ export function SuggestSpot({ label = "빠진 곳이 있나요? 추천하기" }:
   const pending = (mine ?? []).filter((item) => item.status === "new").length;
 
   const send = async () => {
-    const supabase = getBrowserClient();
+    const supabase = await loadClient();
     if (!supabase || !userId || busy) return;
     setBusy(true);
     setNotice(null);
@@ -81,7 +81,7 @@ export function SuggestSpot({ label = "빠진 곳이 있나요? 추천하기" }:
   };
 
   const withdraw = async (id: string) => {
-    const supabase = getBrowserClient();
+    const supabase = await loadClient();
     if (!supabase || !userId) return;
     if (await removeSuggestion(supabase, id)) setMine(await fetchMySuggestions(supabase, userId));
   };

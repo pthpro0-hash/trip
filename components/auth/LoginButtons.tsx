@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { loadClient } from "@/lib/supabase/lazy";
 import type { AuthProvider, ProviderId } from "@/lib/auth/providers";
 import { ProviderIcon } from "./ProviderIcon";
 
@@ -24,13 +24,15 @@ export function LoginButtons({ providers, next = "/" }: LoginButtonsProps) {
   const [failed, setFailed] = useState(false);
 
   const signIn = async (provider: AuthProvider) => {
-    const supabase = getBrowserClient();
+    // 연결 코드는 단추를 누를 때 불러온다(로그인 화면의 첫 JS 를 가볍게). 받는 동안에도 눌린 모양을 보인다.
+    setFailed(false);
+    setPending(provider.id);
+    const supabase = await loadClient();
     if (!supabase) {
+      setPending(null);
       setFailed(true);
       return;
     }
-    setFailed(false);
-    setPending(provider.id);
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: provider.id,

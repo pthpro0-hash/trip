@@ -167,11 +167,12 @@ describe("HomeIntro · 첫 그림", () => {
     await waitFor(() => expect(view.container).toBeEmptyDOMElement());
   });
 
-  it("쿠키는 없다고 봤는데 사실은 로그인했고 기록이 있으면 — 비어 있다가 띠가 생긴다", async () => {
+  it("쿠키가 없으면(둘러보는 사람) 서버에 묻지도 않고 비어 있다 — 로그인 쿠키가 있어야 묻는다", async () => {
     rows = [trip({ id: "t1", title: "민수랑 첫 휴가" })];
     const view = await 띠(false);
+    await new Promise((resolve) => setTimeout(resolve, 30));
     expect(view.container).toBeEmptyDOMElement();
-    expect(await screen.findByText("민수랑 첫 휴가")).toBeTruthy();
+    expect(screen.queryByText("민수랑 첫 휴가")).toBeNull();
   });
 });
 

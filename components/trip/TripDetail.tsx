@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   fetchTripDetail,
@@ -260,7 +261,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
     if (!supabase) return;
     let active = true;
 
-    supabase.auth.getUser().then(async ({ data }) => {
+    currentUser(supabase).then(async ({ data }) => {
       if (!active) return;
       if (!data.user) {
         setStatus("guest");

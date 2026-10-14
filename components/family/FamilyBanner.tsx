@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { startFamilyView, stopFamilyView, useFamilyView } from "@/lib/familyView";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { loadClient } from "@/lib/supabase/lazy";
 import { fetchCircle } from "@/lib/supabase/family";
 import { roleLabel } from "@/lib/family";
 
@@ -28,20 +28,21 @@ export function FamilyBanner() {
   */
   useEffect(() => {
     if (!ownerId || !role || !label) return;
-    const supabase = getBrowserClient();
-    if (!supabase) return;
     let active = true;
-    void fetchCircle(supabase).then((circle) => {
-      if (!active || circle === "failed") return;
-      const now = circle.shared.find((member) => member.id === ownerId);
-      if (!now) {
-        stopFamilyView();
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-        window.location.href = "/?v=sketch";
-        return;
-      }
-      if (now.role !== role) startFamilyView({ ownerId, label, role: now.role });
-    });
+    void loadClient()
+      .then((supabase) => (supabase && active ? fetchCircle(supabase) : "failed"))
+      .then((circle) => {
+        if (!active || circle === "failed") return;
+        const now = circle.shared.find((member) => member.id === ownerId);
+        if (!now) {
+          stopFamilyView();
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+          window.location.href = "/?v=sketch";
+          return;
+        }
+        if (now.role !== role) startFamilyView({ ownerId, label, role: now.role });
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };

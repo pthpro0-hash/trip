@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { clientIfSignedIn, currentUser } from "@/lib/supabase/lazy";
 import { fetchUnreadHeartCount, fetchUnreadReplyCount } from "@/lib/supabase/postcards";
 import { REPLIES_SEEN } from "@/lib/mailboxEvents";
 
@@ -21,13 +21,17 @@ export function MailboxBell() {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    const supabase = getBrowserClient();
-    if (!supabase) return;
     let active = true;
 
     const refresh = async () => {
       try {
-        const { data } = await supabase.auth.getUser();
+        // 로그인 세션 쿠키가 없으면(둘러보는 사람) 셀 것도 없고 로그인 연결 코드도 받지 않는다.
+        const supabase = await clientIfSignedIn();
+        if (!supabase) {
+          if (active) setCount(0);
+          return;
+        }
+        const { data } = await currentUser(supabase);
         if (!data.user) {
           if (active) setCount(0);
           return;

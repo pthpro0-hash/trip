@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser, loadClient } from "@/lib/supabase/lazy";
 import {
   RESHRUNK_BYTES,
   scanStorage,
@@ -54,9 +54,9 @@ export function StorageTidy() {
   const [failed, setFailed] = useState<string | null>(null);
 
   const scan = async () => {
-    const supabase = getBrowserClient();
+    const supabase = await loadClient();
     if (!supabase) return;
-    const { data } = await supabase.auth.getUser();
+    const { data } = await currentUser(supabase);
     if (!data.user) {
       // 도움말은 로그인하지 않은 사람도 연다. 눌러서 아무 일도 없으면 고장난 단추로 보인다.
       setFailed("로그인해야 보관함을 살펴볼 수 있어요.");
@@ -76,9 +76,9 @@ export function StorageTidy() {
   };
 
   const sweep = async () => {
-    const supabase = getBrowserClient();
+    const supabase = await loadClient();
     if (!supabase || !report) return;
-    const { data } = await supabase.auth.getUser();
+    const { data } = await currentUser(supabase);
     if (!data.user) return;
     logUse("storage_cleanup");
     setPhase({ kind: "working", title: "쓰지 않는 파일을 지우고 있어요" });
@@ -90,7 +90,7 @@ export function StorageTidy() {
   };
 
   const reshrinkAll = async () => {
-    const supabase = getBrowserClient();
+    const supabase = await loadClient();
     if (!supabase || !report) return;
     logUse("storage_cleanup");
     const title = "사진을 다시 줄이고 있어요";

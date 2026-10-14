@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps,
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { autoRefreshAbroadNames } from "@/lib/supabase/abroadNames";
@@ -141,7 +142,7 @@ function MapHub({ switcher, initialYear, onList }: MapHubProps) {
     if (!supabase) return;
     let active = true;
 
-    supabase.auth.getUser().then(async ({ data }) => {
+    currentUser(supabase).then(async ({ data }) => {
       if (!active) return;
       if (!data.user) {
         setStatus("guest");

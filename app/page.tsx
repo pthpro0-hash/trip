@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { SpotsHome } from "@/components/home/SpotsHome";
 import { WelcomeDialog } from "@/components/home/WelcomeDialog";
 import { StartSwitch } from "@/components/home/StartSwitch";
-import { SketchHub } from "@/components/hub/SketchHub";
+import { SketchHub } from "@/components/hub/SketchHubLazy";
 import { START_COOKIE, startOf } from "@/lib/start";
 import { hasSessionCookie } from "@/lib/sessionCookie";
 import { viewOf } from "@/lib/nav";

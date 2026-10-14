@@ -4,6 +4,7 @@ import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
+import { currentUser } from "@/lib/supabase/lazy";
 import { deleteTrip, fetchTrips, type SavedTrip } from "@/lib/supabase/trips";
 import { fetchPostcardCounts } from "@/lib/supabase/postcards";
 import { canIn, ownerOf, readFamilyView, useFamilyView } from "@/lib/familyView";
@@ -66,7 +67,7 @@ export function TripList() {
     if (!supabase) return;
     let active = true;
 
-    supabase.auth.getUser().then(async ({ data }) => {
+    currentUser(supabase).then(async ({ data }) => {
       if (!active) return;
       if (!data.user) {
         setStatus("guest");

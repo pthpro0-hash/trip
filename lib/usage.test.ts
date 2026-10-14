@@ -1,4 +1,4 @@
-// @vitest-environment node
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /*
@@ -15,6 +15,8 @@ const ON = "2026-01-01";
 const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 
 beforeEach(() => {
+  // 로그인한 사람의 브라우저에는 세션 쿠키가 있다 — 없으면 세지 않는다.
+  document.cookie = "sb-test-auth-token=x; path=/";
   rpc.mockClear();
   session = { user: { id: "u" } };
 });
@@ -62,6 +64,13 @@ describe("logUse", () => {
     logUse("sketch_save", ON);
     await settle();
     expect(rpc).toHaveBeenCalledWith("log_event", { p_event: "use.sketch_save", p_detail: {} });
+  });
+
+  it("세션 쿠키가 없으면(둘러보는 사람) 서버에 묻지도 않는다", async () => {
+    document.cookie = "sb-test-auth-token=; path=/; max-age=0";
+    logUse("my_map", ON);
+    await settle();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
   it("로그인하지 않았으면 남기지 않는다", async () => {
