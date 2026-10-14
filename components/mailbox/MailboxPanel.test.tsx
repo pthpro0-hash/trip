@@ -165,6 +165,23 @@ describe("MailboxPanel", () => {
     await waitFor(() => expect(copied).toHaveBeenCalledWith(`${window.location.origin}/m/${"T".repeat(43)}`));
   });
 
+  /*
+    처음 쓰는 사람에게 카드의 단추가 너무 많았다. 앞에는 링크 복사 하나만, 나머지는 '더 보기'(닫힌 details) 안에 접는다.
+    jsdom 은 닫힌 details 안도 그대로 보여 주므로, 아래 다른 시험들은 펼치지 않고 단추를 누른다.
+  */
+  it("앞에는 링크 복사만 — 부모님 화면 보기·고치기·설정·초대·링크 새로 만들기·닫기는 닫힌 '더 보기' 안에 있다", async () => {
+    state.list = { owned: [box()], joined: [] };
+    render(<MailboxPanel />);
+    const copyButton = await screen.findByRole("button", { name: "링크 복사" });
+    expect(copyButton.closest("details")).toBeNull();
+    const more = screen.getByText("더 보기").closest("details")!;
+    expect(more.open).toBe(false);
+    for (const name of ["고치기", "설정", "보내는 사람 초대", "링크 새로 만들기", "책장 닫기"]) {
+      expect(screen.getByRole("button", { name }).closest("details"), name).toBe(more);
+    }
+    expect(screen.getByRole("link", { name: "부모님 화면 보기" }).closest("details")).toBe(more);
+  });
+
   it("링크 새로 만들기는 한 번 더 묻고, 새 링크를 복사하고, 옛 링크가 끊긴다고 알린다", async () => {
     state.list = { owned: [box()], joined: [] };
     render(<MailboxPanel />);

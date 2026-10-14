@@ -443,82 +443,103 @@ export function MailboxPanel() {
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-1.5">
-                <button type="button" className={pill} disabled={box.closed} onClick={() => void copy(mailboxUrl(window.location.origin, box.token), "받는 분께 보낼 책장 링크를 복사했어요.")}>
-                  링크 복사
-                </button>
-                <Preview box={box} />
-                <button type="button" className={pill} onClick={() => setEditing(box.id)}>
-                  고치기
-                </button>
-                <button type="button" className={pill} onClick={() => setConfiguring(box.id)}>
-                  설정
-                </button>
-                <button type="button" className={pill} disabled={busy || box.closed} onClick={() => void invite(box)}>
-                  보내는 사람 초대
-                </button>
-              </div>
+              {/*
+                앞에는 링크 복사 하나만 둔다 — 받는 분께 링크를 보내는 것이 이 카드에서 가장 자주 하는 일이다. 부모님 화면 보기·고치기·
+                설정·보내는 사람 초대·링크 새로 만들기·닫기·지우기는 '더 보기' 안에 접는다(2026-10-14, 처음 쓰는 사람에게 단추가 너무 많았다).
+              */}
+              <button type="button" className={`${pill} self-start`} disabled={box.closed} onClick={() => void copy(mailboxUrl(window.location.origin, box.token), "받는 분께 보낼 책장 링크를 복사했어요.")}>
+                링크 복사
+              </button>
 
-              {asking === `rotate-${box.id}` ? (
-                <div className="flex flex-wrap items-center gap-2 text-[13px]">
-                  <span className="text-text">옛 링크는 바로 열리지 않게 돼요. 받는 분께 새 링크를 다시 보내야 해요.</span>
-                  <button type="button" disabled={busy} onClick={() => void rotate(box)} className="rounded-full bg-text px-3.5 py-1.5 font-medium text-bg">
-                    새로 만들기
-                  </button>
-                  <button type="button" onClick={() => setAsking(null)} className="text-text-muted">
-                    그만두기
-                  </button>
-                </div>
-              ) : asking === `close-${box.id}` ? (
-                <div className="flex flex-wrap items-center gap-2 text-[13px]">
-                  <span className="text-text">닫으면 받는 분에게 아무것도 보이지 않아요. 언제든 다시 열 수 있어요.</span>
-                  <button type="button" disabled={busy} onClick={() => void toggleClosed(box)} className="rounded-full bg-text px-3.5 py-1.5 font-medium text-bg">
-                    닫기
-                  </button>
-                  <button type="button" onClick={() => setAsking(null)} className="text-text-muted">
-                    그만두기
-                  </button>
-                </div>
-              ) : asking === `delete-${box.id}` && deletePlan?.id === box.id ? (
-                <div className="flex flex-col gap-2 rounded-lg bg-bg-subtle p-3 text-[13px] leading-relaxed">
-                  <p className="font-medium text-text">
-                    ‘{box.name}’ 책장을 지울까요?{" "}
-                    {deletePlan.sole > 0
-                      ? `이 책장에만 보낸 엽서 ${deletePlan.sole}장과 그 사진 복사본·답장·하트가 모두 지워지고 되돌릴 수 없어요.`
-                      : "이 책장에만 보낸 엽서는 없어요. 받은 답장·하트와 보내는 사람 초대가 지워지고 되돌릴 수 없어요."}
-                  </p>
-                  {deletePlan.kept > 0 && <p className="text-text-muted">다른 책장에도 보낸 엽서 {deletePlan.kept}장은 그쪽에 그대로 남아요.</p>}
-                  <p className="text-text-muted">내 여행과 원본 사진은 그대로예요. 받는 분의 링크는 다시 열리지 않아요.</p>
-                  <div className="flex items-center gap-2">
-                    <button type="button" disabled={busy} onClick={() => void removeBox(box)} className="rounded-full bg-[#d70015] px-3.5 py-1.5 font-medium text-white disabled:opacity-60">
-                      지우기
+              <details className="group flex flex-col" data-more={box.id}>
+                <summary className="flex cursor-pointer list-none items-center gap-1 self-start text-[13px] font-medium text-text-muted hover:text-text [&::-webkit-details-marker]:hidden">
+                  더 보기
+                  <span aria-hidden="true" className="text-[11px] transition group-open:rotate-180">
+                    ▾
+                  </span>
+                </summary>
+                <div className="mt-2.5 flex flex-col gap-2.5">
+                  <div className="flex flex-wrap gap-1.5">
+                    <Preview box={box} />
+                    <button type="button" className={pill} onClick={() => setEditing(box.id)}>
+                      고치기
                     </button>
-                    <button type="button" onClick={() => { setAsking(null); setDeletePlan(null); }} className="text-text-muted">
-                      그만두기
+                    <button type="button" className={pill} onClick={() => setConfiguring(box.id)}>
+                      설정
+                    </button>
+                    <button type="button" className={pill} disabled={busy || box.closed} onClick={() => void invite(box)}>
+                      보내는 사람 초대
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-3 text-[13px] font-medium text-text-muted">
-                  <button type="button" disabled={box.closed} onClick={() => setAsking(`rotate-${box.id}`)} className="hover:text-text disabled:opacity-50">
-                    링크 새로 만들기
-                  </button>
-                  {box.closed ? (
-                    <>
-                      <button type="button" disabled={busy} onClick={() => void toggleClosed(box)} className="hover:text-text">
-                        다시 열기
+
+                  {asking === `rotate-${box.id}` ? (
+                    <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                      <span className="text-text">옛 링크는 바로 열리지 않게 돼요. 받는 분께 새 링크를 다시 보내야 해요.</span>
+                      <button type="button" disabled={busy} onClick={() => void rotate(box)} className="rounded-full bg-text px-3.5 py-1.5 font-medium text-bg">
+                        새로 만들기
                       </button>
-                      <button type="button" disabled={busy} onClick={() => void askDelete(box)} className="text-[#d70015] hover:opacity-80">
-                        책장 지우기
+                      <button type="button" onClick={() => setAsking(null)} className="text-text-muted">
+                        그만두기
                       </button>
-                    </>
+                    </div>
+                  ) : asking === `close-${box.id}` ? (
+                    <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                      <span className="text-text">닫으면 받는 분에게 아무것도 보이지 않아요. 언제든 다시 열 수 있어요.</span>
+                      <button type="button" disabled={busy} onClick={() => void toggleClosed(box)} className="rounded-full bg-text px-3.5 py-1.5 font-medium text-bg">
+                        닫기
+                      </button>
+                      <button type="button" onClick={() => setAsking(null)} className="text-text-muted">
+                        그만두기
+                      </button>
+                    </div>
+                  ) : asking === `delete-${box.id}` && deletePlan?.id === box.id ? (
+                    <div className="flex flex-col gap-2 rounded-lg bg-bg-subtle p-3 text-[13px] leading-relaxed">
+                      <p className="font-medium text-text">
+                        ‘{box.name}’ 책장을 지울까요?{" "}
+                        {deletePlan.sole > 0
+                          ? `이 책장에만 보낸 엽서 ${deletePlan.sole}장과 그 사진 복사본·답장·하트가 모두 지워지고 되돌릴 수 없어요.`
+                          : "이 책장에만 보낸 엽서는 없어요. 받은 답장·하트와 보내는 사람 초대가 지워지고 되돌릴 수 없어요."}
+                      </p>
+                      {deletePlan.kept > 0 && <p className="text-text-muted">다른 책장에도 보낸 엽서 {deletePlan.kept}장은 그쪽에 그대로 남아요.</p>}
+                      <p className="text-text-muted">내 여행과 원본 사진은 그대로예요. 받는 분의 링크는 다시 열리지 않아요.</p>
+                      <div className="flex items-center gap-2">
+                        <button type="button" disabled={busy} onClick={() => void removeBox(box)} className="rounded-full bg-[#d70015] px-3.5 py-1.5 font-medium text-white disabled:opacity-60">
+                          지우기
+                        </button>
+                        <button type="button" onClick={() => { setAsking(null); setDeletePlan(null); }} className="text-text-muted">
+                          그만두기
+                        </button>
+                      </div>
+                    </div>
                   ) : (
-                    <button type="button" onClick={() => setAsking(`close-${box.id}`)} className="hover:text-text">
-                      책장 닫기
-                    </button>
+                    <div className="flex flex-wrap gap-3 text-[13px] font-medium text-text-muted">
+                      <button type="button" disabled={box.closed} onClick={() => setAsking(`rotate-${box.id}`)} className="hover:text-text disabled:opacity-50">
+                        링크 새로 만들기
+                      </button>
+                      {box.closed ? (
+                        <>
+                          <button type="button" disabled={busy} onClick={() => void toggleClosed(box)} className="hover:text-text">
+                            다시 열기
+                          </button>
+                          <button type="button" disabled={busy} onClick={() => void askDelete(box)} className="text-[#d70015] hover:opacity-80">
+                            책장 지우기
+                          </button>
+                        </>
+                      ) : (
+                        <button type="button" onClick={() => setAsking(`close-${box.id}`)} className="hover:text-text">
+                          책장 닫기
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {!box.closed && (
+                    <p className="text-[12px] leading-relaxed text-text-faint">
+                      보내는 사람 초대는 {INVITE_DAYS}일 안에 한 번만 쓸 수 있고, 한 책장에 {MAILBOX_SENDER_LIMIT}명까지 들일 수 있어요.
+                      링크가 퍼졌다면 &lsquo;링크 새로 만들기&rsquo;로 옛 링크를 끊을 수 있어요.
+                    </p>
                   )}
                 </div>
-              )}
+              </details>
 
               {boxInvites.length > 0 && (
                 <ul className="flex flex-col gap-1.5" aria-label={`${box.name} 보내는 사람 초대`}>
@@ -570,12 +591,6 @@ export function MailboxPanel() {
           </button>
         )}
 
-        {list.owned.some((box) => !box.closed) && (
-          <p className="text-[12px] leading-relaxed text-text-faint">
-            보내는 사람 초대는 {INVITE_DAYS}일 안에 한 번만 쓸 수 있고, 한 책장에 {MAILBOX_SENDER_LIMIT}명까지 들일 수 있어요.
-            링크가 퍼졌다면 &lsquo;링크 새로 만들기&rsquo;로 옛 링크를 끊을 수 있어요.
-          </p>
-        )}
       </Section>
 
       {sent.length > 0 && (
