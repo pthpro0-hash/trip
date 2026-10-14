@@ -37,7 +37,6 @@ const view = (postcards: InboxCard[], over: Partial<MailboxView> = {}): MailboxV
   tone: "casual",
   settings: RECOMMENDED,
   members: ["엄마", "아빠"],
-  wishes: [],
   postcards,
   ...over,
 });

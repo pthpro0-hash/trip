@@ -11,7 +11,6 @@ const state = vi.hoisted(() => ({
   boxes: { owned: [], joined: [] } as { owned: unknown[]; joined: unknown[] } | "failed" | "throw",
   replies: 0,
   hearts: 0,
-  wishes: 0,
   signOut: vi.fn(),
   admin: false,
   waiting: 0,
@@ -23,7 +22,6 @@ vi.mock("@/lib/supabase/client", () => ({
 vi.mock("@/lib/supabase/postcards", () => ({
   fetchUnreadReplyCount: async () => state.replies,
   fetchUnreadHeartCount: async () => state.hearts,
-  fetchUnreadWishCount: async () => state.wishes,
 }));
 vi.mock("@/lib/supabase/mailbox", () => ({
   fetchMailboxes: async () => {
@@ -48,7 +46,6 @@ describe("MyInfo · 내 정보 메뉴", () => {
     state.boxes = { owned: [], joined: [] };
     state.replies = 0;
     state.hearts = 0;
-    state.wishes = 0;
     state.signOut.mockReset();
     state.admin = false;
     state.waiting = 0;
@@ -115,13 +112,12 @@ describe("MyInfo · 내 정보 메뉴", () => {
       expect(screen.queryByText(/새 소식/)).toBeNull();
     });
 
-    it("새 답장·하트·가고 싶은 곳을 더해 책장 줄에 알린다", async () => {
+    it("새 답장·하트를 더해 책장 줄에 알린다", async () => {
       state.replies = 1;
       state.hearts = 2;
-      state.wishes = 1;
       render(<MyInfo />);
       const row = await screen.findByRole("link", { name: /^가족 책장/ });
-      await waitFor(() => expect(within(row).getByText("새 소식 4")).toBeTruthy());
+      await waitFor(() => expect(within(row).getByText("새 소식 3")).toBeTruthy());
     });
 
     /*

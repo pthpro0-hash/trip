@@ -3,7 +3,6 @@
 import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { SuggestSpot } from "@/components/spots/SuggestSpot";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
 import {

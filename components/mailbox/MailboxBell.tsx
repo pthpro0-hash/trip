@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
-import { fetchUnreadHeartCount, fetchUnreadReplyCount, fetchUnreadWishCount } from "@/lib/supabase/postcards";
+import { fetchUnreadHeartCount, fetchUnreadReplyCount } from "@/lib/supabase/postcards";
 import { REPLIES_SEEN } from "@/lib/mailboxEvents";
 
 // 책장 화면과 여행 상세가 답장·하트를 "봤다"고 표시했음을 알리는 신호(lib/mailboxEvents). 가져다 쓰던 자리를 위해 다시 내보낸다.
@@ -32,12 +32,11 @@ export function MailboxBell() {
           if (active) setCount(0);
           return;
         }
-        const [replies, hearts, wishes] = await Promise.all([
+        const [replies, hearts] = await Promise.all([
           fetchUnreadReplyCount(supabase),
           fetchUnreadHeartCount(supabase),
-          fetchUnreadWishCount(supabase),
         ]);
-        if (active) setCount(replies + hearts + wishes);
+        if (active) setCount(replies + hearts);
       } catch {
         // 알림을 못 세면 없는 것처럼 둔다.
       }

@@ -9,7 +9,7 @@ import { fetchMailboxes } from "@/lib/supabase/mailbox";
 import { mailboxPath } from "@/lib/mailbox";
 import { AbroadNamesRow } from "./AbroadNamesRow";
 import { countPendingSuggestions, isAdmin } from "@/lib/supabase/spotSuggestions";
-import { fetchUnreadHeartCount, fetchUnreadReplyCount, fetchUnreadWishCount } from "@/lib/supabase/postcards";
+import { fetchUnreadHeartCount, fetchUnreadReplyCount } from "@/lib/supabase/postcards";
 
 /*
   내 정보 — 흩어져 있던 것들이 한 곳에 모인 메뉴.
@@ -201,13 +201,12 @@ export function MyInfo() {
         if (!data.user) return setState("login");
         setState(accountOf(data.user));
         // 새 소식과 책장 줄은 곁다리다. 못 세고 못 읽으면 숫자·줄 없이 조용히 둔다(관리 줄은 그대로 남는다).
-        const [replies, hearts, wishes, boxes] = await Promise.all([
+        const [replies, hearts, boxes] = await Promise.all([
           fetchUnreadReplyCount(supabase),
           fetchUnreadHeartCount(supabase),
-          fetchUnreadWishCount(supabase),
           fetchMailboxes(supabase, data.user.id).catch(() => "failed" as const),
         ]);
-        setUnread(replies + hearts + wishes);
+        setUnread(replies + hearts);
         // 관리자라면 관리 줄을 낸다. 관리자가 아니거나 못 알아보면 아무것도 내지 않는다.
         if (await isAdmin(supabase, data.user.id)) setWaiting((await countPendingSuggestions(supabase)) ?? 0);
         if (boxes !== "failed") {
