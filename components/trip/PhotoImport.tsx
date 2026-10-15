@@ -34,12 +34,14 @@ import { remainingText } from "@/lib/photo/eta";
 import { pickPreviewShots } from "@/lib/photo/preview";
 import { spanText } from "@/lib/photo/span";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
+import { addShots, groupByDay, removeShots, shotsFor, type PickedPlace, type UnlocatedGroup } from "@/lib/photo/unlocated";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 import type { Shot, Trip } from "@/lib/photo/types";
 import { DoneView } from "./photoImport/DoneView";
 import { ImportSteps } from "./photoImport/ImportSteps";
 import { SaveBar } from "./photoImport/SaveBar";
 import { DismissedTrip, TripCard } from "./photoImport/TripCard";
+import { UnlocatedCard } from "./photoImport/UnlocatedCard";
 import type { SaveOutcome, VisitLine } from "./photoImport/types";
 
 /*
@@ -164,6 +166,13 @@ export function PhotoImport() {
   // 좌표로 찾는 장소 이름. 나누기·합치기로 방문이 다시 잡혀도 이름은 따라온다.
   const [placeCache, setPlaceCache] = useState<Map<string, PlaceAnswer>>(new Map());
   const [dailyShots, setDailyShots] = useState<Shot[]>([]);
+  /*
+    위치를 모르는 사진(메신저로 받았거나 위치 저장을 꺼 둔 것) — 찍은 날 하루씩 묶음이다. 사람이 날짜와 장소를 정하면 그 사진도
+    평소 사진처럼 여행 목록에 들어간다(lib/photo/unlocated). 정하지 않은 묶음은 기록에서 빠진다.
+  */
+  const [unlocated, setUnlocated] = useState<UnlocatedGroup[]>([]);
+  const [unlocatedDays, setUnlocatedDays] = useState<Record<string, string>>({});
+  const [unlocatedPlaces, setUnlocatedPlaces] = useState<Record<string, PickedPlace>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string | null>(null);
   /*
@@ -478,6 +487,9 @@ export function PhotoImport() {
     setTrips([]);
     setRead(null);
     setDailyShots([]);
+    setUnlocated([]);
+    setUnlocatedDays({});
+    setUnlocatedPlaces({});
     setStage({ name: "idle" });
     setPicked(new Map());
     setDismissed(new Set());
@@ -505,6 +517,9 @@ export function PhotoImport() {
     setTitles({});
     setUploadNote(null);
     setPicked(new Map(files.map((file) => [file.name, file])));
+    setUnlocated([]);
+    setUnlocatedDays({});
+    setUnlocatedPlaces({});
     setStage({ name: "reading", done: 0, total: files.length });
 
     const result = await readShots(files, (done, total) =>
@@ -517,6 +532,7 @@ export function PhotoImport() {
     const daily = living?.shots ?? [];
     const travelShots = result.shots.filter((shot) => !daily.includes(shot));
     setDailyShots(daily);
+    setUnlocated(groupByDay(result.withoutLocation));
 
     const grouped = groupIntoTrips(travelShots);
     setTrips(grouped);
@@ -629,6 +645,42 @@ export function PhotoImport() {
     const next = new Set(dismissed);
     next.delete(key);
     setDismissed(next);
+  };
+
+  /** 위치를 모르는 묶음에 사람이 정한 날짜·장소를 붙여 여행 목록에 넣는다(이미 넣었으면 빼고 다시 넣는다). */
+  const placeUnlocated = (key: string, place: PickedPlace, day: string) => {
+    const group = unlocated.find((item) => item.key === key);
+    if (!group) return;
+    const ids = new Set(group.photos.map((photo) => photo.id));
+    setTrips((now) => addShots(removeShots(now, ids), shotsFor(group, day, place)));
+    // 정한 이름이 곧 이 곳의 이름이다 — 좌표로 다시 지어 묻지 않는다.
+    setPlaceCache((now) =>
+      new Map(now).set(placeKey(place.lat, place.lng), {
+        title: place.title,
+        isCuratedSpot: place.spotId !== null,
+        spotId: place.spotId,
+        dong: place.dong,
+      }),
+    );
+    setUnlocatedPlaces((now) => ({ ...now, [key]: place }));
+  };
+
+  const clearUnlocated = (key: string) => {
+    const group = unlocated.find((item) => item.key === key);
+    if (!group) return;
+    const ids = new Set(group.photos.map((photo) => photo.id));
+    setTrips((now) => removeShots(now, ids));
+    setUnlocatedPlaces((now) => {
+      const next = { ...now };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const changeUnlockedDay = (key: string, day: string) => {
+    setUnlocatedDays((now) => ({ ...now, [key]: day }));
+    const place = unlocatedPlaces[key];
+    if (place) placeUnlocated(key, place, day);
   };
 
   const save = async () => {
@@ -1093,7 +1145,11 @@ export function PhotoImport() {
     );
   }
 
-  const hasTrips = trips.length > 0;
+  // 위치를 모르는 사진만 골랐어도 장소를 정할 수 있게 확인 화면을 보인다.
+  const hasTrips = trips.length > 0 || unlocated.length > 0;
+  const unplacedPhotos = unlocated
+    .filter((group) => !unlocatedPlaces[group.key])
+    .reduce((sum, group) => sum + group.photos.length, 0);
   // 로그인 전이다. 알아보기 전에는 모른다고 본다.
   const signedOut = authChecked && !userId && !noAdd;
   // 사진을 맡아 두고 떠날 수 있다 — 저장소가 되고, 아직 못 한 적이 없고, 맡을 만한 양일 때.
@@ -1106,7 +1162,7 @@ export function PhotoImport() {
       사진 {read.shots.length + read.withoutLocation.length}장
       {read.screenshots.length > 0 && ` · 화면 캡처 ${read.screenshots.length}장 제외`}
       {dailyShots.length > 0 && ` · 일상 ${dailyShots.length}장 제외`}
-      {read.withoutLocation.length > 0 && ` · 위치 없음 ${read.withoutLocation.length}장`}
+      {unplacedPhotos > 0 && ` · 위치 없음 ${unplacedPhotos}장`}
       {read.unreadable.length > 0 && ` · 읽지 못함 ${read.unreadable.length}개`}
     </p>
   );
@@ -1173,7 +1229,7 @@ export function PhotoImport() {
 
         {stage.name === "ready" && read && (
           <div className="break-keep rounded-2xl bg-bg-subtle p-6 text-[15px] text-text-muted">
-            여행으로 묶을 만한 사진을 찾지 못했어요. 촬영 위치가 들어 있는 사진이 필요해요.
+            여행으로 묶을 만한 사진을 찾지 못했어요. 사진 파일이 맞는지 확인해 주세요.
           </div>
         )}
       </>
@@ -1187,7 +1243,11 @@ export function PhotoImport() {
 
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-[17px] font-semibold text-text">
-          {visible.length > 0 ? `여행 ${visible.length}건을 찾았어요` : "여행을 모두 뺐어요"}
+          {visible.length > 0
+            ? `여행 ${visible.length}건을 찾았어요`
+            : trips.length === 0
+              ? "장소를 정하면 여행으로 기록해요"
+              : "여행을 모두 뺐어요"}
         </h2>
         <button
           type="button"
@@ -1199,6 +1259,16 @@ export function PhotoImport() {
       </div>
 
       {readSummary}
+
+      <UnlocatedCard
+        groups={unlocated}
+        files={picked}
+        days={unlocatedDays}
+        places={unlocatedPlaces}
+        onDay={changeUnlockedDay}
+        onPlace={(key, place) => placeUnlocated(key, place, unlocatedDays[key] ?? key)}
+        onClear={clearUnlocated}
+      />
 
       {restored && (
         <div className="flex items-start justify-between gap-3 rounded-xl bg-accent-soft px-4 py-3 text-[14px] text-text">

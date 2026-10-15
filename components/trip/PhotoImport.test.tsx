@@ -1398,4 +1398,133 @@ describe("PhotoImport", () => {
       expect(screen.queryByText("고르신 사진을 불러오고 있어요")).toBeNull();
     }, 15_000);
   });
+
+  /*
+    메신저로 받았거나 위치 저장을 꺼 둔 사진은 좌표가 없어 여행으로 묶을 수 없었다. 사람이 날짜와 장소를 정해 주면 그 사진도
+    평소 사진처럼 여행이 된다(lib/photo/unlocated). 정하지 않은 사진은 기록에서 빠진다.
+  */
+  describe("위치를 모르는 사진", () => {
+    const 경복궁 = { lat: 37.5796, lng: 126.977 };
+    const 모르는 = [
+      { id: "m1.jpg", takenAt: new Date("2026-09-20T10:00:00") },
+      { id: "m2.jpg", takenAt: new Date("2026-09-20T11:00:00") },
+    ];
+
+    beforeEach(() => {
+      vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+        if (url.startsWith("/api/place-search")) {
+          return {
+            ok: true,
+            json: async () => ({ places: [{ title: "경복궁", address: "서울 종로구 사직로 161", ...경복궁, dong: "서울 종로구 세종로", spotId: null }] }),
+          };
+        }
+        return { ok: true, json: async () => 장소응답(JSON.parse(String(init?.body)).points) };
+      });
+    });
+
+    /** 위치 있는 사진(shots)과 위치 모르는 사진(withoutLocation)을 함께 골랐다. */
+    async function 골라서열기(shots: ReturnType<typeof shot>[], withoutLocation = 모르는) {
+      readShots.mockResolvedValue({ shots, withoutLocation, screenshots: [], unreadable: [] });
+      const view = await 화면열기();
+      const input = view.container.querySelector('input[type="file"]')!;
+      const ids = [...shots.map((s) => s.id), ...withoutLocation.map((p) => p.id)];
+      Object.defineProperty(input, "files", { value: ids.map((id) => new File(["x"], id, { type: "image/jpeg" })), configurable: true });
+      fireEvent.change(input);
+      await screen.findByRole("heading", { name: /위치를 모르는 사진/ });
+      return view;
+    }
+
+    async function 장소정하기(검색어 = "경복궁", 번호 = 0) {
+      fireEvent.change(screen.getAllByLabelText(/사진의 장소 이름/)[번호], { target: { value: 검색어 } });
+      fireEvent.click(screen.getAllByRole("button", { name: "찾기" })[번호]);
+      fireEvent.click(await screen.findByRole("button", { name: /경복궁\s*서울 종로구 사직로 161/ }));
+    }
+
+    it("위치 있는 사진이 하나도 없어도 막히지 않고, 장소를 정하라고 안내한다", async () => {
+      await 골라서열기([]);
+      expect(screen.getByRole("heading", { name: "장소를 정하면 여행으로 기록해요" })).toBeTruthy();
+      expect(screen.queryByText(/여행으로 묶을 만한 사진을 찾지 못했어요/)).toBeNull();
+      // 아직 정한 곳이 없으니 기록할 것도 없다.
+      expect(screen.queryByRole("button", { name: /기록하기/ })).toBeNull();
+      expect(지금걸음()).toBe("2확인");
+    });
+
+    it("장소를 정하면 그 사진이 여행이 되고, 정한 이름이 제목이 된다", async () => {
+      await 골라서열기([]);
+      await 장소정하기();
+
+      expect(await screen.findByText("여행 1건을 찾았어요")).toBeTruthy();
+      await waitFor(() => expect(제목칸()[0].value).toBe("경복궁"));
+      expect(await 기록단추()).toBeEnabled();
+    });
+
+    it("기록하면 정한 좌표와 날짜로 저장하고, 사진도 그 방문에 올린다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1"] });
+      await 골라서열기([]);
+      await 장소정하기();
+      fireEvent.click(await 기록단추());
+
+      await waitFor(() => expect(uploadPhotos).toHaveBeenCalled());
+      const saved = saveTrip.mock.calls[0][2] as { shots: { id: string; lat: number; lng: number; takenAt: Date }[] };
+      expect(saved.shots.map((s) => [s.id, s.lat, s.lng])).toEqual([
+        ["m1.jpg", 경복궁.lat, 경복궁.lng],
+        ["m2.jpg", 경복궁.lat, 경복궁.lng],
+      ]);
+      expect(saved.shots[0].takenAt.getTime()).toBe(new Date("2026-09-20T10:00:00").getTime());
+      const targets = uploadPhotos.mock.calls[0][2] as { visitId: string; file: File; lat: number }[];
+      expect(targets.map((t) => [t.file.name, t.visitId, t.lat])).toEqual([
+        ["m1.jpg", "v1", 경복궁.lat],
+        ["m2.jpg", "v1", 경복궁.lat],
+      ]);
+    });
+
+    it("날짜를 고치면 그 날짜로 기록한다 — 이미 장소를 정했어도", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1"] });
+      await 골라서열기([]);
+      await 장소정하기();
+      await screen.findByText("여행 1건을 찾았어요");
+
+      fireEvent.change(screen.getByLabelText("찍은 날"), { target: { value: "2026-10-03" } });
+      fireEvent.click(await 기록단추());
+
+      await waitFor(() => expect(saveTrip).toHaveBeenCalled());
+      const saved = saveTrip.mock.calls[0][2] as { shots: { takenAt: Date }[] };
+      expect(saved.shots[0].takenAt.getTime()).toBe(new Date("2026-10-03T10:00:00").getTime());
+      expect(saved.shots[1].takenAt.getTime()).toBe(new Date("2026-10-03T11:00:00").getTime());
+    });
+
+    it("장소를 바꾸기로 되돌리면 그 여행이 사라지고, 다시 정할 수 있다", async () => {
+      await 골라서열기([]);
+      await 장소정하기();
+      await screen.findByText("여행 1건을 찾았어요");
+
+      fireEvent.click(screen.getByRole("button", { name: "바꾸기" }));
+      expect(await screen.findByRole("heading", { name: "장소를 정하면 여행으로 기록해요" })).toBeTruthy();
+      expect(screen.getByLabelText(/사진의 장소 이름/)).toBeTruthy();
+    });
+
+    it("위치 있는 사진과 날짜가 이어지면 같은 여행에 합쳐진다", async () => {
+      // 이틀(9/13~14)과 같은 날 찍은 위치 모르는 사진 — 새 여행이 아니라 그 여행의 한 곳이 된다.
+      await 골라서열기(이틀, [{ id: "m1.jpg", takenAt: new Date("2026-09-14T12:00:00") }]);
+      await 장소정하기();
+      await waitFor(() => expect(screen.getByText("여행 1건을 찾았어요")).toBeTruthy());
+    });
+
+    it("정하지 않은 묶음은 기록에서 빠지고, 몇 장이 빠지는지 보인다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      await 골라서열기(이틀);
+      expect(screen.getByText(/위치 없음 2장/)).toBeTruthy();
+
+      fireEvent.click(await 기록단추());
+      await waitFor(() => expect(uploadPhotos).toHaveBeenCalled());
+      const names = (uploadPhotos.mock.calls[0][2] as { file: File }[]).map((t) => t.file.name);
+      expect(names).toEqual(["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"]);
+    });
+
+    it("정하고 나면 위치 없음 수에서 빠진다", async () => {
+      await 골라서열기(이틀);
+      await 장소정하기();
+      await waitFor(() => expect(screen.queryByText(/위치 없음/)).toBeNull());
+    });
+  });
 });
