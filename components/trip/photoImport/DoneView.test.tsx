@@ -13,6 +13,7 @@ const outcome = (partial: Partial<SaveOutcome> = {}): SaveOutcome => ({
   skipped: 0,
   failed: 0,
   photos: 0,
+  photosFailed: 0,
   unsupported: [],
   overLimit: 0,
   merged: 0,
@@ -92,6 +93,27 @@ describe("DoneView", () => {
     it("실패가 없으면 다시 기록하라고 하지 않는다", () => {
       done({ saved: 2 }, vi.fn());
       expect(screen.queryByRole("button", { name: "다시 기록해 보기" })).toBeNull();
+    });
+  });
+
+  describe("사진 올리기만 막혔을 때", () => {
+    it("몇 장인지 알리고, 그 사진만 다시 올릴 수 있게 한다", () => {
+      const onRetryPhotos = vi.fn();
+      render(<DoneView outcome={outcome({ photos: 3, photosFailed: 2 })} onMore={vi.fn()} onRetryPhotos={onRetryPhotos} />);
+      expect(screen.getByText(/사진 2장은 올리지 못했어요. 여행 기록은 남아 있어요/)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "올리지 못한 사진 2장 다시 올리기" }));
+      expect(onRetryPhotos).toHaveBeenCalledTimes(1);
+    });
+
+    it("다시 올리는 동안은 단추를 잠그고 진행을 보인다", () => {
+      render(<DoneView outcome={outcome({ photosFailed: 2 })} onMore={vi.fn()} onRetryPhotos={vi.fn()} retrying progress="1장 / 2장" />);
+      expect(screen.getByRole("button", { name: "사진을 올리고 있어요…" })).toBeDisabled();
+      expect(screen.getByRole("status").textContent).toContain("1장 / 2장");
+    });
+
+    it("막힌 사진이 없으면 다시 올리라고 하지 않는다", () => {
+      render(<DoneView outcome={outcome({ photos: 3 })} onMore={vi.fn()} onRetryPhotos={vi.fn()} />);
+      expect(screen.queryByRole("button", { name: /다시 올리기/ })).toBeNull();
     });
   });
 

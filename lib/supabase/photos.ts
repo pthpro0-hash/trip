@@ -69,6 +69,8 @@ export interface UploadOutcome {
   uploaded: number;
   unsupported: string[];
   failed: number;
+  /** 올리다 막힌(망 끊김 등) 사진의 자리 — 건넨 targets 의 번호. 이것만 다시 올리면 된다. */
+  failedIndexes: number[];
   /** 상한에 걸려 올리지 못한 수. */
   overLimit: number;
 }
@@ -244,7 +246,7 @@ async function uploadEach<T extends PhotoPlace>(
   nameOf: (target: T) => string,
   onProgress?: (done: number, total: number, elapsedMs: number) => void,
 ): Promise<UploadOutcome> {
-  const outcome: UploadOutcome = { uploaded: 0, unsupported: [], failed: 0, overLimit: 0 };
+  const outcome: UploadOutcome = { uploaded: 0, unsupported: [], failed: 0, failedIndexes: [], overLimit: 0 };
   if (targets.length === 0) return outcome;
 
   // 얼마나 걸리는지는 올리는 쪽이 안다. 화면이 시계를 들고 있을 일이 아니다.
@@ -293,7 +295,8 @@ async function uploadEach<T extends PhotoPlace>(
 
     const fly = async () => {
       try {
-        const slot = await putOne(supabase, userId, target, shrunk);
+        // 망이 끊겨 던져도 그 한 장의 실패로 센다 — 나머지 사진과 완료 화면까지 멈추면 어디까지 올랐는지 알 수 없다.
+        const slot: Slot = await putOne(supabase, userId, target, shrunk).catch((): Slot => ({ kind: "failed" }));
         if (slot.kind !== "uploaded") quota.left += 1;
         finish(index, slot);
       } finally {
@@ -309,10 +312,13 @@ async function uploadEach<T extends PhotoPlace>(
   await Promise.all(flying.values());
 
   // 끝난 차례가 아니라 사진 차례대로 센다.
-  for (const slot of slots) {
+  for (const [index, slot] of slots.entries()) {
     if (!slot) continue;
     if (slot.kind === "uploaded") outcome.uploaded += 1;
-    else if (slot.kind === "failed") outcome.failed += 1;
+    else if (slot.kind === "failed") {
+      outcome.failed += 1;
+      outcome.failedIndexes.push(index);
+    }
     else if (slot.kind === "overLimit") outcome.overLimit += 1;
     else outcome.unsupported.push(slot.name);
   }

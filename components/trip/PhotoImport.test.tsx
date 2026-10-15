@@ -200,9 +200,9 @@ describe("PhotoImport", () => {
     saveTrip.mockReset();
     saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: [] });
     uploadPhotos.mockReset();
-    uploadPhotos.mockResolvedValue({ uploaded: 0, unsupported: [], overLimit: 0, failed: 0 });
+    uploadPhotos.mockResolvedValue({ uploaded: 0, unsupported: [], overLimit: 0, failed: 0, failedIndexes: [] });
     uploadPrepared.mockReset();
-    uploadPrepared.mockResolvedValue({ uploaded: 0, unsupported: [], overLimit: 0, failed: 0 });
+    uploadPrepared.mockResolvedValue({ uploaded: 0, unsupported: [], overLimit: 0, failed: 0, failedIndexes: [] });
     prepareForLogin.mockReset();
     prepareForLogin.mockResolvedValue(true);
     goTo.mockReset();
@@ -605,7 +605,7 @@ describe("PhotoImport", () => {
 
     it("올라간 사진과 못 올린 사진을 알린다", async () => {
       saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
-      uploadPhotos.mockResolvedValue({ uploaded: 4, unsupported: ["x.heic"], overLimit: 0, failed: 0 });
+      uploadPhotos.mockResolvedValue({ uploaded: 4, unsupported: ["x.heic"], overLimit: 0, failed: 0, failedIndexes: [] });
       await 사진넣기();
       fireEvent.click(await 기록단추());
       expect(await screen.findByText("사진 4장을 함께 올렸어요")).toBeTruthy();
@@ -624,6 +624,76 @@ describe("PhotoImport", () => {
       expect(지금걸음()).toBe("1고르기");
       // 지난 결과가 남아 있지 않다.
       expect(screen.queryByText(/여행 \d건을 찾았어요/)).toBeNull();
+    });
+
+    describe("여행은 저장됐는데 사진 올리기만 막혔을 때", () => {
+      // 이틀 = a,b(첫 곳) · c,d(둘째 곳) · e(셋째 곳). 올리는 차례도 이 순서다.
+      const 막힘 = (uploaded: number, indexes: number[]) => ({
+        uploaded,
+        unsupported: [],
+        overLimit: 0,
+        failed: indexes.length,
+        failedIndexes: indexes,
+      });
+      const 이름들 = (call: number) => (uploadPhotos.mock.calls[call][2] as { file: File }[]).map((target) => target.file.name);
+
+      it("완료 화면이 올리지 못한 사진 수를 알리고, 여행 기록은 남았다고 말한다", async () => {
+        saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+        uploadPhotos.mockResolvedValue(막힘(3, [3, 4]));
+        await 사진넣기();
+        fireEvent.click(await 기록단추());
+
+        expect(await screen.findByRole("heading", { name: "여행 1건을 기록했어요" })).toBeTruthy();
+        expect(screen.getByText("사진 3장을 함께 올렸어요")).toBeTruthy();
+        expect(screen.getByText(/사진 2장은 올리지 못했어요. 여행 기록은 남아 있어요/)).toBeTruthy();
+        expect(screen.getByRole("button", { name: "올리지 못한 사진 2장 다시 올리기" })).toBeEnabled();
+      });
+
+      it("다시 올리면 막힌 사진만 올리고, 여행은 다시 저장하지 않는다", async () => {
+        saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+        uploadPhotos.mockResolvedValueOnce(막힘(3, [3, 4])).mockResolvedValueOnce(막힘(2, []));
+        await 사진넣기();
+        fireEvent.click(await 기록단추());
+        fireEvent.click(await screen.findByRole("button", { name: "올리지 못한 사진 2장 다시 올리기" }));
+
+        await waitFor(() => expect(uploadPhotos).toHaveBeenCalledTimes(2));
+        expect(이름들(1)).toEqual(["d.jpg", "e.jpg"]);
+        // 막혔던 사진은 올리던 그 방문에 붙는다.
+        expect((uploadPhotos.mock.calls[1][2] as { visitId: string }[]).map((target) => target.visitId)).toEqual(["v2", "v3"]);
+        expect(saveTrip).toHaveBeenCalledTimes(1);
+
+        expect(await screen.findByText("사진 5장을 함께 올렸어요")).toBeTruthy();
+        expect(screen.queryByText(/올리지 못했어요. 여행 기록은 남아 있어요/)).toBeNull();
+        expect(screen.queryByRole("button", { name: /다시 올리기/ })).toBeNull();
+      });
+
+      it("또 막히면 남은 수만 다시 알리고, 그 사진만 계속 다시 올릴 수 있다", async () => {
+        saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+        uploadPhotos
+          .mockResolvedValueOnce(막힘(3, [3, 4]))
+          .mockResolvedValueOnce(막힘(1, [1]))
+          .mockResolvedValueOnce(막힘(1, []));
+        await 사진넣기();
+        fireEvent.click(await 기록단추());
+        fireEvent.click(await screen.findByRole("button", { name: "올리지 못한 사진 2장 다시 올리기" }));
+
+        const again = await screen.findByRole("button", { name: "올리지 못한 사진 1장 다시 올리기" });
+        expect(screen.getByText("사진 4장을 함께 올렸어요")).toBeTruthy();
+        fireEvent.click(again);
+
+        await waitFor(() => expect(uploadPhotos).toHaveBeenCalledTimes(3));
+        expect(이름들(2)).toEqual(["e.jpg"]);
+        expect(await screen.findByText("사진 5장을 함께 올렸어요")).toBeTruthy();
+      });
+
+      it("올리다 막힌 사진이 없으면 다시 올리기 단추가 없다", async () => {
+        saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+        uploadPhotos.mockResolvedValue(막힘(5, []));
+        await 사진넣기();
+        fireEvent.click(await 기록단추());
+        await screen.findByRole("heading", { name: "여행 1건을 기록했어요" });
+        expect(screen.queryByRole("button", { name: /다시 올리기/ })).toBeNull();
+      });
     });
 
     it("저장하지 못한 여행이 있으면 말하고, 다시 기록해 볼 수 있다", async () => {
@@ -868,7 +938,7 @@ describe("PhotoImport", () => {
 
     it("기록하면 맡겨 둔 사진을 바로 올린다 — 파일을 다시 줄이지 않는다", async () => {
       saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
-      uploadPrepared.mockResolvedValue({ uploaded: 5, unsupported: [], overLimit: 0, failed: 0 });
+      uploadPrepared.mockResolvedValue({ uploaded: 5, unsupported: [], overLimit: 0, failed: 0, failedIndexes: [] });
       await 되살린화면();
       fireEvent.click(await 기록단추());
 
@@ -912,9 +982,48 @@ describe("PhotoImport", () => {
       await waitFor(() => expect(stashed.meta).toBeNull());
     });
 
+    it("사진 올리기만 막히면 맡겨 둔 것을 남겨 두었다가, 막힌 사진만 다시 올린 뒤에 지운다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      uploadPrepared
+        .mockResolvedValueOnce({ uploaded: 3, unsupported: [], overLimit: 0, failed: 2, failedIndexes: [3, 4] })
+        .mockResolvedValueOnce({ uploaded: 2, unsupported: [], overLimit: 0, failed: 0, failedIndexes: [] });
+      await 되살린화면();
+      fireEvent.click(await 기록단추());
+
+      expect(await screen.findByRole("heading", { name: "여행 1건을 기록했어요" })).toBeTruthy();
+      expect(screen.getByText(/사진 2장은 올리지 못했어요/)).toBeTruthy();
+      // 다시 올릴 사진이 남았으니 로그인 전에 맡겨 둔 것을 지우지 않는다.
+      expect(stashed.meta).not.toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "올리지 못한 사진 2장 다시 올리기" }));
+      await waitFor(() => expect(uploadPrepared).toHaveBeenCalledTimes(2));
+      expect((uploadPrepared.mock.calls[1][2] as { shotId: string; visitId: string }[]).map((target) => [target.shotId, target.visitId])).toEqual([
+        ["d.jpg", "v2"],
+        ["e.jpg", "v3"],
+      ]);
+      expect(typeof uploadPrepared.mock.calls[1][3]).toBe("function");
+      expect(uploadPhotos).not.toHaveBeenCalled();
+      expect(await screen.findByText("사진 5장을 함께 올렸어요")).toBeTruthy();
+      await waitFor(() => expect(stashed.meta).toBeNull());
+    });
+
+    it("다시 올려도 막히면 맡겨 둔 것은 계속 남는다", async () => {
+      saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+      uploadPrepared
+        .mockResolvedValueOnce({ uploaded: 4, unsupported: [], overLimit: 0, failed: 1, failedIndexes: [4] })
+        .mockResolvedValueOnce({ uploaded: 0, unsupported: [], overLimit: 0, failed: 1, failedIndexes: [0] });
+      await 되살린화면();
+      fireEvent.click(await 기록단추());
+      fireEvent.click(await screen.findByRole("button", { name: "올리지 못한 사진 1장 다시 올리기" }));
+
+      await waitFor(() => expect(uploadPrepared).toHaveBeenCalledTimes(2));
+      expect(await screen.findByRole("button", { name: "올리지 못한 사진 1장 다시 올리기" })).toBeEnabled();
+      expect(stashed.meta).not.toBeNull();
+    });
+
     it("줄이지 못했던 사진(아이폰 HEIC 등)은 올리지 않고 올리지 못한 사진으로 알린다", async () => {
       saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
-      uploadPrepared.mockResolvedValue({ uploaded: 4, unsupported: [], overLimit: 0, failed: 0 });
+      uploadPrepared.mockResolvedValue({ uploaded: 4, unsupported: [], overLimit: 0, failed: 0, failedIndexes: [] });
       await 되살린화면(맡겨둔것({ unsupported: ["c.jpg"], photoIds: ["a.jpg", "b.jpg", "d.jpg", "e.jpg"] }));
       fireEvent.click(await 기록단추());
 
@@ -1176,7 +1285,7 @@ describe("PhotoImport", () => {
     });
 
     it("끝나면 몇 건에 더했고 몇 장은 이미 있었는지 말한다", async () => {
-      uploadPhotos.mockResolvedValue({ uploaded: 2, unsupported: [], overLimit: 0, failed: 0 });
+      uploadPhotos.mockResolvedValue({ uploaded: 2, unsupported: [], overLimit: 0, failed: 0, failedIndexes: [] });
       await 사진넣기();
       fireEvent.click(await screen.findByRole("button", { name: "기존 여행에 사진 더하기" }));
       expect(await screen.findByRole("heading", { name: "기존 여행 1건에 사진을 더했어요" })).toBeTruthy();

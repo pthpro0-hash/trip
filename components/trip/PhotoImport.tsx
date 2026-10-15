@@ -212,6 +212,12 @@ export function PhotoImport() {
     때만 연다 — 읽어 오는 동안 사람이 먼저 사진을 골랐으면, 늦게 온 맡겨 둔 것이 그 위를 덮지 않는다.
   */
   const epochRef = useRef(0);
+  /*
+    여행 기록은 남았는데 올리다 막힌 사진 — 이것만 다시 올린다. 고른 파일이면 파일째, 맡겨 둔 사진이면 열쇠로 들고 있고,
+    맡겨 둔 것은 이 사진들을 다 올릴 때까지 지우지 않는다(지우면 다시 올릴 길이 없다). 화면을 새로 시작하면 버린다.
+  */
+  const leftoverRef = useRef<{ targets: UploadTarget[]; prepared: PreparedTarget[] }>({ targets: [], prepared: [] });
+  const retryingRef = useRef(false);
   // 맡겨 둔 사진에서 작은 그림을 이미 꺼내 본 것(못 꺼낸 것도 다시 시도하지 않는다).
   const triedPreviews = useRef(new Set<string>());
   /*
@@ -450,6 +456,7 @@ export function PhotoImport() {
   const startOver = () => {
     epochRef.current += 1;
     triedPreviews.current.clear();
+    leftoverRef.current = { targets: [], prepared: [] };
     setRestored(null);
     setStashFailed(false);
     setJustSaved(new Set());
@@ -469,6 +476,7 @@ export function PhotoImport() {
     setPicking(false);
     if (files.length === 0) return;
     epochRef.current += 1;
+    leftoverRef.current = { targets: [], prepared: [] };
     // 맡겨 둔 여행으로 열린 화면에서 사진을 새로 고르면 맡겨 둔 것은 버린다.
     if (restored) {
       void clearStash();
@@ -619,6 +627,7 @@ export function PhotoImport() {
       skipped: 0,
       failed: 0,
       photos: 0,
+      photosFailed: 0,
       unsupported: [],
       overLimit: 0,
       merged: 0,
@@ -733,9 +742,12 @@ export function PhotoImport() {
       result.photos += uploaded.uploaded;
       result.unsupported.push(...uploaded.unsupported);
       result.overLimit += uploaded.overLimit;
+      // 올리다 막힌 사진은 기억해 둔다 — 여행 기록은 이미 남았으니, 이 사진만 다시 올릴 수 있게.
+      leftoverRef.current.prepared.push(...uploaded.failedIndexes.flatMap((i) => (prepared[i] ? [prepared[i]] : [])));
+      leftoverRef.current.targets.push(...uploaded.failedIndexes.flatMap((i) => (targets[i] ? [targets[i]] : [])));
 
-      // 기존 여행에 더했다면 방문의 사진 수를 실제 올라간 수로 맞춘다(올리다 막혀도 어긋나지 않게).
-      if (merging) await recountVisits(supabase, placed.map((part) => part.visitId));
+      // 기존 여행에 더했다면 방문의 사진 수를 실제 올라간 수로 맞춘다(올리다 막혀도 어긋나지 않게). 새 여행도 막힌 사진이 있으면 맞춘다.
+      if (merging || uploaded.failed > 0) await recountVisits(supabase, placed.map((part) => part.visitId));
 
       logEvent(supabase, "photos_uploaded", {
         tried: targets.length + prepared.length + lost,
@@ -763,11 +775,14 @@ export function PhotoImport() {
     */
     if (result.saved > 0) rememberStartIfUnset("sketch");
 
+    // 이번에 막힌 것뿐 아니라 앞서 막혀 아직 못 올린 것까지 센다(다시 기록해 본 경우).
+    result.photosFailed = leftoverRef.current.prepared.length + leftoverRef.current.targets.length;
+
     /*
-      맡겨 둔 것은 저장하지 못한 여행이 없을 때 지운다 — 기기에 사진 조각을 남기지 않는다. 저장하지 못한 여행이 있으면 남겨 둔다:
-      다시 기록해 볼 때 같은 사진이 필요하다. 화면 쪽 표시도 이때 걷는다(결과 화면이 이미 덮고 있다).
+      맡겨 둔 것은 저장하지 못한 여행도, 올리다 막힌 사진도 없을 때 지운다 — 기기에 사진 조각을 남기지 않는다. 있으면 남겨 둔다:
+      다시 기록하거나 다시 올릴 때 같은 사진이 필요하다. 화면 쪽 표시도 이때 걷는다(결과 화면이 이미 덮고 있다).
     */
-    if (fromStash && result.failed === 0) {
+    if (fromStash && result.failed === 0 && result.photosFailed === 0) {
       await clearStash();
       setRestored(null);
     }
@@ -776,6 +791,84 @@ export function PhotoImport() {
     setJustSaved(done);
     setOutcome(result);
     setSaving(false);
+  };
+
+  /*
+    올리다 막힌 사진만 다시 올린다. 여행은 이미 기록돼 있으니 다시 저장하지 않고, 막혔던 사진을 그 방문에 이어 붙인다.
+    또 막힌 것은 계속 남긴다(연결이 나아진 뒤 다시 누를 수 있게). 다 올렸고 저장하지 못한 여행도 없으면 맡겨 둔 것을 치운다.
+  */
+  const retryPhotos = async () => {
+    const supabase = getBrowserClient();
+    if (!supabase || !userId || !outcome || retryingRef.current) return;
+    const { targets, prepared } = leftoverRef.current;
+    if (targets.length + prepared.length === 0) return;
+
+    retryingRef.current = true;
+    setSaving(true);
+    const next: typeof leftoverRef.current = { targets: [], prepared: [] };
+    let uploadedNow = 0;
+    let overLimit = 0;
+    const unsupported: string[] = [];
+    let elapsedMs = 0;
+    const progress = (done: number, total: number, elapsed: number) => {
+      elapsedMs = elapsed;
+      const left = remainingText(done, total, elapsed);
+      setUploadNote(`${done}장 / ${total}장${left ? ` · ${left}` : ""}`);
+    };
+    const absorb = (uploaded: Awaited<ReturnType<typeof uploadPhotos>>) => {
+      uploadedNow += uploaded.uploaded;
+      overLimit += uploaded.overLimit;
+      unsupported.push(...uploaded.unsupported);
+    };
+
+    try {
+      if (prepared.length > 0) {
+        const uploaded = await uploadPrepared(supabase, userId, prepared, loadStashedPhoto, progress);
+        absorb(uploaded);
+        next.prepared = uploaded.failedIndexes.flatMap((i) => (prepared[i] ? [prepared[i]] : []));
+      }
+      if (targets.length > 0) {
+        const uploaded = await uploadPhotos(supabase, userId, targets, progress);
+        absorb(uploaded);
+        next.targets = uploaded.failedIndexes.flatMap((i) => (targets[i] ? [targets[i]] : []));
+      }
+    } catch {
+      // 올리기 자체가 던졌다 — 어디까지 올라갔는지 모르니 전부 아직 못 올린 것으로 두고 다시 누를 수 있게 한다.
+      next.prepared = prepared;
+      next.targets = targets;
+      uploadedNow = 0;
+    }
+
+    // 방문의 사진 수를 실제 올라간 수로 맞춘다.
+    await recountVisits(supabase, [...prepared, ...targets].map((item) => item.visitId));
+    leftoverRef.current = next;
+    const stillFailed = next.prepared.length + next.targets.length;
+
+    logEvent(supabase, "photos_uploaded", {
+      tried: prepared.length + targets.length,
+      uploaded: uploadedNow,
+      unsupported: unsupported.length,
+      failed: stillFailed,
+      overLimit,
+      seconds: Math.round(elapsedMs / 1000),
+      retry: true,
+    });
+
+    if (stillFailed === 0 && restored && outcome.failed === 0) {
+      await clearStash();
+      setRestored(null);
+    }
+
+    setUploadNote(null);
+    setOutcome({
+      ...outcome,
+      photos: outcome.photos + uploadedNow,
+      photosFailed: stillFailed,
+      unsupported: [...outcome.unsupported, ...unsupported],
+      overLimit: outcome.overLimit + overLimit,
+    });
+    setSaving(false);
+    retryingRef.current = false;
   };
 
   /*
@@ -974,7 +1067,14 @@ export function PhotoImport() {
       <>
         {picker}
         <ImportSteps current={3} />
-        <DoneView outcome={outcome} onMore={more} onRetry={() => setOutcome(null)} />
+        <DoneView
+          outcome={outcome}
+          onMore={more}
+          onRetry={() => setOutcome(null)}
+          onRetryPhotos={() => void retryPhotos()}
+          retrying={saving}
+          progress={uploadNote}
+        />
       </>
     );
   }

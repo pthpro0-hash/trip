@@ -8,6 +8,8 @@ export interface SaveOutcome {
   failed: number;
   /** 함께 올라간 사진 수. */
   photos: number;
+  /** 여행 기록은 남았는데 올리다 막혀 아직 못 올린 사진 수. 이것만 다시 올릴 수 있다. */
+  photosFailed: number;
   /** 이 브라우저가 열지 못해 올리지 못한 사진(파일 이름). */
   unsupported: string[];
   /** 보관할 수 있는 수를 넘어 올리지 못한 사진 수. */

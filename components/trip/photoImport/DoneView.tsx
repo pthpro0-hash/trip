@@ -24,9 +24,15 @@ interface DoneViewProps {
   onMore: () => void;
   /** 저장하지 못한 여행을 다시 기록해 본다(확인 화면으로 돌아간다). 실패가 없으면 부르지 않는다. */
   onRetry?: () => void;
+  /** 올리다 막힌 사진만 다시 올린다. 막힌 사진이 없으면 부르지 않는다. */
+  onRetryPhotos?: () => void;
+  /** 막힌 사진을 다시 올리는 중. */
+  retrying?: boolean;
+  /** 다시 올리는 진행("3장 / 8장 · …"). */
+  progress?: string | null;
 }
 
-export function DoneView({ outcome, onMore, onRetry }: DoneViewProps) {
+export function DoneView({ outcome, onMore, onRetry, onRetryPhotos, retrying = false, progress }: DoneViewProps) {
   const heading = useRef<HTMLHeadingElement>(null);
 
   // 긴 목록 아래에서 눌렀어도 결과가 맨 위에서 보이고, 화면 읽기 도구가 결과부터 읽는다.
@@ -41,6 +47,9 @@ export function DoneView({ outcome, onMore, onRetry }: DoneViewProps) {
   if (outcome.duplicates > 0) lines.push(`이미 있던 사진 ${outcome.duplicates}장은 건너뛰었어요`);
   if (outcome.skipped > 0) lines.push(`이미 있던 ${outcome.skipped}건은 건너뛰었어요`);
   if (outcome.failed > 0) lines.push(`${outcome.failed}건은 저장하지 못했어요`);
+  if (outcome.photosFailed > 0) {
+    lines.push(`사진 ${outcome.photosFailed}장은 올리지 못했어요. 여행 기록은 남아 있어요. 연결이 안정되면 그 사진만 다시 올릴 수 있어요.`);
+  }
   if (outcome.unsupported.length > 0) {
     lines.push(
       `${outcome.unsupported.length}장은 이 브라우저가 열지 못하는 형식이라 올리지 못했어요. 기록 자체는 남아 있어요.`,
@@ -84,7 +93,19 @@ export function DoneView({ outcome, onMore, onRetry }: DoneViewProps) {
       </div>
 
       <div className="flex w-full flex-col gap-2.5 sm:max-w-xs">
-        <Link href={MAP_HREF} className={PRIMARY}>
+        {outcome.photosFailed > 0 && onRetryPhotos && (
+          <>
+            <button type="button" onClick={onRetryPhotos} disabled={retrying} className={`${PRIMARY} disabled:opacity-60`}>
+              {retrying ? "사진을 올리고 있어요…" : `올리지 못한 사진 ${outcome.photosFailed}장 다시 올리기`}
+            </button>
+            {retrying && (
+              <p role="status" className="break-keep text-[13px] text-text-muted">
+                {progress ? `${progress} · ` : ""}다 올라갈 때까지 이 창을 닫지 마세요.
+              </p>
+            )}
+          </>
+        )}
+        <Link href={MAP_HREF} className={outcome.photosFailed > 0 && onRetryPhotos ? SECONDARY : PRIMARY}>
           지도에서 보기
         </Link>
         <Link href={SKETCH_HREF} className={SECONDARY}>
