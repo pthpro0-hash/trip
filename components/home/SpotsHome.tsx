@@ -2,7 +2,7 @@
 
 import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { SuggestSpot } from "@/components/spots/SuggestSpot";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
 import {
@@ -12,6 +12,7 @@ import {
   type RelaxationSuggestion,
 } from "@/lib/filter";
 import { sortByRelevance, suggestCorrection } from "@/lib/search";
+import { loadOverviews, overviewsLoaded, overviewsVersion, subscribeOverviews } from "@/lib/overviews";
 import { reportEmptySearch } from "@/lib/searchTelemetry";
 import { distanceKm } from "@/lib/geo";
 import { useWishlist } from "@/lib/collections";
@@ -69,6 +70,13 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
   const origin = location.status === "ready" ? location.point : undefined;
 
   const query = criteria.query?.trim() ?? "";
+  /*
+    소개글(검색용, 약 150KB)은 첫 화면에 싣지 않고 검색을 시작할 낌새(검색칸을 누름·검색어가 있음)에 받는다. 받으면 결과를 다시 센다.
+  */
+  const overviews = useSyncExternalStore(subscribeOverviews, overviewsVersion, () => 0);
+  useEffect(() => {
+    if (query) void loadOverviews();
+  }, [query]);
   const results = useMemo(() => {
     const filtered = filterSpots(SPOTS, criteria);
     const scoped = savedOnly ? filtered.filter((spot) => wishlist.ids.includes(spot.id)) : filtered;
@@ -77,7 +85,9 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
     // 누른 사람은 이미 무엇을 볼지 정했고, 남은 질문은 어디가 가깝냐다.
     if (!origin) return ranked;
     return [...ranked].sort((a, b) => distanceKm(origin, a) - distanceKm(origin, b));
-  }, [criteria, query, savedOnly, wishlist.ids, origin]);
+  // overviews: 소개글을 받으면 소개글에만 있는 낱말로 걸리던 결과가 더해진다.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [criteria, query, savedOnly, wishlist.ids, origin, overviews]);
 
   const suggestions = useMemo(
     () => (results.length === 0 && !savedOnly ? suggestRelaxedFilters(SPOTS, criteria) : []),
@@ -91,8 +101,9 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
 
   // 0건이 난 검색어를 모아 무엇을 보강할지 알아낸다.
   useEffect(() => {
-    if (query && results.length === 0) reportEmptySearch(query);
-  }, [query, results.length]);
+    // 소개글을 받기 전의 0건은 아직 모르는 것이다 — 받은 뒤에도 0건이어야 기록한다.
+    if (query && results.length === 0 && overviewsLoaded()) reportEmptySearch(query);
+  }, [query, results.length, overviews]);
 
   /*
     돌아온 사람을 그 여행지 카드 앞에 세운다.
@@ -144,6 +155,7 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
       <SearchBox
         value={criteria.query ?? ""}
         spots={SPOTS}
+        onFocus={() => void loadOverviews()}
         onChange={(next) => {
           setCriteria({ ...criteria, query: next || undefined });
           if (next.trim() && !viewChosenByUser) setMobileView("list");

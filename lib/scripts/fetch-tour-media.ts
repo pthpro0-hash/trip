@@ -195,6 +195,16 @@ async function main() {
 
   writeFileSync("lib/data/spot-media.json", `${JSON.stringify(media, null, 2)}\n`, "utf-8");
 
+  // 첫 화면이 쓰는 작은 파일 둘(카드용 사진·주소 / 검색용 소개글). lib/mediaCard.test.ts 가 spot-media.json 과 어긋나지 않는지 지킨다.
+  const card: Record<string, { t?: string; a: string }> = {};
+  const overview: Record<string, string> = {};
+  for (const [id, entry] of Object.entries(media)) {
+    card[id] = { a: entry.address, ...(entry.images[0] ? { t: entry.images[0].url } : {}) };
+    overview[id] = entry.overview;
+  }
+  writeFileSync("lib/data/spot-card.json", `${JSON.stringify(card)}\n`, "utf-8");
+  writeFileSync("lib/data/spot-overview.json", `${JSON.stringify(overview)}\n`, "utf-8");
+
   const withPhotos = Object.values(media).filter((m) => m.images.length > 0).length;
   console.log(
     `\n완료: ${Object.keys(media).length}곳 수집 (사진 있음 ${withPhotos}곳) → lib/data/spot-media.json`,

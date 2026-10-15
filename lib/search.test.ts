@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect, vi } from "vitest";
 import spotsData from "./data/spots.json";
 import {
   matchesQuery,
@@ -8,6 +8,7 @@ import {
   suggestCompletions,
   suggestCorrection,
 } from "./search";
+import { loadOverviews } from "./overviews";
 import type { Spot } from "./types";
 
 const SPOTS = spotsData as Spot[];
@@ -164,10 +165,22 @@ describe("동의어", () => {
   });
 });
 
+// 소개글은 검색할 때 받는다(첫 화면 JS 를 가볍게) — 시험도 받아 둔 뒤에 찾는다.
+beforeAll(loadOverviews);
+
 describe("공식 소개글 색인", () => {
   it("다른 데 없는 말을 소개글에서 찾는다", () => {
     expect(names(search("템플스테이"))).toContain("통도사");
     expect(names(search("벚꽃")).length).toBeGreaterThan(3);
+  });
+
+  it("소개글을 받기 전에는 소개글에만 있는 말로는 걸리지 않고, 이름으로 찾는 결과는 그대로다", async () => {
+    vi.resetModules();
+    const fresh = await import("./search");
+    const spotList = (await import("./data/spots.json")).default as Spot[];
+    const freshSearch = (query: string) => fresh.sortByRelevance(spotList.filter((spot) => fresh.matchesQuery(spot, query)), query);
+    expect(names(freshSearch("템플스테이"))).not.toContain("통도사");
+    expect(names(freshSearch("경복궁"))[0]).toBe("경복궁");
   });
 
   it("소개글은 가장 낮은 가중치라 이름 일치를 밀어내지 않는다", () => {

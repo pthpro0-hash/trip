@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { spotFocus } from "@/lib/scrollMemory";
 import type { Spot } from "@/lib/types";
-import { getSpotThumbnail } from "@/lib/media";
+import { getSpotThumbnail } from "@/lib/mediaCard";
 import { formatDistance } from "@/lib/geo";
 import { HighlightedText } from "./HighlightedText";
 import { SaveButton } from "./SaveButton";

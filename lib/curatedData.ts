@@ -1,5 +1,5 @@
 import spotsData from "@/lib/data/spots.json";
-import { getSpotThumbnail } from "@/lib/media";
+import { getSpotThumbnail } from "@/lib/mediaCard";
 import type { Spot } from "@/lib/types";
 
 /*

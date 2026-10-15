@@ -39,6 +39,23 @@ describe("HomePage", { timeout: 20000 }, () => {
     );
   });
 
+  /*
+    검색용 소개글(약 150KB)은 첫 화면에 싣지 않고 검색을 시작할 낌새에 받는다. 소개글에만 있는 낱말('템플스테이'는 통도사 소개글에만 있다)도
+    받은 뒤에는 찾아져야 한다.
+  */
+  it("소개글에만 있는 낱말로 검색하면, 소개글을 받은 뒤 그 결과가 나온다", async () => {
+    render(<HomePage />);
+    typeSearch("템플스테이");
+    await waitFor(() => expect(screen.getByRole("link", { name: "통도사 자세히 보기" })).toBeTruthy(), { timeout: 10000 });
+  });
+
+  it("검색칸을 누르면 소개글을 받기 시작한다 — 치기 전에 미리", async () => {
+    const overviews = await import("@/lib/overviews");
+    render(<HomePage />);
+    fireEvent.focus(screen.getByLabelText("검색"));
+    await waitFor(() => expect(overviews.overviewsLoaded()).toBe(true), { timeout: 10000 });
+  });
+
   it("검색하면 모바일 뷰가 리스트로 바뀐다", async () => {
     render(<HomePage />);
     expect(screen.getByRole("button", { name: "지도" }).getAttribute("aria-pressed")).toBe("true");

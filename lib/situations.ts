@@ -1,4 +1,4 @@
-import { getSpotOverview } from "./media";
+import { getSpotOverview, subscribeOverviews } from "./overviews";
 import type { Spot } from "./types";
 
 /*
@@ -116,6 +116,8 @@ export function situationFor(term: string): Situation | null {
 }
 
 const cache = new Map<string, Set<Situation>>();
+// 소개글을 받으면 소개글로 읽어낸 상황이 늘어난다 — 받기 전에 계산해 둔 것을 비운다.
+subscribeOverviews(() => cache.clear());
 
 /** 여행지가 해당하는 상황들. 소개글·테마·볼거리에서 읽어낸다. */
 export function situationsOf(spot: Spot): Set<Situation> {

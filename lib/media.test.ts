@@ -4,7 +4,8 @@
 import { describe, it, expect } from "vitest";
 import mediaData from "./data/spot-media.json";
 import spotsData from "./data/spots.json";
-import { getSpotMedia, getSpotThumbnail } from "./media";
+import { getSpotMedia } from "./media";
+import { getSpotThumbnail } from "./mediaCard";
 import type { Spot, SpotMedia } from "./types";
 
 const MEDIA = mediaData as Record<string, SpotMedia>;

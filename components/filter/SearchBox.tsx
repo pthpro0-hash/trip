@@ -8,6 +8,8 @@ interface SearchBoxProps {
   value: string;
   onChange: (value: string) => void;
   spots: Spot[];
+  /** 칸을 눌렀을 때(검색을 시작할 낌새). 소개글을 미리 받아 두는 데 쓴다. */
+  onFocus?: () => void;
 }
 
 // Typing re-filters 121 spots and rebuilds every map marker, so the parent only
@@ -15,7 +17,7 @@ interface SearchBoxProps {
 // holding its own value.
 const DEBOUNCE_MS = 180;
 
-export function SearchBox({ value, onChange, spots }: SearchBoxProps) {
+export function SearchBox({ value, onChange, spots, onFocus }: SearchBoxProps) {
   const [draft, setDraft] = useState(value);
   const [focused, setFocused] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,7 +72,10 @@ export function SearchBox({ value, onChange, spots }: SearchBoxProps) {
         type="text"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        onFocus={() => setFocused(true)}
+        onFocus={() => {
+          setFocused(true);
+          onFocus?.();
+        }}
         onKeyDown={(e) => {
           if (e.key === "Escape") setFocused(false);
           if (e.key === "Enter") {

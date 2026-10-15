@@ -1,4 +1,5 @@
-import { getSpotAddress, getSpotOverview } from "./media";
+import { getSpotAddress } from "./mediaCard";
+import { getSpotOverview } from "./overviews";
 import { isChosungQuery, normalize, toChosung } from "./textMatch";
 import { isRomanQuery, romanize } from "./romanize";
 import { isStopword, situationFor, situationsOf } from "./situations";
