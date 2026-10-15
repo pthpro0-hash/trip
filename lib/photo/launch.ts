@@ -8,6 +8,12 @@
 let input: HTMLInputElement | null = null;
 let pending: File[] | null = null;
 let opened = false;
+let openedAt = 0;
+/*
+  취소했는데 cancel 이 오지 않는 브라우저(아이폰 사파리)에서는 '열려 있다'가 영영 남는다 — 그러면 나중에 앱으로 돌아올 때마다
+  '불러오는 중'이 떴다. 사진첩은 이만큼 지나면 닫힌 것으로 본다(오래 고르는 중이어도 고른 사진은 평소대로 받는다).
+*/
+const OPEN_MAX_MS = 90_000;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((listener) => listener());
 
@@ -20,6 +26,7 @@ export function launchPicker(): boolean {
   if (!input) return false;
   input.value = "";
   opened = true;
+  openedAt = Date.now();
   emit();
   input.click();
   return true;
@@ -36,7 +43,10 @@ export function cancelLaunch(): void {
   emit();
 }
 
-export const launchOpened = () => opened;
+export const launchOpened = () => opened && Date.now() - openedAt < OPEN_MAX_MS;
+
+/** 사진첩 입력칸에 고른 사진이 이미 들어와 있는가 — 들어와 있으면 곧 change 가 온다(취소가 아니다). */
+export const launchHasFiles = () => (input?.files?.length ?? 0) > 0;
 
 /** 고른 사진이 와 있으면 가져가고 비운다. */
 export function takePendingFiles(): File[] | null {

@@ -1368,5 +1368,34 @@ describe("PhotoImport", () => {
       );
       expect(screen.getByRole("button", { name: "사진 고르기" })).toBeTruthy();
     });
+
+    /*
+      아이폰 사파리는 사진을 고르지 않고 닫아도 cancel 을 보내지 않는다. 그때 안내가 60초씩, 앱으로 돌아올 때마다 또 돌았다.
+      고른 사진이 하나도 건네지지 않으면 몇 초만 보이고 거둔다.
+    */
+    it("cancel 이 오지 않아도 고른 사진이 없으면 몇 초 뒤 안내를 거둔다", async () => {
+      await 창열기();
+      await screen.findByText("고르신 사진을 불러오고 있어요");
+      await waitFor(() => expect(screen.queryByText("고르신 사진을 불러오고 있어요")).toBeNull(), { timeout: 6000 });
+      expect(screen.getByRole("button", { name: "사진 고르기" })).toBeTruthy();
+    }, 15_000);
+
+    it("다른 화면에서 사진첩을 열고 왔다가 cancel 없이 닫아도 안내가 몇 초 뒤 걷히고, 다시 돌아와도 또 뜨지 않는다", async () => {
+      const L = await import("@/lib/photo/launch");
+      const el = document.createElement("input");
+      el.click = vi.fn();
+      L.registerLauncherInput(el);
+      await 화면열기();
+      L.launchPicker();
+      fireEvent.focus(window);
+      await screen.findByText("고르신 사진을 불러오고 있어요");
+      await waitFor(() => expect(screen.queryByText("고르신 사진을 불러오고 있어요")).toBeNull(), { timeout: 6000 });
+      expect(L.launchOpened()).toBe(false);
+
+      // 앱을 갔다 와도(초점이 다시 돌아와도) 안내가 다시 뜨지 않는다.
+      fireEvent.focus(window);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(screen.queryByText("고르신 사진을 불러오고 있어요")).toBeNull();
+    }, 15_000);
   });
 });

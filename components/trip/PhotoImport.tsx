@@ -14,7 +14,7 @@ import { canPrepare, prepareForLogin } from "@/lib/photo/prepare";
 import { clearStash, loadStashedPhoto, probeStash, readStash, type StashMeta } from "@/lib/photo/stash";
 import { fromStashed, shotsOf, toStashed } from "@/lib/photo/stashTrips";
 import { goTo } from "@/lib/goTo";
-import { launchOpened, subscribeLaunch, takePendingFiles } from "@/lib/photo/launch";
+import { cancelLaunch, launchHasFiles, launchOpened, subscribeLaunch, takePendingFiles } from "@/lib/photo/launch";
 import { RESUME_LOGIN_HREF, resumeRequested } from "@/lib/photo/resume";
 import {
   canMerge,
@@ -87,6 +87,11 @@ const RECENT_MS = 60 * 60 * 1000;
 const PREVIEW_FLUSH = 6;
 /** 돌아왔다고 해 놓고 맡겨 둔 것을 읽지 못하는 채로 기다리는 화면을 이보다 오래 두지 않는다. */
 const RESUME_WAIT_MS = 10_000;
+/**
+  고르기 창이 닫힌 뒤 고른 사진이 하나도 건네지지 않으면 '불러오는 중'을 이만큼만 보인다. 취소했는데 cancel 이 오지 않는 브라우저
+  (아이폰 사파리)에서 안내가 몇 분씩 돌지 않게. 고른 사진은 늦게 와도 평소대로 받으므로 안내를 거두는 것은 잃는 것이 없다.
+*/
+const PICK_GRACE_MS = 3000;
 /** 주소는 우리가 바꾸지 않는 한 바뀌지 않는다 — 구독할 것이 없다. */
 const noSubscribe = () => () => undefined;
 
@@ -440,11 +445,20 @@ export function PhotoImport() {
   useEffect(() => {
     if (!picking) return;
     const input = inputRef.current;
-    const give = () => setPicking(false);
+    const give = () => {
+      setPicking(false);
+      // 다른 화면에서 사진첩을 열고 온 경우의 '열려 있다' 표시도 함께 거둔다 — 남아 있으면 다음에 돌아올 때 또 안내가 뜬다.
+      if (launchOpened()) cancelLaunch();
+    };
     input?.addEventListener("cancel", give);
+    // 고른 사진이 하나도 안 들어와 있으면 취소한 것이다. 들어와 있으면 곧 올 것이라 더 기다린다.
+    const grace = setTimeout(() => {
+      if ((input?.files?.length ?? 0) === 0 && !launchHasFiles()) give();
+    }, PICK_GRACE_MS);
     const id = setTimeout(give, 60_000);
     return () => {
       input?.removeEventListener("cancel", give);
+      clearTimeout(grace);
       clearTimeout(id);
     };
   }, [picking]);

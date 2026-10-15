@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { cancelLaunch, launchOpened, launchPicker, receiveFiles, registerLauncherInput, subscribeLaunch, takePendingFiles } from "./launch";
+import { cancelLaunch, launchHasFiles, launchOpened, launchPicker, receiveFiles, registerLauncherInput, subscribeLaunch, takePendingFiles } from "./launch";
 
 /* 어느 화면의 [사진 고르기]든 숨은 입력칸으로 사진첩을 연 채 '사진으로 여행 추가'로 가고, 고른 사진은 그 화면이 받아 간다. */
 const input = () => {
@@ -53,5 +53,26 @@ describe("launch", () => {
   it("빈 선택은 사진이 온 것이 아니다", () => {
     receiveFiles([]);
     expect(takePendingFiles()).toBeNull();
+  });
+
+  it("취소했는데 cancel 이 오지 않아도 오래 지나면 열려 있지 않은 것으로 본다", () => {
+    vi.useFakeTimers();
+    try {
+      registerLauncherInput(input());
+      launchPicker();
+      expect(launchOpened()).toBe(true);
+      vi.advanceTimersByTime(91_000);
+      expect(launchOpened()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("입력칸에 고른 사진이 들어와 있는지 알 수 있다", () => {
+    const el = input();
+    registerLauncherInput(el);
+    expect(launchHasFiles()).toBe(false);
+    Object.defineProperty(el, "files", { value: [file("a.jpg")], configurable: true });
+    expect(launchHasFiles()).toBe(true);
   });
 });
