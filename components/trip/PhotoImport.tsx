@@ -34,7 +34,7 @@ import { remainingText } from "@/lib/photo/eta";
 import { pickPreviewShots } from "@/lib/photo/preview";
 import { spanText } from "@/lib/photo/span";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
-import { addShots, groupByDay, removeShots, shotsFor, type PickedPlace, type UnlocatedGroup } from "@/lib/photo/unlocated";
+import { addShots, groupByDay, removeShots, shotsByDay, shotsFor, snapToDay, type PickedPlace, type UnlocatedGroup } from "@/lib/photo/unlocated";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 import type { Shot, Trip } from "@/lib/photo/types";
 import { DoneView } from "./photoImport/DoneView";
@@ -173,6 +173,8 @@ export function PhotoImport() {
   const [unlocated, setUnlocated] = useState<UnlocatedGroup[]>([]);
   const [unlocatedDays, setUnlocatedDays] = useState<Record<string, string>>({});
   const [unlocatedPlaces, setUnlocatedPlaces] = useState<Record<string, PickedPlace>>({});
+  // 같은 날 위치 있는 사진이 있어 그 자리에 맞춰 저절로 넣은 묶음(사람이 장소를 찾지 않았다).
+  const [unlocatedAuto, setUnlocatedAuto] = useState<Record<string, boolean>>({});
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [userId, setUserId] = useState<string | null>(null);
   /*
@@ -490,6 +492,7 @@ export function PhotoImport() {
     setUnlocated([]);
     setUnlocatedDays({});
     setUnlocatedPlaces({});
+    setUnlocatedAuto({});
     setStage({ name: "idle" });
     setPicked(new Map());
     setDismissed(new Set());
@@ -520,6 +523,7 @@ export function PhotoImport() {
     setUnlocated([]);
     setUnlocatedDays({});
     setUnlocatedPlaces({});
+    setUnlocatedAuto({});
     setStage({ name: "reading", done: 0, total: files.length });
 
     try {
@@ -533,9 +537,22 @@ export function PhotoImport() {
       const daily = living?.shots ?? [];
       const travelShots = result.shots.filter((shot) => !daily.includes(shot));
       setDailyShots(daily);
-      setUnlocated(groupByDay(result.withoutLocation));
+      const groups = groupByDay(result.withoutLocation);
+      setUnlocated(groups);
 
-      const grouped = groupIntoTrips(travelShots);
+      /*
+        같은 날 위치 있는 사진이 있으면 위치 모르는 사진은 그 사진들의 자리에 맞춰 저절로 넣는다 — 단체 카톡방에서 받은 사진과 내가 찍은
+        사진을 함께 올리는 흔한 경우, 장소를 다시 찾지 않아도 되고 같은 곳이 두 곳으로 갈라지지도 않는다(lib/photo/unlocated).
+      */
+      let grouped = groupIntoTrips(travelShots);
+      const auto: Record<string, boolean> = {};
+      for (const group of groups) {
+        const shots = shotsByDay(group, group.key, travelShots);
+        if (!shots) continue;
+        grouped = addShots(grouped, shots);
+        auto[group.key] = true;
+      }
+      setUnlocatedAuto(auto);
       setTrips(grouped);
 
       // 무엇이 걸러졌는지가 곧 무엇이 안 되는지다. 수만 남긴다.
@@ -571,6 +588,7 @@ export function PhotoImport() {
       setTrips([]);
       setRead(null);
       setUnlocated([]);
+      setUnlocatedAuto({});
       setStage({ name: "idle", message: "사진을 읽다가 문제가 생겼어요. 사진을 다시 골라 주세요. 계속 안 되면 다른 사진부터 해 보세요." });
     }
   };
@@ -658,29 +676,59 @@ export function PhotoImport() {
     setDismissed(next);
   };
 
-  /** 위치를 모르는 묶음에 사람이 정한 날짜·장소를 붙여 여행 목록에 넣는다(이미 넣었으면 빼고 다시 넣는다). */
+  /** 이 묶음의 사진을 뺀 나머지 여행에서, 위치가 있는 사진들. 같은 날 사진의 자리에 맞출 때 쓴다. */
+  const locatedWithout = (ids: Set<string>) => removeShots(trips, ids).flatMap((trip) => trip.shots);
+  const idsOf = (group: UnlocatedGroup) => new Set(group.photos.map((photo) => photo.id));
+
+  /**
+   * 위치를 모르는 묶음에 사람이 정한 날짜·장소를 붙여 여행 목록에 넣는다(이미 넣었으면 빼고 다시 넣는다).
+   * 찾아서 고른 장소가 같은 날 찍힌 사진의 자리와 가까우면 그 사진의 좌표로 맞춘다 — 같은 곳이 두 곳으로 갈라지지 않게.
+   */
   const placeUnlocated = (key: string, place: PickedPlace, day: string) => {
     const group = unlocated.find((item) => item.key === key);
     if (!group) return;
-    const ids = new Set(group.photos.map((photo) => photo.id));
-    setTrips((now) => addShots(removeShots(now, ids), shotsFor(group, day, place)));
-    // 정한 이름이 곧 이 곳의 이름이다 — 좌표로 다시 지어 묻지 않는다.
-    setPlaceCache((now) =>
-      new Map(now).set(placeKey(place.lat, place.lng), {
-        title: place.title,
-        isCuratedSpot: place.spotId !== null,
-        spotId: place.spotId,
-        dong: place.dong,
-      }),
-    );
-    setUnlocatedPlaces((now) => ({ ...now, [key]: place }));
+    const ids = idsOf(group);
+    const snap = snapToDay(place, day, locatedWithout(ids));
+    const spot = snap ? { ...place, lat: snap.lat, lng: snap.lng } : place;
+    setTrips((now) => addShots(removeShots(now, ids), shotsFor(group, day, spot)));
+    // 맞춘 자리는 이미 이름이 있다 — 정한 이름으로 덮지 않는다. 새 자리면 정한 이름이 곧 이 곳의 이름이다(좌표로 다시 지어 묻지 않는다).
+    if (!snap) {
+      setPlaceCache((now) =>
+        new Map(now).set(placeKey(spot.lat, spot.lng), {
+          title: spot.title,
+          isCuratedSpot: spot.spotId !== null,
+          spotId: spot.spotId,
+          dong: spot.dong,
+        }),
+      );
+    }
+    setUnlocatedPlaces((now) => ({ ...now, [key]: spot }));
+    setUnlocatedAuto((now) => ({ ...now, [key]: false }));
+  };
+
+  /** 같은 날 위치 있는 사진의 자리에 맞춰 저절로 넣는다. 그날 위치 있는 사진이 없으면 false(사람이 정해야 한다). */
+  const autoPlaceUnlocated = (key: string, day: string): boolean => {
+    const group = unlocated.find((item) => item.key === key);
+    if (!group) return false;
+    const ids = idsOf(group);
+    const shots = shotsByDay(group, day, locatedWithout(ids));
+    if (!shots) return false;
+    setTrips((now) => addShots(removeShots(now, ids), shots));
+    setUnlocatedAuto((now) => ({ ...now, [key]: true }));
+    setUnlocatedPlaces((now) => {
+      const next = { ...now };
+      delete next[key];
+      return next;
+    });
+    return true;
   };
 
   const clearUnlocated = (key: string) => {
     const group = unlocated.find((item) => item.key === key);
     if (!group) return;
-    const ids = new Set(group.photos.map((photo) => photo.id));
+    const ids = idsOf(group);
     setTrips((now) => removeShots(now, ids));
+    setUnlocatedAuto((now) => ({ ...now, [key]: false }));
     setUnlocatedPlaces((now) => {
       const next = { ...now };
       delete next[key];
@@ -692,6 +740,8 @@ export function PhotoImport() {
     setUnlocatedDays((now) => ({ ...now, [key]: day }));
     const place = unlocatedPlaces[key];
     if (place) placeUnlocated(key, place, day);
+    // 저절로 넣었던 묶음은 새 날짜의 사진 자리에 다시 맞춘다. 그날 위치 있는 사진이 없으면 사람이 장소를 정해야 한다.
+    else if (unlocatedAuto[key] && !autoPlaceUnlocated(key, day)) clearUnlocated(key);
   };
 
   const save = async () => {
@@ -1159,7 +1209,7 @@ export function PhotoImport() {
   // 위치를 모르는 사진만 골랐어도 장소를 정할 수 있게 확인 화면을 보인다.
   const hasTrips = trips.length > 0 || unlocated.length > 0;
   const unplacedPhotos = unlocated
-    .filter((group) => !unlocatedPlaces[group.key])
+    .filter((group) => !unlocatedPlaces[group.key] && !unlocatedAuto[group.key])
     .reduce((sum, group) => sum + group.photos.length, 0);
   // 로그인 전이다. 알아보기 전에는 모른다고 본다.
   const signedOut = authChecked && !userId && !noAdd;
@@ -1280,6 +1330,7 @@ export function PhotoImport() {
         files={picked}
         days={unlocatedDays}
         places={unlocatedPlaces}
+        auto={unlocatedAuto}
         onDay={changeUnlockedDay}
         onPlace={(key, place) => placeUnlocated(key, place, unlocatedDays[key] ?? key)}
         onClear={clearUnlocated}

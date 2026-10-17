@@ -1503,11 +1503,82 @@ describe("PhotoImport", () => {
       expect(screen.getByLabelText(/사진의 장소 이름/)).toBeTruthy();
     });
 
-    it("위치 있는 사진과 날짜가 이어지면 같은 여행에 합쳐진다", async () => {
-      // 이틀(9/13~14)과 같은 날 찍은 위치 모르는 사진 — 새 여행이 아니라 그 여행의 한 곳이 된다.
-      await 골라서열기(이틀, [{ id: "m1.jpg", takenAt: new Date("2026-09-14T12:00:00") }]);
-      await 장소정하기();
-      await waitFor(() => expect(screen.getByText("여행 1건을 찾았어요")).toBeTruthy());
+    /*
+      단체 카톡방에서 받은 사진과 내가 찍은 사진을 함께 올리는 일이 흔하다. 같은 날 위치 있는 사진이 있으면 장소를 다시 찾지 않아도
+      그 사진의 자리에 맞춰 넣고, 같은 곳이 두 곳으로 갈라지지 않게 위치 있는 사진의 좌표를 그대로 쓴다.
+    */
+    describe("같은 날 위치 있는 사진이 있을 때", () => {
+      // 이틀: 9/14 에 강릉(c 06:11, d 08:41) → 송정(e 10:02). 받은 사진은 9/14 낮 12시.
+      const 받은 = [{ id: "m1.jpg", takenAt: new Date("2026-09-14T10:05:00") }];
+
+      it("장소를 찾지 않아도 그날 사진의 자리에 맞춰 같은 여행에 저절로 넣는다", async () => {
+        saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+        await 골라서열기(이틀, 받은);
+
+        expect(screen.getByText("같은 날 찍은 사진의 위치에 맞춰 여행에 넣었어요")).toBeTruthy();
+        expect(screen.queryByLabelText(/사진의 장소 이름/)).toBeNull();
+        expect(screen.getByText("여행 1건을 찾았어요")).toBeTruthy();
+        expect(screen.queryByText(/위치 없음/)).toBeNull();
+
+        fireEvent.click(await 기록단추());
+        await waitFor(() => expect(saveTrip).toHaveBeenCalled());
+        const saved = saveTrip.mock.calls[0][2] as { shots: { id: string; lat: number; lng: number }[]; visits: { shots: { id: string }[] }[] };
+        // 받은 사진은 가장 가까운 시각(10:02)의 송정 사진과 같은 좌표다 — 새 곳이 생기지 않는다.
+        const mine = saved.shots.find((shot) => shot.id === "m1.jpg")!;
+        expect([mine.lat, mine.lng]).toEqual([송정.lat, 송정.lng]);
+        expect(saved.visits).toHaveLength(3);
+      });
+
+      it("그날 한 곳에서만 찍었으면 받은 사진도 그 곳의 방문에 들어간다 — 두 곳으로 갈라지지 않는다", async () => {
+        saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1"] });
+        const 한곳 = [shot("a.jpg", "2026-09-13T09:21", 고성), shot("b.jpg", "2026-09-13T09:27", 고성)];
+        await 골라서열기(한곳, [{ id: "m1.jpg", takenAt: new Date("2026-09-13T21:00:00") }]);
+        fireEvent.click(await 기록단추());
+        await waitFor(() => expect(saveTrip).toHaveBeenCalled());
+        const saved = saveTrip.mock.calls[0][2] as { visits: { shots: { id: string }[] }[] };
+        expect(saved.visits).toHaveLength(1);
+        expect(saved.visits[0].shots.map((shot) => shot.id)).toEqual(["a.jpg", "b.jpg", "m1.jpg"]);
+      });
+
+      it("직접 정하기로 바꿀 수 있고, 찾은 장소가 그날 사진과 가까우면 그 사진의 좌표로 맞춘다", async () => {
+        saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+        // 찾은 장소는 송정에서 1km 남짓 떨어져 있다(같은 곳인데 좌표가 어긋난 경우).
+        vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+          if (url.startsWith("/api/place-search")) {
+            return { ok: true, json: async () => ({ places: [{ title: "송정해변", address: "강원 강릉시", lat: 송정.lat + 0.008, lng: 송정.lng, dong: "강원 강릉시 송정동", spotId: null }] }) };
+          }
+          return { ok: true, json: async () => 장소응답(JSON.parse(String(init?.body)).points) };
+        });
+        await 골라서열기(이틀, 받은);
+        fireEvent.click(screen.getByRole("button", { name: "직접 정하기" }));
+        fireEvent.change(screen.getByLabelText(/사진의 장소 이름/), { target: { value: "송정" } });
+        fireEvent.click(screen.getByRole("button", { name: "찾기" }));
+        fireEvent.click(await screen.findByRole("button", { name: /송정해변/ }));
+
+        await screen.findByText("송정해변");
+        fireEvent.click(await 기록단추());
+        await waitFor(() => expect(saveTrip).toHaveBeenCalled());
+        const saved = saveTrip.mock.calls[0][2] as { shots: { id: string; lat: number; lng: number }[]; visits: unknown[] };
+        const mine = saved.shots.find((shot) => shot.id === "m1.jpg")!;
+        expect([mine.lat, mine.lng]).toEqual([송정.lat, 송정.lng]);
+        expect(saved.visits).toHaveLength(3);
+      });
+
+      it("날짜를 위치 있는 사진이 없는 날로 옮기면 저절로 넣은 것을 거두고 장소를 정하라고 한다", async () => {
+        await 골라서열기(이틀, 받은);
+        expect(screen.getByText("여행 1건을 찾았어요")).toBeTruthy();
+
+        fireEvent.change(screen.getByLabelText("찍은 날"), { target: { value: "2026-11-20" } });
+        expect(await screen.findByLabelText(/사진의 장소 이름/)).toBeTruthy();
+        expect(screen.queryByText("같은 날 찍은 사진의 위치에 맞춰 여행에 넣었어요")).toBeNull();
+        expect(screen.getByText(/위치 없음 1장/)).toBeTruthy();
+      });
+
+      it("다른 날 찍은 사진은 그대로 장소를 정해야 한다", async () => {
+        await 골라서열기(이틀);
+        expect(screen.getByLabelText(/사진의 장소 이름/)).toBeTruthy();
+        expect(screen.queryByText("같은 날 찍은 사진의 위치에 맞춰 여행에 넣었어요")).toBeNull();
+      });
     });
 
     it("정하지 않은 묶음은 기록에서 빠지고, 몇 장이 빠지는지 보인다", async () => {

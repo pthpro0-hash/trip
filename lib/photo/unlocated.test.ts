@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { groupIntoTrips } from "./grouping";
-import { addShots, groupByDay, isDayKey, removeShots, shotsFor } from "./unlocated";
+import { addShots, groupByDay, isDayKey, removeShots, shotsByDay, shotsFor, snapToDay } from "./unlocated";
 import type { Shot } from "./types";
 
 /*
@@ -107,5 +107,85 @@ describe("addShots · removeShots", () => {
     const next = removeShots(trips, new Set(["nope"]));
     expect(next).toEqual(trips);
     expect(next[0]).toBe(trips[0]);
+  });
+});
+
+/*
+  단체 카톡방에서 받은 사진과 내가 찍은 사진을 함께 올리면, 같은 날의 위치 모르는 사진은 내 사진이 찍힌 곳에 맞춰 넣는다.
+  찾아서 넣은 좌표와 찍힌 좌표가 조금 어긋나 같은 곳이 두 곳이 되던 문제를 없앤다.
+*/
+describe("shotsByDay · 같은 날 사진의 자리에 맞춰 넣기", () => {
+  const 선산 = { lat: 37.3721, lng: 127.3102 };
+  const 식당 = { lat: 37.4102, lng: 127.2801 }; // 선산에서 4km 남짓
+  const group = (items: { id: string; iso: string; guessed?: boolean }[]) => groupByDay(items.map((i) => photo(i.id, i.iso, i.guessed)))[0];
+
+  it("그날 위치 있는 사진이 없으면 null — 사람이 정해야 한다", () => {
+    expect(shotsByDay(group([{ id: "k", iso: "2026-10-04T10:00:00" }]), "2026-10-04", [shot("a", "2026-10-05T10:00:00")])).toBeNull();
+    expect(shotsByDay(group([{ id: "k", iso: "2026-10-04T10:00:00" }]), "2026-10-04", [])).toBeNull();
+  });
+
+  it("그날 한 곳에서만 찍었으면 그 곳의 좌표를 그대로 쓴다 — 시각은 그대로", () => {
+    const located = [shot("a", "2026-10-04T11:20:00", 선산.lat, 선산.lng), shot("b", "2026-10-04T11:29:00", 선산.lat + 0.0003, 선산.lng)];
+    const shots = shotsByDay(group([{ id: "k1", iso: "2026-10-04T11:25:00" }, { id: "k2", iso: "2026-10-04T18:00:00" }]), "2026-10-04", located)!;
+    expect(shots.map((s) => [s.id, s.lat, s.lng])).toEqual([
+      ["k1", 선산.lat, 선산.lng],
+      ["k2", 선산.lat, 선산.lng],
+    ]);
+    expect(shots[0].takenAt.getTime()).toBe(at("2026-10-04T11:25:00").getTime());
+  });
+
+  it("여러 곳이면 시각이 가장 가까운 사진의 곳에 넣는다", () => {
+    const located = [shot("a", "2026-10-04T11:20:00", 선산.lat, 선산.lng), shot("r", "2026-10-04T13:00:00", 식당.lat, 식당.lng)];
+    const shots = shotsByDay(group([{ id: "k1", iso: "2026-10-04T11:40:00" }, { id: "k2", iso: "2026-10-04T12:45:00" }]), "2026-10-04", located)!;
+    expect(shots.map((s) => [s.id, s.lat])).toEqual([["k1", 선산.lat], ["k2", 식당.lat]]);
+  });
+
+  it("시각을 어림한 사진은 그날 사진이 가장 많은 곳의 마지막 사진 시각에 붙인다 — 방문이 갈라지지 않게", () => {
+    const located = [
+      shot("a", "2026-10-04T11:20:00", 선산.lat, 선산.lng),
+      shot("b", "2026-10-04T11:25:00", 선산.lat, 선산.lng),
+      shot("c", "2026-10-04T11:29:00", 선산.lat, 선산.lng),
+      shot("r", "2026-10-04T13:00:00", 식당.lat, 식당.lng),
+    ];
+    const shots = shotsByDay(group([{ id: "k", iso: "2026-10-04T21:40:00", guessed: true }]), "2026-10-04", located)!;
+    expect([shots[0].lat, shots[0].lng]).toEqual([선산.lat, 선산.lng]);
+    expect(shots[0].takenAt.getTime()).toBe(at("2026-10-04T11:29:00").getTime());
+  });
+
+  it("합치고 나면 같은 곳이 한 방문이다 — 내 사진과 받은 사진이 두 곳으로 갈라지지 않는다", () => {
+    const located = [shot("a", "2026-10-04T11:20:00", 선산.lat, 선산.lng), shot("b", "2026-10-04T12:16:00", 선산.lat + 0.001, 선산.lng)];
+    const trips = groupIntoTrips(located);
+    const fresh = shotsByDay(group([{ id: "k1", iso: "2026-10-04T11:50:00" }]), "2026-10-04", located)!;
+    const merged = addShots(trips, fresh);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].visits).toHaveLength(1);
+    expect(merged[0].visits[0].shots.map((s) => s.id)).toEqual(["a", "k1", "b"]);
+  });
+
+  it("날짜를 옮긴 묶음은 그 날짜의 위치 있는 사진에 맞춘다", () => {
+    const located = [shot("a", "2026-10-11T10:00:00", 선산.lat, 선산.lng)];
+    const shots = shotsByDay(group([{ id: "k", iso: "2026-10-04T10:30:00" }]), "2026-10-11", located)!;
+    expect(shots[0].takenAt.getTime()).toBe(at("2026-10-11T10:30:00").getTime());
+    expect(shots[0].lat).toBe(선산.lat);
+  });
+});
+
+describe("snapToDay · 찾아서 고른 장소를 같은 날 사진의 자리에 맞추기", () => {
+  const 선산 = { lat: 37.3721, lng: 127.3102 };
+  const located = [shot("a", "2026-10-04T11:20:00", 선산.lat, 선산.lng)];
+
+  it("그날 사진이 3km 안에 있으면 그 사진의 좌표로 맞춘다", () => {
+    const snapped = snapToDay({ lat: 37.3799, lng: 127.3102 }, "2026-10-04", located);
+    expect(snapped?.id).toBe("a");
+  });
+
+  it("멀리 있거나(3km 넘게) 다른 날 사진이면 맞추지 않는다", () => {
+    expect(snapToDay({ lat: 37.5, lng: 127.3102 }, "2026-10-04", located)).toBeNull();
+    expect(snapToDay({ lat: 37.3721, lng: 127.3102 }, "2026-10-05", located)).toBeNull();
+  });
+
+  it("여럿이면 가장 가까운 사진", () => {
+    const more = [...located, shot("b", "2026-10-04T12:00:00", 37.3731, 127.3102)];
+    expect(snapToDay({ lat: 37.3732, lng: 127.3102 }, "2026-10-04", more)?.id).toBe("b");
   });
 });

@@ -113,4 +113,14 @@ describe("UnlocatedCard", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /경복궁\s*서울/ })).toBeNull());
     expect(input.value).toBe("");
   });
+
+  it("저절로 넣은 묶음은 그렇다고 말하고, 직접 정하기를 누르면 되돌린다", () => {
+    const { props } = open({ auto: { "2026-09-13": true } });
+    expect(screen.getByText("같은 날 찍은 사진의 위치에 맞춰 여행에 넣었어요")).toBeTruthy();
+    expect(screen.queryByLabelText("2026-09-13 사진의 장소 이름")).toBeNull();
+    // 다른 묶음은 그대로 장소를 찾는다.
+    expect(screen.getByLabelText("2026-09-20 사진의 장소 이름")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "직접 정하기" }));
+    expect(props.onClear).toHaveBeenCalledWith("2026-09-13");
+  });
 });

@@ -1,4 +1,5 @@
-import { dayIndex, dayKey, groupIntoTrips, MERGEABLE_GAP_DAYS, mergeTrips } from "./grouping";
+import { distanceKm } from "../geo";
+import { dayIndex, dayKey, groupIntoTrips, MERGEABLE_GAP_DAYS, mergeTrips, splitIntoVisits } from "./grouping";
 import type { Shot, Trip } from "./types";
 
 /*
@@ -99,4 +100,58 @@ export function addShots(trips: Trip[], shots: Shot[]): Trip[] {
     else next.push(fresh);
   }
   return next.sort((a, b) => a.shots[0].takenAt.getTime() - b.shots[0].takenAt.getTime());
+}
+
+/** 같은 날 위치가 있는 사진을 이만큼 안에서 찾으면 사람이 고른 장소가 곧 그 자리라고 본다(찾은 좌표와 찍힌 좌표의 어긋남). */
+export const SNAP_KM = 3;
+
+/** 그날(YYYY-MM-DD) 찍힌 위치 있는 사진만 시간순으로. */
+export function onDay(shots: Shot[], day: string): Shot[] {
+  return shots.filter((shot) => dayKey(shot.takenAt) === day).sort((a, b) => a.takenAt.getTime() - b.takenAt.getTime());
+}
+
+/**
+ * 같은 날 위치 있는 사진이 있으면 그 사진들의 자리에 맞춰 위치 모르는 묶음을 넣는다 — 단체 카톡방에서 받은 사진과 내가 찍은 사진을
+ * 함께 올리는 흔한 경우, 장소를 다시 찾지 않아도 되게. 위치 있는 사진이 그날 하나도 없으면 null(사람이 정해야 한다).
+ *
+ *   · 그날 한 곳에서만 찍었으면 그 곳.
+ *   · 여러 곳이면, 찍은 시각을 아는 사진은 시각이 가장 가까운 사진의 곳, 시각을 어림한 사진(받은 날 · 받은 시각일 수 있다)은
+ *     그날 사진이 가장 많은 곳. 어림한 시각은 믿을 수 없어 그 곳의 마지막 사진 시각에 붙인다 — 그래야 방문이 갈라지지 않는다.
+ * 좌표는 위치 있는 사진의 것을 그대로 쓴다(찾아서 넣은 좌표와의 어긋남으로 같은 곳이 두 곳이 되지 않게).
+ */
+export function shotsByDay(group: UnlocatedGroup, day: string, located: Shot[]): Shot[] | null {
+  const sameDay = onDay(located, day);
+  if (sameDay.length === 0) return null;
+
+  const visits = splitIntoVisits(sameDay);
+  const biggest = visits.reduce((best, visit) => (visit.shots.length > best.shots.length ? visit : best), visits[0]);
+  const [year, month, date] = day.split("-").map(Number);
+
+  return group.photos.map((photo) => {
+    const time = new Date(year, month - 1, date, photo.takenAt.getHours(), photo.takenAt.getMinutes(), photo.takenAt.getSeconds());
+    if (visits.length === 1) return { id: photo.id, takenAt: time, lat: sameDay[0].lat, lng: sameDay[0].lng };
+
+    if (photo.guessed) {
+      const home = biggest.shots.at(-1)!;
+      return { id: photo.id, takenAt: home.takenAt, lat: home.lat, lng: home.lng };
+    }
+    const near = sameDay.reduce((best, shot) =>
+      Math.abs(shot.takenAt.getTime() - time.getTime()) < Math.abs(best.takenAt.getTime() - time.getTime()) ? shot : best,
+    );
+    return { id: photo.id, takenAt: time, lat: near.lat, lng: near.lng };
+  });
+}
+
+/** 사람이 찾아 고른 장소 근처(SNAP_KM)에 그날 찍힌 위치 있는 사진이 있으면, 그 사진의 좌표로 맞춘다. 없으면 null. */
+export function snapToDay<T extends { lat: number; lng: number }>(place: T, day: string, located: Shot[]): Shot | null {
+  let best: Shot | null = null;
+  let bestKm = SNAP_KM;
+  for (const shot of onDay(located, day)) {
+    const km = distanceKm(place, shot);
+    if (km < bestKm) {
+      best = shot;
+      bestKm = km;
+    }
+  }
+  return best;
 }

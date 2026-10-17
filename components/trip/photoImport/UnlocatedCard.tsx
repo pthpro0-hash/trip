@@ -21,6 +21,8 @@ export interface UnlocatedCardProps {
   days: Record<string, string>;
   /** 정한 장소. 없으면 아직이다. */
   places: Record<string, PickedPlace>;
+  /** 같은 날 위치 있는 사진이 있어 그 자리에 맞춰 저절로 넣은 묶음. */
+  auto?: Record<string, boolean>;
   onDay: (key: string, day: string) => void;
   onPlace: (key: string, place: PickedPlace) => void;
   onClear: (key: string) => void;
@@ -30,7 +32,7 @@ export interface UnlocatedCardProps {
 
 const THUMBS = 3;
 
-export function UnlocatedCard({ groups, files, days, places, onDay, onPlace, onClear, search = searchPlaces }: UnlocatedCardProps) {
+export function UnlocatedCard({ groups, files, days, places, auto = {}, onDay, onPlace, onClear, search = searchPlaces }: UnlocatedCardProps) {
   const total = groups.reduce((sum, group) => sum + group.photos.length, 0);
   if (groups.length === 0) return null;
 
@@ -39,7 +41,7 @@ export function UnlocatedCard({ groups, files, days, places, onDay, onPlace, onC
       <div className="break-keep">
         <h3 className="text-[16px] font-semibold text-text">위치를 모르는 사진 {total}장</h3>
         <p className="mt-1 text-[13px] leading-snug text-text-muted">
-          메신저로 받았거나 위치 저장을 꺼 둔 사진이에요. 날짜와 장소를 정해 주면 이 사진도 여행으로 기록해요. 정하지 않은 사진은 기록에서 빠져요.
+          메신저로 받았거나 위치 저장을 꺼 둔 사진이에요. 같은 날 위치가 있는 사진이 있으면 그 자리에 맞춰 넣고, 없으면 날짜와 장소를 정해 주세요. 정하지 않은 사진은 기록에서 빠져요.
         </p>
       </div>
       <ul className="flex flex-col gap-3">
@@ -50,6 +52,7 @@ export function UnlocatedCard({ groups, files, days, places, onDay, onPlace, onC
               files={files}
               day={days[group.key] ?? group.key}
               place={places[group.key]}
+              auto={auto[group.key] === true}
               onDay={(day) => onDay(group.key, day)}
               onPlace={(place) => onPlace(group.key, place)}
               onClear={() => onClear(group.key)}
@@ -67,13 +70,14 @@ interface GroupRowProps {
   files: Map<string, File>;
   day: string;
   place: PickedPlace | undefined;
+  auto: boolean;
   onDay: (day: string) => void;
   onPlace: (place: PickedPlace) => void;
   onClear: () => void;
   search: (query: string) => Promise<FoundPlace[]>;
 }
 
-function GroupRow({ group, files, day, place, onDay, onPlace, onClear, search }: GroupRowProps) {
+function GroupRow({ group, files, day, place, auto, onDay, onPlace, onClear, search }: GroupRowProps) {
   const dateId = useId();
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<FoundPlace[] | null>(null);
@@ -130,7 +134,18 @@ function GroupRow({ group, files, day, place, onDay, onPlace, onClear, search }:
 
       {thumbs.length > 0 && <TripThumbs key={thumbs.map((file) => file.name).join("|")} files={thumbs} />}
 
-      {place ? (
+      {auto ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg bg-bg-subtle px-3 py-2">
+          <p className="min-w-0 break-keep text-[14px] text-text">같은 날 찍은 사진의 위치에 맞춰 여행에 넣었어요</p>
+          <button
+            type="button"
+            onClick={onClear}
+            className="shrink-0 text-[13px] font-medium text-text-muted underline underline-offset-2 transition hover:text-text"
+          >
+            직접 정하기
+          </button>
+        </div>
+      ) : place ? (
         <div className="flex items-center justify-between gap-3 rounded-lg bg-bg-subtle px-3 py-2">
           <p className="min-w-0 break-keep text-[14px] text-text">
             <span className="text-text-faint">장소 </span>
