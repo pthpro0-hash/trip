@@ -686,6 +686,35 @@ describe("PhotoImport", () => {
         expect(await screen.findByText("사진 5장을 함께 올렸어요")).toBeTruthy();
       });
 
+      it("올리지 못한 사진이 있는데 사진 더 고르기를 누르면 먼저 묻고, 돌아가면 다시 올릴 수 있다", async () => {
+        const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
+        saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+        uploadPhotos.mockResolvedValueOnce(막힘(3, [3, 4])).mockResolvedValueOnce(막힘(2, []));
+        await 사진넣기();
+        fireEvent.click(await 기록단추());
+        fireEvent.click(await screen.findByRole("button", { name: "사진 더 고르기" }));
+
+        // 묻기만 하고, 고르는 창은 열지 않았고 화면도 그대로다.
+        expect(await screen.findByRole("alertdialog")).toBeTruthy();
+        expect(click).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole("button", { name: "돌아가기" }));
+        fireEvent.click(screen.getByRole("button", { name: "올리지 못한 사진 2장 다시 올리기" }));
+        expect(await screen.findByText("사진 5장을 함께 올렸어요")).toBeTruthy();
+      });
+
+      it("[그래도 더 고르기]를 누르면 고르는 창이 열린다", async () => {
+        const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => undefined);
+        saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
+        uploadPhotos.mockResolvedValue(막힘(3, [3, 4]));
+        await 사진넣기();
+        fireEvent.click(await 기록단추());
+        fireEvent.click(await screen.findByRole("button", { name: "사진 더 고르기" }));
+        fireEvent.click(await screen.findByRole("button", { name: "그래도 더 고르기" }));
+
+        expect(click).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole("button", { name: "사진 고르기" })).toBeTruthy();
+      });
+
       it("올리다 막힌 사진이 없으면 다시 올리기 단추가 없다", async () => {
         saveTrip.mockResolvedValue({ ok: true, id: "t1", visitIds: ["v1", "v2", "v3"] });
         uploadPhotos.mockResolvedValue(막힘(5, []));

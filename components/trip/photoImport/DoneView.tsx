@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { MAP_HREF, SKETCH_HREF } from "@/lib/nav";
 import type { SaveOutcome } from "./types";
@@ -34,12 +34,21 @@ interface DoneViewProps {
 
 export function DoneView({ outcome, onMore, onRetry, onRetryPhotos, retrying = false, progress }: DoneViewProps) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const cancelButton = useRef<HTMLButtonElement>(null);
+  // 올리지 못한 사진이 있는데 더 고르려 할 때 한 번 묻는다(더 고르면 그 사진은 올릴 길이 사라진다).
+  const [confirming, setConfirming] = useState(false);
+  const askFirst = confirming && outcome.photosFailed > 0;
 
   // 긴 목록 아래에서 눌렀어도 결과가 맨 위에서 보이고, 화면 읽기 도구가 결과부터 읽는다.
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
     window.scrollTo({ top: 0 });
   }, []);
+
+  // 묻는 창이 뜨면 초점을 옮겨, 화면 읽기 도구가 물음부터 읽고 키보드로 바로 답할 수 있게 한다.
+  useEffect(() => {
+    if (askFirst) cancelButton.current?.focus();
+  }, [askFirst]);
 
   const lines: string[] = [];
   if (outcome.photos > 0) lines.push(`사진 ${outcome.photos}장을 ${outcome.saved > 0 ? "함께 올렸어요" : "더했어요"}`);
@@ -118,13 +127,33 @@ export function DoneView({ outcome, onMore, onRetry, onRetryPhotos, retrying = f
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onMore}
-        className="text-[14px] font-medium text-text-muted underline underline-offset-2 transition hover:text-text"
-      >
-        사진 더 고르기
-      </button>
+      {askFirst ? (
+        <div role="alertdialog" aria-labelledby="more-title" className="flex w-full flex-col gap-3 rounded-xl bg-surface p-4 text-left ring-1 ring-line sm:max-w-xs">
+          <p id="more-title" className="break-keep text-[14px] leading-relaxed text-text">
+            올리지 못한 사진 {outcome.photosFailed}장이 있어요. 지금 사진을 더 고르면 그 사진은 다시 올릴 수 없어요.
+          </p>
+          <div className="flex gap-2">
+            <button ref={cancelButton} type="button" onClick={() => setConfirming(false)} className={`${SECONDARY} flex-1`}>
+              돌아가기
+            </button>
+            <button
+              type="button"
+              onClick={onMore}
+              className="flex-1 rounded-full bg-bg-subtle px-4 py-3 text-[15px] font-medium text-text-muted transition hover:bg-line"
+            >
+              그래도 더 고르기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => (outcome.photosFailed > 0 ? setConfirming(true) : onMore())}
+          className="text-[14px] font-medium text-text-muted underline underline-offset-2 transition hover:text-text"
+        >
+          사진 더 고르기
+        </button>
+      )}
     </section>
   );
 }

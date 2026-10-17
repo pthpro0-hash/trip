@@ -117,6 +117,56 @@ describe("DoneView", () => {
     });
   });
 
+  describe("올리지 못한 사진이 있는데 사진을 더 고르려 할 때", () => {
+    const 더고르기 = () => screen.getByRole("button", { name: "사진 더 고르기" });
+
+    it("한 번 묻는다 — 더 고르면 그 사진은 다시 올릴 수 없다", () => {
+      const onMore = vi.fn();
+      render(<DoneView outcome={outcome({ photos: 3, photosFailed: 2 })} onMore={onMore} onRetryPhotos={vi.fn()} />);
+      fireEvent.click(더고르기());
+
+      expect(onMore).not.toHaveBeenCalled();
+      expect(screen.getByRole("alertdialog")).toBeTruthy();
+      expect(screen.getByText(/올리지 못한 사진 2장이 있어요. 지금 사진을 더 고르면 그 사진은 다시 올릴 수 없어요/)).toBeTruthy();
+      // 묻는 동안은 초점이 안전한 쪽(돌아가기)에 있다.
+      expect(screen.getByRole("button", { name: "돌아가기" })).toHaveFocus();
+    });
+
+    it("[그래도 더 고르기]를 눌러야 고른다", () => {
+      const onMore = vi.fn();
+      render(<DoneView outcome={outcome({ photosFailed: 1 })} onMore={onMore} onRetryPhotos={vi.fn()} />);
+      fireEvent.click(더고르기());
+      fireEvent.click(screen.getByRole("button", { name: "그래도 더 고르기" }));
+      expect(onMore).toHaveBeenCalledTimes(1);
+    });
+
+    it("[돌아가기]를 누르면 묻는 창을 닫고 아무것도 바뀌지 않는다 — 다시 올리기도 그대로 있다", () => {
+      const onMore = vi.fn();
+      render(<DoneView outcome={outcome({ photosFailed: 1 })} onMore={onMore} onRetryPhotos={vi.fn()} />);
+      fireEvent.click(더고르기());
+      fireEvent.click(screen.getByRole("button", { name: "돌아가기" }));
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+      expect(onMore).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "올리지 못한 사진 1장 다시 올리기" })).toBeTruthy();
+    });
+
+    it("잃을 사진이 없으면 묻지 않고 곧바로 고른다", () => {
+      const onMore = vi.fn();
+      render(<DoneView outcome={outcome({ photos: 3 })} onMore={onMore} />);
+      fireEvent.click(더고르기());
+      expect(onMore).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it("묻는 중에 사진을 다 올렸으면 창이 저절로 사라진다", () => {
+      const view = render(<DoneView outcome={outcome({ photosFailed: 1 })} onMore={vi.fn()} onRetryPhotos={vi.fn()} />);
+      fireEvent.click(더고르기());
+      expect(screen.getByRole("alertdialog")).toBeTruthy();
+      view.rerender(<DoneView outcome={outcome({ photos: 1, photosFailed: 0 })} onMore={vi.fn()} onRetryPhotos={vi.fn()} />);
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+  });
+
   describe("보이는 자리", () => {
     it("맨 위로 올려 보여 준다 — 긴 목록 아래에서 눌렀어도", () => {
       done();
