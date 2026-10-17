@@ -522,45 +522,56 @@ export function PhotoImport() {
     setUnlocatedPlaces({});
     setStage({ name: "reading", done: 0, total: files.length });
 
-    const result = await readShots(files, (done, total) =>
-      setStage({ name: "reading", done, total }),
-    );
-    setRead(result);
-
-    // 집·직장처럼 여러 날에 걸쳐 되풀이되는 곳은 여행이 아니다.
-    const living = findLivingArea(result.shots);
-    const daily = living?.shots ?? [];
-    const travelShots = result.shots.filter((shot) => !daily.includes(shot));
-    setDailyShots(daily);
-    setUnlocated(groupByDay(result.withoutLocation));
-
-    const grouped = groupIntoTrips(travelShots);
-    setTrips(grouped);
-
-    // 무엇이 걸러졌는지가 곧 무엇이 안 되는지다. 수만 남긴다.
-    logEvent(getBrowserClient(), "photos_read", {
-      picked: files.length,
-      usable: result.shots.length,
-      daily: daily.length,
-      noLocation: result.withoutLocation.length,
-      screenshots: result.screenshots.length,
-      unreadable: result.unreadable.length,
-      trips: grouped.length,
-    });
-
-    if (grouped.length === 0) {
-      setStage({ name: "ready" });
-      return;
-    }
-
-    setStage({ name: "naming" });
     try {
-      setPlaceCache(await lookupPlaces(grouped, new Map()));
-      setStage({ name: "ready" });
+      const result = await readShots(files, (done, total) =>
+        setStage({ name: "reading", done, total }),
+      );
+      setRead(result);
+
+      // 집·직장처럼 여러 날에 걸쳐 되풀이되는 곳은 여행이 아니다.
+      const living = findLivingArea(result.shots);
+      const daily = living?.shots ?? [];
+      const travelShots = result.shots.filter((shot) => !daily.includes(shot));
+      setDailyShots(daily);
+      setUnlocated(groupByDay(result.withoutLocation));
+
+      const grouped = groupIntoTrips(travelShots);
+      setTrips(grouped);
+
+      // 무엇이 걸러졌는지가 곧 무엇이 안 되는지다. 수만 남긴다.
+      logEvent(getBrowserClient(), "photos_read", {
+        picked: files.length,
+        usable: result.shots.length,
+        daily: daily.length,
+        noLocation: result.withoutLocation.length,
+        screenshots: result.screenshots.length,
+        unreadable: result.unreadable.length,
+        trips: grouped.length,
+      });
+
+      if (grouped.length === 0) {
+        setStage({ name: "ready" });
+        return;
+      }
+
+      setStage({ name: "naming" });
+      try {
+        setPlaceCache(await lookupPlaces(grouped, new Map()));
+        setStage({ name: "ready" });
+      } catch {
+        // 이름을 못 붙여도 언제 어디를 몇 장 찍었는지는 보여줄 수 있다.
+        setPlaceCache(new Map());
+        setStage({ name: "ready", message: "장소 이름을 가져오지 못했어요. 날짜와 사진은 그대로예요." });
+      }
+  
     } catch {
-      // 이름을 못 붙여도 언제 어디를 몇 장 찍었는지는 보여줄 수 있다.
-      setPlaceCache(new Map());
-      setStage({ name: "ready", message: "장소 이름을 가져오지 못했어요. 날짜와 사진은 그대로예요." });
+      /*
+        읽다가 예기치 못하게 막혔다. 아무 말 없이 '읽는 중'에 멈춰 있으면 사람은 기다리다 지친다 — 처음 화면으로 돌려 놓고 말한다.
+      */
+      setTrips([]);
+      setRead(null);
+      setUnlocated([]);
+      setStage({ name: "idle", message: "사진을 읽다가 문제가 생겼어요. 사진을 다시 골라 주세요. 계속 안 되면 다른 사진부터 해 보세요." });
     }
   };
 
@@ -1226,6 +1237,10 @@ export function PhotoImport() {
         </div>
 
         {readSummary}
+
+        {stage.message && (
+          <p role="alert" className="break-keep rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">{stage.message}</p>
+        )}
 
         {stage.name === "ready" && read && (
           <div className="break-keep rounded-2xl bg-bg-subtle p-6 text-[15px] text-text-muted">

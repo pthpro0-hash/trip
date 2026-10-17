@@ -16,6 +16,20 @@ export interface ReadResult {
   unreadable: string[];
 }
 
+/** 이 해 전의 날짜는 카메라 시계가 풀린 것으로 본다(EXIF 가 깨지면 1899 같은 해가 나온다). */
+const EARLIEST_YEAR = 1990;
+const DAY_MS = 86_400_000;
+
+/**
+ * 믿을 수 있는 촬영 시각인가. 메신저를 거친 사진은 EXIF 날짜가 깨져 있기도 하다 — Date 가 아닌 글자("," 같은)가 오거나, 읽어도 1899년이다.
+ * 이런 것을 그대로 두면 날짜를 다루는 모든 곳이 터지거나 엉뚱한 해로 묶인다.
+ */
+export function usableDate(value: unknown): value is Date {
+  if (!(value instanceof Date)) return false;
+  const time = value.getTime();
+  return Number.isFinite(time) && value.getFullYear() >= EARLIEST_YEAR && time <= Date.now() + DAY_MS;
+}
+
 /** 사진 파일인가 — 동영상·문서는 아니다. 브라우저가 형식을 모르는 HEIC 는 이름으로 본다. */
 function isImage(file: File) {
   return file.type.startsWith("image/") || /\.(jpe?g|png|heic|heif|webp|gif)$/i.test(file.name);
@@ -49,7 +63,8 @@ export async function readShots(
       // 아래에서 '읽지 못함'으로 처리한다.
     }
 
-    const takenAt = (tags?.DateTimeOriginal ?? tags?.CreateDate) as Date | undefined;
+    // 쓸 수 없는 날짜는 없는 것과 같다 — 다음 후보를 보고, 그것도 없으면 아래에서 파일 날짜로 어림한다.
+    const takenAt = [tags?.DateTimeOriginal, tags?.CreateDate].find(usableDate);
 
     if (!takenAt) {
       /*

@@ -47,7 +47,9 @@ export function isDayKey(value: string): boolean {
 /** 찍은 날(벽시계)로 묶는다. 날짜순, 같은 날은 찍은 순. */
 export function groupByDay(photos: { id: string; takenAt: Date; guessed?: boolean }[]): UnlocatedGroup[] {
   const byDay = new Map<string, UnlocatedPhoto[]>();
-  for (const photo of [...photos].sort((a, b) => a.takenAt.getTime() - b.takenAt.getTime())) {
+  // 날짜를 읽을 수 없는 것(Date 가 아니거나 달력에 없는 시각)은 묶을 수 없다 — 하나 때문에 화면 전체가 멈추지 않게 거른다.
+  const dated = photos.filter((photo) => photo.takenAt instanceof Date && Number.isFinite(photo.takenAt.getTime()));
+  for (const photo of [...dated].sort((a, b) => a.takenAt.getTime() - b.takenAt.getTime())) {
     const key = dayKey(photo.takenAt);
     const list = byDay.get(key) ?? [];
     list.push({ id: photo.id, takenAt: photo.takenAt, guessed: photo.guessed === true });

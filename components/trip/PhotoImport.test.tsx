@@ -1521,6 +1521,30 @@ describe("PhotoImport", () => {
       expect(names).toEqual(["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"]);
     });
 
+    /*
+      카카오톡을 거친 사진의 깨진 EXIF 날짜가 묶기 단계를 터뜨려 화면이 '사진을 읽고 있어요 7장 / 7장'에서 멈췄다(실제 겪은 일).
+      읽는 쪽이 걸러 주지만, 어떤 까닭이든 읽다가 막히면 멈춰 있지 않고 말해 준다.
+    */
+    it("읽다가 예기치 못하게 막혀도 '읽는 중'에 멈춰 있지 않고 처음 화면으로 돌아와 말한다", async () => {
+      readShots.mockRejectedValue(new Error("boom"));
+      const view = await 화면열기();
+      const input = view.container.querySelector('input[type="file"]')!;
+      Object.defineProperty(input, "files", { value: [new File(["x"], "a.jpg", { type: "image/jpeg" })], configurable: true });
+      fireEvent.change(input);
+
+      expect(await screen.findByText(/사진을 읽다가 문제가 생겼어요/)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "사진 고르기" })).toBeTruthy();
+      expect(screen.queryByText("사진을 읽고 있어요")).toBeNull();
+    });
+
+    it("날짜를 못 읽는 사진이 섞여 와도 멈추지 않는다 — 읽을 수 있는 것만 보인다", async () => {
+      await 골라서열기([], [
+        { id: "m1.jpg", takenAt: new Date("2026-09-20T10:00:00") },
+        { id: "bad.jpg", takenAt: "," as unknown as Date },
+      ]);
+      expect(screen.getByRole("heading", { name: "위치를 모르는 사진 1장" })).toBeTruthy();
+    });
+
     it("정하고 나면 위치 없음 수에서 빠진다", async () => {
       await 골라서열기(이틀);
       await 장소정하기();

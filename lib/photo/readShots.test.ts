@@ -78,4 +78,38 @@ describe("readShots", () => {
     const result = await readShots([file("nodate.jpg", "image/jpeg", 0)]);
     expect(result.unreadable).toEqual(["nodate.jpg"]);
   });
+
+  /*
+    카카오톡을 거친 사진은 EXIF 날짜가 깨져 있기도 하다. 읽은 날짜가 Date 가 아닌 글자(",")로 오거나 1899년으로 와서, 이것을 그대로 쓰면
+    날짜를 다루는 곳이 터져 화면이 '읽는 중'에서 멈췄다(실제 겪은 일). 쓸 수 없는 날짜는 없는 것과 같게 다룬다.
+  */
+  describe("깨진 촬영 날짜", () => {
+    it.each([
+      ["Date 가 아닌 글자", ","],
+      ["1899년(0000:00:00)", new Date(1899, 10, 30)],
+      ["읽을 수 없는 날짜(Invalid Date)", new Date(Number.NaN)],
+      ["먼 미래", new Date(Date.now() + 400 * 86_400_000)],
+    ])("%s → 날짜 없는 사진으로 보고 파일 날짜로 어림한다", async (_label, bad) => {
+      tagsByName["bad.jpg"] = { DateTimeOriginal: bad };
+      const result = await readShots([file("bad.jpg", "image/jpeg", Date.UTC(2026, 8, 20, 3, 0, 0))]);
+      expect(result.unreadable).toEqual([]);
+      expect(result.withoutLocation).toHaveLength(1);
+      expect(result.withoutLocation[0]).toMatchObject({ id: "bad.jpg", guessed: true });
+      expect(result.withoutLocation[0].takenAt).toBeInstanceOf(Date);
+      expect(result.withoutLocation[0].takenAt.getTime()).toBe(Date.UTC(2026, 8, 20, 3, 0, 0));
+    });
+
+    it("위치가 있어도 날짜가 깨졌으면 날짜를 사람이 확인하도록 '위치를 모르는 사진'으로 넘긴다", async () => {
+      tagsByName["gps.jpg"] = { DateTimeOriginal: ",", latitude: 37.5, longitude: 127 };
+      const result = await readShots([file("gps.jpg", "image/jpeg")]);
+      expect(result.shots).toEqual([]);
+      expect(result.withoutLocation[0]).toMatchObject({ id: "gps.jpg", guessed: true });
+    });
+
+    it("CreateDate 만 멀쩡하면 그것을 쓴다", async () => {
+      tagsByName["c.jpg"] = { DateTimeOriginal: ",", CreateDate: new Date("2026-09-13T09:21:00"), latitude: 37.5, longitude: 127 };
+      const result = await readShots([file("c.jpg", "image/jpeg")]);
+      expect(result.shots.map((s) => s.id)).toEqual(["c.jpg"]);
+    });
+  });
 });

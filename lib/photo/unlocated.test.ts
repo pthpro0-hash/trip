@@ -28,6 +28,15 @@ describe("groupByDay", () => {
     expect(groupByDay([photo("a.jpg", "2026-09-13T08:00:00")])[0].guessed).toBe(false);
   });
 
+  it("날짜를 읽을 수 없는 것이 섞여 있어도 터지지 않고 나머지만 묶는다", () => {
+    const groups = groupByDay([
+      { id: "ok.jpg", takenAt: at("2026-09-13T08:00:00") },
+      { id: "str.jpg", takenAt: "," as unknown as Date },
+      { id: "nan.jpg", takenAt: new Date(Number.NaN) },
+    ]);
+    expect(groups.map((group) => group.photos.map((p) => p.id))).toEqual([["ok.jpg"]]);
+  });
+
   it("사진이 없으면 묶음도 없다", () => {
     expect(groupByDay([])).toEqual([]);
   });
