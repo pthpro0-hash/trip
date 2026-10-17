@@ -12,6 +12,14 @@ function typeSearch(value: string) {
 // which takes a couple of seconds on its own and longer when the rest of the
 // suite is competing for the machine — well past the 5s default.
 describe("HomePage", { timeout: 20000 }, () => {
+  it("머리글이 갈 곳 찾기와 내 여행의 관계를 말하고, 사진으로 시작하는 길과 예시로 가는 길을 둔다", () => {
+    render(<HomePage />);
+    expect(screen.getByRole("heading", { level: 1, name: "한국관광 100선" })).toBeTruthy();
+    expect(screen.getByText("갈 곳은 여기서 찾고, 다녀온 곳은 사진으로 내 여행에 남겨요")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "사진으로 내 여행 만들기" })).toHaveAttribute("href", "/trips/new");
+    expect(screen.getByRole("link", { name: "예시 여행 보기" })).toHaveAttribute("href", "/example");
+  });
+
   it("권역 필터를 선택하면 렌더링되는 SpotCard 수가 줄어든다", () => {
     render(<HomePage />);
 

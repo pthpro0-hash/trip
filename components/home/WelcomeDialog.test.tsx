@@ -76,6 +76,21 @@ describe("WelcomeDialog", () => {
       expect(within(dialog).queryByRole("link", { name: /로그인/ })).toBeNull();
     });
 
+    it("고르기 전에 결과부터 보고 싶은 사람을 위해 예시 여행으로 가는 길이 있고, 누르면 팝업을 닫는다", async () => {
+      render(<WelcomeDialog />);
+      const dialog = await 팝업();
+      const link = within(dialog).getByRole("link", { name: "예시 여행 보기" });
+      expect(link).toHaveAttribute("href", "/example");
+      fireEvent.click(link);
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("갈 곳 찾기는 이 화면의 한국관광 100선이라고 관계를 말한다", async () => {
+      render(<WelcomeDialog />);
+      const dialog = await 팝업();
+      expect(within(dialog).getByText("가 볼 곳은 이 화면의 한국관광 100선에서 찾아요")).toBeTruthy();
+    });
+
     it("안심 한 줄 — 고르는 동안 사진은 기기 밖으로 나가지 않고, 기록할 때 로그인한다", async () => {
       render(<WelcomeDialog />);
       const dialog = await 팝업();

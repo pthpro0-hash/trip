@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { currentUser, loadClient } from "@/lib/supabase/lazy";
@@ -193,6 +194,15 @@ export function WelcomeDialog() {
           사진 고르기
         </AddPhotosLink>
 
+        {/* 고르기 전에 결과부터 보고 싶은 사람에게. 로그인 없이 예시 여행으로 간다. */}
+        <Link
+          href="/example"
+          onClick={close}
+          className="-mt-1 self-center text-[14px] font-medium text-text-muted underline underline-offset-2 transition hover:text-text"
+        >
+          예시 여행 보기
+        </Link>
+
         <div className="flex items-start gap-1.5 text-[13px] leading-snug text-text-muted">
           <svg
             viewBox="0 0 24 24"
@@ -213,6 +223,9 @@ export function WelcomeDialog() {
             <span className="text-text-faint">기록으로 남길 때 로그인해요</span>
           </p>
         </div>
+
+        {/* 이 화면 뒤의 여행 100선과의 관계 — 갈 곳 찾기는 그쪽이다. */}
+        <p className="break-keep text-[13px] leading-snug text-text-muted">가 볼 곳은 이 화면의 한국관광 100선에서 찾아요</p>
 
         <div className="flex items-center justify-between border-t border-line pt-3 text-[14px]">
           <button

@@ -10,19 +10,20 @@ import { UsageTracker } from "@/components/layout/UsageTracker";
 import "./globals.css";
 
 const SITE_NAME = "내 여행 스케치";
+const TAGLINE = "사진으로 남기는 내 여행";
 const DESCRIPTION =
-  "2025~2026 한국관광 100선 121곳을 지역·테마·상황으로 검색하고, 사진과 이용 안내까지 한 번에 확인하세요.";
+  "사진만 고르면 날짜와 장소로 묶어 지도와 한 장 카드로 만들어 드려요. 갈 곳은 2025~2026 한국관광 100선 121곳에서 찾아요.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://yeohaeng-sesang.vercel.app"),
   // 상세 페이지가 자기 제목을 주면 뒤에 서비스 이름이 붙는다.
-  title: { default: `${SITE_NAME} | 한국관광 100선 추천`, template: `%s | ${SITE_NAME}` },
+  title: { default: `${SITE_NAME} | ${TAGLINE}`, template: `%s | ${SITE_NAME}` },
   description: DESCRIPTION,
   openGraph: {
     siteName: SITE_NAME,
     type: "website",
     locale: "ko_KR",
-    title: `${SITE_NAME} | 한국관광 100선 추천`,
+    title: `${SITE_NAME} | ${TAGLINE}`,
     description: DESCRIPTION,
   },
   twitter: { card: "summary_large_image" },

@@ -294,6 +294,11 @@ describe("PhotoImport", () => {
   });
 
   describe("고르기 화면", () => {
+    it("고르기 전에 결과가 어떻게 나오는지 예시를 볼 수 있다", async () => {
+      await 화면열기();
+      expect(screen.getByRole("link", { name: "결과가 어떻게 나오는지 예시 보기" })).toHaveAttribute("href", "/example");
+    });
+
     it("사진 고르기 단추가 하나, 크게 있다", async () => {
       await 화면열기();
       const button = screen.getByRole("button", { name: "사진 고르기" });

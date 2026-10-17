@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "내 여행 스케치",
     short_name: "여행 스케치",
-    description: "사진만 고르면 다녀온 길이 지도 위에 한 장의 그림이 돼요.",
+    description: "사진으로 남기는 내 여행 — 사진만 고르면 다녀온 길이 지도 위에 한 장의 그림이 돼요.",
     lang: "ko",
     start_url: "/?v=sketch",
     scope: "/",

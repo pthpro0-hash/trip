@@ -132,6 +132,11 @@ describe("HubView · 로그인 전 시트", () => {
     expect(screen.getByText("사진을 고르면 언제 어디서 찍었는지 읽어 지도에 얹어 드려요.")).toBeTruthy();
   });
 
+  it("고르기 전에 결과부터 볼 수 있다 — '예시 보기'가 예시 여행으로 간다", () => {
+    openGuest();
+    expect(screen.getByRole("link", { name: "예시 보기" })).toHaveAttribute("href", "/example");
+  });
+
   it("앞세운 단추는 '사진 고르기' — 로그인 없이 시작한다", () => {
     openGuest();
     const pick = screen.getByRole("link", { name: "사진 고르기" });

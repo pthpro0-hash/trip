@@ -733,6 +733,9 @@ function SheetHeader({
           >
             로그인
           </Link>
+          <Link href="/example" className="text-[14px] font-medium text-text-muted transition hover:text-text">
+            예시 보기
+          </Link>
         </div>
       </div>
     );
@@ -747,12 +750,17 @@ function SheetHeader({
       <div className="flex flex-col gap-2 pb-1">
         <p className="text-[15px] font-semibold text-text">사진을 고르면 여기에 점이 찍혀요</p>
         <p className="text-[13px] text-text-muted">찍은 시각과 위치를 읽어 다녀온 길을 지도에 그려 드려요.</p>
-        <AddPhotosLink
-          href={ADD_HREF}
-          className="self-start rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
-        >
-          사진 고르기
-        </AddPhotosLink>
+        <div className="flex items-center gap-4">
+          <AddPhotosLink
+            href={ADD_HREF}
+            className="rounded-full bg-accent px-4 py-2 text-[14px] font-medium text-on-accent transition hover:bg-accent-hover"
+          >
+            사진 고르기
+          </AddPhotosLink>
+          <Link href="/example" className="text-[14px] font-medium text-text-muted transition hover:text-text">
+            예시 보기
+          </Link>
+        </div>
       </div>
     );
   }

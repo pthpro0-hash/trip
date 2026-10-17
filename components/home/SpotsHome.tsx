@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
 import { SuggestSpot } from "@/components/spots/SuggestSpot";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -139,8 +140,20 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
           한국관광 100선
         </h1>
         <p className="mt-1 text-[15px] text-text-muted">
-          2025~2026년 121곳, 조건으로 찾고 지도로 만나보세요
+          갈 곳은 여기서 찾고, 다녀온 곳은 사진으로 내 여행에 남겨요
         </p>
+        {/* 내 여행의 시작과 결과 예시로 가는 길 — 큰 띠를 얹지 않고 한 줄로만 둔다(첫 화면이 혼잡해 보이지 않게). */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <AddPhotosLink
+            href="/trips/new"
+            className="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-on-accent transition hover:bg-accent-hover"
+          >
+            사진으로 내 여행 만들기
+          </AddPhotosLink>
+          <Link href="/example" className="text-[14px] font-medium text-text-muted underline underline-offset-2 transition hover:text-text">
+            예시 여행 보기
+          </Link>
+        </div>
       </header>
 
       {/*

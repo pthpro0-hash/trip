@@ -7,7 +7,7 @@ import { StorageTidy } from "@/components/trip/StorageTidy";
 
 export const metadata: Metadata = {
   title: "도움말",
-  description: "사진으로 여행 기록 만들기, 내 여행 지도, 한장 요약, 여행 100선, 가족 책장 사용법을 안내합니다.",
+  description: "사진으로 남기는 내 여행 — 사진으로 여행 기록 만들기, 내 여행 지도, 한장 요약, 가족 책장, 갈 곳 찾기(여행 100선) 사용법을 안내합니다.",
   alternates: { canonical: "/help" },
 };
 
@@ -58,6 +58,9 @@ export default function HelpPage() {
           사진만 고르면 다녀온 길이 한 장의 그림이 됩니다. 자주 묻는 것부터 적어 두었어요.
         </p>
         <p className="mt-1 text-[14px] leading-relaxed text-text-faint">항목을 누르면 자세한 설명이 펼쳐져요.</p>
+        <Link href="/example" className="mt-2 inline-block text-[14px] font-medium text-accent underline underline-offset-2">
+          결과부터 보고 싶다면 예시 여행 보기
+        </Link>
       </header>
 
       {/* 찾으러 온 사람은 목차부터 본다. 누르면 그 갈래가 펼쳐진다. */}

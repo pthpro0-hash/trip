@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { rememberedName, type PlaceMemory } from "@/lib/placeMemory";
 import { isInKorea } from "@/lib/weatherGrid";
@@ -1261,6 +1262,9 @@ export function PhotoImport() {
           >
             사진 고르기
           </button>
+          <Link href="/example" className="self-center text-[14px] font-medium text-text-muted underline underline-offset-2 transition hover:text-text">
+            결과가 어떻게 나오는지 예시 보기
+          </Link>
           {/*
             약속은 정확해야 한다: 고르는 동안(읽는 동안)은 사진이 기기 밖으로 나가지 않지만, 기록할 때
             "사진도 함께 올리기"를 고르면 올라간다. "올라가지 않아요"라고 하면 틀린 약속이 된다.

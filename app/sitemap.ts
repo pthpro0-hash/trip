@@ -9,6 +9,8 @@ export const BASE_URL = "https://yeohaeng-sesang.vercel.app";
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: BASE_URL, changeFrequency: "weekly", priority: 1 },
+    // 사진으로 남기는 내 여행이 어떤 것인지 결과로 보여 주는 예시. 로그인 없이 볼 수 있다.
+    { url: `${BASE_URL}/example`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${BASE_URL}/regions`, changeFrequency: "monthly", priority: 0.8 },
     ...REGIONS.map((region) => ({
       url: `${BASE_URL}/regions/${encodeURIComponent(region)}`,
