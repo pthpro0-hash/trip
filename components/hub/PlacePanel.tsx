@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getBrowserClient } from "@/lib/supabase/client";
-import { fetchPlacePhotos, signedUrls, thumbUrls, type PlacePhoto } from "@/lib/supabase/photos";
+import { fetchPlacePhotos, thumbUrls, type PlacePhoto } from "@/lib/supabase/photos";
+import { useBigPhotos } from "@/lib/useBigPhotos";
 import { tripFocus } from "@/lib/scrollMemory";
 import type { HubPlace } from "@/lib/hub";
 import { PhotoViewer } from "@/components/trip/PhotoViewer";
@@ -29,7 +30,6 @@ const day = (stamp: string) => stamp.slice(0, 10).replaceAll("-", ".");
 export function PlacePanel({ userId, places }: PlacePanelProps) {
   const [photos, setPhotos] = useState<PlacePhoto[] | null>(null);
   const [thumbs, setThumbs] = useState<Map<string, string>>(new Map());
-  const [big, setBig] = useState<Map<string, string>>(new Map());
   const [viewing, setViewing] = useState<number | null>(null);
 
   const visitKey = places.map((place) => place.visitId).join(",");
@@ -64,20 +64,11 @@ export function PlacePanel({ userId, places }: PlacePanelProps) {
   /* 크게 볼 때는 이곳 사진을 한 줄로 이어 넘긴다. */
   const reel = useMemo(() => sections.flatMap((section) => section.photos), [sections]);
 
-  const open = async (index: number) => {
-    setViewing(index);
-    const path = reel[index]?.storagePath;
-    if (!path || big.has(path)) return;
-    const supabase = getBrowserClient();
-    if (!supabase) return;
-    const url = (await signedUrls(supabase, [path])).get(path);
-    if (url) setBig((current) => new Map(current).set(path, url));
-  };
-
-  const move = (step: number) => {
-    if (viewing === null || reel.length === 0) return;
-    void open((viewing + step + reel.length) % reel.length);
-  };
+  // 보고 있는 자리 앞뒤 몇 장의 주소를 한 번에 미리 받아 둔다(lib/useBigPhotos) — 넘길 때마다 묻지 않게.
+  const bigAt = useBigPhotos(
+    reel.map((photo) => photo.storagePath),
+    viewing,
+  );
 
   const lead = places[0];
   const title =
@@ -129,7 +120,7 @@ export function PlacePanel({ userId, places }: PlacePanelProps) {
                 <button
                   key={photo.id}
                   type="button"
-                  onClick={() => void open(index)}
+                  onClick={() => setViewing(index)}
                   aria-label={`사진 ${index + 1} 크게 보기`}
                   className="aspect-square overflow-hidden rounded-lg bg-bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
@@ -146,12 +137,12 @@ export function PlacePanel({ userId, places }: PlacePanelProps) {
 
       {viewing !== null && reel[viewing] && (
         <PhotoViewer
-          url={big.get(reel[viewing].storagePath) ?? thumbs.get(reel[viewing].storagePath) ?? null}
-          index={viewing}
           total={reel.length}
+          current={viewing}
+          urlAt={bigAt}
+          previewAt={(index) => thumbs.get(reel[index].storagePath) ?? null}
+          onChange={setViewing}
           onClose={() => setViewing(null)}
-          onPrev={() => move(-1)}
-          onNext={() => move(1)}
         />
       )}
     </div>

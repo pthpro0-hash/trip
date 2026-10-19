@@ -22,11 +22,6 @@ export function SharedTripGallery({ visits }: { visits: GalleryVisit[] }) {
   const reel = visits.flatMap((visit) => visit.urls);
   const [viewing, setViewing] = useState<number | null>(null);
 
-  const move = (step: number) => {
-    if (viewing === null || reel.length === 0) return;
-    setViewing((viewing + step + reel.length) % reel.length);
-  };
-
   // 곳마다 사진 한 줄(reel)에서 몇 번째부터인지. 크게 볼 때 그 자리에서 열려야 한다.
   const starts = visits.map((_, index) => visits.slice(0, index).reduce((sum, visit) => sum + visit.urls.length, 0));
   return (
@@ -66,12 +61,12 @@ export function SharedTripGallery({ visits }: { visits: GalleryVisit[] }) {
 
       {viewing !== null && reel[viewing] && (
         <PhotoViewer
-          url={reel[viewing]}
-          index={viewing + 1}
           total={reel.length}
+          current={viewing}
+          // 공개 주소라 받아 올 것이 없다 — 이미 목록에서 받은 그림이 브라우저에 있다.
+          urlAt={(index) => reel[index] ?? null}
+          onChange={setViewing}
           onClose={() => setViewing(null)}
-          onPrev={() => move(-1)}
-          onNext={() => move(1)}
         />
       )}
     </>

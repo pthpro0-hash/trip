@@ -363,6 +363,9 @@ describe("사진 크게 보기", () => {
     }
   });
 
+  /** 지금 가운데에 보이는 사진의 큰 판. 옆 장의 그림이 아니라. */
+  const 지금사진 = (dialog: HTMLElement) => dialog.querySelector('[data-slide="current"] img[data-photo="big"]') as HTMLImageElement | null;
+
   const 열기 = async () => {
     await 상세();
     const tiles = await screen.findAllByRole("button", { name: "사진 크게 보기" });
@@ -373,9 +376,7 @@ describe("사진 크게 보기", () => {
   it("사진을 누르면 화면 가득 뜬다", async () => {
     const dialog = await 열기();
     // 목록의 작은 판이 아니라 보관본을 불러온다.
-    await waitFor(() =>
-      expect(dialog.querySelector("img")?.getAttribute("src")).toContain("원본"),
-    );
+    await waitFor(() => expect(지금사진(dialog)?.getAttribute("src")).toContain("원본"));
   });
 
   it("몇 번째인지 알려준다", async () => {
@@ -385,8 +386,8 @@ describe("사진 크게 보기", () => {
 
   it("잘라내지 않는다 — 세로 사진이 잘리면 찍은 것이 사라진다", async () => {
     const dialog = await 열기();
-    await waitFor(() => expect(dialog.querySelector("img")).toBeTruthy());
-    expect(dialog.querySelector("img")!.className).toContain("object-contain");
+    await waitFor(() => expect(지금사진(dialog)).toBeTruthy());
+    expect(지금사진(dialog)!.className).toContain("object-contain");
   });
 
   it("Escape 로 닫는다", async () => {
@@ -403,8 +404,8 @@ describe("사진 크게 보기", () => {
 
   it("사진 자체를 눌러도 닫히지 않는다", async () => {
     const dialog = await 열기();
-    await waitFor(() => expect(dialog.querySelector("img")).toBeTruthy());
-    fireEvent.click(dialog.querySelector("img")!);
+    await waitFor(() => expect(지금사진(dialog)).toBeTruthy());
+    fireEvent.click(지금사진(dialog)!);
     expect(screen.queryByRole("dialog")).toBeTruthy();
   });
 

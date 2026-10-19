@@ -21,7 +21,8 @@ import {
   type TripDetail as Detail,
 } from "@/lib/supabase/tripDetail";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
-import { deletePhoto, setCoverPhoto, signedUrls, thumbUrls } from "@/lib/supabase/photos";
+import { deletePhoto, setCoverPhoto, thumbUrls } from "@/lib/supabase/photos";
+import { useBigPhotos } from "@/lib/useBigPhotos";
 import { deleteTrip } from "@/lib/supabase/trips";
 import {
   fetchPhotosInPostcards,
@@ -249,12 +250,11 @@ export function TripDetail({ tripId }: { tripId: string }) {
   }, [trip, userId, canEdit]);
   /*
     크게 보고 있는 사진. 목록에는 작은 판을 쓰지만 여기서는 보관본을
-    그대로 불러온다 — 열어 본 것만 받으므로 미리 받아 둘 이유가 없다.
+    그대로 불러온다. 보고 있는 자리 앞뒤 몇 장의 주소는 한 번에 미리 받아 둔다(lib/useBigPhotos) — 넘길 때마다 묻지 않게.
   */
   const [viewing, setViewing] = useState<number | null>(null);
   /** 다른 여행들에 적어 둔 동행자. 나중에 채울 때 단추로 내민다. */
   const [usedCompanions, setUsedCompanions] = useState<string[]>([]);
-  const [bigUrls, setBigUrls] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     const supabase = getBrowserClient();
@@ -510,6 +510,13 @@ export function TripDetail({ tripId }: { tripId: string }) {
     setConfirmingPhoto(null);
   };
 
+  // 크게 볼 사진들의 줄. 훅이라 아래의 이른 반환보다 먼저 둔다.
+  const reel = trip ? trip.visits.flatMap((visit) => visit.photos) : [];
+  const bigAt = useBigPhotos(
+    reel.map((photo) => photo.storagePath),
+    viewing,
+  );
+
   if (status === "loading") return <Waiting title="여행을 불러오고 있어요" />;
 
   if (status === "guest") {
@@ -541,26 +548,10 @@ export function TripDetail({ tripId }: { tripId: string }) {
     크게 볼 때는 여행 전체를 한 줄로 이어 넘긴다. 방문 단위로 끊어
     놓으면 여덟 장 보고 창을 닫았다 다시 열어야 한다.
   */
-  const reel = trip.visits.flatMap((visit) => visit.photos);
 
-  const open = async (storagePath: string) => {
+  const open = (storagePath: string) => {
     const at = reel.findIndex((photo) => photo.storagePath === storagePath);
-    if (at < 0) return;
-    setViewing(at);
-    if (bigUrls.has(storagePath)) return;
-
-    const supabase = getBrowserClient();
-    if (!supabase) return;
-    const urls = await signedUrls(supabase, [storagePath]);
-    const url = urls.get(storagePath);
-    if (url) setBigUrls((current) => new Map(current).set(storagePath, url));
-  };
-
-  /** 끝에서 넘기면 처음으로 돈다. 막다른 길을 만들지 않는다. */
-  const move = (step: number) => {
-    if (viewing === null || reel.length === 0) return;
-    const next = (viewing + step + reel.length) % reel.length;
-    void open(reel[next].storagePath);
+    if (at >= 0) setViewing(at);
   };
 
   const allPhotoTimes = trip.visits.flatMap((visit) => visit.photos.map((p) => p.takenAt));
@@ -634,7 +625,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
         오기 전에는 같은 크기의 빈 자리가 서고, 사진이 하나도 없는 여행에는 자리를 두지 않는다.
       */}
       {cover && (
-        <TripHero url={photoUrls.get(cover.storagePath) ?? null} onOpen={() => void open(cover.storagePath)} />
+        <TripHero url={photoUrls.get(cover.storagePath) ?? null} onOpen={() => open(cover.storagePath)} />
       )}
 
       <div>
@@ -886,7 +877,7 @@ export function TripDetail({ tripId }: { tripId: string }) {
                         {url && (
                           <button
                             type="button"
-                            onClick={() => void open(photo.storagePath)}
+                            onClick={() => open(photo.storagePath)}
                             aria-label="사진 크게 보기"
                             className="h-full w-full cursor-zoom-in"
                           >
@@ -932,12 +923,13 @@ export function TripDetail({ tripId }: { tripId: string }) {
 
       {viewing !== null && reel[viewing] && (
         <PhotoViewer
-          url={bigUrls.get(reel[viewing].storagePath) ?? null}
-          index={viewing + 1}
           total={reel.length}
+          current={viewing}
+          urlAt={bigAt}
+          // 큰 판이 오기 전에는 목록에서 이미 받아 둔 작은 판을 먼저 보인다.
+          previewAt={(index) => photoUrls.get(reel[index].storagePath) ?? null}
+          onChange={setViewing}
           onClose={() => setViewing(null)}
-          onPrev={() => move(-1)}
-          onNext={() => move(1)}
         />
       )}
 
