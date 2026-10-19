@@ -35,6 +35,7 @@ import { remainingText } from "@/lib/photo/eta";
 import { pickPreviewShots } from "@/lib/photo/preview";
 import { spanText } from "@/lib/photo/span";
 import { buildTripTitle } from "@/lib/photo/tripTitle";
+import { samplePoints, voteAnswer, type PlaceAnswer } from "@/lib/photo/placeVote";
 import { addShots, groupByDay, removeShots, shotsByDay, shotsFor, snapToDay, type PickedPlace, type UnlocatedGroup } from "@/lib/photo/unlocated";
 import { Waiting, WaitingOverlay } from "@/components/layout/Waiting";
 import type { Shot, Trip } from "@/lib/photo/types";
@@ -59,13 +60,6 @@ import type { SaveOutcome, VisitLine } from "./photoImport/types";
 
   이 컴포넌트는 상태와 저장을 들고, 화면 조각은 photoImport/ 에 있다.
 */
-
-interface PlaceAnswer {
-  title: string;
-  isCuratedSpot: boolean;
-  spotId: string | null;
-  dong: string | null;
-}
 
 interface Stage {
   name: "idle" | "reading" | "naming" | "ready" | "failed";
@@ -115,19 +109,35 @@ function hourMinute(date: Date) {
   return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 }
 
-/** 아직 모르는 좌표만 물어보고 캐시에 더한다. */
+/**
+ * 아직 모르는 방문의 이름을 물어보고 캐시에 더한다.
+ *
+ * 한국 안의 방문은 첫 사진 한 장이 아니라 앞 · 가운데 · 끝 사진 석 장의 답을 모아 이름을 정한다(lib/photo/placeVote) — 한 장이 길가에서
+ * 찍혀 주소로 떨어져도 다른 장이 이름난 곳을 찾으면 그 이름이 된다. 캐시의 열쇠는 방문의 첫 사진 자리다(화면 곳곳이 그것으로 찾는다).
+ */
 async function lookupPlaces(
   trips: Trip[],
   known: Map<string, PlaceAnswer>,
 ): Promise<Map<string, PlaceAnswer>> {
-  const wanted = new Map<string, { lat: number; lng: number }>();
+  const visits = new Map<string, { samples: { lat: number; lng: number }[] }>();
   for (const visit of trips.flatMap((trip) => trip.visits)) {
-    const { lat, lng } = visit.shots[0];
-    const key = placeKey(lat, lng);
-    if (!known.has(key)) wanted.set(key, { lat, lng });
+    const first = visit.shots[0];
+    const key = placeKey(first.lat, first.lng);
+    if (known.has(key) || visits.has(key)) continue;
+    // 해외는 한 장만 — 해외 이름은 초당 한 번씩 묻는 곳이라 늘리지 않는다.
+    visits.set(key, { samples: isInKorea(first.lat, first.lng) ? samplePoints(visit.shots) : [first] });
   }
 
-  const next = new Map(known);
+  // 방문마다 석 장을 합쳐 한 번에 묻는다. 같은 자리(100m)는 한 번만.
+  const wanted = new Map<string, { lat: number; lng: number }>();
+  for (const { samples } of visits.values()) {
+    for (const point of samples) {
+      const key = placeKey(point.lat, point.lng);
+      if (!wanted.has(key)) wanted.set(key, { lat: point.lat, lng: point.lng });
+    }
+  }
+
+  const raw = new Map<string, PlaceAnswer>();
   const points = [...wanted.values()];
   const keys = [...wanted.keys()];
 
@@ -147,12 +157,21 @@ async function lookupPlaces(
         });
         if (!response.ok) throw new Error("place lookup failed");
         const body: { places: PlaceAnswer[] } = await response.json();
-        body.places.forEach((place, i) => next.set(slice[i].key, place));
+        body.places.forEach((place, i) => raw.set(slice[i].key, place));
       } catch (error) {
         // 해외 이름을 못 얻어도 한국 쪽 이름과 날짜·사진은 그대로다. 한국 쪽이 막히면 예전처럼 알린다.
         if (!abroad) throw error;
       }
     }
+  }
+
+  const next = new Map(known);
+  for (const [key, { samples }] of visits) {
+    const answers = samples.flatMap((point) => {
+      const found = raw.get(placeKey(point.lat, point.lng));
+      return found ? [found] : [];
+    });
+    if (answers.length > 0) next.set(key, voteAnswer(answers));
   }
   return next;
 }
@@ -1063,6 +1082,22 @@ export function PhotoImport() {
     }
 
     const shaped = shapeOf(trip);
+    // 이름 후보 — 사진이 많은 방문의 주변 이름난 곳부터. 지금 제목과 같은 것은 뺀다.
+    const current = titleOf(trip);
+    const nameChoices = [
+      ...new Set(
+        [...shaped.visits]
+          .sort((a, b) => b.shots.length - a.shots.length)
+          .flatMap((visit) => {
+            const found = placeCache.get(placeKey(visit.shots[0].lat, visit.shots[0].lng));
+            if (!found) return [];
+            // 자동으로 붙은 이름(이름난 곳일 때)도 후보다 — 다른 이름으로 바꿨다가 되돌릴 수 있게.
+            return [...(found.kind && found.kind !== "area" ? [found.title] : []), ...(found.candidates ?? [])];
+          }),
+      ),
+    ]
+      .filter((name) => name !== current)
+      .slice(0, 4);
     const alreadySaved = overlapsSaved(tripRange(trip), savedRanges);
     const editable = Boolean(userId) && !alreadySaved;
     const above = aboveOf.get(key);
@@ -1071,6 +1106,7 @@ export function PhotoImport() {
       <TripCard
         title={titleOf(trip)}
         onTitle={(next) => setTitles({ ...titles, [key]: next })}
+        nameChoices={nameChoices}
         span={span}
         photos={trip.shots.length}
         places={shaped.visits.length}

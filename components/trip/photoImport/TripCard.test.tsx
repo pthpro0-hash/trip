@@ -56,6 +56,31 @@ function card(partial: Partial<ComponentProps<typeof TripCard>> = {}) {
 
 const toggle = () => screen.getByRole("button", { name: /고치기|방문한 곳 보기/ });
 
+/*
+  자동으로 붙은 제목이 틀려도 타이핑하지 않고 근처의 이름난 곳을 눌러서 고친다.
+*/
+describe("TripCard · 이름 후보", () => {
+  it("후보를 칩으로 보이고, 누르면 그 이름이 제목이 된다", () => {
+    const { onTitle } = card({ nameChoices: ["강릉카페거리", "환희컵박물관"] });
+    const group = screen.getByRole("group", { name: "이름 후보" });
+    expect(Array.from(group.querySelectorAll("button")).map((button) => button.textContent)).toEqual(["강릉카페거리", "환희컵박물관"]);
+    fireEvent.click(screen.getByRole("button", { name: "환희컵박물관" }));
+    expect(onTitle).toHaveBeenCalledWith("환희컵박물관");
+  });
+
+  it("후보가 없으면 칩 자리를 두지 않는다", () => {
+    card({ nameChoices: [] });
+    expect(screen.queryByRole("group", { name: "이름 후보" })).toBeNull();
+    card();
+    expect(screen.queryByRole("group", { name: "이름 후보" })).toBeNull();
+  });
+
+  it("고칠 수 없는 카드(이미 기록한 여행 등)에는 칩이 없다", () => {
+    card({ nameChoices: ["강릉카페거리"], editable: false });
+    expect(screen.queryByRole("group", { name: "이름 후보" })).toBeNull();
+  });
+});
+
 describe("TripCard · 겉모습", () => {
   it("제목은 바로 고칠 수 있는 칸이다", () => {
     const { onTitle } = card();

@@ -340,6 +340,83 @@ describe("장소 이름 고치기", () => {
     expect(await screen.findByText(/장소 이름을 바꾸지 못했어요/)).toBeTruthy();
   });
 
+  /*
+    자동으로 붙은 이름(옛날에는 대개 주소)이 틀렸을 때 타이핑하지 않고 눌러서 고친다. 후보는 고치기를 열 때 그 자리 주변에서 묻는다.
+  */
+  describe("이름 후보 — 눌러서 고른다", () => {
+    const 후보응답 = (place: Record<string, unknown>) => {
+      const bodies: unknown[] = [];
+      vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return { ok: true, json: async () => ({ places: [place] }) };
+      });
+      return bodies;
+    };
+    const 열기 = async () => {
+      await 상세();
+      fireEvent.click(screen.getByRole("button", { name: "안목해변 이름 고치기" }));
+      return screen.getByLabelText("안목해변 이름 고치기") as HTMLInputElement;
+    };
+
+    it("고치기를 열면 그 곳의 좌표로 주변 후보를 묻고, 지금 이름을 뺀 후보를 칩으로 보인다", async () => {
+      const bodies = 후보응답({ title: "안목해변", kind: "here", candidates: ["강릉카페거리", "환희컵박물관"] });
+      await 열기();
+      const group = await screen.findByRole("group", { name: "이름 후보" });
+      expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["강릉카페거리", "환희컵박물관"]);
+      expect((bodies[0] as { points: { lat: number }[] }).points).toHaveLength(1);
+    });
+
+    it("이름난 곳으로 붙은 새 이름이 있으면 그것이 맨 앞 — 옛 기록의 주소 이름을 고칠 때 쓸모가 크다", async () => {
+      후보응답({ title: "경포대 근처", kind: "near", candidates: ["경포호"] });
+      await 열기();
+      const group = await screen.findByRole("group", { name: "이름 후보" });
+      expect(within(group).getAllByRole("button").map((button) => button.textContent)).toEqual(["경포대 근처", "경포호"]);
+    });
+
+    it("주소로 물러난 답은 후보가 아니다 — 후보가 없으면 칩도 없다", async () => {
+      후보응답({ title: "강릉시 견소동", kind: "area", candidates: [] });
+      await 열기();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(screen.queryByRole("group", { name: "이름 후보" })).toBeNull();
+    });
+
+    it("칩을 누르면 그 이름으로 저장하고 입력칸을 닫는다 — 한 번만 저장한다", async () => {
+      후보응답({ title: "안목해변", kind: "here", candidates: ["강릉카페거리"] });
+      const input = await 열기();
+      input.focus();
+      fireEvent.click(await screen.findByRole("button", { name: "강릉카페거리" }));
+      // 입력칸이 사라지며 초점을 잃는 일이 있어도 같은 곳을 또 저장하지 않는다.
+      fireEvent.blur(input);
+
+      await waitFor(() => expect(saveVisitName).toHaveBeenCalled());
+      expect(saveVisitName.mock.calls[0].slice(-2)).toEqual(["v2", "강릉카페거리"]);
+      expect(saveVisitName).toHaveBeenCalledTimes(1);
+      expect(await screen.findByText("강릉카페거리")).toBeTruthy();
+      expect(screen.queryByLabelText("안목해변 이름 고치기")).toBeNull();
+    });
+
+    it("칩을 누르는 동안 입력칸의 초점을 빼앗지 않는다 — 눌러 보기도 전에 닫히지 않게", async () => {
+      후보응답({ title: "안목해변", kind: "here", candidates: ["강릉카페거리"] });
+      await 열기();
+      const chip = await screen.findByRole("button", { name: "강릉카페거리" });
+      const down = fireEvent.mouseDown(chip);
+      // preventDefault 가 불렸으면 fireEvent 는 false 를 돌려준다.
+      expect(down).toBe(false);
+    });
+
+    it("후보를 못 물어도 고치기는 그대로 된다", async () => {
+      vi.stubGlobal("fetch", async () => {
+        throw new Error("망");
+      });
+      const input = await 열기();
+      fireEvent.change(input, { target: { value: "직접 쓴 이름" } });
+      fireEvent.blur(input);
+      await waitFor(() => expect(saveVisitName).toHaveBeenCalled());
+      expect(saveVisitName.mock.calls[0].slice(-2)).toEqual(["v2", "직접 쓴 이름"]);
+      expect(screen.queryByRole("group", { name: "이름 후보" })).toBeNull();
+    });
+  });
+
   it("한 번에 한 곳만 연다", async () => {
     await 상세();
     fireEvent.click(screen.getByRole("button", { name: "화진포해변 이름 고치기" }));

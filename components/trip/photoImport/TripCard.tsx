@@ -18,6 +18,8 @@ import type { VisitLine } from "./types";
 export interface TripCardProps {
   title: string;
   onTitle: (next: string) => void;
+  /** 제목으로 고를 수 있는 주변의 이름난 곳들. 누르면 그 이름이 제목이 된다. 없으면 칩을 두지 않는다. */
+  nameChoices?: string[];
   /** 사람이 읽는 기간. "2026년 9월 13일 ~ 14일". */
   span: string;
   photos: number;
@@ -61,6 +63,7 @@ function Pencil() {
 export function TripCard({
   title,
   onTitle,
+  nameChoices = [],
   span,
   photos,
   places,
@@ -101,6 +104,22 @@ export function TripCard({
           </div>
         ) : (
           <p className="text-[17px] font-semibold tracking-tight text-text">{title || span}</p>
+        )}
+        {editable && nameChoices.length > 0 && (
+          // 자동으로 붙은 이름이 틀려도 타이핑하지 않고 눌러서 고친다.
+          <div role="group" aria-label="이름 후보" className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[12px] text-text-faint">이 근처</span>
+            {nameChoices.map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => onTitle(name)}
+                className="rounded-full bg-bg-subtle px-2.5 py-1 text-[13px] font-medium text-text-muted transition hover:bg-line hover:text-text"
+              >
+                {name}
+              </button>
+            ))}
+          </div>
         )}
         <p className="mt-1.5 text-[13px] text-text-faint">
           {span} · 사진 {photos}장 · 방문 {places}곳

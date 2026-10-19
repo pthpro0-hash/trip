@@ -1656,4 +1656,75 @@ describe("PhotoImport", () => {
       await waitFor(() => expect(screen.queryByText(/위치 없음/)).toBeNull());
     });
   });
+
+  /*
+    사진을 올리면 대부분 주소가 제목이 되어 사람이 매번 고쳐야 했다. 이제 (1) 방문의 앞·가운데·끝 사진 석 장의 답을 모아 가장 나은 이름을
+    고르고, (2) 200m 안에 없으면 1.5km 안의 이름난 곳을 "근처"로 붙이고, (3) 틀려도 눌러서 고칠 후보를 보여 준다.
+  */
+  describe("사진 이름 붙이기 — 주소 대신 주변 명소", () => {
+    // 안목에서 위로 450m 간격으로 찍은 석 장(한 방문).
+    const 석장 = [
+      shot("p1.jpg", "2026-09-14T09:00", { lat: 37.7728, lng: 128.9474 }),
+      shot("p2.jpg", "2026-09-14T09:05", { lat: 37.7768, lng: 128.9474 }),
+      shot("p3.jpg", "2026-09-14T09:10", { lat: 37.7808, lng: 128.9474 }),
+    ];
+    const 답 = (title: string, kind: string, candidates: string[] = []) => ({ title, isCuratedSpot: false, spotId: null, dong: null, kind, candidates });
+    /** 위도 → 답. 좌표마다 다른 답을 건넨다. */
+    const 좌표별응답 = (byLat: Record<string, unknown>) => {
+      const asked: { lat: number }[] = [];
+      vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+        const points = JSON.parse(String(init.body)).points as { lat: number; lng: number }[];
+        asked.push(...points);
+        return { ok: true, json: async () => ({ places: points.map((point) => byLat[point.lat.toFixed(4)] ?? 답("어딘가", "area")) }) };
+      });
+      return asked;
+    };
+
+    it("첫 사진이 주소로 떨어져도 다른 사진이 이름난 곳을 찾았으면 그 이름이 제목이다", async () => {
+      const asked = 좌표별응답({
+        "37.7728": 답("강릉시 견소동", "area"),
+        "37.7768": 답("안목해변", "here"),
+        "37.7808": 답("강릉시 견소동", "area"),
+      });
+      await 사진넣기(석장);
+      await waitFor(() => expect(제목칸()[0].value).toBe("안목해변"));
+      // 앞 · 가운데 · 끝 석 장을 한 번에 물었다.
+      expect(asked.map((point) => point.lat.toFixed(4))).toEqual(["37.7728", "37.7768", "37.7808"]);
+    });
+
+    it("200m 안에 없어도 1.5km 안의 이름난 곳이면 '근처'가 붙어 제목이 된다 — 주소가 되지 않는다", async () => {
+      좌표별응답({ "37.7728": 답("무릉공원 근처", "near"), "37.7768": 답("무릉공원 근처", "near"), "37.7808": 답("무릉공원 근처", "near") });
+      await 사진넣기(석장);
+      await waitFor(() => expect(제목칸()[0].value).toBe("무릉공원 근처"));
+    });
+
+    it("틀려도 눌러서 고친다 — 주변 이름난 곳이 후보 칩으로 보이고, 누르면 제목이 바뀐다", async () => {
+      좌표별응답({
+        "37.7728": 답("안목해변", "here", ["강릉카페거리", "환희컵박물관"]),
+        "37.7768": 답("안목해변", "here", ["강릉카페거리"]),
+        "37.7808": 답("안목해변", "here", []),
+      });
+      await 사진넣기(석장);
+      await waitFor(() => expect(제목칸()[0].value).toBe("안목해변"));
+      const group = await screen.findByRole("group", { name: "이름 후보" });
+      // 지금 제목은 후보에서 빠지고, 많이 나온 후보가 앞이다.
+      expect(Array.from(group.querySelectorAll("button")).map((button) => button.textContent)).toEqual(["강릉카페거리", "환희컵박물관"]);
+
+      fireEvent.click(screen.getByRole("button", { name: "환희컵박물관" }));
+      expect(제목칸()[0].value).toBe("환희컵박물관");
+      // 고른 이름은 칩에서 빠지고 이전 이름이 후보로 돌아온다.
+      await waitFor(() => {
+        const names = Array.from(screen.getByRole("group", { name: "이름 후보" }).querySelectorAll("button")).map((button) => button.textContent);
+        expect(names).not.toContain("환희컵박물관");
+        expect(names).toContain("안목해변");
+      });
+    });
+
+    it("후보가 없으면 칩을 두지 않는다", async () => {
+      좌표별응답({ "37.7728": 답("안목해변", "here"), "37.7768": 답("안목해변", "here"), "37.7808": 답("안목해변", "here") });
+      await 사진넣기(석장);
+      await waitFor(() => expect(제목칸()[0].value).toBe("안목해변"));
+      expect(screen.queryByRole("group", { name: "이름 후보" })).toBeNull();
+    });
+  });
 });

@@ -1,7 +1,7 @@
 import spotsData from "@/lib/data/spots.json";
 import type { Spot } from "@/lib/types";
 import { isInKorea } from "@/lib/weatherGrid";
-import { pickPlaceName } from "@/lib/photo/placeName";
+import { NEARBY_M, pickPlaceName, placeCandidates, type PlaceKind } from "@/lib/photo/placeName";
 import type { NearbyPlace } from "@/lib/photo/types";
 
 /*
@@ -10,7 +10,8 @@ import type { NearbyPlace } from "@/lib/photo/types";
   카카오 REST 키는 서버에만 둔다. 브라우저로 내보내면 남이 우리 몫의
   호출 한도를 쓴다.
 */
-const SEARCH_RADIUS_M = 1000;
+// 이름을 붙일 후보를 찾는 반경. 여기에 없으면 1.5km 안의 이름난 곳을 "근처"로 붙인다(lib/photo/placeName).
+const SEARCH_RADIUS_M = NEARBY_M;
 const MAX_POINTS = 25;
 const UPSTREAM_TIMEOUT_MS = 8000;
 // 100m 남짓. 이보다 가까운 좌표는 같은 곳으로 보고 한 번만 물어본다.
@@ -27,6 +28,10 @@ interface PlaceAnswer {
   /** 100선 중 하나면 그 id. 기록에서 여행지 페이지로 잇는다. */
   spotId: string | null;
   dong: string | null;
+  /** 어떻게 붙은 이름인가(100선 · 바로 여기 · 근처 · 주소). */
+  kind: PlaceKind;
+  /** 이름을 고칠 때 눌러서 고를 주변 후보. 지금 이름은 빼고, 최대 4개. */
+  candidates: string[];
 }
 
 // 사진 한 묶음 안에는 같은 자리에서 찍은 것이 많다. 한 번 물어본 곳은 다시 묻지 않는다.
@@ -57,14 +62,14 @@ async function describe(key: string, lat: number, lng: number): Promise<PlaceAns
       category_group_code: "AT4",
       radius: String(SEARCH_RADIUS_M),
       sort: "distance",
-      size: "10",
+      size: "15",
     }),
     kakao(key, "search/category.json", {
       ...common,
       category_group_code: "CT1",
       radius: String(SEARCH_RADIUS_M),
       sort: "distance",
-      size: "10",
+      size: "15",
     }),
   ]);
 
@@ -105,11 +110,17 @@ async function describe(key: string, lat: number, lng: number): Promise<PlaceAns
   }));
 
   const picked = pickPlaceName(nearby, SPOT_NAMES, shortDong ?? undefined);
+  const title = picked?.title ?? shortDong ?? "알 수 없는 곳";
+  const base = title.replace(/ 근처$/, "");
   const answer: PlaceAnswer = {
-    title: picked?.title ?? shortDong ?? "알 수 없는 곳",
+    title,
     isCuratedSpot: picked?.isCuratedSpot ?? false,
     spotId: picked?.isCuratedSpot ? (ID_BY_NAME.get(picked.title) ?? null) : null,
     dong,
+    kind: picked?.kind ?? "area",
+    candidates: placeCandidates(nearby, SPOT_NAMES, 5)
+      .filter((name) => name !== base)
+      .slice(0, 4),
   };
 
   memo.set(cacheKey, answer);

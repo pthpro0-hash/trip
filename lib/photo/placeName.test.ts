@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { pickPlaceName, scorePlaceName, withinReach } from "./placeName";
+import { isLandmark, NEARBY_M, pickPlaceName, placeCandidates, scorePlaceName, withinReach } from "./placeName";
 import type { NearbyPlace } from "./types";
 
 // 아래 목록과 거리는 실제 카카오 응답에서 그대로 가져온 것이다.
@@ -39,6 +39,7 @@ describe("pickPlaceName", () => {
     expect(pickPlaceName(보령_대천, SPOTS)).toEqual({
       title: "대천해수욕장",
       isCuratedSpot: true,
+      kind: "spot",
     });
   });
 
@@ -60,6 +61,7 @@ describe("pickPlaceName", () => {
     expect(pickPlaceName(nearby, SPOTS)).toEqual({
       title: "해운대 & 송정해수욕장",
       isCuratedSpot: true,
+      kind: "spot",
     });
   });
 
@@ -67,6 +69,7 @@ describe("pickPlaceName", () => {
     expect(pickPlaceName([], SPOTS, "서울특별시 중구 회현동")).toEqual({
       title: "서울특별시 중구 회현동",
       isCuratedSpot: false,
+      kind: "area",
     });
   });
 
@@ -146,8 +149,8 @@ describe("가까운 것만 '여기'라고 부른다", () => {
     expect(pickPlaceName(남산_회현동, SPOTS, "중구 회현동1가")?.title).toBe("남산둘레길");
   });
 
-  it("1km 밖은 넓은 곳이라도 보지 않는다", () => {
-    const 멀리: NearbyPlace[] = [{ name: "어딘가해변", distanceM: 1400 }];
+  it("1.5km 밖은 이름난 곳이라도 보지 않는다", () => {
+    const 멀리: NearbyPlace[] = [{ name: "어딘가해변", distanceM: 1600 }];
     expect(pickPlaceName(멀리, SPOTS, "어느 읍 어느 리")?.title).toBe("어느 읍 어느 리");
   });
 
@@ -167,5 +170,97 @@ describe("withinReach", () => {
       { name: "송정해변", distanceM: 978 },
     ]);
     expect(kept.map((p) => p.name)).toEqual(["송정해변"]);
+  });
+});
+
+/*
+  200m 안에 아무것도 없는 자리는 법정동 주소로 떨어져 사람이 매번 고쳐야 했다. 1.5km 안의 이름난 곳이 있으면 "근처"로 붙인다.
+*/
+describe("근처의 이름난 곳 — 주소로 떨어지기 전에", () => {
+  it("여기엔 없고 1.5km 안에 이름난 곳이 있으면 '근처'를 붙인다", () => {
+    const nearby: NearbyPlace[] = [{ name: "남이섬수목원", distanceM: 1300 }];
+    expect(pickPlaceName(nearby, SPOTS, "춘천시 남산면 방하리")).toEqual({ title: "남이섬수목원 근처", isCuratedSpot: false, kind: "near" });
+  });
+
+  it("100선이 1.5km 안에 있으면 그것이 먼저다 — 근처로, 100선 표시는 달지 않는다(거기 있었던 것이 아니다)", () => {
+    const nearby: NearbyPlace[] = [
+      { name: "작은공원", distanceM: 1100 },
+      { name: "남산서울타워", distanceM: 1200 },
+    ];
+    expect(pickPlaceName(nearby, SPOTS, "중구 회현동")).toEqual({ title: "남산서울타워 근처", isCuratedSpot: false, kind: "near" });
+  });
+
+  it("가까운 순으로 고르되 이름이 짧은 것을 좋아한다", () => {
+    const nearby: NearbyPlace[] = [
+      { name: "한국전통문화체험복합관광단지", distanceM: 1200 },
+      { name: "무릉공원", distanceM: 1100 },
+    ];
+    expect(pickPlaceName(nearby, SPOTS, "어느 동")?.title).toBe("무릉공원 근처");
+  });
+
+  it("골짜기 지명·섬 같은 것은 근처로도 말하지 않는다 — 사람이 틀렸다고 바로잡은 이름들", () => {
+    const nearby: NearbyPlace[] = [
+      { name: "사기장골", distanceM: 900 },
+      { name: "민어도", distanceM: 1200 },
+    ];
+    expect(pickPlaceName(nearby, SPOTS, "서산시 운산면 용현리")).toEqual({ title: "서산시 운산면 용현리", isCuratedSpot: false, kind: "area" });
+  });
+
+  it("바로 여기의 이름이 있으면 근처 이름보다 그것이 이긴다", () => {
+    const nearby: NearbyPlace[] = [
+      { name: "안목해변", distanceM: 99 },
+      { name: "남이섬수목원", distanceM: 1300 },
+    ];
+    expect(pickPlaceName(nearby, SPOTS, "강릉시 견소동")).toMatchObject({ title: "안목해변", kind: "here" });
+  });
+
+  it("범위는 1.5km", () => {
+    expect(NEARBY_M).toBe(1500);
+    expect(pickPlaceName([{ name: "무릉공원", distanceM: 1500 }], SPOTS, "x")?.title).toBe("무릉공원 근처");
+    expect(pickPlaceName([{ name: "무릉공원", distanceM: 1501 }], SPOTS, "x")?.title).toBe("x");
+  });
+});
+
+describe("isLandmark", () => {
+  it("장소를 가리키는 말과 시설 이름으로 끝나면 이름난 곳이다", () => {
+    for (const name of ["송정해변", "무릉공원", "국립중앙박물관", "남이섬수목원", "해파랑길 전망대"]) expect(isLandmark(name)).toBe(true);
+  });
+
+  it("골짜기·마을 골목 지명은 아니다", () => {
+    for (const name of ["사기장골", "함장골", "민어도", "새터말골"]) expect(isLandmark(name)).toBe(false);
+  });
+});
+
+describe("placeCandidates · 고칠 때 눌러서 고를 후보", () => {
+  const nearby: NearbyPlace[] = [
+    { name: "안중근의사기념관", distanceM: 159 },
+    { name: "남산둘레길", distanceM: 268 },
+    { name: "한양도성유적전시관", distanceM: 210 },
+    { name: "남이섬수목원", distanceM: 1300 },
+    { name: "사기장골", distanceM: 900 },
+  ];
+
+  it("100선이 먼저, 그다음은 가깝고 짧은 이름이 쓸 만한 차례로", () => {
+    const names = placeCandidates(nearby, ["남산서울타워", "남산둘레길"]);
+    expect(names[0]).toBe("남산둘레길");
+    expect(names).toContain("남이섬수목원");
+  });
+
+  it("골짜기 지명처럼 이름난 곳이 아닌 먼 것은 뺀다 — 가까우면(200m 안) 넣는다", () => {
+    const names = placeCandidates(nearby, []);
+    expect(names).not.toContain("사기장골");
+    expect(placeCandidates([{ name: "도소골", distanceM: 150 }], [])).toEqual(["도소골"]);
+  });
+
+  it("같은 이름은 한 번만, 최대 5개", () => {
+    const many: NearbyPlace[] = Array.from({ length: 9 }, (_, i) => ({ name: `공원${i}공원`, distanceM: 100 + i }));
+    many.push({ name: "공원0공원", distanceM: 120 });
+    const names = placeCandidates(many, []);
+    expect(names).toHaveLength(5);
+    expect(new Set(names).size).toBe(5);
+  });
+
+  it("주변에 없으면 빈 목록", () => {
+    expect(placeCandidates([], ["남산서울타워"])).toEqual([]);
   });
 });

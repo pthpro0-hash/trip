@@ -23,6 +23,7 @@ import {
 import { buildTripTitle } from "@/lib/photo/tripTitle";
 import { deletePhoto, setCoverPhoto, thumbUrls } from "@/lib/supabase/photos";
 import { useBigPhotos } from "@/lib/useBigPhotos";
+import { fetchNameChoices } from "@/lib/photo/nameChoices";
 import { deleteTrip } from "@/lib/supabase/trips";
 import {
   fetchPhotosInPostcards,
@@ -146,6 +147,11 @@ export function TripDetail({ tripId }: { tripId: string }) {
   /** 고치고 있는 장소. 한 번에 하나만 연다. */
   const [editingVisit, setEditingVisit] = useState<string | null>(null);
   const [visitName, setVisitName] = useState("");
+  /*
+    이름을 고치는 곳의 주변 이름난 곳(눌러서 고를 후보). 고치기를 열 때 그 자리에서 묻는다 — 어느 곳의 후보인지 함께 적어 둬서,
+    다른 곳으로 옮겨 가면 앞 곳의 후보가 잠깐 보이지 않게 한다.
+  */
+  const [nameChoices, setNameChoices] = useState<{ visitId: string; names: string[] }>({ visitId: "", names: [] });
   const [visitFailed, setVisitFailed] = useState(false);
   /** 방금 고친 이름을 기억해 둔 방문. "다음부터 이 이름으로" 를 한 번 알린다. */
   const [rememberedVisit, setRememberedVisit] = useState<string | null>(null);
@@ -209,6 +215,22 @@ export function TripDetail({ tripId }: { tripId: string }) {
     그동안 해외 사진은 이름을 못 얻었다. 고칠 수 있는 사람이 열었을 때만, 한 곳을 한 번만 묻고, 알아낸 이름은 기록에 저장한다
     (사람이 고친 이름은 '알 수 없는 곳'이 아니므로 건드리지 않는다).
   */
+  // 이름을 고치려고 열면 그 자리 주변의 이름난 곳을 묻는다(눌러서 고를 후보).
+  useEffect(() => {
+    if (editingVisit === null || !trip) return;
+    const visit = trip.visits.find((one) => one.id === editingVisit);
+    if (!visit) return;
+    let active = true;
+    void fetchNameChoices(visit.lat, visit.lng, visit.placeName).then((names) => {
+      if (active) setNameChoices({ visitId: visit.id, names });
+    });
+    return () => {
+      active = false;
+    };
+    // 곳을 열 때 한 번 — 여행 자료가 다시 바뀔 때마다 다시 묻지 않는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingVisit]);
+
   const askedAbroad = useRef(new Set<string>());
   useEffect(() => {
     if (!trip || !userId || !canEdit) return;
@@ -407,11 +429,11 @@ export function TripDetail({ tripId }: { tripId: string }) {
     return true;
   };
 
-  const submitVisitName = async (visitId: string) => {
+  const submitVisitName = async (visitId: string, chosen?: string) => {
     const supabase = getBrowserClient();
     if (!supabase || !userId || !trip) return;
 
-    const name = visitName.trim();
+    const name = (chosen ?? visitName).trim();
     const before = trip.visits.find((visit) => visit.id === visitId)?.placeName;
     setEditingVisit(null);
     // 이름 없는 곳은 나중에 다시 찾을 길이 없다. 비우면 되돌린다.
@@ -849,6 +871,33 @@ export function TripDetail({ tripId }: { tripId: string }) {
                   </div>
                 )}
               </div>
+
+              {editingVisit === visit.id && nameChoices.visitId === visit.id && nameChoices.names.length > 0 && (
+                // 자동으로 붙은 이름이 틀렸을 때 타이핑하지 않고 눌러서 고친다. 누르는 동안 입력칸이 초점을 잃어 닫히지 않게 한다.
+                <div role="group" aria-label="이름 후보" className="flex flex-wrap items-center gap-1.5 pl-8">
+                  <span className="text-[12px] text-text-faint">이 근처</span>
+                  {nameChoices.names.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onPointerDown={(event) => event.preventDefault()}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        // 입력칸이 사라지며 blur 가 와도 같은 곳을 또 저장하지 않게 한 번 건너뛰고, 안 와도 남지 않게 곧 푼다.
+                        cancelling.current = true;
+                        setTimeout(() => {
+                          cancelling.current = false;
+                        }, 0);
+                        setVisitName(name);
+                        void submitVisitName(visit.id, name);
+                      }}
+                      className="rounded-full bg-bg-subtle px-2.5 py-1 text-[13px] font-medium text-text-muted transition hover:bg-line hover:text-text"
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {rememberedVisit === visit.id && (
                 <p className="pl-8 text-[13px] text-accent">
