@@ -49,6 +49,55 @@ describe("SiteHeader", () => {
     expect(screen.getByRole("link", { name: "도움말" })).toBeTruthy();
   });
 
+  /*
+    부모님께 엽서를 보내는 가족 책장은 아래 탭의 "내 정보" 안에 있어서 찾기 어려웠다. 위 띠에 바로가기를 둔다.
+    도움말은 물음표 대신 "Help" 라고 적는다.
+  */
+  describe("가족 책장 바로가기 · Help", () => {
+    it("가족 책장 링크가 위 띠에 있다 — 첫 화면에서도", async () => {
+      await 머리띠("/");
+      expect(screen.getByRole("link", { name: "가족 책장" })).toHaveAttribute("href", "/mailboxes");
+    });
+
+    it.each(["/", "/trips/abc", "/spots/경복궁", "/me", "/sketch"])("%s — 아래 탭이 있는 화면에서는 폰에서도 보인다", async (at) => {
+      await 머리띠(at);
+      const link = screen.getByRole("link", { name: "가족 책장" });
+      expect(link.className).toContain("inline-flex");
+      expect(link.className).not.toContain("hidden");
+    });
+
+    it.each(["/trips/new", "/login"])("%s — 아래 탭이 없어 폭이 빠듯한 폰에서는 접고, 넓은 화면에서는 보인다", async (at) => {
+      await 머리띠(at);
+      const link = screen.getByRole("link", { name: "가족 책장" });
+      expect(link.className).toContain("hidden");
+      expect(link.className).toContain("sm:inline-flex");
+    });
+
+    it("가족 책장 화면에서는 그 링크가 켜져 있다 — 하위 화면에서도", async () => {
+      await 머리띠("/mailboxes");
+      expect(켜진곳()).toEqual(["가족 책장"]);
+      screen.getByRole("link", { name: "가족 책장" });
+    });
+
+    it("다른 화면에서는 켜지지 않는다 — 이름만 닮은 주소도", async () => {
+      await 머리띠("/mailboxesx");
+      expect(켜진곳()).not.toContain("가족 책장");
+    });
+
+    it("도움말은 물음표가 아니라 'Help' 라고 적고, 스크린리더에는 도움말로 읽힌다", async () => {
+      await 머리띠("/");
+      const help = screen.getByRole("link", { name: "도움말" });
+      expect(help).toHaveAttribute("href", "/help");
+      expect(help.textContent).toBe("Help");
+      expect(help.textContent).not.toContain("?");
+    });
+
+    it("도움말 화면에서는 Help 가 켜져 있다", async () => {
+      await 머리띠("/help");
+      expect(켜진곳()).toEqual(["Help"]);
+    });
+  });
+
   it.each([
     ["/spots/경복궁", "여행 100선"],
     ["/regions/강원권", "여행 100선"],
