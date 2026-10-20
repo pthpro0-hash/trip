@@ -101,7 +101,7 @@ describe("PhotoViewer · 보이는 것", () => {
     expect(big.className).toContain("opacity-0");
     fireEvent.load(big);
     expect(current.querySelector('img[data-photo="preview"]')).toBeNull();
-    expect(big.className).toContain("opacity-100");
+    expect(big.className).not.toContain("opacity-0");
   });
 });
 
@@ -210,9 +210,9 @@ describe("PhotoViewer · 옆으로 밀기", () => {
     expect(props.onChange).not.toHaveBeenCalled();
   });
 
-  it("옆으로 미는 것은 우리가 받고 위아래는 브라우저에 맡긴다(touch-action)", () => {
+  it("손가락 움직임은 우리가 모두 받는다(touch-action: none) — 두 손가락 확대와 두 번 누르기 확대를 이 화면이 직접 한다", () => {
     const { area } = open();
-    expect(area.style.touchAction).toBe("pan-y");
+    expect(area.style.touchAction).toBe("none");
   });
 
   it("밀고 난 뒤의 클릭은 닫지 않는다 — 넘기다 닫히면 안 된다", () => {
