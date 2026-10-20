@@ -6,7 +6,7 @@ const PID = "P".repeat(43);
 const files = ["a.webp", "b.webp", "c.webp"];
 const srcOf = (container: HTMLElement) => container.querySelector("img")?.getAttribute("src") ?? "";
 
-describe("PhotoAlbum · 책 한 권의 사진을 한 장씩 넘겨 본다", () => {
+describe("PhotoAlbum · 엽서 한 장의 사진을 한 장씩 넘겨 본다", () => {
   it("사진이 없으면 아무것도 그리지 않는다", () => {
     const { container } = render(<PhotoAlbum postcardId={PID} files={[]} />);
     expect(container.firstChild).toBeNull();

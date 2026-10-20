@@ -16,12 +16,12 @@ import {
 } from "./mailboxSettings";
 
 /*
-  책장 설정. 권장값이 기본이고, 저장된 값이 비었거나 깨졌거나 범위를 벗어나면 그 칸만 권장으로 읽는다
+  사진첩 설정. 권장값이 기본이고, 저장된 값이 비었거나 깨졌거나 범위를 벗어나면 그 칸만 권장으로 읽는다
   (저장된 값 하나가 틀려도 화면이 안 깨지게). 받는 쪽에는 부모님 화면에 필요한 것만 내려간다.
 */
 
 describe("권장값", () => {
-  it("사진 20장·640px·글씨 크게·하트 사진마다·최근 10권·작년 오늘 켬·올해의 책 켬·가고 싶은 곳 받기 켬", () => {
+  it("사진 20장·640px·글씨 크게·하트 사진마다·최근 10권·작년 오늘 켬·올해 모아보기 켬·가고 싶은 곳 받기 켬", () => {
     expect(RECOMMENDED).toEqual({
       photos: 20,
       size: 640,
@@ -105,18 +105,18 @@ describe("receiverSettings · 받는 쪽에 내려가는 것", () => {
   });
 });
 
-describe("sendLimits · 한 책을 여러 책장에 꽂을 때", () => {
+describe("sendLimits · 한 엽서를 여러 사진첩에 모아을 때", () => {
   const box = (over: Partial<MailboxSettings>): MailboxSettings => ({ ...RECOMMENDED, ...over });
 
   it("사진 수는 가장 적은 쪽에, 크기는 더 선명한 쪽에 맞춘다 — 복사본은 하나라서", () => {
     expect(sendLimits([box({ photos: 20, size: 640 }), box({ photos: 12, size: 960 })])).toEqual({ photos: 12, size: 960 });
   });
 
-  it("하나면 그 책장 설정 그대로", () => {
+  it("하나면 그 사진첩 설정 그대로", () => {
     expect(sendLimits([box({ photos: 6, size: 640 })])).toEqual({ photos: 6, size: 640 });
   });
 
-  it("책장이 없으면 권장", () => {
+  it("사진첩이 없으면 권장", () => {
     expect(sendLimits([])).toEqual({ photos: RECOMMENDED.photos, size: RECOMMENDED.size });
   });
 });
@@ -136,7 +136,7 @@ describe("권장과 다른 설정", () => {
   });
 });
 
-describe("bookSizeText · 책 한 권의 보관 용량 어림", () => {
+describe("bookSizeText · 엽서 한 장의 보관 용량 어림", () => {
   it("640px 20장은 약 1.0~1.4MB, 960px 20장은 약 2.0~2.8MB", () => {
     expect(bookSizeText(20, 640)).toBe("약 1.0~1.4MB");
     expect(bookSizeText(20, 960)).toBe("약 2.0~2.8MB");

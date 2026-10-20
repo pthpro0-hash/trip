@@ -26,10 +26,10 @@ describe("MailboxBell · 새 소식(답장·하트) 알림", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("새 소식이 오면 숫자와 함께 나타나고, 누르면 책장 화면으로 간다", async () => {
+  it("새 소식이 오면 숫자와 함께 나타나고, 누르면 사진첩 화면으로 간다", async () => {
     state.unread = 2;
     render(<MailboxBell />);
-    const link = await screen.findByRole("link", { name: "가족 책장 새 소식 2개" });
+    const link = await screen.findByRole("link", { name: "가족 사진첩 새 소식 2개" });
     expect(link).toHaveAttribute("href", "/mailboxes");
     expect(link).toHaveTextContent("2");
   });
@@ -37,20 +37,20 @@ describe("MailboxBell · 새 소식(답장·하트) 알림", () => {
   it("열 개가 넘으면 9+", async () => {
     state.unread = 14;
     render(<MailboxBell />);
-    expect(await screen.findByRole("link", { name: "가족 책장 새 소식 14개" })).toHaveTextContent("9+");
+    expect(await screen.findByRole("link", { name: "가족 사진첩 새 소식 14개" })).toHaveTextContent("9+");
   });
 
   it("답장·하트를 더해 센다", async () => {
     state.unread = 1;
     state.hearts = 2;
     render(<MailboxBell />);
-    expect(await screen.findByRole("link", { name: "가족 책장 새 소식 3개" })).toHaveTextContent("3");
+    expect(await screen.findByRole("link", { name: "가족 사진첩 새 소식 3개" })).toHaveTextContent("3");
   });
 
   it("하트만 와도 나타난다", async () => {
     state.hearts = 1;
     render(<MailboxBell />);
-    expect(await screen.findByRole("link", { name: "가족 책장 새 소식 1개" })).toBeTruthy();
+    expect(await screen.findByRole("link", { name: "가족 사진첩 새 소식 1개" })).toBeTruthy();
   });
 
   it("세션 쿠키가 없으면(둘러보는 사람) 서버에 묻지도 않고 없다", async () => {
@@ -69,7 +69,7 @@ describe("MailboxBell · 새 소식(답장·하트) 알림", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("책장 화면이 답장을 봤다고 알리면 다시 세어 사라진다", async () => {
+  it("사진첩 화면이 답장을 봤다고 알리면 다시 세어 사라진다", async () => {
     state.unread = 1;
     const { container } = render(<MailboxBell />);
     await screen.findByRole("link", { name: /새 소식 1개/ });

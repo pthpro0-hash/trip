@@ -55,7 +55,7 @@ describe("MyInfo · 내 정보 메뉴", () => {
     describe("관리자에게만", () => {
       it("관리자가 아니면 관리 줄이 없다", async () => {
         render(<MyInfo />);
-        await screen.findByRole("link", { name: /가족 책장/ });
+        await screen.findByRole("link", { name: /가족 사진첩/ });
         expect(screen.queryByRole("link", { name: /빠진 곳 추천 관리/ })).toBeNull();
       });
 
@@ -86,7 +86,7 @@ describe("MyInfo · 내 정보 메뉴", () => {
       render(<MyInfo />);
       await screen.findByText("김지민");
       expect(hrefOf(/^가족 공유/)).toBe("/family");
-      expect(hrefOf(/^가족 책장/)).toBe("/mailboxes");
+      expect(hrefOf(/^가족 사진첩/)).toBe("/mailboxes");
       expect(screen.queryByRole("link", { name: /^보관함 정리/ })).toBeNull();
       expect(screen.queryByText(/해외 장소 이름/)).toBeNull();
       expect(hrefOf(/^도움말/)).toBe("/help");
@@ -105,36 +105,36 @@ describe("MyInfo · 내 정보 메뉴", () => {
       render(<MyInfo />);
       await screen.findByText("김지민");
       expect(within(screen.getByRole("link", { name: /^가족 공유/ })).getByText(/가족을 초대해/)).toBeTruthy();
-      expect(within(screen.getByRole("link", { name: /^가족 책장/ })).getByText(/부모님께 엽서/)).toBeTruthy();
+      expect(within(screen.getByRole("link", { name: /^가족 사진첩/ })).getByText(/부모님께 엽서/)).toBeTruthy();
     });
 
-    it("새 소식이 없으면 책장 줄에 숫자가 없다", async () => {
+    it("새 소식이 없으면 사진첩 줄에 숫자가 없다", async () => {
       render(<MyInfo />);
       await screen.findByText("김지민");
       expect(screen.queryByText(/새 소식/)).toBeNull();
     });
 
-    it("새 답장·하트를 더해 책장 줄에 알린다", async () => {
+    it("새 답장·하트를 더해 사진첩 줄에 알린다", async () => {
       state.replies = 1;
       state.hearts = 2;
       render(<MyInfo />);
-      const row = await screen.findByRole("link", { name: /^가족 책장/ });
+      const row = await screen.findByRole("link", { name: /^가족 사진첩/ });
       await waitFor(() => expect(within(row).getByText("새 소식 3")).toBeTruthy());
     });
 
     /*
-      책꽂이는 가족 책장(관리 화면)과 미리보기를 거쳐야 겨우 닿았다. 내 정보에서 책장마다 줄을 내어,
-      누르면 그 책장 안(책꽂이)으로 바로 들어간다.
+      묶음은 가족 사진첩(관리 화면)과 미리보기를 거쳐야 겨우 닿았다. 내 정보에서 사진첩마다 줄을 내어,
+      누르면 그 사진첩 안(묶음)으로 바로 들어간다.
     */
-    describe("내 책장 속으로", () => {
-      it("내가 만든 책장마다 줄이 하나씩 있고, 누르면 그 책장 안(책꽂이)으로 들어간다", async () => {
+    describe("내 사진첩 속으로", () => {
+      it("내가 만든 사진첩마다 줄이 하나씩 있고, 누르면 그 사진첩 안(묶음)으로 들어간다", async () => {
         state.boxes = {
           owned: [shelf("1", "우리 엄마 아빠", TOKEN_A), shelf("2", "시댁", TOKEN_B)],
           joined: [],
         };
         render(<MyInfo />);
         const first = await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
-        // 미리보기 방식 — 열어 본 표시·답장·하트는 부모님께 가지 않고, 안 열어 본 책도 책꽂이에 보인다.
+        // 미리보기 방식 — 열어 본 표시·답장·하트는 부모님께 가지 않고, 안 열어 본 엽서도 묶음에 보인다.
         expect(first).toHaveAttribute("href", `/m/${TOKEN_A}?preview=all`);
         expect(screen.getByRole("link", { name: /^시댁/ })).toHaveAttribute("href", `/m/${TOKEN_B}?preview=all`);
       });
@@ -143,70 +143,70 @@ describe("MyInfo · 내 정보 메뉴", () => {
         state.boxes = { owned: [shelf("1", "우리 엄마 아빠", TOKEN_A)], joined: [] };
         render(<MyInfo />);
         const row = await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
-        expect(within(row).getByText(/책꽂이/)).toBeTruthy();
+        expect(within(row).getByText(/묶음/)).toBeTruthy();
       });
 
-      it("관리 화면으로 가는 '가족 책장' 줄은 그대로 있다 — 설정·보낸 엽서는 거기서", async () => {
+      it("관리 화면으로 가는 '가족 사진첩' 줄은 그대로 있다 — 설정·보낸 엽서는 거기서", async () => {
         state.boxes = { owned: [shelf("1", "우리 엄마 아빠", TOKEN_A)], joined: [] };
         render(<MyInfo />);
         await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
-        expect(hrefOf(/^가족 책장/)).toBe("/mailboxes");
+        expect(hrefOf(/^가족 사진첩/)).toBe("/mailboxes");
       });
 
-      it("책장 줄은 '가족' 묶음 안에, 가족 책장 줄 바로 아래에 있다", async () => {
+      it("사진첩 줄은 '가족' 묶음 안에, 가족 사진첩 줄 바로 아래에 있다", async () => {
         state.boxes = { owned: [shelf("1", "우리 엄마 아빠", TOKEN_A)], joined: [] };
         render(<MyInfo />);
         const mine = await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
-        const manage = screen.getByRole("link", { name: /^가족 책장/ });
+        const manage = screen.getByRole("link", { name: /^가족 사진첩/ });
         expect(manage.compareDocumentPosition(mine) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
         const group = mine.closest("section");
         expect(group?.querySelector("h2")?.textContent).toBe("가족");
         expect(group?.contains(manage)).toBe(true);
       });
 
-      it("닫아 둔 책장은 줄을 내지 않는다 — 부모님께도 아무것도 안 보이니 들어갈 것이 없다", async () => {
+      it("닫아 둔 사진첩은 줄을 내지 않는다 — 부모님께도 아무것도 안 보이니 들어갈 것이 없다", async () => {
         state.boxes = {
-          owned: [shelf("1", "우리 엄마 아빠", TOKEN_A), shelf("2", "닫은 책장", TOKEN_B, { closed: true })],
+          owned: [shelf("1", "우리 엄마 아빠", TOKEN_A), shelf("2", "닫은 사진첩", TOKEN_B, { closed: true })],
           joined: [],
         };
         render(<MyInfo />);
         await screen.findByRole("link", { name: /^우리 엄마 아빠/ });
-        expect(screen.queryByRole("link", { name: /^닫은 책장/ })).toBeNull();
+        expect(screen.queryByRole("link", { name: /^닫은 사진첩/ })).toBeNull();
       });
 
-      it("보내는 사람으로만 들어간 남의 책장은 줄을 내지 않는다", async () => {
-        state.boxes = { owned: [], joined: [shelf("9", "남의 책장", TOKEN_B)] };
+      it("보내는 사람으로만 들어간 남의 사진첩은 줄을 내지 않는다", async () => {
+        state.boxes = { owned: [], joined: [shelf("9", "남의 사진첩", TOKEN_B)] };
         render(<MyInfo />);
         await screen.findByText("김지민");
-        await waitFor(() => expect(screen.queryByRole("link", { name: /^남의 책장/ })).toBeNull());
+        await waitFor(() => expect(screen.queryByRole("link", { name: /^남의 사진첩/ })).toBeNull());
       });
 
-      it("책장이 하나도 없으면 책장 줄 없이 '가족 책장' 줄만 있다", async () => {
+      it("사진첩이 하나도 없으면 사진첩 줄 없이 '가족 사진첩' 줄만 있다", async () => {
         render(<MyInfo />);
         await screen.findByText("김지민");
-        expect(hrefOf(/^가족 책장/)).toBe("/mailboxes");
-        expect(screen.queryByRole("link", { name: /책꽂이 안으로/ })).toBeNull();
+        expect(hrefOf(/^가족 사진첩/)).toBe("/mailboxes");
+        expect(screen.queryByRole("link", { name: /묶음 안으로/ })).toBeNull();
       });
 
-      it("책장을 못 읽어도 나머지는 그대로다 — 관리 줄과 새 소식은 남는다", async () => {
+      it("사진첩을 못 읽어도 나머지는 그대로다 — 관리 줄과 새 소식은 남는다", async () => {
         state.replies = 1;
         state.boxes = "failed";
         render(<MyInfo />);
-        const row = await screen.findByRole("link", { name: /^가족 책장/ });
+        const row = await screen.findByRole("link", { name: /^가족 사진첩/ });
         await waitFor(() => expect(within(row).getByText("새 소식 1")).toBeTruthy());
-        expect(screen.queryByRole("link", { name: /책꽂이 안으로/ })).toBeNull();
+        expect(screen.queryByRole("link", { name: /묶음 안으로/ })).toBeNull();
       });
 
-      it("책장을 읽다가 오류가 나도 화면이 무너지지 않는다", async () => {
+      it("사진첩을 읽다가 오류가 나도 화면이 무너지지 않는다", async () => {
         state.replies = 2;
         state.boxes = "throw";
         render(<MyInfo />);
-        const row = await screen.findByRole("link", { name: /^가족 책장/ });
+        const row = await screen.findByRole("link", { name: /^가족 사진첩/ });
         await waitFor(() => expect(within(row).getByText("새 소식 2")).toBeTruthy());
         expect(screen.getByRole("link", { name: /^가족 공유/ })).toBeTruthy();
       });
 
-      it("로그인하지 않았으면 책장 줄도 없다", async () => {
+      it("로그인하지 않았으면 사진첩 줄도 없다", async () => {
         state.user = null;
         state.boxes = { owned: [shelf("1", "우리 엄마 아빠", TOKEN_A)], joined: [] };
         render(<MyInfo />);
@@ -239,7 +239,7 @@ describe("MyInfo · 내 정보 메뉴", () => {
 
     it("로그인하면 무엇을 쓸 수 있는지 알리고 로그인으로 보낸다 — 돌아올 곳은 내 정보", async () => {
       render(<MyInfo />);
-      expect(await screen.findByText(/로그인하면 가족 공유·가족 책장을 쓸 수 있어요/)).toBeTruthy();
+      expect(await screen.findByText(/로그인하면 가족 공유·가족 사진첩을 쓸 수 있어요/)).toBeTruthy();
       expect(screen.getByRole("link", { name: "로그인하기" })).toHaveAttribute("href", "/login?next=/me");
     });
 
@@ -247,7 +247,7 @@ describe("MyInfo · 내 정보 메뉴", () => {
       render(<MyInfo />);
       await screen.findByRole("link", { name: "로그인하기" });
       expect(screen.queryByRole("link", { name: /^가족 공유/ })).toBeNull();
-      expect(screen.queryByRole("link", { name: /^가족 책장/ })).toBeNull();
+      expect(screen.queryByRole("link", { name: /^가족 사진첩/ })).toBeNull();
       expect(screen.queryByRole("link", { name: /^보관함 정리/ })).toBeNull();
       expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
       expect(hrefOf(/^도움말/)).toBe("/help");

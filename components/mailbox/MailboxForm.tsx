@@ -5,7 +5,7 @@ import { GREETING_NAME_MAX, NAME_MAX, normalizeMembers, suggestionsFor, type Ton
 import type { MailboxInput } from "@/lib/supabase/mailbox";
 
 /*
-  책장 하나의 모습을 정하는 칸들. 만들 때와 고칠 때 같이 쓴다.
+  사진첩 하나의 모습을 정하는 칸들. 만들 때와 고칠 때 같이 쓴다.
 
     이름        내가 구분하려고 붙이는 이름("우리 엄마 아빠")
     부르는 말   인사말 맨 앞에 저절로 붙는다("엄마 아빠, …")
@@ -40,16 +40,16 @@ export function MailboxForm({ initial, submitLabel, busy, onSubmit, onCancel }: 
       className="flex flex-col gap-3 rounded-xl bg-bg p-3.5 ring-1 ring-line"
     >
       <label className="flex flex-col gap-1">
-        <span className="text-[13px] font-medium text-text-muted">책장 이름</span>
+        <span className="text-[13px] font-medium text-text-muted">사진첩 이름</span>
         <input
           type="text"
           value={name}
           maxLength={NAME_MAX}
           onChange={(event) => setName(event.target.value)}
-          placeholder="우리 엄마 아빠"
+          placeholder="엄마 아빠 사진첩"
           className="rounded-lg bg-bg-subtle px-3 py-2.5 text-[15px] text-text outline-none ring-1 ring-line focus:ring-2 focus:ring-accent"
         />
-        <span className="text-[12px] text-text-faint">나만 알아보면 돼요. 받는 분에게는 보이지 않아요.</span>
+        <span className="text-[12px] text-text-faint">받는 분이 여는 화면의 제목이 돼요. 예: 엄마 아빠 사진첩</span>
       </label>
 
       <label className="flex flex-col gap-1">

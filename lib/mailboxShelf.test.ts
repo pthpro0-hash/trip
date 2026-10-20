@@ -20,8 +20,8 @@ const card = (id: string, over: Partial<InboxCard> = {}): InboxCard => ({
   ...over,
 });
 
-describe("shelfYears · 해별 책꽂이", () => {
-  it("해마다 한 칸 — 새 해가 위, 같은 해 안에서는 최근에 다녀온 책이 먼저", () => {
+describe("shelfYears · 해별 묶음", () => {
+  it("해마다 한 칸 — 새 해가 위, 같은 해 안에서는 최근에 다녀온 엽서가 먼저", () => {
     const years = shelfYears([
       card("A", { startedOn: "2025-04-01" }),
       card("B", { startedOn: "2026-02-10" }),
@@ -33,7 +33,7 @@ describe("shelfYears · 해별 책꽂이", () => {
     expect(years[1].cards.map((entry) => entry.title)).toEqual(["D", "A"]);
   });
 
-  it("책꽂이에는 열어 본 책만 — 안 열어 본 엽서는 위의 '새 엽서'에 있다", () => {
+  it("묶음에는 열어 본 엽서만 — 안 열어 본 엽서는 위의 '새 엽서'에 있다", () => {
     const years = shelfYears([card("A", { opened: false }), card("B", { opened: true })]);
     expect(years).toHaveLength(1);
     expect(years[0].cards.map((entry) => entry.title)).toEqual(["B"]);
@@ -64,7 +64,7 @@ describe("yearTitle", () => {
 describe("lastYearToday · 작년 오늘", () => {
   const today = "2026-10-07";
 
-  it("작년 오늘이 여행 기간 안에 든 책", () => {
+  it("작년 오늘이 여행 기간 안에 든 엽서", () => {
     const found = lastYearToday([card("A", { startedOn: "2025-10-05", endedOn: "2025-10-07" })], today);
     expect(found?.card.title).toBe("A");
     expect(found?.yearsAgo).toBe(1);
@@ -77,11 +77,11 @@ describe("lastYearToday · 작년 오늘", () => {
     expect(lastYearToday([card("A", { startedOn: "2025-09-30", endedOn: "2025-10-03" })], today)).toBeNull();
   });
 
-  it("올해 다녀온 책은 '작년'이 아니다", () => {
+  it("올해 다녀온 엽서는 '작년'이 아니다", () => {
     expect(lastYearToday([card("A", { startedOn: "2026-10-05", endedOn: "2026-10-06" })], today)).toBeNull();
   });
 
-  it("여러 권이면 오늘에 가장 가까운 책, 같으면 더 최근 해", () => {
+  it("여러 권이면 오늘에 가장 가까운 엽서, 같으면 더 최근 해", () => {
     const near = card("N", { startedOn: "2025-10-09", endedOn: "2025-10-09" });
     const exact = card("E", { startedOn: "2024-10-06", endedOn: "2024-10-08" });
     expect(lastYearToday([near, exact], today)?.card.title).toBe("E");
@@ -92,7 +92,7 @@ describe("lastYearToday · 작년 오늘", () => {
     expect(lastYearToday([older, recent], today)?.card.title).toBe("R");
   });
 
-  it("해를 넘기는 여행도 맞춘다 — 12월 30일에 떠나 1월 2일에 돌아온 책은 1월 1일의 '작년 오늘'", () => {
+  it("해를 넘기는 여행도 맞춘다 — 12월 30일에 떠나 1월 2일에 돌아온 엽서는 1월 1일의 '작년 오늘'", () => {
     const found = lastYearToday([card("A", { startedOn: "2025-12-30", endedOn: "2026-01-02" })], "2027-01-01");
     expect(found?.card.title).toBe("A");
     expect(found?.yearsAgo).toBe(1);
@@ -107,7 +107,7 @@ describe("lastYearToday · 작년 오늘", () => {
     expect(lastYearToday([], today)).toBeNull();
   });
 
-  it("날짜를 못 읽는 책은 건너뛴다", () => {
+  it("날짜를 못 읽는 엽서는 건너뛴다", () => {
     expect(lastYearToday([card("A", { startedOn: "", endedOn: "" })], today)).toBeNull();
   });
 
@@ -130,7 +130,7 @@ describe("올해 지도의 재료", () => {
   const a = card("A", { photoCount: 3, places: [place("오동도", "2026-10-05"), place("향일암", "2026-10-06", { photo: null, photoCount: 0 })] });
   const b = card("B", { photoCount: 2, places: [place("안목해변", "2026-02-10")] });
 
-  it("곳을 날짜순으로 — 책이 달라도 날짜가 먼저", () => {
+  it("곳을 날짜순으로 — 엽서가 달라도 날짜가 먼저", () => {
     const steps = yearSteps([a, b]);
     expect(steps.map((step) => step.placeName)).toEqual(["안목해변", "오동도", "향일암"]);
     expect(steps.map((step) => [step.month, step.day])).toEqual([
@@ -140,14 +140,14 @@ describe("올해 지도의 재료", () => {
     ]);
   });
 
-  it("눌러서 갈 여행은 없고, 책마다 한 여행으로 센다", () => {
+  it("눌러서 갈 여행은 없고, 엽서마다 한 여행으로 센다", () => {
     const steps = yearSteps([a, b]);
     expect(steps.map((step) => step.tripId)).toEqual([b.id, a.id, a.id]);
     expect(tripsPerMonth(steps)[9]).toBe(1);
     expect(tripsPerMonth(steps)[1]).toBe(1);
   });
 
-  it("대표 사진 키는 '엽서 주소/파일' — 책마다 같은 파일 이름(a.webp)이 있어도 섞이지 않는다", () => {
+  it("대표 사진 키는 '엽서 주소/파일' — 엽서마다 같은 파일 이름(a.webp)이 있어도 섞이지 않는다", () => {
     const steps = yearSteps([a, b]);
     expect(steps.map((step) => step.photoPath)).toEqual([`${b.id}/a.webp`, `${a.id}/a.webp`, null]);
     const urls = yearPhotoUrls([a, b]);
@@ -161,7 +161,7 @@ describe("올해 지도의 재료", () => {
     expect(yearSteps([odd]).map((step) => step.placeName)).toEqual(["제대로"]);
   });
 
-  it("합계 — 책 수, 곳 수, 사진 수", () => {
+  it("합계 — 엽서 수, 곳 수, 사진 수", () => {
     const steps = yearSteps([a, b]);
     expect(yearTotals([a, b], steps)).toEqual({ trips: 2, places: 3, photos: 5 });
   });

@@ -8,7 +8,7 @@ const LAND = "#F6F3E9";
 const COAST = "#A9BFCB";
 
 interface RegionMiniMapProps {
-  /** 색칠해 보여줄 여행지. 보통 한 권역의 전부. */
+  /** 색칠해 보여줄 여행지. 보통 한 번역의 전부. */
   spots: Spot[];
   accent: string;
   dotRadius?: number;

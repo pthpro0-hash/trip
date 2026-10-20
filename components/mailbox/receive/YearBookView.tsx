@@ -11,11 +11,11 @@ import { PreviewBanner } from "./PreviewBanner";
 import { Cover, YearMap } from "./shelfParts";
 
 /*
-  올해의 책 — 그해 열어 본 책들을 한 권으로 묶어 보는 화면.
+  올해 모아보기 — 그해 열어 본 엽서들을 한곳에 묶어 보는 화면.
 
-  저장하지 않고 열어 본 책에서 그때그때 만든다. 위에서 아래로: 표지(그림 몇 장과 숫자) → 가장 사랑받은 사진 →
-  가장 사랑받은 책 → 한 해 다녀온 길(지도) → 달마다. 하트가 없으면 '사랑받은' 두 칸은 비운다.
-  설정에서 올해의 책을 끈 책장이면 열지 않는다(주소를 직접 열어도).
+  저장하지 않고 열어 본 엽서에서 그때그때 만든다. 위에서 아래로: 표지(그림 몇 장과 숫자) → 가장 사랑받은 사진 →
+  가장 사랑받은 엽서 → 한 해 다녀온 길(지도) → 달마다. 하트가 없으면 '사랑받은' 두 칸은 비운다.
+  설정에서 올해 모아보기를 끈 사진첩이면 열지 않는다(주소를 직접 열어도).
 */
 
 const MOSAIC: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-2", 4: "grid-cols-2" };
@@ -29,7 +29,7 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
     <main style={scale} className="mx-auto flex min-h-screen max-w-xl flex-col gap-7 px-5 pb-16 pt-8">
       {preview && <PreviewBanner all={preview === "all"} toggle={{ href: yearBookPath(token, year, preview === "all" ? true : "all") }} />}
       <Link href={back} className="self-start rs-18 font-semibold text-accent">
-        ← 책장
+        ← 사진첩
       </Link>
       {children}
     </main>
@@ -38,8 +38,8 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
   if (!view.settings.year) {
     return shell(
       <header className="flex flex-col gap-2">
-        <h1 className="rs-28 font-bold text-text">올해의 책은 지금 쓰지 않고 있어요</h1>
-        <p className="rs-18 leading-relaxed text-text-muted">보내는 가족이 올해의 책을 꺼 두었어요. 책장에서 엽서와 책꽂이는 그대로 볼 수 있어요.</p>
+        <h1 className="rs-28 font-bold text-text">올해 모아보기는 지금 쓰지 않고 있어요</h1>
+        <p className="rs-18 leading-relaxed text-text-muted">보내는 가족이 올해 모아보기를 꺼 두었어요. 사진첩에서 엽서와 묶음은 그대로 볼 수 있어요.</p>
       </header>,
     );
   }
@@ -47,8 +47,8 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
   if (!book) {
     return shell(
       <header className="flex flex-col gap-2">
-        <h1 className="rs-28 font-bold text-text">{year}년의 책은 아직 없어요</h1>
-        <p className="rs-18 leading-relaxed text-text-muted">열어 본 엽서가 모이면 한 해의 책이 만들어져요.</p>
+        <h1 className="rs-28 font-bold text-text">{year}년 모아보기는 아직 없어요</h1>
+        <p className="rs-18 leading-relaxed text-text-muted">열어 본 엽서가 모이면 한 해 모아보기가 만들어져요.</p>
       </header>,
     );
   }
@@ -67,7 +67,7 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
   return shell(
     <>
       <header className="flex flex-col gap-3">
-        <p className="rs-18 font-semibold text-accent">우리 가족 올해의 책</p>
+        <p className="rs-18 font-semibold text-accent">우리 가족 올해 모아보기</p>
         <h1 className="rs-32 font-bold tracking-tight text-text">{year}년</h1>
         {book.covers.length > 0 && (
           <div data-testid="mosaic" className={`grid gap-2 ${MOSAIC[book.covers.length]}`}>
@@ -104,8 +104,8 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
       )}
 
       {book.lovedBooks.length > 0 && (
-        <section aria-label="가장 사랑받은 책" className="flex flex-col gap-3">
-          <h2 className="rs-24 font-bold text-text">가장 사랑받은 책</h2>
+        <section aria-label="가장 사랑받은 엽서" className="flex flex-col gap-3">
+          <h2 className="rs-24 font-bold text-text">가장 사랑받은 엽서</h2>
           <ul className="flex flex-col gap-3">
             {book.lovedBooks.map(({ card, n }) => (
               <li key={card.id}>
@@ -156,11 +156,11 @@ export function YearBookView({ token, view, year, preview = false }: { token: st
         href={yearBookPrintPath(token, year, preview)}
         className="flex min-h-14 items-center justify-center rounded-2xl bg-accent-soft rs-20 font-semibold text-accent"
       >
-        책으로 저장(PDF)
+        모아보기 저장(PDF)
       </Link>
 
       <Link href={back} className="flex min-h-14 items-center justify-center rounded-2xl bg-bg-subtle rs-20 font-semibold text-text">
-        책장으로 가기
+        사진첩으로 가기
       </Link>
     </>,
   );

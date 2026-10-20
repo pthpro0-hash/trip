@@ -5,14 +5,14 @@ import { firstShelfInput, firstShelfItem } from "./mailboxFirst";
 import { RECOMMENDED } from "./mailboxSettings";
 
 /*
-  처음 엽서를 보내는 사람은 책장이 없다. 책장을 만들려면 /mailboxes 로 가서 다섯 칸(책장 이름 · 부르는 말 · 앞에 붙일지 ·
+  처음 엽서를 보내는 사람은 사진첩이 없다. 사진첩을 만들려면 /mailboxes 로 가서 다섯 칸(사진첩 이름 · 부르는 말 · 앞에 붙일지 ·
   받는 분 이름 · 말투)을 채우고 돌아와야 했다. 엽서 창 안에서 "누구에게 보내나요?"와 말투 두 가지만 묻고, 나머지는 그
   답에서 만든다.
 */
 describe("firstShelfInput", () => {
-  it("'엄마, 아빠'라고만 답해도 책장이 갖춰진다 — 이름 · 부르는 말 · 받는 분", () => {
+  it("'엄마, 아빠'라고만 답해도 사진첩이 갖춰진다 — 이름 · 부르는 말 · 받는 분", () => {
     expect(firstShelfInput("엄마, 아빠", "casual")).toEqual({
-      name: "우리 엄마 아빠",
+      name: "엄마 아빠 사진첩",
       greetingName: "엄마 아빠",
       useGreeting: true,
       tone: "casual",
@@ -22,7 +22,7 @@ describe("firstShelfInput", () => {
 
   it("한 분이면 그분 하나", () => {
     expect(firstShelfInput("할머니", "polite")).toMatchObject({
-      name: "우리 할머니",
+      name: "할머니 사진첩",
       greetingName: "할머니",
       tone: "polite",
       members: "할머니",
@@ -66,11 +66,11 @@ describe("firstShelfInput", () => {
       expect(normalizeMembers(input.members)).toEqual(long);
     });
 
-    it("책장 이름도 한도(40자)를 넘지 않는다", () => {
+    it("사진첩 이름도 한도(40자)를 넘지 않는다", () => {
       const names = ["가나다라마바사아자차", "카타파하가나다라마바", "사아자차카타파하가나", "다라마바사아자차카타", "파하가나다라마바사아", "자차카타파하가나다라"];
       const input = firstShelfInput(names.join(" "), "casual")!;
       expect(input.name.length).toBeLessThanOrEqual(NAME_MAX);
-      expect(input.name.startsWith("우리 ")).toBe(true);
+      expect(input.name.endsWith(" 사진첩")).toBe(true);
     });
 
     it("여섯 명이 넘으면 여섯 명까지(받는 쪽 한도)", () => {
@@ -81,18 +81,18 @@ describe("firstShelfInput", () => {
 });
 
 /*
-  책장을 만든 직후 엽서 창은 같은 창에서 이어 간다. 방금 만든 줄을 서버에서 다시 읽다가 실패하면 "만들었는데 안 된다"가
+  사진첩을 만든 직후 엽서 창은 같은 창에서 이어 간다. 방금 만든 줄을 서버에서 다시 읽다가 실패하면 "만들었는데 안 된다"가
   되니, 만든 값에 서버가 돌려준 id · 링크 글자만 붙여 쓴다.
 */
 describe("firstShelfItem", () => {
   const input = firstShelfInput("엄마, 아빠", "casual")!;
   const token = "T".repeat(43);
 
-  it("만든 책장 그대로 — 설정은 권장, 열려 있고, 보내는 사람은 나 하나", () => {
+  it("만든 사진첩 그대로 — 설정은 권장, 열려 있고, 보내는 사람은 나 하나", () => {
     expect(firstShelfItem("me", input, { id: "m1", token })).toEqual({
       id: "m1",
       ownerId: "me",
-      name: "우리 엄마 아빠",
+      name: "엄마 아빠 사진첩",
       greetingName: "엄마 아빠",
       useGreeting: true,
       tone: "casual",

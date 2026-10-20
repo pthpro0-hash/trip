@@ -45,7 +45,7 @@ export function JoinCard({ token }: { token: string | null }) {
       ) : (
         <>
           <p className="text-[16px] leading-relaxed text-text-muted">
-            이 초대를 수락하면 초대한 사람의 여행 기록을 함께 볼 수 있어요. 어디까지 할 수 있는지는 그 사람이 정한 권한을
+            이 초대를 수락하면 초대한 사람의 여행 기록을 함께 볼 수 있어요. 어디까지 할 수 있는지는 그 사람이 정한 번한을
             따라요. 언제든 나갈 수 있어요.
           </p>
           {result && <p role="alert" className="rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">{WHY[result.reason]}</p>}

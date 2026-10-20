@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import type { InboxCard, MailboxView } from "@/lib/supabase/mailboxPublic";
 import { FONT_SCALE } from "@/lib/mailboxSettings";
-import { mailboxPath, postcardPath, yearBookPath, type PreviewMode } from "@/lib/mailbox";
+import { albumTitle, mailboxPath, postcardPath, yearBookPath, type PreviewMode } from "@/lib/mailbox";
 import { lastYearLabel, lastYearToday, shelfYears, yearTitle, type ShelfYear } from "@/lib/mailboxShelf";
 import { yearBookSeason } from "@/lib/mailboxYearBook";
 import { useWho } from "@/lib/mailboxWho";
@@ -13,13 +13,13 @@ import { Cover, YearMap, sentDay, tripDay, useToday } from "./shelfParts";
 import { WhoPicker } from "./WhoPicker";
 
 /*
-  책장 첫 화면 — 부모님이 보는 곳.
+  사진첩 첫 화면 — 부모님이 보는 곳.
 
   글씨는 크게(본문 18px 이상), 단추는 손가락 하나 크기로. 할 수 있는 일은 "열어 보기"뿐이다. 설정·메뉴·계정은 없다.
 
-  위에서 아래로: 새로 온 엽서(큰 카드 — 안 열어 본 것) → 올해의 책(12월~2월에만) → 작년 오늘(오늘 즈음 다녀온 책,
-  있을 때만) → 책꽂이(열어 본 책을 해마다 꽂아 둔다. 가장 새 해만 펼쳐 있고, 해마다 그해 다녀온 곳을 지도로,
-  그해를 한 권으로 볼 수 있다). 열어 보면 큰 카드에서 책꽂이로 내려간다 — 새 엽서가 책꽂이에 묻히지 않는다.
+  위에서 아래로: 새로 온 엽서(큰 카드 — 안 열어 본 것) → 올해 모아보기(12월~2월에만) → 작년 오늘(오늘 즈음 다녀온 엽서,
+  있을 때만) → 묶음(열어 본 엽서를 해마다 모아 둔다. 가장 새 해만 펼쳐 있고, 해마다 그해 다녀온 곳을 지도로,
+  그해를 한 번으로 볼 수 있다). 열어 보면 큰 카드에서 묶음으로 내려간다 — 새 엽서가 묶음에 묻히지 않는다.
 */
 
 /** 안 열어 본 엽서 — 큰 카드. */
@@ -54,7 +54,7 @@ function Card({ token, card, preview }: { token: string; card: InboxCard; previe
   );
 }
 
-/** 책꽂이의 책 한 권 — 표지. */
+/** 묶음의 엽서 한 장 — 표지. */
 function Book({ token, card, preview }: { token: string; card: InboxCard; preview: PreviewMode }) {
   const last = card.replies.at(-1);
   return (
@@ -80,7 +80,7 @@ function Book({ token, card, preview }: { token: string; card: InboxCard; previe
 const shortButton =
   "flex min-h-14 min-w-0 flex-1 items-center justify-center gap-1 rounded-2xl px-2 text-center rs-17 font-semibold leading-snug break-keep transition active:scale-[0.99]";
 
-/** 한 해의 책꽂이. 접었다 펼 수 있고, 펼치면 맨 위에 올해의 책·지도 단추, 그 밑에 표지가 나온다. */
+/** 한 해의 묶음. 접었다 펼 수 있고, 펼치면 맨 위에 올해 모아보기·지도 단추, 그 밑에 표지가 나온다. */
 function Year({
   token,
   entry,
@@ -125,10 +125,10 @@ function Year({
               {hasBook && (
                 <Link
                   href={yearBookPath(token, entry.year, preview)}
-                  aria-label={`${label} 올해의 책 보기`}
+                  aria-label={`${label} 올해 모아보기`}
                   className={`${shortButton} bg-accent text-on-accent`}
                 >
-                  <span aria-hidden="true">📖</span> 올해의 책 보기
+                  <span aria-hidden="true">📖</span> 올해 모아보기
                 </Link>
               )}
               {hasPlaces && (
@@ -147,7 +147,7 @@ function Year({
 
           {mapOpen && hasPlaces && <YearMap year={entry.year} cards={entry.cards} />}
 
-          <ul aria-label={`${title} 책꽂이`} className="grid grid-cols-2 gap-x-3.5 gap-y-5">
+          <ul aria-label={`${title} 묶음`} className="grid grid-cols-2 gap-x-3.5 gap-y-5">
             {entry.cards.map((card) => (
               <Book key={card.id} token={token} card={card} preview={preview} />
             ))}
@@ -158,7 +158,7 @@ function Year({
   );
 }
 
-/** 올해의 책이 만들어졌다는 알림(12월~2월). */
+/** 올해 모아보기가 만들어졌다는 알림(12월~2월). */
 function YearBookNotice({ token, year, preview }: { token: string; year: string; preview: PreviewMode }) {
   return (
     <Link
@@ -169,8 +169,8 @@ function YearBookNotice({ token, year, preview }: { token: string; year: string;
         📖
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="rs-22 font-bold leading-snug">{year}년 올해의 책이 만들어졌어요</span>
-        <span className="rs-16 opacity-90">한 해를 한 권으로 모아 봤어요</span>
+        <span className="rs-22 font-bold leading-snug">{year}년 올해 모아보기가 만들어졌어요</span>
+        <span className="rs-16 opacity-90">한 해를 한곳에 모아 봤어요</span>
       </span>
       <span aria-hidden="true" className="rs-24">
         ›
@@ -179,7 +179,7 @@ function YearBookNotice({ token, year, preview }: { token: string; year: string;
   );
 }
 
-/** 오늘 즈음 다녀온 지난 해의 책 한 권. */
+/** 오늘 즈음 다녀온 지난 해의 엽서 한 장. */
 function LastYear({ token, card, yearsAgo, preview }: { token: string; card: InboxCard; yearsAgo: number; preview: PreviewMode }) {
   const label = lastYearLabel(yearsAgo);
   return (
@@ -223,7 +223,7 @@ export function MailboxHome({ token, view, today, preview = false }: { token: st
       {preview && <PreviewBanner all={preview === "all"} toggle={{ href: mailboxPath(token, preview === "all" ? true : "all") }} />}
 
       <header className="flex flex-col gap-2">
-        <h1 className="rs-32 font-bold tracking-tight text-text">우리 가족 책장</h1>
+        <h1 className="rs-32 font-bold tracking-tight text-text">{albumTitle(view.name)}</h1>
         <p className="rs-18 leading-relaxed text-text-muted">
           {view.postcards.length === 0
             ? "아직 도착한 엽서가 없어요. 가족이 여행을 다녀오면 이곳으로 엽서가 와요."

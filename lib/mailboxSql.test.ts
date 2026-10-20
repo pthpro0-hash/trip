@@ -69,7 +69,7 @@ describe("mailbox.sql · 표", () => {
   });
 });
 
-describe("mailbox.sql · 책장 설정", () => {
+describe("mailbox.sql · 사진첩 설정", () => {
   it("설정 칸(settings)이 있고 JSON 객체이며 크기가 제한된다 — 이미 만든 표에도 더해진다", () => {
     expect(sql).toMatch(/alter table public\.mailboxes add column if not exists settings jsonb not null default '\{\}'::jsonb/);
     expect(sql).toMatch(/jsonb_typeof\(settings\) = 'object'/);
@@ -90,7 +90,7 @@ describe("mailbox.sql · 책장 설정", () => {
     expect(fn("mailbox_view")).toContain("jsonb_array_length");
   });
 
-  it("우편함 목록에는 엽서마다 끝난 날과 곳 목록(places)이 있다 — 책꽂이·작년 오늘·올해 지도의 재료", () => {
+  it("우편함 목록에는 엽서마다 끝난 날과 곳 목록(places)이 있다 — 묶음·작년 오늘·올해 지도의 재료", () => {
     const body = fn("mailbox_view");
     expect(body).toContain("'endedOn'");
     expect(body).toContain("'places'");
@@ -104,7 +104,7 @@ describe("mailbox.sql · 책장 설정", () => {
     expect(body).toMatch(/jsonb_typeof\(v -> 'photos'\) = 'array'/);
   });
 
-  it("목록에는 엽서마다 하트 수(heartCounts: 사진별, 책 하트는 빈 글자)가 있다 — 올해의 책의 재료", () => {
+  it("목록에는 엽서마다 하트 수(heartCounts: 사진별, 엽서 하트는 빈 글자)가 있다 — 올해 모아보기의 재료", () => {
     const body = fn("mailbox_view");
     expect(body).toContain("'heartCounts'");
     expect(body).toContain("postcard_hearts");
@@ -267,11 +267,11 @@ describe("mailbox.sql · 하트", () => {
     );
   });
 
-  it("한 사람이 한 사진(또는 한 책)에 하트는 하나다 — 같은 곳을 두 번 눌러도 겹치지 않는다", () => {
+  it("한 사람이 한 사진(또는 한 엽서)에 하트는 하나다 — 같은 곳을 두 번 눌러도 겹치지 않는다", () => {
     expect(sql).toMatch(/unique \(postcard_id, mailbox_id, who, file\)/);
   });
 
-  it("사진 칸은 비었으면 책 하트, 아니면 파일 이름 모양이어야 한다", () => {
+  it("사진 칸은 비었으면 엽서 하트, 아니면 파일 이름 모양이어야 한다", () => {
     expect(sql).toMatch(/file\s+text\s+not null default '' check \(file = '' or file ~ '\^\[A-Za-z0-9\._-\]\{1,80\}\$'\)/);
     expect(sql).toMatch(/who\s+text\s+not null check \(length\(who\) between 1 and 10\)/);
   });
@@ -300,7 +300,7 @@ describe("mailbox.sql · 하트", () => {
     expect(body).toContain("delete from public.postcard_hearts");
   });
 
-  it("우편함 설정이 책마다(book)면 책 하트만, 아니면 엽서에 든 사진에만 누를 수 있다", () => {
+  it("우편함 설정이 엽서마다(book)면 엽서 하트만, 아니면 엽서에 든 사진에만 누를 수 있다", () => {
     const body = fn("mailbox_heart");
     expect(body).toContain("settings ->> 'heart'");
     expect(body).toContain("'book'");
@@ -427,7 +427,7 @@ describe("mailbox.sql · 우편함 지우기", () => {
   });
 });
 
-describe("mailbox.sql · 오래된 책의 사진 줄이기", () => {
+describe("mailbox.sql · 오래된 엽서의 사진 줄이기", () => {
   it("보관 권수는 설정(keep)에서 읽는다 — 'all' 이면 제한 없음(null), 비었거나 모르는 값이면 권장 10", () => {
     const body = fn("mailbox_keep_count");
     expect(body).toContain("to_jsonb('all'::text)");
@@ -451,7 +451,7 @@ describe("mailbox.sql · 오래된 책의 사진 줄이기", () => {
     expect(sql).not.toMatch(/grant execute on function public\.mailbox_keep_count/);
   });
 
-  it("배달된 우편함이 모두 내 것이고, 모든 우편함에서 보관 권수를 넘은 책만 후보다", () => {
+  it("배달된 우편함이 모두 내 것이고, 모든 우편함에서 보관 권수를 넘은 엽서만 후보다", () => {
     const body = fn("mailbox_trim_candidates");
     expect(body).toContain("owns_all_deliveries");
     expect(body).toContain("mailbox_keep_count");
@@ -496,11 +496,11 @@ describe("mailbox.sql · 가고 싶은 곳 보내기", () => {
     expect(sql).toMatch(/who\s+text\s+not null check \(length\(who\) between 1 and 10\)/);
   });
 
-  it("책장을 지우면 함께 지워진다", () => {
+  it("사진첩을 지우면 함께 지워진다", () => {
     expect(sql).toMatch(/mailbox_id\s+uuid\s+not null references public\.mailboxes \(id\) on delete cascade,\s+who\s+text\s+not null check \(length\(who\) between 1 and 10\),\s+spot_id/);
   });
 
-  it("그 책장의 보내는 사람들이 읽고 '봤다'고 표시한다 — 직접 넣고 지우는 길은 없다", () => {
+  it("그 사진첩의 보내는 사람들이 읽고 '봤다'고 표시한다 — 직접 넣고 지우는 길은 없다", () => {
     expect(policy("mailbox_wishes_select")).toContain("is_mailbox_sender(mailbox_id)");
     expect(policy("mailbox_wishes_update")).toContain("is_mailbox_sender(mailbox_id)");
     expect(sql).not.toMatch(/policy "mailbox_wishes_insert/);
@@ -516,7 +516,7 @@ describe("mailbox.sql · 가고 싶은 곳 보내기", () => {
     expect(sql).toMatch(/revoke all on table[^;]*public\.mailbox_wishes[^;]*from anon/);
   });
 
-  it("보내기는 열린 책장에만, 설정에서 끄지 않았을 때만 — 켜고 끄기(토글), 너무 잦거나 가득 차면 막는다", () => {
+  it("보내기는 열린 사진첩에만, 설정에서 끄지 않았을 때만 — 켜고 끄기(토글), 너무 잦거나 가득 차면 막는다", () => {
     const body = fn("mailbox_wish");
     expect(body).toContain("closed_at is null");
     expect(body).toContain("settings ->> 'wish'");
@@ -528,7 +528,7 @@ describe("mailbox.sql · 가고 싶은 곳 보내기", () => {
     expect(body).toMatch(/>= 100/);
   });
 
-  it("받는 쪽 목록에 이 책장의 가고 싶은 곳(누가 어느 곳)이 내려간다", () => {
+  it("받는 쪽 목록에 이 사진첩의 가고 싶은 곳(누가 어느 곳)이 내려간다", () => {
     const body = fn("mailbox_view");
     expect(body).toContain("'wishes'");
     expect(body).toContain("mailbox_wishes");

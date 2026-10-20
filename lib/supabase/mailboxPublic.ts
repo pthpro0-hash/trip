@@ -6,11 +6,11 @@ import { SUPABASE_URL } from "./config";
 import { POSTCARD_BUCKET } from "./postcardCleanup";
 
 /*
-  가족 책장 · 받는 쪽(로그인 없음)이 읽고 답하는 길.
+  가족 사진첩 · 받는 쪽(로그인 없음)이 읽고 답하는 길.
 
-  받는 쪽은 표를 읽지 못하고, 링크의 글자를 받아 그 책장 것만 돌려주는 함수(RPC)만 쓴다
+  받는 쪽은 표를 읽지 못하고, 링크의 글자를 받아 그 사진첩 것만 돌려주는 함수(RPC)만 쓴다
   (supabase/mailbox.sql). 내려받은 것은 보낸 사람의 브라우저가 적은 것이라 모양을 확인하고, 모르는
-  모양은 그리지 않는다. 모르는 링크·닫힌 책장·오류는 모두 null — 화면은 "열리지 않는 링크"를 보인다.
+  모양은 그리지 않는다. 모르는 링크·닫힌 사진첩·오류는 모두 null — 화면은 "열리지 않는 링크"를 보인다.
 */
 
 /** 엽서 보관함 파일의 공개 주소. 이름은 한 칸으로 묶어 "../" 같은 것이 섞여도 폴더 밖을 못 가리킨다. */
@@ -23,7 +23,7 @@ export interface Reply {
   reaction: string;
 }
 
-/** 책 한 권에 든 곳 하나. 올해 지도와 작년 오늘이 쓴다(좌표는 보낸 때 이미 1km 로 흐려져 있다). */
+/** 엽서 한 장에 든 곳 하나. 올해 지도와 작년 오늘이 쓴다(좌표는 보낸 때 이미 1km 로 흐려져 있다). */
 export interface InboxPlace {
   placeName: string;
   lat: number;
@@ -35,7 +35,7 @@ export interface InboxPlace {
   photo: string | null;
 }
 
-/** 사진 하나에(file 이 빈 글자면 책 하나에) 하트를 단 사람 수. */
+/** 사진 하나에(file 이 빈 글자면 엽서 하나에) 하트를 단 사람 수. */
 export interface HeartCount {
   file: string;
   n: number;
@@ -50,11 +50,11 @@ export interface InboxCard {
   endedOn: string;
   /** 다녀온 곳들(들른 차례). */
   places: InboxPlace[];
-  /** 사진별 하트 수(올해의 책이 쓴다). 하트가 없으면 빈 목록. */
+  /** 사진별 하트 수(올해 모아보기가 쓴다). 하트가 없으면 빈 목록. */
   heartCounts: HeartCount[];
   /** 첫 사진 파일 이름. 사진이 없으면 null. */
   cover: string | null;
-  /** 책(엽서)에 든 사진 수. */
+  /** 엽서(엽서)에 든 사진 수. */
   photoCount: number;
   greeting: string;
   sentAt: string;
@@ -64,6 +64,8 @@ export interface InboxCard {
 }
 
 export interface MailboxView {
+  /** 보내는 사람이 붙인 사진첩 이름("엄마 아빠 사진첩"). 옛 서버 설정이면 빈 글자. */
+  name: string;
   tone: Tone;
   /** 부모님 화면 설정(글씨 크기·답장 문구 …). 칸마다 확인해 읽는다. */
   settings: MailboxSettings;
@@ -82,7 +84,7 @@ export interface ReceivedPostcard {
   settings: MailboxSettings;
   members: string[];
   replies: Reply[];
-  /** 이 책장에서 누가 어느 사진(책 하트면 빈 글자)에 하트를 달았나. */
+  /** 이 사진첩에서 누가 어느 사진(엽서 하트면 빈 글자)에 하트를 달았나. */
   hearts: Heart[];
 }
 
@@ -161,13 +163,14 @@ function cardOf(raw: unknown): InboxCard | null {
   };
 }
 
-/** 책장 첫 화면: 받은 엽서 목록. 모르는 링크·닫힌 책장이면 null. */
+/** 사진첩 첫 화면: 받은 엽서 목록. 모르는 링크·닫힌 사진첩이면 null. */
 export async function fetchMailboxView(supabase: SupabaseClient, token: string): Promise<MailboxView | null> {
   if (!isMailboxToken(token)) return null;
   const { data, error } = await supabase.rpc("mailbox_view", { box_token: token });
   if (error || !isRecord(data)) return null;
   const cards = Array.isArray(data.postcards) ? data.postcards.map(cardOf).filter((card): card is InboxCard => card !== null) : [];
   return {
+    name: isString(data.name) ? data.name.trim() : "",
     tone: toneOf(data.tone),
     settings: resolveSettings(data.settings),
     members: strings(data.members),
@@ -175,7 +178,7 @@ export async function fetchMailboxView(supabase: SupabaseClient, token: string):
   };
 }
 
-/** 엽서 한 장. 그 책장에 없는 엽서·모양이 틀린 스냅샷이면 null. */
+/** 엽서 한 장. 그 사진첩에 없는 엽서·모양이 틀린 스냅샷이면 null. */
 export async function fetchMailboxPostcard(
   supabase: SupabaseClient,
   token: string,
@@ -186,7 +189,7 @@ export async function fetchMailboxPostcard(
   if (error || !isRecord(data) || !isString(data.id) || !isString(data.senderName)) return null;
   if (!isPostcardSnapshot(data.snapshot)) return null;
   const mailbox = isRecord(data.mailbox) ? data.mailbox : {};
-  // 사진을 줄인 책은 files 에 남은 사진만 있다. 곳마다의 사진 목록도 거기 맞춘다(지도가 지워진 사진을 가리키지 않게).
+  // 사진을 줄인 엽서는 files 에 남은 사진만 있다. 곳마다의 사진 목록도 거기 맞춘다(지도가 지워진 사진을 가리키지 않게).
   const kept = new Set(data.snapshot.files);
   const snapshot = {
     ...data.snapshot,
@@ -206,7 +209,7 @@ export async function fetchMailboxPostcard(
   };
 }
 
-/** 미리보기에서 모든 엽서를 열어 본 것처럼 — 책꽂이·작년 오늘·올해의 책을 볼 수 있게. 원래 것은 바꾸지 않는다. */
+/** 미리보기에서 모든 엽서를 열어 본 것처럼 — 묶음·작년 오늘·올해 모아보기를 볼 수 있게. 원래 것은 바꾸지 않는다. */
 export function asOpened(view: MailboxView): MailboxView {
   return { ...view, postcards: view.postcards.map((card) => ({ ...card, opened: true })) };
 }
@@ -224,7 +227,7 @@ export async function markPostcardOpened(supabase: SupabaseClient, token: string
 export type HeartResult = { ok: true } | { ok: false; reason: "invalid" | "closed" | "often" | "changed" | "failed" };
 
 /**
- * 하트를 켜거나 끈다. 사진 하트는 파일 이름, 책 하트는 빈 글자. 서버가 책장 설정(사진마다·책마다)과 맞지
+ * 하트를 켜거나 끈다. 사진 하트는 파일 이름, 엽서 하트는 빈 글자. 서버가 사진첩 설정(사진마다·엽서마다)과 맞지
  * 않으면 거절한다 — 그때는 "하트 방식이 바뀌었어요"(changed)로 알려 화면을 다시 열게 한다.
  */
 export async function toggleHeart(

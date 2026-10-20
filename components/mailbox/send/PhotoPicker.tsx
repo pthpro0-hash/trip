@@ -5,7 +5,7 @@ import { useId, useState } from "react";
 /*
   엽서에 실을 사진.
 
-  사진은 자동으로 골라 둔다(곳마다 골고루, 책장 설정의 장수까지). 사람 대부분은 그대로 보내는데, 예전에는 스무 장 가까운
+  사진은 자동으로 골라 둔다(곳마다 골고루, 사진첩 설정의 장수까지). 사람 대부분은 그대로 보내는데, 예전에는 스무 장 가까운
   사진 격자가 창 맨 위를 차지했다. 접어 두고 "사진 12장을 골라 뒀어요 · 바꾸기"로 말한다 — 바꾸고 싶은 사람만 연다.
   무엇을 골랐는지는 위의 엽서 미리보기(첫 사진)가 보여 준다.
 */
@@ -19,7 +19,7 @@ interface PhotoPickerProps {
   picked: string[];
   /** 실을 수 있는 최대 장수. */
   limit: number;
-  /** 한도가 줄어든 까닭(책장 설정). 없으면 null. */
+  /** 한도가 줄어든 까닭(사진첩 설정). 없으면 null. */
   limitNote: string | null;
   /** 손으로 고쳤는가 — 그러면 추천으로 되돌리는 길을 낸다. */
   manual: boolean;
@@ -58,7 +58,7 @@ export function PhotoPicker({ photos, urls, picked, limit, limitNote, manual, on
         </button>
       </div>
 
-      {/* 책장 설정 때문에 장수가 줄었다면 까닭을 접힌 채로도 말한다(펼쳐야 알 수 있으면 '왜 6장이지?'가 된다). */}
+      {/* 사진첩 설정 때문에 장수가 줄었다면 까닭을 접힌 채로도 말한다(펼쳐야 알 수 있으면 '왜 6장이지?'가 된다). */}
       {limitNote && <p className="text-[12px] leading-relaxed text-text-faint">{limitNote}</p>}
 
       {open && (

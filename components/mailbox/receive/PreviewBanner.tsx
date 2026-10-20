@@ -3,7 +3,7 @@ import Link from "next/link";
 /**
  * 보내는 사람이 부모님 화면을 미리 보는 중이라는 띠. 무엇이 가지 않는지 말해 준다.
  *
- * 부모님이 열어 본 엽서가 없으면 책꽂이·작년 오늘·올해의 책이 비어 있다. 그래서 '모든 엽서를 열어 본 것처럼'(all)
+ * 부모님이 열어 본 엽서가 없으면 묶음·작년 오늘·올해 모아보기가 비어 있다. 그래서 '모든 엽서를 열어 본 것처럼'(all)
  * 보는 방식이 있고, 띠의 링크로 그것과 '지금 부모님이 보시는 대로'를 오간다(toggle).
  */
 export function PreviewBanner({ all = false, toggle }: { all?: boolean; toggle?: { href: string } }) {
@@ -17,14 +17,14 @@ export function PreviewBanner({ all = false, toggle }: { all?: boolean; toggle?:
         <strong className="font-bold">미리보기예요</strong> — 부모님께는 아무 표시도 가지 않아요. 열어 봤다는 표시도, 답장도,
         하트도 보내지 않아요.
       </p>
-      {all && <p>모든 엽서를 열어 본 것처럼 보여 드려요. 책꽂이·작년 오늘·올해의 책을 확인해 보세요.</p>}
+      {all && <p>모든 엽서를 열어 본 것처럼 보여 드려요. 묶음·작년 오늘·올해 모아보기를 확인해 보세요.</p>}
       {toggle && (
         <Link href={toggle.href} className="self-start font-semibold underline underline-offset-4">
-          {all ? "지금 부모님이 보시는 대로 보기" : "모든 엽서를 열어 본 것처럼 보기 (책꽂이 확인)"}
+          {all ? "지금 부모님이 보시는 대로 보기" : "모든 엽서를 열어 본 것처럼 보기 (묶음 확인)"}
         </Link>
       )}
       <Link href="/mailboxes" className="self-start font-semibold underline underline-offset-4">
-        ← 내 책장으로
+        ← 내 사진첩으로
       </Link>
     </div>
   );

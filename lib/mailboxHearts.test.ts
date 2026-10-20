@@ -9,7 +9,7 @@ const hearts: Heart[] = [
 ];
 
 describe("mailboxHearts · 받는 쪽에서 하트를 세고 켜고 끈다", () => {
-  it("사진마다 하트가 몇 개인지 센다 — 책 하트(빈 글자)는 따로", () => {
+  it("사진마다 하트가 몇 개인지 센다 — 엽서 하트(빈 글자)는 따로", () => {
     expect(heartCount(hearts, "a.webp")).toBe(2);
     expect(heartCount(hearts, "b.webp")).toBe(1);
     expect(heartCount(hearts, "c.webp")).toBe(0);
@@ -45,7 +45,7 @@ describe("mailboxHearts · 받는 쪽에서 하트를 세고 켜고 끈다", () 
     expect(JSON.stringify(hearts)).toBe(before);
   });
 
-  it("하트 파일 이름은 빈 글자(책 하트)이거나 안전한 파일 이름이어야 한다", () => {
+  it("하트 파일 이름은 빈 글자(엽서 하트)이거나 안전한 파일 이름이어야 한다", () => {
     expect(isHeartFile("")).toBe(true);
     expect(isHeartFile("a.webp")).toBe(true);
     expect(isHeartFile("../a.webp")).toBe(false);
@@ -62,7 +62,7 @@ describe("summarizeHearts · 보낸 사람이 보는 하트 한 줄", () => {
     { id: "h4", mailboxId: "m2", who: "엄마", file: "a.webp", seen: true },
   ];
 
-  it("(책장, 이름)마다 한 줄 — 사진 하트는 몇 장인지, 책 하트는 책 하나", () => {
+  it("(사진첩, 이름)마다 한 줄 — 사진 하트는 몇 장인지, 엽서 하트는 엽서 하나", () => {
     expect(summarizeHearts(rows)).toEqual([
       { mailboxId: "m1", who: "엄마", photos: 2, book: false, ids: ["h1", "h2"] },
       { mailboxId: "m1", who: "아빠", photos: 0, book: true, ids: ["h3"] },
@@ -78,7 +78,7 @@ describe("summarizeHearts · 보낸 사람이 보는 하트 한 줄", () => {
 describe("heartTarget · 하트를 어디에 눌렀는지", () => {
   const line = (over: Partial<{ photos: number; book: boolean }>) => ({ mailboxId: "m1", who: "엄마", photos: 0, book: false, ids: [], ...over });
 
-  it("사진에만 눌렀으면 몇 장에, 책에만이면 이 여행에, 둘 다면 이 여행과 사진 몇 장에", () => {
+  it("사진에만 눌렀으면 몇 장에, 엽서에만이면 이 여행에, 둘 다면 이 여행과 사진 몇 장에", () => {
     expect(heartTarget(line({ photos: 3 }))).toBe("사진 3장에");
     expect(heartTarget(line({ book: true }))).toBe("이 여행에");
     expect(heartTarget(line({ book: true, photos: 2 }))).toBe("이 여행과 사진 2장에");

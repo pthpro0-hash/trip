@@ -24,6 +24,7 @@ const card = (letter: string, over: Partial<InboxCard> = {}): InboxCard => ({
   ...over,
 });
 const view = (postcards: InboxCard[], over: Partial<MailboxView> = {}): MailboxView => ({
+  name: "",
   tone: "casual",
   settings: RECOMMENDED,
   members: ["엄마", "아빠"],
@@ -56,18 +57,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("YearBookPrint · 올해의 책을 쪽으로 나눈 인쇄용 책", () => {
-  it("쪽 순서 — 표지, 사랑받은 사진, 사랑받은 책, 지도, 달마다, 여행마다, 끝쪽", () => {
+describe("YearBookPrint · 올해 모아보기를 쪽으로 나눈 인쇄용 모아보기", () => {
+  it("쪽 순서 — 표지, 사랑받은 사진, 사랑받은 엽서, 지도, 달마다, 여행마다, 끝쪽", () => {
     const { container } = render(<YearBookPrint token={TOKEN} view={view(books)} year="2026" filesById={filesById} />);
     expect(pages(container)).toEqual(["cover", "loved-photos", "loved-books", "map", "months", "trip", "trip", "last"]);
   });
 
-  it("하트가 없으면 사랑받은 사진·책 쪽이 빠지고, 곳 정보가 없으면 지도 쪽이 빠진다", () => {
+  it("하트가 없으면 사랑받은 사진·엽서 쪽이 빠지고, 곳 정보가 없으면 지도 쪽이 빠진다", () => {
     const { container } = render(<YearBookPrint token={TOKEN} view={view([card("A")])} year="2026" filesById={{ [idOf("A")]: photos(2) }} />);
     expect(pages(container)).toEqual(["cover", "months", "trip", "last"]);
   });
 
-  it("표지에는 해와 숫자가 있다 — 다른 해의 책은 들어오지 않는다", () => {
+  it("표지에는 해와 숫자가 있다 — 다른 해의 엽서는 들어오지 않는다", () => {
     render(<YearBookPrint token={TOKEN} view={view(books)} year="2026" filesById={filesById} />);
     expect(screen.getByRole("heading", { level: 1, name: "2026년" })).toBeTruthy();
     expect(screen.getByText("2번 다녀왔어요 · 3곳 · 사진 6장 · 하트 9개")).toBeTruthy();
@@ -95,7 +96,7 @@ describe("YearBookPrint · 올해의 책을 쪽으로 나눈 인쇄용 책", () 
     expect(trips[1].querySelectorAll("img")).toHaveLength(14);
   });
 
-  it("사진 목록이 없으면 표지 사진 하나만 — 엽서 한 장을 못 읽어도 책은 만들어진다", () => {
+  it("사진 목록이 없으면 표지 사진 하나만 — 엽서 한 장을 못 읽어도 엽서는 만들어진다", () => {
     const { container } = render(<YearBookPrint token={TOKEN} view={view([card("A")])} year="2026" filesById={{}} />);
     const trip = container.querySelector("[data-page='trip']") as HTMLElement;
     expect(trip.querySelectorAll("img")).toHaveLength(1);
@@ -144,7 +145,7 @@ describe("YearBookPrint · 올해의 책을 쪽으로 나눈 인쇄용 책", () 
       expect(print).toHaveBeenCalledTimes(1);
     });
 
-    it("그림이 하나도 없는 책은 바로 저장할 수 있다", async () => {
+    it("그림이 하나도 없는 엽서는 바로 저장할 수 있다", async () => {
       const plain = [card("A", { cover: null })];
       render(<YearBookPrint token={TOKEN} view={view(plain)} year="2026" filesById={{ [idOf("A")]: [] }} />);
       expect(await screen.findByRole("button", { name: "PDF로 저장" })).toBeEnabled();
@@ -207,20 +208,20 @@ describe("YearBookPrint · 올해의 책을 쪽으로 나눈 인쇄용 책", () 
     for (const child of children) expect(child.getAttribute("data-page")).not.toBeNull();
   });
 
-  it("책장으로 돌아가는 길이 있다 — 올해의 책으로", () => {
+  it("사진첩으로 돌아가는 길이 있다 — 올해 모아보기로", () => {
     render(<YearBookPrint token={TOKEN} view={view(books)} year="2026" filesById={filesById} />);
-    expect(screen.getByRole("link", { name: /올해의 책/ })).toHaveAttribute("href", `/m/${TOKEN}/year/2026`);
+    expect(screen.getByRole("link", { name: /올해 모아보기/ })).toHaveAttribute("href", `/m/${TOKEN}/year/2026`);
   });
 
-  it("그해 열어 본 책이 없으면 '아직 없어요'", () => {
+  it("그해 열어 본 엽서가 없으면 '아직 없어요'", () => {
     render(<YearBookPrint token={TOKEN} view={view(books)} year="2024" filesById={filesById} />);
-    expect(screen.getByText("2024년의 책은 아직 없어요")).toBeTruthy();
+    expect(screen.getByText("2024년 모아보기는 아직 없어요")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /PDF로 저장|사진 불러오는 중/ })).toBeNull();
   });
 
-  it("설정에서 올해의 책을 끈 책장이면 만들지 않는다", () => {
+  it("설정에서 올해 모아보기를 끈 사진첩이면 만들지 않는다", () => {
     render(<YearBookPrint token={TOKEN} view={view(books, { settings: { ...RECOMMENDED, year: false } })} year="2026" filesById={filesById} />);
-    expect(screen.getByText("올해의 책은 지금 쓰지 않고 있어요")).toBeTruthy();
+    expect(screen.getByText("올해 모아보기는 지금 쓰지 않고 있어요")).toBeTruthy();
     expect(screen.queryByRole("heading", { level: 1, name: "2026년" })).toBeNull();
   });
 
@@ -228,7 +229,7 @@ describe("YearBookPrint · 올해의 책을 쪽으로 나눈 인쇄용 책", () 
     it("띠가 붙고, 돌아가는 길에 미리보기 방식이 이어진다", () => {
       render(<YearBookPrint token={TOKEN} view={view(books)} year="2026" filesById={filesById} preview="all" />);
       expect(screen.getByRole("note", { name: "미리보기" })).toBeTruthy();
-      const back = screen.getAllByRole("link", { name: /올해의 책/ }).filter((link) => !link.closest("[role=note]"));
+      const back = screen.getAllByRole("link", { name: /올해 모아보기/ }).filter((link) => !link.closest("[role=note]"));
       for (const link of back) expect(link).toHaveAttribute("href", `/m/${TOKEN}/year/2026?preview=all`);
     });
   });

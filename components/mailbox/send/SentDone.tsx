@@ -9,7 +9,7 @@ import type { MailboxItem } from "@/lib/supabase/mailbox";
 /*
   엽서를 만든 뒤.
 
-  할 일은 하나 — 받는 분께 링크를 보내는 것이다. 책장마다 [카카오톡 등으로 보내기](폰의 공유창, 카카오톡이 목록에 나온다)와
+  할 일은 하나 — 받는 분께 링크를 보내는 것이다. 사진첩마다 [카카오톡 등으로 보내기](폰의 공유창, 카카오톡이 목록에 나온다)와
   [링크 복사](공유창이 없는 브라우저)가 있다. 그리고 다음 일을 말해 둔다: 열어 보시면 여행 상세에서 알려 드린다.
 */
 
@@ -17,12 +17,12 @@ interface SentDoneProps {
   postcardId: string;
   /** 보낸 이름(받는 분께 ‘○○이 보낸 엽서’로 보인 것). */
   senderName: string;
-  /** 엽서가 간 책장과, 그 책장에 보인 글(호칭 포함). */
+  /** 엽서가 간 사진첩과, 그 사진첩에 보인 글(호칭 포함). */
   boxes: { box: MailboxItem; greeting: string }[];
   onClose: () => void;
 }
 
-/** "누가 열어 보시면" — 책장이 하나면 그 분들, 여럿이면 받는 분들. */
+/** "누가 열어 보시면" — 사진첩이 하나면 그 분들, 여럿이면 받는 분들. */
 function whoOpens(boxes: SentDoneProps["boxes"]): string {
   if (boxes.length !== 1) return "받는 분들이";
   const name = boxes[0].box.greetingName?.trim();

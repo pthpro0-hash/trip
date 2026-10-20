@@ -5,7 +5,7 @@ import { RECOMMENDED } from "@/lib/mailboxSettings";
 import { SentDone } from "./SentDone";
 
 /*
-  엽서를 만든 뒤. 할 일은 하나 — 링크를 보내는 것. 책장마다 "카카오톡 등으로 보내기"(폰의 공유창)와 "링크 복사"가 있고,
+  엽서를 만든 뒤. 할 일은 하나 — 링크를 보내는 것. 사진첩마다 "카카오톡 등으로 보내기"(폰의 공유창)와 "링크 복사"가 있고,
   "부모님이 열어 보시면 여행 상세에서 알려 드려요"라고 다음 일을 말해 준다(여행 상세에 열어 봤는지가 나온다).
 */
 
@@ -25,7 +25,7 @@ const box = (over: Partial<MailboxItem>): MailboxItem => ({
 });
 
 const 엄마아빠 = box({ id: "m1" });
-const 장모님 = box({ id: "m2", name: "장인 장모님 책장", greetingName: "장모님", tone: "polite", token: "U".repeat(43) });
+const 장모님 = box({ id: "m2", name: "장인 장모님 사진첩", greetingName: "장모님", tone: "polite", token: "U".repeat(43) });
 const CARD = "P".repeat(43);
 const linkOf = (token: string) => `${window.location.origin}/m/${token}/p/${CARD}`;
 
@@ -63,7 +63,7 @@ describe("SentDone", () => {
   });
 
   describe("열어 보셨는지는 여행 상세에서", () => {
-    it("책장이 하나면 그 분들이 열어 보시면 알려 준다고 말한다", () => {
+    it("사진첩이 하나면 그 분들이 열어 보시면 알려 준다고 말한다", () => {
       done();
       expect(screen.getByText(/엄마 아빠가 열어 보시면 여행 상세에서 알려 드려요/)).toBeTruthy();
     });
@@ -73,7 +73,7 @@ describe("SentDone", () => {
       expect(screen.getByText(/장모님이 열어 보시면 여행 상세에서 알려 드려요/)).toBeTruthy();
     });
 
-    it("책장이 여럿이면 받는 분들", () => {
+    it("사진첩이 여럿이면 받는 분들", () => {
       done([
         { box: 엄마아빠, greeting: "엄마 아빠, 안녕" },
         { box: 장모님, greeting: "장모님, 안녕" },
@@ -81,31 +81,31 @@ describe("SentDone", () => {
       expect(screen.getByText(/받는 분들이 열어 보시면 여행 상세에서 알려 드려요/)).toBeTruthy();
     });
 
-    it("부르는 말이 없는 책장이면 받는 분", () => {
+    it("부르는 말이 없는 사진첩이면 받는 분", () => {
       done([{ box: box({ greetingName: null, useGreeting: false }), greeting: "안녕" }]);
       expect(screen.getByText(/받는 분이 열어 보시면 여행 상세에서 알려 드려요/)).toBeTruthy();
     });
   });
 
-  it("책장마다 이름과 보낸 글이 보인다", () => {
+  it("사진첩마다 이름과 보낸 글이 보인다", () => {
     done([
       { box: 엄마아빠, greeting: "엄마 아빠, 안녕" },
       { box: 장모님, greeting: "장모님, 건강하시죠?" },
     ]);
-    const second = screen.getByText("장인 장모님 책장").closest("li")!;
+    const second = screen.getByText("장인 장모님 사진첩").closest("li")!;
     expect(within(second).getByText(/“장모님, 건강하시죠\?”/)).toBeTruthy();
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
 
   describe("공유", () => {
-    it("폰의 공유창을 열 수 있으면 [카카오톡 등으로 보내기] — 그 책장 링크와 글을 넘긴다", async () => {
+    it("폰의 공유창을 열 수 있으면 [카카오톡 등으로 보내기] — 그 사진첩 링크와 글을 넘긴다", async () => {
       const share = vi.fn(async () => undefined);
       setShare(share);
       done([
         { box: 엄마아빠, greeting: "엄마 아빠, 안녕" },
         { box: 장모님, greeting: "장모님, 안녕" },
       ]);
-      const second = screen.getByText("장인 장모님 책장").closest("li")!;
+      const second = screen.getByText("장인 장모님 사진첩").closest("li")!;
       fireEvent.click(within(second).getByRole("button", { name: "카카오톡 등으로 보내기" }));
       await waitFor(() =>
         expect(share).toHaveBeenCalledWith({ title: "김지민이 보낸 여행 엽서", text: "장모님, 안녕", url: linkOf("U".repeat(43)) }),
@@ -142,7 +142,7 @@ describe("SentDone", () => {
   });
 
   describe("링크 복사", () => {
-    it("그 책장 링크를 복사하고, 어디에 붙여 넣으면 되는지 말해 준다", async () => {
+    it("그 사진첩 링크를 복사하고, 어디에 붙여 넣으면 되는지 말해 준다", async () => {
       const writeText = vi.fn(async () => undefined);
       setClipboard({ writeText });
       done([

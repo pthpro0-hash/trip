@@ -4,7 +4,7 @@ import { render, screen, fireEvent, within } from "@testing-library/react";
 import { FirstShelfForm } from "./FirstShelfForm";
 
 /*
-  처음 엽서를 보내는 사람에게는 책장이 없다. "책장을 만들어 주세요"라며 다른 화면(다섯 칸짜리 폼)으로 보내는 대신,
+  처음 엽서를 보내는 사람에게는 사진첩이 없다. "사진첩을 만들어 주세요"라며 다른 화면(다섯 칸짜리 폼)으로 보내는 대신,
   엽서 창 안에서 두 가지만 묻는다 — 누구에게 보내나요, 말투는.
 */
 
@@ -25,7 +25,7 @@ describe("FirstShelfForm", () => {
     // 묶음 이름은 fieldset 의 legend 하나가 맡는다(안쪽 radiogroup 에 같은 이름을 또 달지 않는다).
     expect(screen.getByRole("group", { name: "말투" })).toBeTruthy();
     expect(screen.queryByRole("radiogroup")).toBeNull();
-    // 책장 이름 · 부르는 말 같은 칸은 묻지 않는다.
+    // 사진첩 이름 · 부르는 말 같은 칸은 묻지 않는다.
     expect(screen.getAllByRole("textbox")).toHaveLength(1);
   });
 
@@ -100,7 +100,7 @@ describe("FirstShelfForm", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("만드는 동안에는 누를 수 없다 — 책장이 둘 만들어지지 않게", () => {
+  it("만드는 동안에는 누를 수 없다 — 사진첩이 둘 만들어지지 않게", () => {
     form({ busy: true });
     expect(screen.getByRole("button", { name: "만드는 중…" })).toBeDisabled();
   });

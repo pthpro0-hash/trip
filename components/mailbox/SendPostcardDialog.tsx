@@ -25,7 +25,7 @@ import { logUse } from "@/lib/usage";
   한 줄기로 간다: (처음이면 누구에게 보내는지 한 가지만 묻고) → 한 줄을 쓰면 위의 엽서 미리보기가 바로 바뀐다 → [엽서 만들기]
   → 링크를 보낸다. 사진과 받는 곳·인사말은 자동으로 채워 접어 두었다 — 바꾸고 싶은 사람만 연다.
 
-  인사말은 책장마다 따로다 — 한 번 쓰면 다른 책장에 복사되고 호칭만 그 책장 것으로 바뀐다. 직접 고친 책장은 따로 간다.
+  인사말은 사진첩마다 따로다 — 한 번 쓰면 다른 사진첩에 복사되고 호칭만 그 사진첩 것으로 바뀐다. 직접 고친 사진첩은 따로 간다.
   보내면 엽서는 그 순간의 모습으로 남는다(사진은 한 번만 복사한다).
 
   링크 보내기는 폰의 공유창(카카오톡이 목록에 나온다)을 연다. 안 되는 브라우저에서는 링크 복사(SentDone).
@@ -53,15 +53,15 @@ function remembered(): string {
 type Sent = { postcardId: string; boxes: { box: MailboxItem; greeting: string }[]; senderName: string };
 
 const REASON: Record<Extract<SendPostcardResult, { ok: false }>["reason"], string> = {
-  invalid: "받을 책장, 한 줄, 보내는 이름을 확인해 주세요.",
+  invalid: "받을 사진첩, 한 줄, 보내는 이름을 확인해 주세요.",
   photos: "사진을 옮기지 못했어요. 인터넷이 약한가 봐요. 잠시 뒤 다시 해 주세요. (엽서는 나가지 않았어요)",
   failed: "보내지 못했어요. 잠시 뒤 다시 해 주세요. (엽서는 나가지 않았어요)",
 };
 
-/** 처음 책장을 만들다 안 됐을 때. 책장이라는 말을 모르는 사람도 읽을 수 있게 쓴다. */
+/** 처음 사진첩을 만들다 안 됐을 때. 사진첩이라는 말을 모르는 사람도 읽을 수 있게 쓴다. */
 const CREATE_REASON = {
   invalid: "받는 분을 다시 적어 주세요. 예: 엄마, 아빠",
-  limit: "더 만들 수 없어요. ‘내 정보’의 ‘가족 책장’에서 쓰지 않는 곳을 닫은 뒤 다시 해 주세요.",
+  limit: "더 만들 수 없어요. ‘내 정보’의 ‘가족 사진첩’에서 쓰지 않는 곳을 닫은 뒤 다시 해 주세요.",
   failed: "저장하지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.",
 } as const;
 
@@ -93,7 +93,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   const [createError, setCreateError] = useState<string | null>(null);
   const nameId = useId();
   /*
-    책장을 방금 만들어 '누구에게' 화면이 사라지고 엽서 쓰기로 넘어오면, 눌렀던 단추가 없어져 초점이 갈 곳을 잃는다 — 새 제목으로
+    사진첩을 방금 만들어 '누구에게' 화면이 사라지고 엽서 쓰기로 넘어오면, 눌렀던 단추가 없어져 초점이 갈 곳을 잃는다 — 새 제목으로
     옮겨 화면 낭독기가 새 걸음을 읽게 한다. (엽서를 열 때부터 글칸에 초점을 주지는 않는다: 폰에서는 키보드가 바로 올라와 미리보기를 가린다.)
   */
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -119,7 +119,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
         const list = await fetchMailboxes(supabase, userId);
         if (!active) return;
         if (list === "failed") return setBoxes("failed");
-        // 닫은 책장에는 보낼 수 없다.
+        // 닫은 사진첩에는 보낼 수 없다.
         setBoxes([...list.owned, ...list.joined].filter((box) => !box.closed));
       } catch {
         // 읽다가 끊겼다 — '불러오는 중…'에 영영 머물지 않게.
@@ -132,14 +132,14 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   }, [userId]);
 
   const openBoxes = Array.isArray(boxes) ? boxes : [];
-  // 처음에는 열린 책장을 모두 고른 것으로 둔다. 하나뿐이면 더 쉽다.
+  // 처음에는 열린 사진첩을 모두 고른 것으로 둔다. 하나뿐이면 더 쉽다.
   const selectedIds = checked ?? new Set(openBoxes.map((box) => box.id));
   const selected = openBoxes.filter((box) => selectedIds.has(box.id));
   const rows = greetingsFor(body, selected, overrides);
   const rowOf = (id: string) => rows.find((row) => row.mailboxId === id);
 
   /*
-    이 책에 실을 수 있는 사진 수와 크기. 책장마다 설정이 다른데 사진 복사본은 하나라서, 고른 책장들 중
+    이 엽서에 실을 수 있는 사진 수와 크기. 사진첩마다 설정이 다른데 사진 복사본은 하나라서, 고른 사진첩들 중
     가장 적은 수에, 가장 선명한 크기에 맞춘다(sendLimits).
   */
   const limits = sendLimits(selected.map((box) => box.settings));
@@ -151,7 +151,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
       ? null
       : selected.length > 1 && strictest.length < selected.length
         ? `${attachParticle(strictest.map((box) => box.name).join(", "), "은", "는")} ${limits.photos}장까지라 ${limits.photos}장까지 고를 수 있어요.`
-        : `책장 설정에 따라 ${limits.photos}장까지 고를 수 있어요.`;
+        : `사진첩 설정에 따라 ${limits.photos}장까지 고를 수 있어요.`;
 
   const togglePhoto = (id: string) =>
     setManual(
@@ -169,7 +169,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   const firstShot = photos.find((photo) => picked.includes(photo.id));
   const previewUrl = (firstShot && photoUrls.get(firstShot.storagePath)) || null;
 
-  /** 한 줄 아래 추천 문구: 받는 곳이 정해진 말투로. 책장마다의 추천은 접힌 목록 안에 있다. */
+  /** 한 줄 아래 추천 문구: 받는 곳이 정해진 말투로. 사진첩마다의 추천은 접힌 목록 안에 있다. */
   const tone: Tone = selected[0]?.tone ?? "casual";
 
   /*
@@ -178,7 +178,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   */
   const missing =
     selected.length === 0
-      ? "받을 책장을 골라 주세요."
+      ? "받을 사진첩을 골라 주세요."
       : body.trim().length === 0
         ? "한 줄을 적어 주세요. 받는 분께 가는 인사말이에요."
         : senderName.trim().length === 0
@@ -188,7 +188,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
   /** 아래 띠에 보이는 알림: 서버 쪽 실패가 먼저, 아니면 눌러 본 뒤로는 지금 빠진 것(채우면 사라진다). */
   const notice = failure ?? (tried ? missing : null);
 
-  /** 처음 보내는 사람: 답 하나로 책장을 만들고 같은 창에서 이어 간다. */
+  /** 처음 보내는 사람: 답 하나로 사진첩을 만들고 같은 창에서 이어 간다. */
   const createShelf = async ({ who, tone: answer }: { who: string; tone: Tone }) => {
     const supabase = getBrowserClient();
     const input: MailboxInput | null = firstShelfInput(who, answer);
@@ -198,8 +198,8 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
     try {
       /*
         지난 시도가 서버에는 들어갔는데 답이 오다 끊겼다면('저장하지 못했어요'가 떴는데 사실은 만들어져 있다면) 다시 눌러 만들 때
-        같은 책장이 둘이 된다 — 둘 다 받는 곳으로 골라져 부모님께 링크가 두 개 간다. 만들기 전에 한 번 더 읽어, 이미 열린
-        책장이 있으면 새로 만들지 않고 그것을 쓴다.
+        같은 사진첩이 둘이 된다 — 둘 다 받는 곳으로 골라져 부모님께 링크가 두 개 간다. 만들기 전에 한 번 더 읽어, 이미 열린
+        사진첩이 있으면 새로 만들지 않고 그것을 쓴다.
       */
       const existing = await fetchMailboxes(supabase, userId);
       if (existing !== "failed") {
@@ -299,7 +299,7 @@ export function SendPostcardDialog({ userId, trip, photoUrls, onClose }: SendPos
         ) : boxes === "failed" ? (
           <>
             {heading}
-            <p className="text-[14px] text-text-muted">책장을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>
+            <p className="text-[14px] text-text-muted">사진첩을 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>
           </>
         ) : boxes.length === 0 ? (
           <FirstShelfForm busy={creating} error={createError} onSubmit={(answer) => void createShelf(answer)} />

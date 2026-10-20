@@ -45,10 +45,10 @@ export function SiteHeader() {
   const canAdd = canIn(useFamilyView(), "add");
   // 폰의 아래 탭이 있는 화면이면 위 띠의 갈래는 폰에서 접는다.
   const bottomNav = showsBottomNav(pathname);
-  // 가족 책장(보내는 쪽) 화면에서는 그 바로가기가 켜져 보인다.
+  // 가족 사진첩(보내는 쪽) 화면에서는 그 바로가기가 켜져 보인다.
   const onShelf = pathname === "/mailboxes" || pathname.startsWith("/mailboxes/");
 
-  // 가족 책장의 받는 쪽(부모님)에는 위 띠가 없다 — 엽서와 답장 단추뿐이다.
+  // 가족 사진첩의 받는 쪽(부모님)에는 위 띠가 없다 — 엽서와 답장 단추뿐이다.
   if (isReceiverPath(pathname)) return null;
 
   return (
@@ -105,7 +105,7 @@ export function SiteHeader() {
             </AddPhotosLink>
           )}
           {/*
-            가족 책장(부모님께 엽서를 보내는 곳)으로 가는 바로가기. 예전에는 아래 탭의 "내 정보" 안으로 들어가야 했다.
+            가족 사진첩(부모님께 엽서를 보내는 곳)으로 가는 바로가기. 예전에는 아래 탭의 "내 정보" 안으로 들어가야 했다.
             아래 탭이 없는 좁은 화면(로그인 · 링크로 받은 화면 · 사진 고르기)에서는 갈래 둘과 계정 칩만으로도 폭이 꽉 차서 접는다.
           */}
           <Link
@@ -115,7 +115,7 @@ export function SiteHeader() {
               bottomNav ? "inline-flex" : "hidden sm:inline-flex"
             } ${onShelf ? "bg-accent-soft text-accent" : "text-text-muted hover:bg-bg-subtle hover:text-text"}`}
           >
-            가족 책장
+            가족 사진첩
           </Link>
           {/* 도움말은 "Help" 라고 적는다 — 물음표만으로는 무엇인지 알아보기 어렵다. 스크린리더에는 "도움말"로 읽힌다. */}
           <Link

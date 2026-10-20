@@ -34,11 +34,11 @@ beforeEach(() => {
 });
 
 /*
-  오래된 책의 사진 줄이기 — 순서는 책장 지우기와 같다. 줄일 책과 지울 파일을 알아내고, 사진 파일을 먼저 지우고,
-  그다음에 기록을 고친다. 파일을 못 지운 책이 있어도 지운 만큼은 기록에 맞춘다(서버가 파일이 정말 사라진 것만 뺀다).
+  오래된 엽서의 사진 줄이기 — 순서는 사진첩 지우기와 같다. 줄일 엽서와 지울 파일을 알아내고, 사진 파일을 먼저 지우고,
+  그다음에 기록을 고친다. 파일을 못 지운 엽서가 있어도 지운 만큼은 기록에 맞춘다(서버가 파일이 정말 사라진 것만 뺀다).
 */
 describe("planMailboxTrim · 무엇을 줄이나", () => {
-  it("줄일 책과 책마다 지울 파일을 읽는다", async () => {
+  it("줄일 엽서와 엽서마다 지울 파일을 읽는다", async () => {
     const { client, calls } = fake({
       mailbox_trim_plan: { data: { books: [{ id: P1, drop: ["b.webp", "c.webp"] }, { id: P2, drop: ["b.webp"] }] } },
     });
@@ -51,18 +51,18 @@ describe("planMailboxTrim · 무엇을 줄이나", () => {
     expect(calls[0]).toEqual({ name: "mailbox_trim_plan", args: { box: "m1" } });
   });
 
-  it("줄일 책이 없으면 빈 목록", async () => {
+  it("줄일 엽서가 없으면 빈 목록", async () => {
     expect(await planMailboxTrim(fake({ mailbox_trim_plan: { data: { books: [] } } }).client, "m1")).toEqual({ books: [] });
   });
 
-  it("내 책장이 아니거나(null) 오류거나 던지면 null — 조용히 아무것도 안 보인다", async () => {
+  it("내 사진첩이 아니거나(null) 오류거나 던지면 null — 조용히 아무것도 안 보인다", async () => {
     expect(await planMailboxTrim(fake({ mailbox_trim_plan: { data: null } }).client, "m1")).toBeNull();
     expect(await planMailboxTrim(fake({ mailbox_trim_plan: { error: { message: "x" } } }).client, "m1")).toBeNull();
     const throwing = { rpc: async () => { throw new Error("offline"); } } as unknown as SupabaseClient;
     expect(await planMailboxTrim(throwing, "m1")).toBeNull();
   });
 
-  it("엽서 주소·파일 이름 모양이 틀린 것은 버리고, 지울 파일이 없는 책은 뺀다", async () => {
+  it("엽서 주소·파일 이름 모양이 틀린 것은 버리고, 지울 파일이 없는 엽서는 뺀다", async () => {
     const { client } = fake({
       mailbox_trim_plan: {
         data: {
@@ -83,7 +83,7 @@ describe("planMailboxTrim · 무엇을 줄이나", () => {
 describe("trimMailbox · 줄이기", () => {
   const plan = { books: [{ id: P1, drop: ["b.webp", "c.webp"] }, { id: P2, drop: ["b.webp"] }] };
 
-  it("책마다 사진 파일을 먼저 지우고, 그다음 기록을 고친다 — 이 차례로", async () => {
+  it("엽서마다 사진 파일을 먼저 지우고, 그다음 기록을 고친다 — 이 차례로", async () => {
     const { client, calls } = fake({ mailbox_trim_plan: { data: plan }, mailbox_trim_apply: { data: 3 } });
     expect(await trimMailbox(client, "m1")).toEqual({ ok: true, books: 2, files: 3 });
     expect(files.calls).toEqual([
@@ -94,14 +94,14 @@ describe("trimMailbox · 줄이기", () => {
     expect(calls[1].args).toEqual({ box: "m1", cards: [P1, P2] });
   });
 
-  it("줄일 책이 없으면 파일도 기록도 건드리지 않는다", async () => {
+  it("줄일 엽서가 없으면 파일도 기록도 건드리지 않는다", async () => {
     const { client, calls } = fake({ mailbox_trim_plan: { data: { books: [] } } });
     expect(await trimMailbox(client, "m1")).toEqual({ ok: true, books: 0, files: 0 });
     expect(files.calls).toEqual([]);
     expect(calls.map((call) => call.name)).toEqual(["mailbox_trim_plan"]);
   });
 
-  it("한 책의 파일을 못 지워도 나머지는 계속하고, 지운 만큼은 기록에 맞춘 뒤 files 로 알린다", async () => {
+  it("한 엽서의 파일을 못 지워도 나머지는 계속하고, 지운 만큼은 기록에 맞춘 뒤 files 로 알린다", async () => {
     files.fail.add(P1);
     const { client, calls } = fake({ mailbox_trim_plan: { data: plan }, mailbox_trim_apply: { data: 1 } });
     expect(await trimMailbox(client, "m1")).toEqual({ ok: false, reason: "files" });
@@ -116,7 +116,7 @@ describe("trimMailbox · 줄이기", () => {
     expect(calls.map((call) => call.name)).toEqual(["mailbox_trim_plan"]);
   });
 
-  it("기록을 고치는 함수가 오류거나 null(내 책장 아님)이면 failed", async () => {
+  it("기록을 고치는 함수가 오류거나 null(내 사진첩 아님)이면 failed", async () => {
     expect(await trimMailbox(fake({ mailbox_trim_plan: { data: plan }, mailbox_trim_apply: { error: { message: "x" } } }).client, "m1")).toEqual({
       ok: false,
       reason: "failed",

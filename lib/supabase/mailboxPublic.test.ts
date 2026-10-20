@@ -14,7 +14,7 @@ import {
 
 /*
   받는 쪽(로그인 없음)이 읽는 것. 내려받은 것은 보낸 사람의 브라우저가 적은 것이라 모양을 확인하고,
-  모르는 모양은 그리지 않는다. 링크가 틀렸거나 책장이 닫혔으면 null — 화면은 "열리지 않는 링크"를 보인다.
+  모르는 모양은 그리지 않는다. 링크가 틀렸거나 사진첩이 닫혔으면 null — 화면은 "열리지 않는 링크"를 보인다.
 */
 
 const TOKEN = "T".repeat(43);
@@ -68,7 +68,7 @@ describe("fetchMailboxView", () => {
     ],
   };
 
-  it("책장과 받은 엽서 목록을 읽을 수 있는 모양으로", async () => {
+  it("사진첩과 받은 엽서 목록을 읽을 수 있는 모양으로", async () => {
     const { client, calls } = fake({ mailbox_view: { data: view } });
     const result = await fetchMailboxView(client, TOKEN);
     expect(calls[0]).toEqual({ name: "mailbox_view", args: { box_token: TOKEN } });
@@ -77,12 +77,20 @@ describe("fetchMailboxView", () => {
     expect(result?.postcards[0].replies).toEqual([{ who: "엄마", reaction: "좋구나" }]);
   });
 
+  it("사진첩 이름도 읽는다 — 받는 분이 여는 화면의 제목이다. 옛 서버 설정이라 없으면 빈 글자", async () => {
+    expect((await fetchMailboxView(fake({ mailbox_view: { data: { ...view, name: "  엄마 아빠 사진첩 " } } }).client, TOKEN))?.name).toBe("엄마 아빠 사진첩");
+    const { name: _gone, ...old } = view;
+    void _gone;
+    expect((await fetchMailboxView(fake({ mailbox_view: { data: old } }).client, TOKEN))?.name).toBe("");
+    expect((await fetchMailboxView(fake({ mailbox_view: { data: { ...view, name: 3 } } }).client, TOKEN))?.name).toBe("");
+  });
+
   it("열어 본 시각이 있으면 opened", async () => {
     const { client } = fake({ mailbox_view: { data: { ...view, postcards: [{ ...view.postcards[0], openedAt: "2026-10-02T01:00:00Z" }] } } });
     expect((await fetchMailboxView(client, TOKEN))?.postcards[0].opened).toBe(true);
   });
 
-  it("모르는 링크·닫힌 책장(null)은 null", async () => {
+  it("모르는 링크·닫힌 사진첩(null)은 null", async () => {
     expect(await fetchMailboxView(fake({ mailbox_view: { data: null } }).client, TOKEN)).toBeNull();
   });
 
@@ -166,7 +174,7 @@ describe("fetchMailboxPostcard", () => {
     expect(result?.snapshot.title).toBe("강릉 바다");
   });
 
-  it("줄인 책은 곳마다 사진 목록에서도 지워진 사진을 뺀다 — 앨범과 지도가 같은 사진만 가리키게", async () => {
+  it("줄인 엽서는 곳마다 사진 목록에서도 지워진 사진을 뺀다 — 앨범과 지도가 같은 사진만 가리키게", async () => {
     const trimmed = {
       ...snapshot,
       files: ["a.webp"],
@@ -194,12 +202,12 @@ describe("fetchMailboxPostcard", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("그 책장에 없는 엽서(null)는 null", async () => {
+  it("그 사진첩에 없는 엽서(null)는 null", async () => {
     expect(await fetchMailboxPostcard(fake({ mailbox_postcard: { data: null } }).client, TOKEN, CARD)).toBeNull();
   });
 });
 
-describe("책꽂이 재료 · 끝난 날과 곳 목록", () => {
+describe("묶음 재료 · 끝난 날과 곳 목록", () => {
   const base = { name: "x", tone: "casual", members: [], postcards: [] };
   const raw = { id: CARD, senderName: "지민", title: "여수", startedOn: "2025-10-05", cover: "a.webp", greeting: "", sentAt: "", openedAt: null, replies: [] };
   const read = async (over: Record<string, unknown>) =>
@@ -258,13 +266,13 @@ describe("책꽂이 재료 · 끝난 날과 곳 목록", () => {
   });
 });
 
-describe("올해의 책 재료 · 사진별 하트 수", () => {
+describe("올해 모아보기 재료 · 사진별 하트 수", () => {
   const base = { name: "x", tone: "casual", members: [], postcards: [] };
   const raw = { id: CARD, senderName: "지민", title: "여수", startedOn: "2025-10-05", cover: "a.webp", greeting: "", sentAt: "", openedAt: null, replies: [] };
   const read = async (over: Record<string, unknown>) =>
     (await fetchMailboxView(fake({ mailbox_view: { data: { ...base, postcards: [{ ...raw, ...over }] } } }).client, TOKEN))?.postcards[0];
 
-  it("사진별 하트 수를 읽는다 — 책 하트는 사진이 빈 글자", async () => {
+  it("사진별 하트 수를 읽는다 — 엽서 하트는 사진이 빈 글자", async () => {
     const card = await read({
       heartCounts: [
         { file: "a.webp", n: 3 },
@@ -343,7 +351,7 @@ describe("하트 · 받는 쪽", () => {
     });
   });
 
-  it("끄기도 같은 길 — 책 하트는 사진이 빈 글자", async () => {
+  it("끄기도 같은 길 — 엽서 하트는 사진이 빈 글자", async () => {
     const { client, calls } = fake({ mailbox_heart: { data: true } });
     expect(await toggleHeart(client, TOKEN, CARD, "엄마", "", false)).toEqual({ ok: true });
     expect(calls[0].args).toMatchObject({ heart_file: "", heart_on: false });

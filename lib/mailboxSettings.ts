@@ -1,34 +1,34 @@
 /*
-  책장 설정.
+  사진첩 설정.
 
   권장값이 기본이다. 저장된 값은 칸마다 따로 읽는다 — 비었거나, 모양이 틀렸거나, 선택지 밖이면 그 칸만
   권장으로 되돌리고 나머지는 살린다. 저장된 값 하나가 틀려도 화면이 깨지지 않게 하려는 것이다.
 
   어느 설정이 어디에 쓰이나:
-    photos·size   엽서를 보낼 때(새로 꽂는 책부터). 이미 보낸 엽서는 보낸 순간 그대로다.
-    font·words·heart·past·year  부모님 화면(바로 바뀐다). 하트는 사진마다 / 책마다, past 는 '작년 오늘', year 는 '올해의 책'.
+    photos·size   엽서를 보낼 때(새로 보내는 엽서부터). 이미 보낸 엽서는 보낸 순간 그대로다.
+    font·words·heart·past·year  부모님 화면(바로 바뀐다). 하트는 사진마다 / 엽서마다, past 는 '작년 오늘', year 는 '올해 모아보기'.
     wish  예전 '가고 싶은 곳 보내기'. 기능은 2026-10-14 화면에서 뺐고, 저장된 값과 서버가 쓰므로 칸만 남겨 둔다.
-    keep  오래된 책의 사진 줄이기(책장 주인이 단추로). 최근 10권만 사진까지, 나머지는 표지·하트 받은 사진만.
+    keep  오래된 엽서의 사진 줄이기(사진첩 주인이 단추로). 최근 10권만 사진까지, 나머지는 표지·하트 받은 사진만.
 */
 
 export type FontSize = "normal" | "large" | "xlarge";
 
 export interface MailboxSettings {
-  /** 책 한 권에 싣는 사진 수. */
+  /** 엽서 한 장에 싣는 사진 수. */
   photos: 6 | 12 | 20;
   /** 엽서로 복사하는 사진의 긴 변(px). */
   size: 640 | 960;
   /** 부모님 화면의 글씨 크기. */
   font: FontSize;
-  /** 하트를 사진마다 받을지, 책마다 한 번만 받을지. */
+  /** 하트를 사진마다 받을지, 엽서마다 한 번만 받을지. */
   heart: "photo" | "book";
   /** 답장 단추 문구 셋. */
   words: [string, string, string];
-  /** 책장에 사진까지 보관할 책 수. */
+  /** 사진첩에 사진까지 보관할 엽서 수. */
   keep: 10 | "all";
-  /** 책장 홈에 "작년 오늘"을 보일지. */
+  /** 사진첩 홈에 "작년 오늘"을 보일지. */
   past: boolean;
-  /** 연말에 "올해의 책"을 저절로 만들지. */
+  /** 연말에 "올해 모아보기"을 저절로 만들지. */
   year: boolean;
   /**
    * 부모님 화면에 '가고 싶은 곳 보내기'를 둘지. 그 기능은 2026-10-14 화면에서 뺐다 — 저장된 설정과 서버(mailbox.sql)가 이 칸을
@@ -53,7 +53,7 @@ export const PHOTO_CHOICES = [6, 12, 20] as const;
 export const SIZE_CHOICES = [640, 960] as const;
 export const FONT_CHOICES: FontSize[] = ["normal", "large", "xlarge"];
 export const HEART_CHOICES = ["photo", "book"] as const;
-/** 사진까지 보관할 책 수: 최근 10권(권장) 또는 전부. */
+/** 사진까지 보관할 엽서 수: 최근 10권(권장) 또는 전부. */
 export const KEEP_CHOICES = [10, "all"] as const;
 /** 답장 문구 한 칸의 글자 수. */
 export const WORD_MAX = 15;
@@ -122,8 +122,8 @@ export function receiverSettings(settings: MailboxSettings): ReceiverSettings {
 }
 
 /**
- * 한 책을 여러 책장에 꽂을 때의 한도. 사진 복사본은 하나라서 사진 수는 가장 적은 쪽에, 크기는 더 선명한
- * 쪽에 맞춘다(모자라게 보내지는 않고, 한 책장의 한도는 넘지 않는다).
+ * 한 엽서를 여러 사진첩에 모아을 때의 한도. 사진 복사본은 하나라서 사진 수는 가장 적은 쪽에, 크기는 더 선명한
+ * 쪽에 맞춘다(모자라게 보내지는 않고, 한 사진첩의 한도는 넘지 않는다).
  */
 export function sendLimits(list: MailboxSettings[]): { photos: number; size: number } {
   if (list.length === 0) return { photos: RECOMMENDED.photos, size: RECOMMENDED.size };
@@ -148,7 +148,7 @@ export function settingsDiffCount(settings: MailboxSettings): number {
 }
 
 /**
- * 책 한 권이 보관함에서 차지하는 크기의 어림. 사진 한 장은 640px 에서 50~70KB, 960px 에서 100~140KB 쯤이다
+ * 엽서 한 장이 보관함에서 차지하는 크기의 어림. 사진 한 장은 640px 에서 50~70KB, 960px 에서 100~140KB 쯤이다
  * (WebP, 사진마다 다르다). 설정 화면에서 선택이 용량에 어떤 영향을 주는지 보여 주는 데 쓴다.
  */
 export function bookSizeText(photos: number, size: number): string {
@@ -158,7 +158,7 @@ export function bookSizeText(photos: number, size: number): string {
 }
 
 /**
- * 오래된 책의 사진을 줄이면 얼마나 아끼는지의 어림. 640px 사진 한 장은 50~70KB 쯤이다(960px 로 보낸 것은 더 크다 —
+ * 오래된 엽서의 사진을 줄이면 얼마나 아끼는지의 어림. 640px 사진 한 장은 50~70KB 쯤이다(960px 로 보낸 것은 더 크다 —
  * 어림이라 작은 쪽으로 말한다).
  */
 export function trimSavingsText(files: number): string {

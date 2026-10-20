@@ -12,8 +12,8 @@ describe("FamilyPage", () => {
     expect(screen.getByRole("heading", { level: 1, name: "가족 공유" })).toBeTruthy();
   });
 
-  it("가족 책장으로 가는 안내는 그대로 있다", () => {
+  it("가족 사진첩으로 가는 안내는 그대로 있다", () => {
     render(<FamilyPage />);
-    expect(screen.getByRole("link", { name: "가족 책장" })).toHaveAttribute("href", "/mailboxes");
+    expect(screen.getByRole("link", { name: "가족 사진첩" })).toHaveAttribute("href", "/mailboxes");
   });
 });

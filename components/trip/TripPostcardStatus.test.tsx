@@ -4,7 +4,7 @@ import type { TripPostcardLine } from "@/lib/supabase/postcards";
 import { TripPostcardStatus } from "./TripPostcardStatus";
 
 /*
-  엽서를 보내고 나면 궁금한 것은 하나다 — 부모님이 열어 보셨나, 뭐라고 하셨나. 예전에는 ‘내 정보 → 가족 책장’의 보낸 엽서
+  엽서를 보내고 나면 궁금한 것은 하나다 — 부모님이 열어 보셨나, 뭐라고 하셨나. 예전에는 ‘내 정보 → 가족 사진첩’의 보낸 엽서
   목록을 열어야 알 수 있었다. 여행 상세의 공유 줄 아래에 받는 곳마다 한 줄(열어 보셨는지)과 그 아래에 부모님의 답장·하트를
   보여 주고, 아직 안 열어 보셨으면 같은 링크를 다시 보낼 수 있다.
 */
@@ -65,15 +65,15 @@ describe("TripPostcardStatus · 열어 보셨는지", () => {
     expect(mark).toBeTruthy();
   });
 
-  it("부르는 말이 없는 책장은 책장 이름으로 말한다 — 따옴표로 묶어 어떤 이름에도 ‘에’가 자연스럽게", () => {
-    render(<TripPostcardStatus lines={[line({ greetingName: null, name: "장인 장모님 책장" })]} />);
-    expect(screen.getByRole("listitem")).toHaveTextContent("‘장인 장모님 책장’에 엽서를 보냈어요 · 아직 안 열어 보셨어요");
+  it("부르는 말이 없는 사진첩은 사진첩 이름으로 말한다 — 따옴표로 묶어 어떤 이름에도 ‘에’가 자연스럽게", () => {
+    render(<TripPostcardStatus lines={[line({ greetingName: null, name: "장인 장모님 사진첩" })]} />);
+    expect(screen.getByRole("listitem")).toHaveTextContent("‘장인 장모님 사진첩’에 엽서를 보냈어요 · 아직 안 열어 보셨어요");
   });
 
   it("받는 곳이 여럿이면 한 곳에 한 줄씩", () => {
     render(
       <TripPostcardStatus
-        lines={[line({ opened: true }), line({ mailboxId: "m2", greetingName: "장모님", name: "장인 장모님 책장" })]}
+        lines={[line({ opened: true }), line({ mailboxId: "m2", greetingName: "장모님", name: "장인 장모님 사진첩" })]}
       />,
     );
     const items = screen.getAllByRole("listitem");
@@ -99,7 +99,7 @@ describe("TripPostcardStatus · 부모님의 답장과 하트", () => {
     expect(within(item).getByText("장모님이 ‘고맙다’ 하셨어요")).toBeTruthy();
   });
 
-  it("하트는 사람마다 한 줄 — 사진 몇 장에, 책에는 ‘이 여행에’, 둘 다면 함께", () => {
+  it("하트는 사람마다 한 줄 — 사진 몇 장에, 엽서에는 ‘이 여행에’, 둘 다면 함께", () => {
     render(
       <TripPostcardStatus
         lines={[
@@ -190,7 +190,7 @@ describe("TripPostcardStatus · 부모님의 답장과 하트", () => {
       <TripPostcardStatus
         lines={[
           line({ opened: true, replies: [reply("r1", "엄마", "좋구나")] }),
-          line({ mailboxId: "m2", greetingName: "장모님", name: "장인 장모님 책장", opened: true, replies: [{ ...reply("r2", "장모님", "고맙다"), mailboxId: "m2" }] }),
+          line({ mailboxId: "m2", greetingName: "장모님", name: "장인 장모님 사진첩", opened: true, replies: [{ ...reply("r2", "장모님", "고맙다"), mailboxId: "m2" }] }),
         ]}
       />,
     );
@@ -219,12 +219,12 @@ describe("TripPostcardStatus · 다시 보내기", () => {
     expect(screen.getByRole("button", { name: "엄마 아빠께 엽서 다시 보내기" })).toHaveTextContent("다시 보내기");
   });
 
-  it("받는 곳이 여럿이면 단추 이름이 어느 곳인지 말한다 — 링크는 그 책장의 것", async () => {
+  it("받는 곳이 여럿이면 단추 이름이 어느 곳인지 말한다 — 링크는 그 사진첩의 것", async () => {
     const share = vi.fn(async () => undefined);
     setShare(share);
     render(
       <TripPostcardStatus
-        lines={[line(), line({ mailboxId: "m2", greetingName: "장모님", name: "장인 장모님 책장", token: "U".repeat(43), greeting: "장모님, 안녕" })]}
+        lines={[line(), line({ mailboxId: "m2", greetingName: "장모님", name: "장인 장모님 사진첩", token: "U".repeat(43), greeting: "장모님, 안녕" })]}
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "장모님께 엽서 다시 보내기" }));

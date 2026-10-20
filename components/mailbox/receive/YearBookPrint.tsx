@@ -15,12 +15,12 @@ import { postcardFileUrl, type MailboxView } from "@/lib/supabase/mailboxPublic"
 import { PreviewBanner } from "./PreviewBanner";
 
 /*
-  올해의 책을 쪽으로 나눈 인쇄용 책. 화면에는 쪽이 위아래로 쌓여 보이고, [PDF로 저장]을 누르면 브라우저의 인쇄 창이 열려
+  올해 모아보기를 쪽으로 나눈 인쇄용 모아보기. 화면에는 쪽이 위아래로 쌓여 보이고, [PDF로 저장]을 누르면 브라우저의 인쇄 창이 열려
   PDF 로 저장할 수 있다(별도의 PDF 프로그램도 결제도 없다).
 
   쪽 크기는 A5 세로(148×210mm). 쪽 안의 색은 고정이다 — 어두운 화면 설정이어도 종이에는 흰 바탕에 어두운 글씨로 나온다.
   그림은 바로 불러온다(lazy 가 아니다): 보일 때만 불러오면 인쇄할 때 빠진다. 다 불러오기 전에는 저장 단추를 막는다.
-  사진은 책장에 있는 크기(약 640px)라 가족끼리 보는 기념 PDF에 알맞다 — 전문 인쇄소용 고화질은 아니다.
+  사진은 사진첩에 있는 크기(약 640px)라 가족끼리 보는 기념 PDF에 알맞다 — 전문 인쇄소용 고화질은 아니다.
 */
 
 /** A5 를 화면 픽셀로(96dpi): 148mm ≈ 559px. 좁은 화면에서는 이 비율로 줄여 보인다. */
@@ -156,7 +156,7 @@ export function YearBookPrint({
         </div>
       )}
       <Link href={mailboxPath(token, preview)} className="self-start text-[18px] font-semibold text-accent print:hidden">
-        ← 책장
+        ← 사진첩
       </Link>
       {children}
     </main>
@@ -165,16 +165,16 @@ export function YearBookPrint({
   if (!view.settings.year) {
     return shell(
       <header className="flex flex-col gap-2">
-        <h1 className="text-[26px] font-bold text-text">올해의 책은 지금 쓰지 않고 있어요</h1>
-        <p className="text-[17px] leading-relaxed text-text-muted">보내는 가족이 올해의 책을 꺼 두었어요.</p>
+        <h1 className="text-[26px] font-bold text-text">올해 모아보기는 지금 쓰지 않고 있어요</h1>
+        <p className="text-[17px] leading-relaxed text-text-muted">보내는 가족이 올해 모아보기를 꺼 두었어요.</p>
       </header>,
     );
   }
   if (!book) {
     return shell(
       <header className="flex flex-col gap-2">
-        <h1 className="text-[26px] font-bold text-text">{year}년의 책은 아직 없어요</h1>
-        <p className="text-[17px] leading-relaxed text-text-muted">열어 본 엽서가 모이면 한 해의 책이 만들어져요.</p>
+        <h1 className="text-[26px] font-bold text-text">{year}년 모아보기는 아직 없어요</h1>
+        <p className="text-[17px] leading-relaxed text-text-muted">열어 본 엽서가 모이면 한 해 모아보기가 만들어져요.</p>
       </header>,
     );
   }
@@ -202,7 +202,7 @@ export function YearBookPrint({
     kind: "cover",
     node: () => (
       <Page kind="cover">
-        <p className="mt-[8mm] text-[15px] font-semibold text-[#0071e3]">우리 가족 올해의 책</p>
+        <p className="mt-[8mm] text-[15px] font-semibold text-[#0071e3]">우리 가족 올해 모아보기</p>
         <h1 className={`mt-1 text-[44px] font-bold leading-tight tracking-tight ${INK}`}>{year}년</h1>
         {book.covers.length > 0 && (
           <div className={`mt-[8mm] grid gap-1.5 ${book.covers.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
@@ -214,7 +214,7 @@ export function YearBookPrint({
           </div>
         )}
         <p className={`mt-[8mm] text-[17px] leading-relaxed ${INK}`}>{summary}</p>
-        <p className={`mt-auto text-[12px] ${MUTED}`}>내 여행 스케치로 만든 책</p>
+        <p className={`mt-auto text-[12px] ${MUTED}`}>내 여행 스케치로 만든 모아보기</p>
       </Page>
     ),
   });
@@ -246,7 +246,7 @@ export function YearBookPrint({
       kind: "loved-books",
       node: (no) => (
         <Page kind="loved-books" no={no}>
-          <h2 className={`text-[22px] font-bold ${INK}`}>가장 사랑받은 책</h2>
+          <h2 className={`text-[22px] font-bold ${INK}`}>가장 사랑받은 엽서</h2>
           <ul className="mt-[6mm] flex flex-col gap-3">
             {book.lovedBooks.map(({ card, n }) => (
               <li key={card.id} className="flex items-center gap-3">
@@ -366,7 +366,7 @@ export function YearBookPrint({
       <Page kind="last" no={no}>
         <div className="my-auto flex flex-col items-center gap-2 text-center">
           <p className={`text-[20px] font-bold ${INK}`}>{year}년, 같이 다녀온 이야기</p>
-          <p className={`text-[12px] ${MUTED}`}>내 여행 스케치 · 가족 책장</p>
+          <p className={`text-[12px] ${MUTED}`}>내 여행 스케치 · 가족 사진첩</p>
         </div>
       </Page>
     ),
@@ -403,11 +403,11 @@ export function YearBookPrint({
         </div>
       )}
       <Link href={back} className="self-start text-[18px] font-semibold text-accent print:hidden">
-        ← 올해의 책으로
+        ← 올해 모아보기로
       </Link>
 
       <section aria-label="저장하는 법" className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-4 print:hidden">
-        <h2 className="text-[18px] font-bold text-text">책으로 저장하기</h2>
+        <h2 className="text-[18px] font-bold text-text">모아보기 저장하기</h2>
         <ol className="list-decimal space-y-1 pl-5 text-[14px] leading-relaxed text-text-muted">
           <li>사진을 다 불러오면 아래 [PDF로 저장]이 켜져요.</li>
           <li>
@@ -420,7 +420,7 @@ export function YearBookPrint({
           </li>
         </ol>
         <p className="text-[13px] leading-relaxed text-text-faint">
-          사진은 책장에 있는 크기(약 640px)라 가족용 기념 PDF에 알맞아요. 전문 인쇄소에 맡길 만큼 또렷하지는 않아요.
+          사진은 사진첩에 있는 크기(약 640px)라 가족용 기념 PDF에 알맞아요. 전문 인쇄소에 맡길 만큼 또렷하지는 않아요.
         </p>
         <button
           type="button"

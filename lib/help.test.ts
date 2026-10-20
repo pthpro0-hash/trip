@@ -158,11 +158,11 @@ describe("도움말 내용", () => {
       expect(step.detail).toContain("'부모님께 엽서 보내기'");
     });
 
-    it("책장은 처음 엽서를 보낼 때 '누구에게 보내나요?'에 답하면 저절로 만들어진다고 알린다", () => {
-      const step = stepOf("책장 만들기");
+    it("사진첩은 처음 엽서를 보낼 때 '누구에게 보내나요?'에 답하면 저절로 만들어진다고 알린다", () => {
+      const step = stepOf("사진첩 만들기");
       expect(step.summary).toContain("저절로");
       expect(step.detail).toContain("'누구에게 보내나요?'");
-      expect(step.detail).toContain("'가족 책장'");
+      expect(step.detail).toContain("'가족 사진첩'");
     });
 
     it("엽서는 한 줄을 쓰고 '엽서 만들기'를 누르면 되고, 링크는 '카카오톡 등으로 보내기'로 보낸다고 알린다", () => {
@@ -190,8 +190,8 @@ describe("도움말 내용", () => {
       expect(step.detail).toContain("[링크 복사]");
     });
 
-    it("없어진 길을 말하지 않는다 — 책장을 먼저 만들러 가야 한다는 안내", () => {
-      expect(all()).not.toContain("에서 책장을 만들면 돼요");
+    it("없어진 길을 말하지 않는다 — 사진첩을 먼저 만들러 가야 한다는 안내", () => {
+      expect(all()).not.toContain("에서 사진첩을 만들면 돼요");
     });
 
     it("여행 하나의 링크는 '공유'에서 '링크로 보여 주기'로 만든다고 알린다", () => {
@@ -210,26 +210,26 @@ describe("도움말 내용", () => {
     });
   });
 
-  it("갈래 순서는 스케치·100선·가족 책장·계정 — '이번 여행'(코스 짜기)은 뺐다", () => {
+  it("갈래 순서는 스케치·100선·가족 사진첩·계정 — '이번 여행'(코스 짜기)은 뺐다", () => {
     expect(CHAPTERS.map((chapter) => chapter.id)).toEqual(["sketch", "browse", "shelf", "account"]);
     const shelf = CHAPTERS.find((chapter) => chapter.id === "shelf")!;
-    expect(shelf.title).toBe("가족 책장");
+    expect(shelf.title).toBe("가족 사진첩");
     expect(shelf.href).toBe("/mailboxes");
   });
 
-  it("내 정보에서 내 책장 속으로 들어가는 길을 알려 준다", () => {
+  it("내 정보에서 내 사진첩 속으로 들어가는 길을 알려 준다", () => {
     const shelf = CHAPTERS.find((chapter) => chapter.id === "shelf")!;
-    const step = shelf.steps.find((s) => s.title === "내 책장 속으로 들어가 보기")!;
+    const step = shelf.steps.find((s) => s.title === "내 사진첩 속으로 들어가 보기")!;
     expect(step).toBeTruthy();
     expect(step.detail).toContain("내 정보");
-    expect(step.detail).toContain("책꽂이");
+    expect(step.detail).toContain("묶음");
     expect(step.detail).toContain("부모님께 가지 않아요");
   });
 
-  it("책꽂이의 단추가 해 제목 아래로 옮겨진 것을 말한다", () => {
+  it("묶음의 단추가 해 제목 아래로 옮겨진 것을 말한다", () => {
     const shelf = CHAPTERS.find((chapter) => chapter.id === "shelf")!;
     const text = shelf.steps.map((step) => step.detail).join(" ");
-    expect(text).toContain("해 제목 바로 아래 '올해의 책 보기'");
+    expect(text).toContain("해 제목 바로 아래 '올해 모아보기'");
     expect(text).toContain("해 제목 바로 아래 '지도로 보기'");
     expect(text).not.toContain("다녀온 곳 지도로 보기");
   });
@@ -260,12 +260,13 @@ describe("도움말 내용", () => {
       expect(browse.steps.map((step) => step.title)).toContain("가고 싶은 곳에 담으세요");
     });
 
-    it("책장 카드의 단추는 '더 보기' 안에 있다고 알린다", () => {
+    it("사진첩을 열면 갈래(엽서·반응·설정)가 있다고 알린다 — 카드에 단추가 모여 있던 때의 말('더 보기')은 없다", () => {
       const shelf = CHAPTERS.find((chapter) => chapter.id === "shelf")!;
       const text = shelf.steps.map((step) => step.detail).join(" ");
-      for (const word of ["'더 보기'를 열고 '보내는 사람 초대'", "'더 보기' → '설정'", "'더 보기'를 열고 '링크 새로 만들기'", "'더 보기'에서 먼저 '책장 닫기'"]) {
+      for (const word of ["'설정' 갈래의 '보내는 사람 초대'", "'설정' 갈래의 '세부 설정'", "'설정' 갈래에서 '링크 새로 만들기'", "'설정' 갈래에서 먼저 '사진첩 닫기'", "[링크 보내기]", "[부모님 화면으로 보기]"]) {
         expect(text, word).toContain(word);
       }
+      expect(text).not.toContain("'더 보기'");
     });
   });
 });

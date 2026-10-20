@@ -3,28 +3,28 @@ import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
 import type { FootprintStep } from "./footprint";
 
 /*
-  책꽂이 — 부모님이 열어 본 책을 해마다 꽂아 두고, 작년 오늘을 꺼내 보이고, 그해 다녀온 곳을 지도에 찍는다.
+  묶음 — 부모님이 열어 본 엽서를 해마다 꽂아 두고, 작년 오늘을 꺼내 보이고, 그해 다녀온 곳을 지도에 찍는다.
 
-  여기는 셈만 한다. 그리는 것은 components/mailbox/receive 가 한다. 안 열어 본 엽서는 책꽂이에 꽂지 않는다 —
+  여기는 셈만 한다. 그리는 것은 components/mailbox/receive 가 한다. 안 열어 본 엽서는 묶음에 꽂지 않는다 —
   위의 '새 엽서'에 큰 카드로 있다가, 열어 보면 꽂힌다.
 */
 
-/** 그 책의 해. 다녀온 날, 모르면 보낸 날. 둘 다 모르면 "". */
+/** 그 엽서의 해. 다녀온 날, 모르면 보낸 날. 둘 다 모르면 "". */
 function yearOf(card: InboxCard): string {
   const year = card.startedOn.slice(0, 4) || card.sentAt.slice(0, 4);
   return /^\d{4}$/.test(year) ? year : "";
 }
 
-/** 책을 꽂을 때의 차례를 정하는 날. 다녀온 날, 모르면 보낸 날. */
+/** 엽서를 꽂을 때의 차례를 정하는 날. 다녀온 날, 모르면 보낸 날. */
 const dateOf = (card: InboxCard): string => card.startedOn || card.sentAt;
 
 export interface ShelfYear {
-  /** "2026". 날짜를 모르는 책들은 "". */
+  /** "2026". 날짜를 모르는 엽서들은 "". */
   year: string;
   cards: InboxCard[];
 }
 
-/** 열어 본 책을 해마다 나눈다. 새 해가 위, 같은 해 안에서는 최근에 다녀온 책이 먼저, 날짜를 모르는 책은 맨 아래. */
+/** 열어 본 엽서를 해마다 나눈다. 새 해가 위, 같은 해 안에서는 최근에 다녀온 엽서가 먼저, 날짜를 모르는 엽서는 맨 아래. */
 export function shelfYears(cards: InboxCard[]): ShelfYear[] {
   const byYear = new Map<string, InboxCard[]>();
   for (const card of cards) {
@@ -60,7 +60,7 @@ export interface LastYearToday {
 export const lastYearLabel = (yearsAgo: number): string => (yearsAgo === 1 ? "작년 오늘" : `${yearsAgo}년 전 오늘`);
 
 /**
- * 지난 해들 가운데 '오늘'에 가장 가까운 책 한 권. today 는 "2026-10-07"(이 폰의 오늘).
+ * 지난 해들 가운데 '오늘'에 가장 가까운 엽서 한 장. today 는 "2026-10-07"(이 폰의 오늘).
  *
  * 여행 기간(끝난 날을 모르면 시작한 날 하루)에서 앞뒤 3일 안이면 후보이고, 기간에 오늘이 들어 있으면 거리 0 이다.
  * 거리가 같으면 더 최근 해. 해를 넘긴 여행(12월 30일~1월 2일)도 맞추려고 시작한 해와 그다음 해 둘 다 본다.
@@ -94,10 +94,10 @@ export function lastYearToday(cards: InboxCard[], today: string): LastYearToday 
 
 /* ── 올해 지도 ─────────────────────────────────────────── */
 
-/** 곳의 대표 사진 키. 책마다 같은 파일 이름(a.webp)이 있어서 엽서 주소를 앞에 붙인다. */
+/** 곳의 대표 사진 키. 엽서마다 같은 파일 이름(a.webp)이 있어서 엽서 주소를 앞에 붙인다. */
 const photoKey = (card: InboxCard, file: string): string => `${card.id}/${file}`;
 
-/** 그해 책들에서 찍을 곳. 날짜순이고, 책 하나를 한 여행으로 센다. 달을 못 읽는 곳은 건너뛴다. */
+/** 그해 엽서들에서 찍을 곳. 날짜순이고, 엽서 하나를 한 여행으로 센다. 달을 못 읽는 곳은 건너뛴다. */
 export function yearSteps(cards: InboxCard[]): FootprintStep[] {
   const found: { key: string; step: FootprintStep }[] = [];
   for (const card of cards) {
@@ -112,7 +112,7 @@ export function yearSteps(cards: InboxCard[]): FootprintStep[] {
           lng: place.lng,
           month,
           day: Number(place.day.slice(8, 10)) || null,
-          // 눌러서 갈 곳은 없다(shared). 책마다 한 여행으로 세려고 엽서 주소를 넣는다.
+          // 눌러서 갈 곳은 없다(shared). 엽서마다 한 여행으로 세려고 엽서 주소를 넣는다.
           tripId: card.id,
           photoCount: place.photoCount,
           photoPath: place.photo ? photoKey(card, place.photo) : null,

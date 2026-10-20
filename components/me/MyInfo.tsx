@@ -14,17 +14,17 @@ import { fetchUnreadHeartCount, fetchUnreadReplyCount } from "@/lib/supabase/pos
 /*
   내 정보 — 흩어져 있던 것들이 한 곳에 모인 메뉴.
 
-  예전에는 위 띠의 이름을 눌러야 '가족 공유'가 열렸고, 가족 책장은 그 맨 아래 링크로만 갈 수 있었다.
+  예전에는 위 띠의 이름을 눌러야 '가족 공유'가 열렸고, 가족 사진첩은 그 맨 아래 링크로만 갈 수 있었다.
   폰에서는 이름이 접혀 사진만 남아 그것이 메뉴인지도 알기 어려웠다. 이제 폰의 하단 탭 맨 끝과 위 띠의
   이름·사진이 모두 여기로 온다. 로그아웃도 여기 있다(폰의 위 띠가 빠듯해서).
 
-  가족 책장은 줄이 둘이다. '가족 책장'은 관리 화면(설정·보낸 엽서·링크), 그 아래 책장마다 한 줄은 그 책장 안(책꽂이)으로
-  바로 들어가는 길이다. 예전에는 관리 화면 → '부모님 화면 보기'를 거쳐야 책꽂이가 보여 찾지 못했다.
+  가족 사진첩은 줄이 둘이다. '가족 사진첩'은 관리 화면(설정·보낸 엽서·링크), 그 아래 사진첩마다 한 줄은 그 사진첩 안(묶음)으로
+  바로 들어가는 길이다. 예전에는 관리 화면 → '부모님 화면 보기'를 거쳐야 묶음이 보여 찾지 못했다.
 
   로그인하지 않았으면 로그인이 필요한 길은 내지 않고, 안내(도움말·처리방침·약관)만 남긴다.
 */
 
-/** 내 정보에 줄을 낼 책장 하나. */
+/** 내 정보에 줄을 낼 사진첩 하나. */
 export interface ShelfLink {
   id: string;
   name: string;
@@ -99,7 +99,7 @@ export function MyInfoView({
   unread: number;
   /** 관리자일 때 검토 전인 빠진 곳 추천 수(관리자가 아니면 null — 관리 줄을 내지 않는다). */
   waiting?: number | null;
-  /** 들어가 볼 수 있는 내 책장들(닫은 것·남의 것은 빠진다). 못 읽었으면 빈 목록. */
+  /** 들어가 볼 수 있는 내 사진첩들(닫은 것·남의 것은 빠진다). 못 읽었으면 빈 목록. */
   shelves?: ShelfLink[];
   signingOut: boolean;
   onSignOut: () => void;
@@ -129,7 +129,7 @@ export function MyInfoView({
 
       {state === "login" ? (
         <section className="flex flex-col items-start gap-3 rounded-2xl bg-accent-soft p-4">
-          <p className="text-[15px] leading-relaxed text-text">로그인하면 가족 공유·가족 책장을 쓸 수 있어요.</p>
+          <p className="text-[15px] leading-relaxed text-text">로그인하면 가족 공유·가족 사진첩을 쓸 수 있어요.</p>
           <Link
             href="/login?next=/me"
             className="rounded-full bg-accent px-5 py-2.5 text-[15px] font-medium text-on-accent transition hover:bg-accent-hover"
@@ -143,13 +143,13 @@ export function MyInfoView({
             <Row href="/family" title="가족 공유" hint="가족을 초대해 내 여행을 함께 봐요" />
             <Row
               href="/mailboxes"
-              title="가족 책장"
+              title="가족 사진첩"
               hint="부모님께 엽서 보내기 — 앱도 로그인도 필요 없어요"
               badge={unread > 0 ? `새 소식 ${unread}` : undefined}
             />
             {shelves.map((shelf) => (
-              // 미리보기 방식으로 들어간다 — 열어 본 표시·답장·하트는 부모님께 가지 않고, 안 열어 본 책도 책꽂이에 꽂혀 보인다.
-              <Row key={shelf.id} nested href={mailboxPath(shelf.token, "all")} title={shelf.name} hint="책꽂이 안으로 들어가기" />
+              // 미리보기 방식으로 들어간다 — 열어 본 표시·답장·하트는 부모님께 가지 않고, 안 열어 본 엽서도 묶음에 모여 보인다.
+              <Row key={shelf.id} nested href={mailboxPath(shelf.token, "all")} title={shelf.name} hint="묶음 안으로 들어가기" />
             ))}
           </Group>
           {waiting !== null && (
@@ -196,7 +196,7 @@ export function MyInfo() {
         const { data } = await currentUser(supabase);
         if (!data.user) return setState("login");
         setState(accountOf(data.user));
-        // 새 소식과 책장 줄은 곁다리다. 못 세고 못 읽으면 숫자·줄 없이 조용히 둔다(관리 줄은 그대로 남는다).
+        // 새 소식과 사진첩 줄은 곁다리다. 못 세고 못 읽으면 숫자·줄 없이 조용히 둔다(관리 줄은 그대로 남는다).
         const [replies, hearts, boxes] = await Promise.all([
           fetchUnreadReplyCount(supabase),
           fetchUnreadHeartCount(supabase),

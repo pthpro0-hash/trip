@@ -1,23 +1,23 @@
 /*
-  하트 — 부모님이 사진에(또는 책 한 권에) 누르는 가장 작은 답장.
+  하트 — 부모님이 사진에(또는 엽서 한 장에) 누르는 가장 작은 답장.
 
-  받는 쪽은 로그인이 없어서 "누가"는 이름 글자(who)다. 하트 한 개 = (이름, 사진 파일). 책마다 하트를 받는
-  책장(설정 heart:"book")은 사진 파일이 빈 글자다. 켜고 끄는 일은 함수(mailbox_heart)가 하고, 여기는 화면이
+  받는 쪽은 로그인이 없어서 "누가"는 이름 글자(who)다. 하트 한 개 = (이름, 사진 파일). 엽서마다 하트를 받는
+  사진첩(설정 heart:"book")은 사진 파일이 빈 글자다. 켜고 끄는 일은 함수(mailbox_heart)가 하고, 여기는 화면이
   쓰는 순수한 계산만 둔다.
 */
 
 export interface Heart {
   who: string;
-  /** 하트를 단 사진 파일 이름. 책 하트면 빈 글자. */
+  /** 하트를 단 사진 파일 이름. 엽서 하트면 빈 글자. */
   file: string;
 }
 
-/** 빈 글자(책 하트)이거나 엽서 보관함 파일 이름 모양. 서버(mailbox.sql)가 막는 모양과 같다. */
+/** 빈 글자(엽서 하트)이거나 엽서 보관함 파일 이름 모양. 서버(mailbox.sql)가 막는 모양과 같다. */
 export function isHeartFile(file: string): boolean {
   return file === "" || /^[A-Za-z0-9._-]{1,80}$/.test(file);
 }
 
-/** 이 사진(빈 글자면 책)에 하트가 몇 개인가. */
+/** 이 사진(빈 글자면 엽서)에 하트가 몇 개인가. */
 export function heartCount(hearts: Heart[], file: string): number {
   return hearts.filter((heart) => heart.file === file).length;
 }
@@ -40,7 +40,7 @@ export function withHeart(hearts: Heart[], who: string, file: string, on: boolea
   return on ? [...rest, { who, file }] : rest;
 }
 
-/** 보낸 사람이 읽는 하트 한 줄(책장·이름마다). 사진 하트는 몇 장, 책 하트는 책 하나. */
+/** 보낸 사람이 읽는 하트 한 줄(사진첩·이름마다). 사진 하트는 몇 장, 엽서 하트는 엽서 하나. */
 export interface HeartLine {
   mailboxId: string;
   who: string;

@@ -18,7 +18,7 @@ import type { TripDetail } from "./tripDetail";
              줄이 먼저 사라지면 폴더의 주인을 밝힐 길이 없어 사진이 공개 보관함에 영영 남는다.
              파일을 못 지웠으면 줄도, 원본도 지우지 않고 실패를 알린다. 다시 누르면 된다.
 
-  사진은 엽서당 한 번만 복사한다(책장이 몇 개든). 보관함은 공개라 CDN 이 캐시하므로 캐시를
+  사진은 엽서당 한 번만 복사한다(사진첩이 몇 개든). 보관함은 공개라 CDN 이 캐시하므로 캐시를
   짧게(1분) 둔다 — 길게 두면 지운 뒤에도 한동안 사진이 보인다.
 */
 
@@ -35,9 +35,9 @@ export interface SendPostcardInput {
   trip: TripDetail;
   /** 엽서에 실을 사진(trip_photos id). */
   photoIds: string[];
-  /** 받을 책장과 그 책장에 보일 인사말(호칭 포함). */
+  /** 받을 사진첩과 그 사진첩에 보일 인사말(호칭 포함). */
   deliveries: { mailboxId: string; greeting: string }[];
-  /** 이 책에 실을 수 있는 사진 수(책장 설정의 가장 적은 쪽). 안 주면 20장. */
+  /** 이 엽서에 실을 수 있는 사진 수(사진첩 설정의 가장 적은 쪽). 안 주면 20장. */
   maxPhotos?: number;
   /** 복사하는 사진의 긴 변. 보통(640)은 줄여서, 선명(960)은 목록 판 그대로. 안 주면 640. */
   size?: 640 | 960;
@@ -48,7 +48,7 @@ export type SendPostcardResult =
   | { ok: true; postcardId: string }
   | { ok: false; reason: "invalid" | "photos" | "failed" };
 
-/** 엽서를 보낸다. 책장마다 다른 인사말이 들어가고, 사진은 한 번만 복사한다. */
+/** 엽서를 보낸다. 사진첩마다 다른 인사말이 들어가고, 사진은 한 번만 복사한다. */
 export async function sendPostcard(supabase: SupabaseClient, input: SendPostcardInput): Promise<SendPostcardResult> {
   const { senderId, trip, deliveries, onProgress } = input;
   const senderName = input.senderName.trim();
@@ -136,7 +136,7 @@ export async function sendPostcard(supabase: SupabaseClient, input: SendPostcard
     }
   }
 
-  // 책장에 넣는다. 책장마다 인사말이 다르다.
+  // 사진첩에 넣는다. 사진첩마다 인사말이 다르다.
   const delivered = await supabase.from("postcard_deliveries").insert(
     deliveries.map((delivery) => ({
       postcard_id: postcardId,
@@ -163,30 +163,30 @@ export async function fetchPostcardCounts(supabase: SupabaseClient, userId: stri
 /** 이 여행으로 보낸 엽서의 받는 곳 한 줄. 여행 상세가 "엄마 아빠께 엽서를 보냈어요 · 열어 보셨어요"와 부모님 반응으로 보여 준다. */
 export interface TripPostcardLine {
   mailboxId: string;
-  /** 책장 이름("우리 엄마 아빠"). */
+  /** 사진첩 이름("우리 엄마 아빠"). */
   name: string;
   /** 부르는 말("엄마 아빠"). 없으면 null. */
   greetingName: string | null;
-  /** 이 책장에 가장 최근에 보낸 엽서를 받는 분이 열어 봤는가. */
+  /** 이 사진첩에 가장 최근에 보낸 엽서를 받는 분이 열어 봤는가. */
   opened: boolean;
-  /** 이 책장에 가장 최근에 보낸 엽서. 안 열어 보셨을 때 다시 보내는 링크가 이 엽서 것이다. */
+  /** 이 사진첩에 가장 최근에 보낸 엽서. 안 열어 보셨을 때 다시 보내는 링크가 이 엽서 것이다. */
   postcardId: string;
-  /** 그 엽서에 적은 보낸 이름과, 그 책장에 보인 인사말(다시 보낼 때 공유창의 제목·글에 쓴다). */
+  /** 그 엽서에 적은 보낸 이름과, 그 사진첩에 보인 인사말(다시 보낼 때 공유창의 제목·글에 쓴다). */
   senderName: string;
   greeting: string;
-  /** 책장 링크의 글자. 엽서 주소(/m/<글자>/p/<엽서 id>)를 만든다. */
+  /** 사진첩 링크의 글자. 엽서 주소(/m/<글자>/p/<엽서 id>)를 만든다. */
   token: string;
-  /** 부모님이 이 여행의 엽서에 이 책장에서 남긴 답장·하트(오래된 것부터). 못 읽어도 줄은 나온다. */
+  /** 부모님이 이 여행의 엽서에 이 사진첩에서 남긴 답장·하트(오래된 것부터). 못 읽어도 줄은 나온다. */
   replies: SentReply[];
   hearts: SentHeart[];
 }
 
 /**
- * 이 여행으로 보낸 엽서를 받는 곳마다 한 줄로. 같은 책장에 여러 번 보냈으면 가장 최근 엽서가 기준(열어 봤는지 · 다시 보내는 링크)
- * 이고, 닫은 책장은 뺀다(열어 볼 수 없는 곳에 "아직 안 열어 보셨어요"가 영영 남지 않게). 부모님의 답장·하트는 이 여행의 엽서
- * 전부에서 그 책장 몫을 모은다. 보낸 엽서가 없으면 빈 목록, **못 읽었으면 null** — 부르는 쪽이 지금 보이는 줄을 그대로 두게
+ * 이 여행으로 보낸 엽서를 받는 곳마다 한 줄로. 같은 사진첩에 여러 번 보냈으면 가장 최근 엽서가 기준(열어 봤는지 · 다시 보내는 링크)
+ * 이고, 닫은 사진첩은 뺀다(열어 볼 수 없는 곳에 "아직 안 열어 보셨어요"가 영영 남지 않게). 부모님의 답장·하트는 이 여행의 엽서
+ * 전부에서 그 사진첩 몫을 모은다. 보낸 엽서가 없으면 빈 목록, **못 읽었으면 null** — 부르는 쪽이 지금 보이는 줄을 그대로 두게
  * 한다(빈 목록으로 덮으면 읽기 실패 한 번에 보이던 줄이 사라진다). 답장·하트 표만 못 읽으면 줄은 나오고 반응만 빈다.
- * 새 표 없이 있는 표(엽서 · 배달 · 책장 · 답장 · 하트)만 읽는다.
+ * 새 표 없이 있는 표(엽서 · 배달 · 사진첩 · 답장 · 하트)만 읽는다.
  */
 export async function fetchTripPostcardLines(
   supabase: SupabaseClient,
@@ -202,7 +202,7 @@ export async function fetchTripPostcardLines(
   if (cards.error || !cards.data) return null;
   if (cards.data.length === 0) return [];
   const cardRows = cards.data as { id: string; sender_name: string }[];
-  // 최근 엽서가 앞에 오는 차례. 책장마다 처음 만나는 배달이 가장 최근 것이다.
+  // 최근 엽서가 앞에 오는 차례. 사진첩마다 처음 만나는 배달이 가장 최근 것이다.
   const newestFirst = new Map(cardRows.map((card, index) => [card.id, index]));
   const senderOf = new Map(cardRows.map((card) => [card.id, card.sender_name]));
   const ids = [...newestFirst.keys()];
@@ -278,7 +278,7 @@ export interface SentReply {
   seen: boolean;
 }
 
-/** 받는 분이 단 하트 한 개. 사진 하트는 파일 이름, 책 하트는 빈 글자. */
+/** 받는 분이 단 하트 한 개. 사진 하트는 파일 이름, 엽서 하트는 빈 글자. */
 export interface SentHeart {
   id: string;
   mailboxId: string;
@@ -294,7 +294,9 @@ export interface SentPostcard {
   title: string | null;
   startedOn: string;
   sentAt: string;
-  /** 어느 책장에 넣었고, 받는 분이 열어 봤는가. */
+  /** 표지로 쓸 사진 파일 이름(엽서 보관함 속). 사진이 없으면 null. */
+  cover: string | null;
+  /** 어느 사진첩에 넣었고, 받는 분이 열어 봤는가. */
   deliveries: { mailboxId: string; opened: boolean }[];
   /** 받는 분들의 답장(오래된 것부터)과 그중 못 본 수. */
   replies: SentReply[];
@@ -366,7 +368,9 @@ export async function fetchSentPostcards(supabase: SupabaseClient, userId: strin
       ]);
     }
   }
-  return (cards.data as { id: string; trip_id: string; created_at: string; snapshot: { title?: string | null; startedOn?: string } }[]).map((row) => {
+  return (
+    cards.data as { id: string; trip_id: string; created_at: string; snapshot: { title?: string | null; startedOn?: string; files?: unknown } }[]
+  ).map((row) => {
     const replies = repliesByCard.get(row.id) ?? [];
     return {
       id: row.id,
@@ -374,6 +378,7 @@ export async function fetchSentPostcards(supabase: SupabaseClient, userId: strin
       title: row.snapshot?.title ?? null,
       startedOn: row.snapshot?.startedOn ?? "",
       sentAt: row.created_at,
+      cover: Array.isArray(row.snapshot?.files) && typeof row.snapshot.files[0] === "string" ? row.snapshot.files[0] : null,
       deliveries: byCard.get(row.id) ?? [],
       replies,
       hearts: heartsByCard.get(row.id) ?? [],
@@ -399,7 +404,7 @@ export async function markRepliesSeen(supabase: SupabaseClient, ids: string[]): 
 }
 
 /**
- * 아직 못 본 하트 소식의 수. 한 사람이 사진 스무 장에 눌러도 한 소식이다 — (엽서, 책장, 이름)마다 하나.
+ * 아직 못 본 하트 소식의 수. 한 사람이 사진 스무 장에 눌러도 한 소식이다 — (엽서, 사진첩, 이름)마다 하나.
  * 못 세면 0(알림이 없는 것처럼 조용히).
  */
 export async function fetchUnreadHeartCount(supabase: SupabaseClient): Promise<number> {

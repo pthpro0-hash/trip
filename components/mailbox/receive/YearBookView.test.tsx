@@ -34,6 +34,7 @@ const card = (letter: string, over: Partial<InboxCard> = {}): InboxCard => ({
   ...over,
 });
 const view = (postcards: InboxCard[], over: Partial<MailboxView> = {}): MailboxView => ({
+  name: "",
   tone: "casual",
   settings: RECOMMENDED,
   members: ["엄마", "아빠"],
@@ -55,15 +56,15 @@ const books = [
   card("C", { startedOn: "2025-05-01" }),
 ];
 
-describe("YearBookView · 올해의 책", () => {
+describe("YearBookView · 올해 모아보기", () => {
   it("맨 위에 해와 숫자가 크게 — 몇 번 다녀왔나, 몇 곳, 사진, 하트", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2026" />);
     expect(screen.getByRole("heading", { level: 1, name: "2026년" })).toBeTruthy();
-    expect(screen.getByText("우리 가족 올해의 책")).toBeTruthy();
+    expect(screen.getByText("우리 가족 올해 모아보기")).toBeTruthy();
     expect(screen.getByText("2번 다녀왔어요 · 3곳 · 사진 20장 · 하트 9개")).toBeTruthy();
   });
 
-  it("그해 열어 본 책만 센다 — 다른 해의 책은 들어오지 않는다", () => {
+  it("그해 열어 본 엽서만 센다 — 다른 해의 엽서는 들어오지 않는다", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2026" />);
     expect(screen.queryByRole("link", { name: /C 여행/ })).toBeNull();
   });
@@ -76,7 +77,7 @@ describe("YearBookView · 올해의 책", () => {
   });
 
   describe("가장 사랑받은 사진", () => {
-    it("하트 많은 순으로 보이고, 누르면 그 책으로 간다", () => {
+    it("하트 많은 순으로 보이고, 누르면 그 엽서로 간다", () => {
       render(<YearBookView token={TOKEN} view={view(books)} year="2026" />);
       const section = screen.getByRole("region", { name: "가장 사랑받은 사진" });
       const links = within(section).getAllByRole("link");
@@ -88,13 +89,13 @@ describe("YearBookView · 올해의 책", () => {
     it("하트가 없으면 이 칸이 없다", () => {
       render(<YearBookView token={TOKEN} view={view([card("A")])} year="2026" />);
       expect(screen.queryByRole("region", { name: "가장 사랑받은 사진" })).toBeNull();
-      expect(screen.queryByRole("region", { name: "가장 사랑받은 책" })).toBeNull();
+      expect(screen.queryByRole("region", { name: "가장 사랑받은 엽서" })).toBeNull();
     });
   });
 
-  it("가장 사랑받은 책은 하트 합계 순 — 책 하트까지 더한다", () => {
+  it("가장 사랑받은 엽서은 하트 합계 순 — 엽서 하트까지 더한다", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2026" />);
-    const section = screen.getByRole("region", { name: "가장 사랑받은 책" });
+    const section = screen.getByRole("region", { name: "가장 사랑받은 엽서" });
     const items = within(section).getAllByRole("link");
     expect(items[0]).toHaveTextContent("B 여행");
     expect(items[0]).toHaveTextContent("하트 5개");
@@ -112,7 +113,7 @@ describe("YearBookView · 올해의 책", () => {
     expect(screen.queryByRole("region", { name: "한 해 다녀온 길" })).toBeNull();
   });
 
-  it("달마다 — 여행이 있는 달만, 책 제목이 그 엽서로 가는 길", () => {
+  it("달마다 — 여행이 있는 달만, 엽서 제목이 그 엽서로 가는 길", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2026" />);
     const section = screen.getByRole("region", { name: "달마다" });
     expect(within(section).getByText("2월")).toBeTruthy();
@@ -121,24 +122,24 @@ describe("YearBookView · 올해의 책", () => {
     expect(within(section).getByRole("link", { name: /A 여행/ })).toHaveAttribute("href", `/m/${TOKEN}/p/${idOf("A")}`);
   });
 
-  it("책장으로 돌아가는 길이 맨 위와 맨 아래에 있다", () => {
+  it("사진첩으로 돌아가는 길이 맨 위와 맨 아래에 있다", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2026" />);
-    const back = screen.getAllByRole("link", { name: /책장/ });
+    const back = screen.getAllByRole("link", { name: /사진첩/ });
     expect(back.length).toBeGreaterThanOrEqual(2);
     for (const link of back) expect(link).toHaveAttribute("href", `/m/${TOKEN}`);
   });
 
-  it("그해 열어 본 책이 없으면 '아직 없어요' — 만들어지는 때를 알려 준다", () => {
+  it("그해 열어 본 엽서가 없으면 '아직 없어요' — 만들어지는 때를 알려 준다", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2024" />);
-    expect(screen.getByText("2024년의 책은 아직 없어요")).toBeTruthy();
+    expect(screen.getByText("2024년 모아보기는 아직 없어요")).toBeTruthy();
     expect(screen.getByText(/열어 본 엽서가 모이면/)).toBeTruthy();
-    expect(screen.getAllByRole("link", { name: /책장/ })[0]).toHaveAttribute("href", `/m/${TOKEN}`);
+    expect(screen.getAllByRole("link", { name: /사진첩/ })[0]).toHaveAttribute("href", `/m/${TOKEN}`);
   });
 
-  it("설정에서 끈 책장이면 올해의 책은 열리지 않는다 — 책장으로 돌려보낸다", () => {
+  it("설정에서 끈 사진첩이면 올해 모아보기는 열리지 않는다 — 사진첩으로 돌려보낸다", () => {
     render(<YearBookView token={TOKEN} view={view(books, { settings: { ...RECOMMENDED, year: false } })} year="2026" />);
     expect(screen.queryByRole("heading", { level: 1, name: "2026년" })).toBeNull();
-    expect(screen.getByText("올해의 책은 지금 쓰지 않고 있어요")).toBeTruthy();
+    expect(screen.getByText("올해 모아보기는 지금 쓰지 않고 있어요")).toBeTruthy();
   });
 
   it("글씨 크기는 설정을 따른다", () => {
@@ -152,7 +153,7 @@ describe("YearBookView · 올해의 책", () => {
     it("띠가 붙고, 모든 길에 미리보기 표시가 이어진다", () => {
       render(<YearBookView token={TOKEN} view={view(books)} year="2026" preview />);
       expect(screen.getByRole("note", { name: "미리보기" })).toBeTruthy();
-      // 띠 안의 링크(방식 바꾸기)는 따로 본다 — 책 안의 길들만.
+      // 띠 안의 링크(방식 바꾸기)는 따로 본다 — 엽서 안의 길들만.
       const hrefs = screen
         .getAllByRole("link")
         .filter((link) => !link.closest("[role=note]"))
@@ -185,22 +186,22 @@ describe("YearBookView · 미리보기 방식", () => {
   });
 });
 
-describe("YearBookView · 책으로 저장(PDF)", () => {
-  it("맨 아래에 '책으로 저장(PDF)'이 있고, 인쇄용 책 화면으로 간다", () => {
+describe("YearBookView · 모아보기 저장(PDF)", () => {
+  it("맨 아래에 '모아보기 저장(PDF)'이 있고, 인쇄용 모아보기 화면으로 간다", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2026" />);
-    expect(screen.getByRole("link", { name: "책으로 저장(PDF)" })).toHaveAttribute("href", `/m/${TOKEN}/year/2026/book`);
+    expect(screen.getByRole("link", { name: "모아보기 저장(PDF)" })).toHaveAttribute("href", `/m/${TOKEN}/year/2026/book`);
   });
 
   it("미리보기 방식이 이어진다", () => {
     render(<YearBookView token={TOKEN} view={view(books)} year="2026" preview="all" />);
-    expect(screen.getByRole("link", { name: "책으로 저장(PDF)" })).toHaveAttribute("href", `/m/${TOKEN}/year/2026/book?preview=all`);
+    expect(screen.getByRole("link", { name: "모아보기 저장(PDF)" })).toHaveAttribute("href", `/m/${TOKEN}/year/2026/book?preview=all`);
   });
 
-  it("그해의 책이 없거나 설정에서 끈 책장에는 없다", () => {
+  it("그해의 엽서가 없거나 설정에서 끈 사진첩에는 없다", () => {
     const { unmount } = render(<YearBookView token={TOKEN} view={view(books)} year="2024" />);
-    expect(screen.queryByRole("link", { name: "책으로 저장(PDF)" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "모아보기 저장(PDF)" })).toBeNull();
     unmount();
     render(<YearBookView token={TOKEN} view={view(books, { settings: { ...RECOMMENDED, year: false } })} year="2026" />);
-    expect(screen.queryByRole("link", { name: "책으로 저장(PDF)" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "모아보기 저장(PDF)" })).toBeNull();
   });
 });

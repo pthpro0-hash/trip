@@ -6,11 +6,11 @@ import { normalizeMembers, suggestionsFor, type Tone } from "@/lib/mailbox";
 /*
   처음 엽서를 보내는 사람에게 묻는 두 가지.
 
-  책장이 없으면 엽서를 보낼 수 없는데, 책장을 만들려면 /mailboxes 로 떠나 다섯 칸을 채우고 돌아와야 했다. 여기서는 엽서 창
-  안에서 "누구에게 보내나요?"와 말투만 묻는다. 책장 이름 · 부르는 말 · 받는 분 이름은 그 답에서 만든다(lib/mailboxFirst).
+  사진첩이 없으면 엽서를 보낼 수 없는데, 사진첩을 만들려면 /mailboxes 로 떠나 다섯 칸을 채우고 돌아와야 했다. 여기서는 엽서 창
+  안에서 "누구에게 보내나요?"와 말투만 묻는다. 사진첩 이름 · 부르는 말 · 받는 분 이름은 그 답에서 만든다(lib/mailboxFirst).
   나머지 설정은 권장값이고, 바꾸는 것은 나중에 한다.
 
-  이 컴포넌트는 묻기만 한다. 책장을 실제로 만드는 것은 부르는 쪽(SendPostcardDialog)이다.
+  이 컴포넌트는 묻기만 한다. 사진첩을 실제로 만드는 것은 부르는 쪽(SendPostcardDialog)이다.
 */
 
 interface FirstShelfFormProps {
@@ -19,6 +19,17 @@ interface FirstShelfFormProps {
   /** 지난 시도가 실패한 까닭. */
   error: string | null;
   onSubmit: (answer: { who: string; tone: Tone }) => void;
+  /*
+    말은 부르는 쪽이 바꿀 수 있다. 엽서 창에서는 "부모님께 엽서 보내기"로, 가족 사진첩에서 새 사진첩을 만들 때는 사진첩 말로 묻는다
+    (같은 두 가지 — 받는 분과 말투 — 만 묻는다).
+  */
+  heading?: string;
+  intro?: string;
+  question?: string;
+  submitLabel?: string;
+  footnote?: string;
+  /** 있으면 [그만두기]를 보인다. */
+  onCancel?: () => void;
 }
 
 const TONES: { value: Tone; label: string }[] = [
@@ -26,7 +37,17 @@ const TONES: { value: Tone; label: string }[] = [
   { value: "polite", label: "존댓말" },
 ];
 
-export function FirstShelfForm({ busy, error, onSubmit }: FirstShelfFormProps) {
+export function FirstShelfForm({
+  busy,
+  error,
+  onSubmit,
+  heading = "부모님께 엽서 보내기",
+  intro = "먼저 받는 분을 알려 주세요. 한 번만 하면 돼요.",
+  question = "누구에게 보내나요?",
+  submitLabel = "다음",
+  footnote = "나머지 설정은 나중에 ‘내 정보’의 ‘가족 사진첩’에서 바꿀 수 있어요.",
+  onCancel,
+}: FirstShelfFormProps) {
   const [who, setWho] = useState("");
   const [tone, setTone] = useState<Tone>("casual");
   const [missing, setMissing] = useState(false);
@@ -51,14 +72,14 @@ export function FirstShelfForm({ busy, error, onSubmit }: FirstShelfFormProps) {
     >
       {/* 오른쪽 위의 ✕ 를 피해 제목만 오른쪽을 비운다. */}
       <div className="pr-9">
-        <h2 className="text-[20px] font-bold tracking-tight text-text">부모님께 엽서 보내기</h2>
-        <p className="mt-1 text-[14px] leading-relaxed text-text-muted">먼저 받는 분을 알려 주세요. 한 번만 하면 돼요.</p>
+        <h2 className="text-[20px] font-bold tracking-tight text-text">{heading}</h2>
+        <p className="mt-1 text-[14px] leading-relaxed text-text-muted">{intro}</p>
       </div>
 
       {/* 이름표는 질문만 감싼다. 아래의 예·알아들은 이름까지 감싸면 입력칸의 이름이 길어진다. */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor={whoId} className="text-[14px] font-semibold text-text">
-          누구에게 보내나요?
+          {question}
         </label>
         <input
           id={whoId}
@@ -127,11 +148,14 @@ export function FirstShelfForm({ busy, error, onSubmit }: FirstShelfFormProps) {
           disabled={busy}
           className="rounded-full bg-accent px-5 py-3 text-[15px] font-semibold text-on-accent transition hover:bg-accent-hover disabled:opacity-60"
         >
-          {busy ? "만드는 중…" : "다음"}
+          {busy ? "만드는 중…" : submitLabel}
         </button>
-        <p className="text-center text-[12px] text-text-faint">
-          나머지 설정은 나중에 &lsquo;내 정보&rsquo;의 &lsquo;가족 책장&rsquo;에서 바꿀 수 있어요.
-        </p>
+        {onCancel && (
+          <button type="button" onClick={onCancel} className="rounded-full bg-bg-subtle px-4 py-2.5 text-[14px] font-medium text-text-muted hover:bg-line">
+            그만두기
+          </button>
+        )}
+        <p className="text-center text-[12px] text-text-faint">{footnote}</p>
       </div>
     </form>
   );

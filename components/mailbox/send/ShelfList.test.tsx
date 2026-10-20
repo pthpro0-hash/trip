@@ -7,8 +7,8 @@ import { greetingsFor } from "@/lib/mailbox";
 import { ShelfList } from "./ShelfList";
 
 /*
-  책장이 하나뿐인 대부분의 경우에 "받을 책장" 목록과 책장마다의 인사말 칸은 군더더기다. 접어 둔다 — 책장이 하나면
-  "인사말 고치기", 둘 이상이면 "받는 곳 바꾸기". 펼치면 예전 그대로 책장마다 체크 · 인사말 · 추천 문구가 있다.
+  사진첩이 하나뿐인 대부분의 경우에 "받을 사진첩" 목록과 사진첩마다의 인사말 칸은 군더더기다. 접어 둔다 — 사진첩이 하나면
+  "인사말 고치기", 둘 이상이면 "받는 곳 바꾸기". 펼치면 예전 그대로 사진첩마다 체크 · 인사말 · 추천 문구가 있다.
 */
 
 const box = (over: Partial<MailboxItem>): MailboxItem => ({
@@ -27,7 +27,7 @@ const box = (over: Partial<MailboxItem>): MailboxItem => ({
 });
 
 const 엄마아빠 = box({ id: "m1" });
-const 장모님 = box({ id: "m2", name: "장인 장모님 책장", greetingName: "장모님", tone: "polite", token: "U".repeat(43) });
+const 장모님 = box({ id: "m2", name: "장인 장모님 사진첩", greetingName: "장모님", tone: "polite", token: "U".repeat(43) });
 
 function list(
   options: {
@@ -47,7 +47,7 @@ function list(
 
 const toggle = () => screen.getByRole("button", { name: /바꾸기|고치기|접기/ });
 
-describe("ShelfList · 책장이 하나일 때", () => {
+describe("ShelfList · 사진첩이 하나일 때", () => {
   it("접혀 있다 — 인사말 고치기", () => {
     list({ boxes: [엄마아빠] });
     expect(toggle()).toHaveTextContent("고치기");
@@ -55,7 +55,7 @@ describe("ShelfList · 책장이 하나일 때", () => {
     expect(screen.queryByLabelText("우리 엄마 아빠 인사말")).toBeNull();
   });
 
-  it("펼치면 인사말 칸이 있고, 책장을 고르는 체크는 없다 — 고를 것이 하나뿐이다", () => {
+  it("펼치면 인사말 칸이 있고, 사진첩을 고르는 체크는 없다 — 고를 것이 하나뿐이다", () => {
     list({ boxes: [엄마아빠] });
     fireEvent.click(toggle());
     expect((screen.getByLabelText("우리 엄마 아빠 인사말") as HTMLTextAreaElement).value).toBe("바다 보고 왔어요!");
@@ -63,45 +63,45 @@ describe("ShelfList · 책장이 하나일 때", () => {
   });
 });
 
-describe("ShelfList · 책장이 여럿일 때", () => {
+describe("ShelfList · 사진첩이 여럿일 때", () => {
   it("접힌 머리에 받는 곳 이름이 나온다", () => {
     list();
     expect(screen.getByText("받는 곳")).toBeTruthy();
-    expect(screen.getByText("우리 엄마 아빠, 장인 장모님 책장")).toBeTruthy();
+    expect(screen.getByText("우리 엄마 아빠, 장인 장모님 사진첩")).toBeTruthy();
     expect(toggle()).toHaveTextContent("바꾸기");
   });
 
-  it("체크를 푼 책장은 머리에서 빠진다", () => {
+  it("체크를 푼 사진첩은 머리에서 빠진다", () => {
     list({ selected: ["m1"] });
     expect(screen.getByText("우리 엄마 아빠")).toBeTruthy();
-    expect(screen.queryByText(/장인 장모님 책장/)).toBeNull();
+    expect(screen.queryByText(/장인 장모님 사진첩/)).toBeNull();
   });
 
-  it("펼치면 책장마다 체크가 있고, 누르면 알린다", () => {
+  it("펼치면 사진첩마다 체크가 있고, 누르면 알린다", () => {
     const { onToggle } = list();
     fireEvent.click(toggle());
     expect(screen.getByRole("checkbox", { name: /우리 엄마 아빠/ })).toBeChecked();
-    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 책장/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /장인 장모님 사진첩/ }));
     expect(onToggle).toHaveBeenCalledWith("m2");
   });
 
-  it("말투를 책장 옆에 적는다", () => {
+  it("말투를 사진첩 옆에 적는다", () => {
     list();
     fireEvent.click(toggle());
     expect(screen.getByText("편하게")).toBeTruthy();
     expect(screen.getByText("존댓말")).toBeTruthy();
   });
 
-  it("체크를 푼 책장에는 인사말 칸이 없다", () => {
+  it("체크를 푼 사진첩에는 인사말 칸이 없다", () => {
     list({ selected: ["m1"] });
     fireEvent.click(toggle());
     expect(screen.getByLabelText("우리 엄마 아빠 인사말")).toBeTruthy();
-    expect(screen.queryByLabelText("장인 장모님 책장 인사말")).toBeNull();
+    expect(screen.queryByLabelText("장인 장모님 사진첩 인사말")).toBeNull();
   });
 });
 
 describe("ShelfList · 인사말", () => {
-  it("책장마다 호칭만 다르게 복사된다 — 받는 분께 보이는 글", () => {
+  it("사진첩마다 호칭만 다르게 복사된다 — 받는 분께 보이는 글", () => {
     list();
     fireEvent.click(toggle());
     expect(screen.getByText(/“엄마 아빠, 바다 보고 왔어요!”/)).toBeTruthy();
@@ -109,7 +109,7 @@ describe("ShelfList · 인사말", () => {
     expect(screen.getAllByText("자동으로 채웠어요")).toHaveLength(2);
   });
 
-  it("호칭을 붙이지 않는 책장은 그렇게 말한다", () => {
+  it("호칭을 붙이지 않는 사진첩은 그렇게 말한다", () => {
     list({ boxes: [box({ id: "m1", useGreeting: false })] });
     fireEvent.click(toggle());
     expect(screen.getByText("호칭 없이 보내요")).toBeTruthy();
@@ -128,14 +128,14 @@ describe("ShelfList · 인사말", () => {
     expect(screen.getByText("직접 고쳤어요")).toBeTruthy();
     expect(screen.getByText(/“장모님, 건강하시죠\? 바다에 다녀왔습니다\.”/)).toBeTruthy();
 
-    fireEvent.change(screen.getByLabelText("장인 장모님 책장 인사말"), { target: { value: "다른 말" } });
+    fireEvent.change(screen.getByLabelText("장인 장모님 사진첩 인사말"), { target: { value: "다른 말" } });
     expect(onEdit).toHaveBeenCalledWith("m2", "다른 말");
 
     fireEvent.click(screen.getByRole("button", { name: "원래대로" }));
     expect(onReset).toHaveBeenCalledWith("m2");
   });
 
-  it("고치지 않은 책장에는 원래대로가 없다", () => {
+  it("고치지 않은 사진첩에는 원래대로가 없다", () => {
     list();
     fireEvent.click(toggle());
     expect(screen.queryByRole("button", { name: "원래대로" })).toBeNull();

@@ -46,7 +46,7 @@ describe("regionViewBox", () => {
   });
 
   it("비율을 맞출 때 담아야 할 것을 잘라내지 않는다", () => {
-    // 가로로 납작한 권역을 세로 틀에 넣어도 양 끝이 살아 있어야 한다.
+    // 가로로 납작한 번역을 세로 틀에 넣어도 양 끝이 살아 있어야 한다.
     const box = regionViewBox("제주권", [], FRAME);
     expect(holds(box, 33.2, 126.15)).toBe(true);
     expect(holds(box, 33.55, 126.95)).toBe(true);

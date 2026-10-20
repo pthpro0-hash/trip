@@ -7,7 +7,7 @@ import { StorageTidy } from "@/components/trip/StorageTidy";
 
 export const metadata: Metadata = {
   title: "도움말",
-  description: "사진으로 남기는 내 여행 — 사진으로 여행 기록 만들기, 내 여행 지도, 한장 요약, 가족 책장, 갈 곳 찾기(여행 100선) 사용법을 안내합니다.",
+  description: "사진으로 남기는 내 여행 — 사진으로 여행 기록 만들기, 내 여행 지도, 한장 요약, 가족 사진첩, 갈 곳 찾기(여행 100선) 사용법을 안내합니다.",
   alternates: { canonical: "/help" },
 };
 

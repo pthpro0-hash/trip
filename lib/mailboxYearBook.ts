@@ -2,10 +2,10 @@ import type { InboxCard } from "@/lib/supabase/mailboxPublic";
 import { shelfYears, yearSteps } from "./mailboxShelf";
 
 /*
-  올해의 책 — 그해 열어 본 책들을 한 권으로 묶어 보여 준다.
+  올해 모아보기 — 그해 열어 본 엽서들을 한곳에 묶어 보여 준다.
 
-  저장하지 않고 그때그때 계산한다. 열어 본 책이 늘면 올해의 책도 달라진다. 하트가 있으면 "가장 사랑받은 사진·책"이
-  나오고, 없으면 그 칸은 비운다. 책꽂이와 같이 안 열어 본 엽서는 넣지 않는다.
+  저장하지 않고 그때그때 계산한다. 열어 본 엽서가 늘면 올해 모아보기도 달라진다. 하트가 있으면 "가장 사랑받은 사진·엽서"이
+  나오고, 없으면 그 칸은 비운다. 묶음와 같이 안 열어 본 엽서는 넣지 않는다.
 */
 
 export interface LovedPhoto {
@@ -21,14 +21,14 @@ export interface LovedBook {
 
 export interface YearBook {
   year: string;
-  /** 그해 열어 본 책. 다녀온 날 오름차순. */
+  /** 그해 열어 본 엽서. 다녀온 날 오름차순. */
   cards: InboxCard[];
   stats: { trips: number; places: number; photos: number; hearts: number };
-  /** 표지 모자이크에 쓸 책(최대 4). 사랑받은 책이 먼저. */
+  /** 표지 모자이크에 쓸 엽서(최대 4). 사랑받은 엽서이 먼저. */
   covers: InboxCard[];
   /** 하트 많이 받은 사진(최대 6). */
   lovedPhotos: LovedPhoto[];
-  /** 하트 많이 받은 책(최대 3). */
+  /** 하트 많이 받은 엽서(최대 3). */
   lovedBooks: LovedBook[];
   /** 여행이 있는 달만, 1월부터. */
   months: { month: number; cards: InboxCard[] }[];
@@ -38,16 +38,16 @@ const COVERS = 4;
 const LOVED_PHOTOS = 6;
 const LOVED_BOOKS = 3;
 
-/** 책을 가르는 날. 다녀온 날, 모르면 보낸 날. */
+/** 엽서를 가르는 날. 다녀온 날, 모르면 보낸 날. */
 const dateOf = (card: InboxCard): string => card.startedOn || card.sentAt;
 
 const heartsOf = (card: InboxCard): number => card.heartCounts.reduce((sum, entry) => sum + (entry.n > 0 ? entry.n : 0), 0);
 
-/** 많은 순, 같으면 최근에 다녀온 책이 먼저. */
+/** 많은 순, 같으면 최근에 다녀온 엽서가 먼저. */
 const byLoveThenNewer = <T extends { n: number; card: InboxCard }>(a: T, b: T): number =>
   b.n - a.n || dateOf(b.card).localeCompare(dateOf(a.card));
 
-/** 이 해의 올해의 책. 그해 열어 본 책이 없으면(또는 날짜를 모르는 책들이면) null. */
+/** 이 해의 올해 모아보기. 그해 열어 본 엽서가 없으면(또는 날짜를 모르는 엽서들이면) null. */
 export function yearBook(cards: InboxCard[], year: string): YearBook | null {
   if (year === "") return null;
   const entry = shelfYears(cards).find((item) => item.year === year);
@@ -64,7 +64,7 @@ export function yearBook(cards: InboxCard[], year: string): YearBook | null {
   const lovedAll: LovedBook[] = books.map((card) => ({ card, n: heartsOf(card) })).sort(byLoveThenNewer);
   const lovedBooks = lovedAll.filter((item) => item.n > 0).slice(0, LOVED_BOOKS);
 
-  // 사랑받은 책이 먼저, 나머지는 최근에 다녀온 책부터. 표지 그림이 없는 책은 모자이크에 못 쓴다.
+  // 사랑받은 엽서이 먼저, 나머지는 최근에 다녀온 엽서부터. 표지 그림이 없는 엽서는 모자이크에 못 쓴다.
   const covers = lovedAll
     .map((item) => item.card)
     .filter((card) => card.cover)
@@ -95,8 +95,8 @@ export function yearBook(cards: InboxCard[], year: string): YearBook | null {
 }
 
 /**
- * 올해의 책을 알릴 해. 12월에는 그해, 1~2월에는 지난해이고 그 밖의 달에는 없다(null).
- * 그해에 열어 본 책이 있어야 한다. today 는 이 폰의 오늘("2026-12-05"), 모르면("") 없다.
+ * 올해 모아보기를 알릴 해. 12월에는 그해, 1~2월에는 지난해이고 그 밖의 달에는 없다(null).
+ * 그해에 열어 본 엽서가 있어야 한다. today 는 이 폰의 오늘("2026-12-05"), 모르면("") 없다.
  */
 export function yearBookSeason(cards: InboxCard[], today: string): string | null {
   const match = /^(\d{4})-(\d{2})-\d{2}$/.exec(today);

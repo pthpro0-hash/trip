@@ -68,7 +68,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
 
       <RegionExplorer region={region} spots={spots} />
 
-      {/* 한 권역을 다 본 사람이 목록으로 되돌아가지 않고 옆으로 넘어갈 수 있게. */}
+      {/* 한 번역을 다 본 사람이 목록으로 되돌아가지 않고 옆으로 넘어갈 수 있게. */}
       <nav className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-5">
         <Link
           href={`/regions/${prev}`}

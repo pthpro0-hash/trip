@@ -6,7 +6,7 @@ import type { InboxCard } from "@/lib/supabase/mailboxPublic";
 import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
 
 /*
-  책꽂이(MailboxHome)와 올해의 책(YearBookView)이 함께 쓰는 조각들.
+  묶음(MailboxHome)와 올해 모아보기(YearBookView)이 함께 쓰는 조각들.
 */
 
 /** 지도는 무거워서 단추를 눌렀을 때(또는 지도가 꼭 필요한 화면에서만) 불러온다. 부모님 폰의 데이터를 아낀다. */
@@ -41,12 +41,12 @@ export const tripDay = (day: string, withYear = false) => {
   return withYear ? `${match[1]}년 ${text}` : text;
 };
 
-/** 책 표지. 그림이 없으면 편지 그림. */
+/** 엽서 표지. 그림이 없으면 편지 그림. */
 export function Cover({ card, className }: { card: InboxCard; className: string }) {
   return (
     <span className={`relative grid place-items-center overflow-hidden bg-bg-subtle ${className}`}>
       {card.cover ? (
-        // 우리 엽서 보관함의 공개 주소라 next/image 로 미리 최적화할 수 없다. 보일 때만 불러온다(책이 많아도 가볍게).
+        // 우리 엽서 보관함의 공개 주소라 next/image 로 미리 최적화할 수 없다. 보일 때만 불러온다(엽서가 많아도 가볍게).
         // eslint-disable-next-line @next/next/no-img-element
         <img src={postcardFileUrl(card.id, card.cover)} alt="" loading="lazy" className="h-full w-full object-cover" />
       ) : (

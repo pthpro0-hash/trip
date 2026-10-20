@@ -20,18 +20,18 @@ const card = (id: string, over: Partial<InboxCard> = {}): InboxCard => ({
 });
 const place = (name: string, day: string) => ({ placeName: name, lat: 35, lng: 127, day, photoCount: 1, photo: "a.webp" });
 
-describe("yearBook · 올해의 책", () => {
-  it("그해 열어 본 책이 없으면 책이 없다", () => {
+describe("yearBook · 올해 모아보기", () => {
+  it("그해 열어 본 엽서가 없으면 엽서가 없다", () => {
     expect(yearBook([], "2026")).toBeNull();
     expect(yearBook([card("A", { opened: false })], "2026")).toBeNull();
     expect(yearBook([card("A", { startedOn: "2025-05-01" })], "2026")).toBeNull();
   });
 
-  it("날짜를 모르는 책들('')은 올해의 책이 되지 않는다", () => {
+  it("날짜를 모르는 엽서들('')은 올해 모아보기가 되지 않는다", () => {
     expect(yearBook([card("A", { startedOn: "", sentAt: "" })], "")).toBeNull();
   });
 
-  it("그해 열어 본 책만 다녀온 날 순으로 담는다", () => {
+  it("그해 열어 본 엽서만 다녀온 날 순으로 담는다", () => {
     const book = yearBook(
       [
         card("C", { startedOn: "2026-11-01" }),
@@ -45,7 +45,7 @@ describe("yearBook · 올해의 책", () => {
     expect(book?.cards.map((entry) => entry.title)).toEqual(["A", "B", "C"]);
   });
 
-  it("숫자 — 몇 번 다녀왔나, 몇 곳, 사진 몇 장, 하트 몇 개(사진 하트와 책 하트를 모두)", () => {
+  it("숫자 — 몇 번 다녀왔나, 몇 곳, 사진 몇 장, 하트 몇 개(사진 하트와 엽서 하트를 모두)", () => {
     const book = yearBook(
       [
         card("A", {
@@ -64,7 +64,7 @@ describe("yearBook · 올해의 책", () => {
   });
 
   describe("가장 사랑받은 사진", () => {
-    it("하트 많은 순 — 같으면 최근에 다녀온 책의 것이 먼저, 책 하트는 사진이 아니라 뺀다", () => {
+    it("하트 많은 순 — 같으면 최근에 다녀온 엽서의 것이 먼저, 엽서 하트는 사진이 아니라 뺀다", () => {
       const book = yearBook(
         [
           card("A", { startedOn: "2026-02-10", heartCounts: [{ file: "a.webp", n: 3 }, { file: "", n: 9 }] }),
@@ -90,7 +90,7 @@ describe("yearBook · 올해의 책", () => {
       expect(yearBook([card("A")], "2026")?.lovedPhotos).toEqual([]);
     });
 
-    it("하트 수가 0 이하이거나 안 열어 본 책의 하트는 세지 않는다", () => {
+    it("하트 수가 0 이하이거나 안 열어 본 엽서의 하트는 세지 않는다", () => {
       const book = yearBook(
         [card("A", { heartCounts: [{ file: "a.webp", n: 0 }] }), card("N", { opened: false, heartCounts: [{ file: "n.webp", n: 9 }] })],
         "2026",
@@ -100,8 +100,8 @@ describe("yearBook · 올해의 책", () => {
     });
   });
 
-  describe("가장 사랑받은 책", () => {
-    it("책 하나에 단 하트의 합계(사진 하트 + 책 하트)가 많은 순, 같으면 최근 것이 먼저, 최대 세 권", () => {
+  describe("가장 사랑받은 엽서", () => {
+    it("엽서 하나에 단 하트의 합계(사진 하트 + 엽서 하트)가 많은 순, 같으면 최근 것이 먼저, 최대 세 권", () => {
       const book = yearBook(
         [
           card("A", { startedOn: "2026-01-10", heartCounts: [{ file: "a.webp", n: 2 }, { file: "", n: 2 }] }), // 4
@@ -125,7 +125,7 @@ describe("yearBook · 올해의 책", () => {
   });
 
   describe("표지 모자이크", () => {
-    it("표지 그림이 있는 책에서 최대 네 장 — 사랑받은 책이 먼저, 나머지는 최근 순", () => {
+    it("표지 그림이 있는 엽서에서 최대 네 장 — 사랑받은 엽서이 먼저, 나머지는 최근 순", () => {
       const book = yearBook(
         [
           card("A", { startedOn: "2026-01-10" }),
@@ -168,7 +168,7 @@ describe("yearBook · 올해의 책", () => {
   });
 });
 
-describe("yearBookSeason · 올해의 책을 알릴 철", () => {
+describe("yearBookSeason · 올해 모아보기를 알릴 철", () => {
   const books = [card("A", { startedOn: "2026-05-05" })];
 
   it("12월에는 그해, 1~2월에는 지난해", () => {
@@ -182,7 +182,7 @@ describe("yearBookSeason · 올해의 책을 알릴 철", () => {
     for (const today of ["2026-11-30", "2027-03-01", "2026-07-07"]) expect(yearBookSeason(books, today)).toBeNull();
   });
 
-  it("그해에 열어 본 책이 없으면 알릴 책이 없다", () => {
+  it("그해에 열어 본 엽서가 없으면 알릴 엽서가 없다", () => {
     expect(yearBookSeason([card("A", { startedOn: "2025-05-05" })], "2026-12-05")).toBeNull();
     expect(yearBookSeason([card("A", { startedOn: "2026-05-05", opened: false })], "2026-12-05")).toBeNull();
   });

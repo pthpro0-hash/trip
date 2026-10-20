@@ -19,10 +19,10 @@ import {
 } from "@/lib/mailboxSettings";
 
 /*
-  책장 설정 — 권장값이 기본이고, 바꾼 것은 "권장" 표시가 사라져 한눈에 보인다.
+  사진첩 설정 — 권장값이 기본이고, 바꾼 것은 "권장" 표시가 사라져 한눈에 보인다.
 
-  지금 쓰이는 설정만 보인다: 책 한 권 사진 수·크기(새로 꽂는 책부터), 부모님 화면 글씨·답장 문구·하트·작년 오늘·올해의 책(바로). '가고 싶은 곳 받기'는 기능째 뺐다(2026-10-14).
-  보관 권수는 책장 주인이 [사진 줄이기]를 누를 때 쓰인다(저절로 지우지 않는다). 값은 지금도 지켜서 저장한다
+  지금 쓰이는 설정만 보인다: 엽서 한 장 사진 수·크기(새로 보내는 엽서부터), 부모님 화면 글씨·답장 문구·하트·작년 오늘·올해 모아보기(바로). '가고 싶은 곳 받기'는 기능째 뺐다(2026-10-14).
+  보관 권수는 사진첩 주인이 [사진 줄이기]를 누를 때 쓰인다(저절로 지우지 않는다). 값은 지금도 지켜서 저장한다
   (설정을 저장한다고 아직 안 보이는 칸이 권장으로 덮이지 않게).
 */
 
@@ -99,13 +99,13 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
       className="flex flex-col gap-4 rounded-xl bg-bg p-3.5 ring-1 ring-line"
     >
       <section className="flex flex-col gap-3">
-        <h4 className="text-[15px] font-semibold text-text">책</h4>
+        <h4 className="text-[15px] font-semibold text-text">엽서</h4>
         <div className="flex flex-col gap-1.5">
           <p className="flex items-center gap-1.5 text-[14px] text-text">
-            책 한 권 사진 수 <Rec show={!differs("photos")} />
+            엽서 한 장 사진 수 <Rec show={!differs("photos")} />
           </p>
           <Segment
-            label="책 한 권 사진 수"
+            label="엽서 한 장 사진 수"
             value={draft.photos}
             options={PHOTO_CHOICES.map((count) => ({ value: count, text: `${count}장` }))}
             onChange={(value) => set("photos", value)}
@@ -113,10 +113,10 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
         </div>
         <div className="flex flex-col gap-1.5">
           <p className="flex items-center gap-1.5 text-[14px] text-text">
-            사진까지 보관할 책 <Rec show={!differs("keep")} />
+            사진까지 보관할 엽서 <Rec show={!differs("keep")} />
           </p>
           <Segment
-            label="사진까지 보관할 책"
+            label="사진까지 보관할 엽서"
             value={draft.keep}
             options={KEEP_CHOICES.map((choice) => ({
               value: choice,
@@ -126,7 +126,7 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
             onChange={(value) => set("keep", value)}
           />
           <p className="text-[12px] leading-relaxed text-text-faint">
-            보관 권수를 넘은 오래된 책은 책장 카드의 [사진 줄이기]를 눌러야 줄어요 — 저절로 지워지지 않아요. 줄여도 표지·하트 받은 사진과 한 줄
+            보관 권수를 넘은 오래된 엽서은 사진첩 카드의 [사진 줄이기]를 눌러야 줄어요 — 저절로 지워지지 않아요. 줄여도 표지·하트 받은 사진과 한 줄
             인사말·지도·답장·하트는 남고, 되돌릴 수 없어요.
           </p>
         </div>
@@ -144,8 +144,8 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
             onChange={(value) => set("size", value)}
           />
           <p className="text-[12px] leading-relaxed text-text-faint">
-            책 한 권이 {bookSizeText(draft.photos, draft.size)}예요. 새로 꽂는 책부터 적용돼요. 이미 꽂은 책은 보낸 순간 그대로예요.
-            한 책을 책장 여러 곳에 꽂을 때는 사진 수는 가장 적은 쪽에, 크기는 더 선명한 쪽에 맞춰요.
+            엽서 한 장이 {bookSizeText(draft.photos, draft.size)}예요. 새로 보내는 엽서부터 적용돼요. 이미 보낸 엽서은 보낸 순간 그대로예요.
+            한 엽서를 사진첩 여러 곳에 꽂을 때는 사진 수는 가장 적은 쪽에, 크기는 더 선명한 쪽에 맞춰요.
           </p>
         </div>
       </section>
@@ -201,7 +201,7 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
             value={draft.heart}
             options={HEART_CHOICES.map((choice) => ({
               value: choice,
-              text: choice === "photo" ? "사진마다" : "책마다",
+              text: choice === "photo" ? "사진마다" : "엽서마다",
               hint: choice === "photo" ? "사진 한 장 한 장에" : "여행 한 번에 하나",
             }))}
             onChange={(value) => set("heart", value)}
@@ -224,15 +224,15 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
             onChange={(value) => set("past", value === "on")}
           />
           <p className="text-[12px] leading-relaxed text-text-faint">
-            오늘 즈음(앞뒤 3일) 다녀온 지난 해의 책을 책장 맨 위에 보여 줘요. 해당하는 책이 없으면 아무것도 나오지 않고, 바꾸면 바로 적용돼요.
+            오늘 즈음(앞뒤 3일) 다녀온 지난 해의 엽서를 사진첩 맨 위에 보여 줘요. 해당하는 엽서가 없으면 아무것도 나오지 않고, 바꾸면 바로 적용돼요.
           </p>
         </div>
         <div className="flex flex-col gap-1.5">
           <p className="flex items-center gap-1.5 text-[14px] text-text">
-            올해의 책 <Rec show={!differs("year")} />
+            올해 모아보기 <Rec show={!differs("year")} />
           </p>
           <Segment
-            label="올해의 책"
+            label="올해 모아보기"
             value={draft.year ? "on" : "off"}
             options={[
               { value: "on", text: "보여 주기" },
@@ -241,8 +241,8 @@ export function MailboxSettingsEditor({ initial, busy, onSave, onCancel }: Props
             onChange={(value) => set("year", value === "on")}
           />
           <p className="text-[12px] leading-relaxed text-text-faint">
-            그해 열어 본 엽서를 한 권으로 묶어 보여 줘요(표지·가장 사랑받은 사진과 책·한 해 지도). 12월부터 2월까지 책장 맨 위에 알려 주고,
-            책꽂이의 해마다 단추로도 볼 수 있어요. 끄면 둘 다 안 보이고, 바꾸면 바로 적용돼요.
+            그해 열어 본 엽서를 한곳에 묶어 보여 줘요(표지·가장 사랑받은 사진과 엽서·한 해 지도). 12월부터 2월까지 사진첩 맨 위에 알려 주고,
+            묶음의 해마다 단추로도 볼 수 있어요. 끄면 둘 다 안 보이고, 바꾸면 바로 적용돼요.
           </p>
         </div>
       </section>

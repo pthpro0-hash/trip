@@ -39,15 +39,15 @@ describe("HelpPage · 가족 공유", () => {
   });
 });
 
-describe("HelpPage · 가족 책장", () => {
-  it("엽서 보내기·받는 법·지우면 어떻게 되는지를 '가족 책장' 갈래에 풀어 적었다", () => {
+describe("HelpPage · 가족 사진첩", () => {
+  it("엽서 보내기·받는 법·지우면 어떻게 되는지를 '가족 사진첩' 갈래에 풀어 적었다", () => {
     render(<HelpPage />);
-    for (const title of ["엽서 보내기", "부모님이 엽서 받는 법", "엽서는 보낸 그대로 남아요", "책장 지우기", "내 책장 속으로 들어가 보기"]) {
+    for (const title of ["엽서 보내기", "부모님이 엽서 받는 법", "엽서는 보낸 그대로 남아요", "사진첩 지우기", "내 사진첩 속으로 들어가 보기"]) {
       expect(screen.getByText(title)).toBeTruthy();
     }
     // 엽서 보내기·받는 법은 자주 묻는 것으로 맨 위에 올라갔다 — 그 둘을 함께 본다.
     const section = { textContent: `${document.getElementById("shelf")!.textContent} ${document.getElementById("faq")!.textContent}` };
-    for (const word of ["가족 책장", "책장 3개", "기본 20장까지", "책장 설정", "권장", "링크 하나", "로그인", "답장", "하트", "사진마다", "책마다", "책꽂이", "작년 오늘", "올해의 책", "부모님 화면 보기", "책장 지우기", "사진 줄이기", "사진까지 보관할 책", "책으로 저장(PDF)", "PDF로 저장", "새로 만들기", "거두기", "함께 지워"]) {
+    for (const word of ["가족 사진첩", "사진첩 3개", "기본 20장까지", "사진첩 설정", "권장", "링크 하나", "로그인", "답장", "하트", "사진마다", "엽서마다", "묶음", "작년 오늘", "올해 모아보기", "부모님 화면으로 보기", "사진첩 지우기", "사진 줄이기", "사진까지 보관할 엽서", "모아보기 저장(PDF)", "PDF로 저장", "새로 만들기", "거두기", "함께 지워"]) {
       expect(section.textContent).toContain(word);
     }
   });
@@ -112,7 +112,7 @@ describe("HelpPage · 세 층 — 요약 · 목록 · 상세설명", () => {
     expect(item.tagName).toBe("DETAILS");
   });
 
-  it("목차에 갈래가 다 있고, 가족 책장으로도 바로 간다", () => {
+  it("목차에 갈래가 다 있고, 가족 사진첩으로도 바로 간다", () => {
     render(<HelpPage />);
     const toc = screen.getByRole("navigation", { name: "목차" });
     const hrefs = Array.from(toc.querySelectorAll("a")).map((a) => a.getAttribute("href"));
@@ -127,7 +127,7 @@ describe("HelpPage · 세 층 — 요약 · 목록 · 상세설명", () => {
 });
 
 describe("HelpPage · 내 정보", () => {
-  it("가족 공유·가족 책장·로그아웃이 '내 정보'에 있다고 알려 준다 — 옛 길(이름 칩 → 가족 공유)은 더 말하지 않는다", () => {
+  it("가족 공유·가족 사진첩·로그아웃이 '내 정보'에 있다고 알려 준다 — 옛 길(이름 칩 → 가족 공유)은 더 말하지 않는다", () => {
     render(<HelpPage />);
     const text = document.body.textContent ?? "";
     expect(text).toContain("내 여행 · 한장 요약 · 사진 고르기 · 여행 100선 · 내 정보");

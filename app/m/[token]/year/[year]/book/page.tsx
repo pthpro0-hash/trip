@@ -10,10 +10,10 @@ import { yearBook } from "@/lib/mailboxYearBook";
 import { YearBookPrint } from "@/components/mailbox/receive/YearBookPrint";
 
 /*
-  가족 책장 · 올해의 책을 쪽으로 나눠 PDF 로 저장하는 화면.
+  가족 사진첩 · 올해 모아보기를 쪽으로 나눠 PDF 로 저장하는 화면.
 
-  책에 넣는 사진 목록은 엽서 한 장씩 읽어 와야 알 수 있다(책장 목록에는 표지와 사진 수만 있다). 그해 열어 본 책이 열 권
-  안팎이라 한 번에 읽는다. 읽지 못한 엽서는 표지 사진 하나만으로 쪽을 만든다. 링크가 새로 만들어졌거나 책장이 닫혔으면
+  엽서에 넣는 사진 목록은 엽서 한 장씩 읽어 와야 알 수 있다(사진첩 목록에는 표지와 사진 수만 있다). 그해 열어 본 엽서가 열 권
+  안팎이라 한 번에 읽는다. 읽지 못한 엽서는 표지 사진 하나만으로 쪽을 만든다. 링크가 새로 만들어졌거나 사진첩이 닫혔으면
   곧바로 열리지 않아야 하므로 요청마다 새로 읽는다. 검색에는 나오지 않게 한다.
 */
 
@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { token, year } = await params;
   return {
     // 인쇄 창에서 PDF 로 저장할 때 이 제목이 파일 이름이 된다.
-    title: `${year}년 우리 가족 올해의 책`,
+    title: `${year}년 우리 가족 올해 모아보기`,
     robots: { index: false, follow: false },
     manifest: `/m/${token}/manifest.webmanifest`,
   };

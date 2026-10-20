@@ -103,11 +103,11 @@ describe("PhotoPicker", () => {
   });
 
   it("한도 때문에 줄어든 까닭을 접어 둔 채로도 알려 준다 — 펼쳐야 알 수 있으면 ‘왜 6장이지?’가 된다", () => {
-    picker({ limitNote: "책장 설정에 따라 6장까지 고를 수 있어요." });
-    expect(screen.getByText("책장 설정에 따라 6장까지 고를 수 있어요.")).toBeTruthy();
+    picker({ limitNote: "사진첩 설정에 따라 6장까지 고를 수 있어요." });
+    expect(screen.getByText("사진첩 설정에 따라 6장까지 고를 수 있어요.")).toBeTruthy();
     // 펼쳐도 한 번만 나온다.
     fireEvent.click(toggle());
-    expect(screen.getAllByText("책장 설정에 따라 6장까지 고를 수 있어요.")).toHaveLength(1);
+    expect(screen.getAllByText("사진첩 설정에 따라 6장까지 고를 수 있어요.")).toHaveLength(1);
   });
 
   it("까닭이 없으면 말하지 않는다", () => {

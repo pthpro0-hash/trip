@@ -78,7 +78,7 @@ describe("ReceivedPostcardView · 부모님이 보는 엽서", () => {
     expect(screen.getByText("1 / 2")).toBeTruthy();
   });
 
-  it("앨범은 넘겨 볼 수 있다 — 책 한 권이 사진 여러 장이라서", () => {
+  it("앨범은 넘겨 볼 수 있다 — 엽서 한 장이 사진 여러 장이라서", () => {
     const { container } = render(<ReceivedPostcardView token={TOKEN} card={card()} />);
     fireEvent.click(screen.getByRole("button", { name: "다음 사진" }));
     expect(container.querySelector("img")?.getAttribute("src")).toMatch(/b\.webp$/);
@@ -131,7 +131,7 @@ describe("ReceivedPostcardView · 부모님이 보는 엽서", () => {
     expect(screen.getByRole("list", { name: "보낸 답장" })).toHaveTextContent("아빠: 잘 다녀왔니");
   });
 
-  it("받는 분 이름이 없는 책장은 '가족'으로 바로 답한다", async () => {
+  it("받는 분 이름이 없는 사진첩은 '가족'으로 바로 답한다", async () => {
     render(<ReceivedPostcardView token={TOKEN} card={card({ members: [] })} />);
     expect(screen.queryByText("누가 보시나요?")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "다음엔 같이 가자" }));
@@ -150,12 +150,12 @@ describe("ReceivedPostcardView · 부모님이 보는 엽서", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(text);
   });
 
-  it("책장으로 돌아가는 길이 있다", () => {
+  it("사진첩으로 돌아가는 길이 있다", () => {
     render(<ReceivedPostcardView token={TOKEN} card={card()} />);
-    expect(screen.getByRole("link", { name: "책장으로 가기" })).toHaveAttribute("href", `/m/${TOKEN}`);
+    expect(screen.getByRole("link", { name: "사진첩으로 가기" })).toHaveAttribute("href", `/m/${TOKEN}`);
   });
 
-  it("답장 단추 문구는 책장 설정의 것을 쓴다 — 집마다 말투가 다르다", () => {
+  it("답장 단추 문구는 사진첩 설정의 것을 쓴다 — 집마다 말투가 다르다", () => {
     window.localStorage.setItem(whoKey, "엄마");
     render(<ReceivedPostcardView token={TOKEN} card={card({ settings: { ...RECOMMENDED, words: ["고맙다", "또 가자", "잘했다"] } })} />);
     expect(screen.getByRole("button", { name: "고맙다" })).toBeTruthy();
@@ -218,7 +218,7 @@ describe("ReceivedPostcardView · 하트", () => {
     expect(screen.getByRole("button", { name: "이 사진에 하트" }).getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("받는 분 이름이 없는 책장은 '가족'으로 바로 하트를 단다", async () => {
+  it("받는 분 이름이 없는 사진첩은 '가족'으로 바로 하트를 단다", async () => {
     render(<ReceivedPostcardView token={TOKEN} card={card({ members: [] })} />);
     fireEvent.click(screen.getByRole("button", { name: "이 사진에 하트" }));
     await waitFor(() => expect(calls.heart).toHaveBeenCalledWith(expect.anything(), TOKEN, PID, "가족", "a.webp", true));
@@ -259,7 +259,7 @@ describe("ReceivedPostcardView · 하트", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "이 사진 하트 빼기" })).toBeTruthy());
   });
 
-  it("책마다 하트(설정)면 사진에는 하트가 없고, 책 하나에 한 번 단다", async () => {
+  it("엽서마다 하트(설정)면 사진에는 하트가 없고, 엽서 하나에 한 번 단다", async () => {
     asMom();
     render(<ReceivedPostcardView token={TOKEN} card={card({ settings: { ...RECOMMENDED, heart: "book" } })} />);
     expect(screen.queryByRole("button", { name: "이 사진에 하트" })).toBeNull();
@@ -268,7 +268,7 @@ describe("ReceivedPostcardView · 하트", () => {
     await waitFor(() => expect(calls.heart).toHaveBeenCalledWith(expect.anything(), TOKEN, PID, "엄마", "", true));
   });
 
-  it("책 하트는 누가 눌렀는지 이름으로 보인다", () => {
+  it("엽서 하트는 누가 눌렀는지 이름으로 보인다", () => {
     asMom();
     render(
       <ReceivedPostcardView
@@ -336,20 +336,20 @@ describe("ReceivedPostcardView · 미리보기", () => {
     expect(screen.getByRole("button", { name: "이 사진에 하트" }).getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("책마다 하트(설정)여도 마찬가지로 보내지 않는다", async () => {
+  it("엽서마다 하트(설정)여도 마찬가지로 보내지 않는다", async () => {
     render(<ReceivedPostcardView token={TOKEN} card={card({ settings: { ...RECOMMENDED, heart: "book" } })} preview />);
     fireEvent.click(screen.getByRole("button", { name: "이 여행에 하트" }));
     expect(await screen.findByRole("status")).toHaveTextContent("미리보기라서 하트는 보내지 않아요");
     expect(calls.heart).not.toHaveBeenCalled();
   });
 
-  it("책장으로 돌아가는 길도 미리보기로 이어진다", () => {
+  it("사진첩으로 돌아가는 길도 미리보기로 이어진다", () => {
     preview();
-    expect(screen.getByRole("link", { name: "책장으로 가기" })).toHaveAttribute("href", `/m/${TOKEN}?preview=1`);
+    expect(screen.getByRole("link", { name: "사진첩으로 가기" })).toHaveAttribute("href", `/m/${TOKEN}?preview=1`);
   });
 
   it("평소 화면의 돌아가는 길에는 표시가 붙지 않는다", () => {
     render(<ReceivedPostcardView token={TOKEN} card={card()} />);
-    expect(screen.getByRole("link", { name: "책장으로 가기" })).toHaveAttribute("href", `/m/${TOKEN}`);
+    expect(screen.getByRole("link", { name: "사진첩으로 가기" })).toHaveAttribute("href", `/m/${TOKEN}`);
   });
 });

@@ -190,7 +190,7 @@ describe("deriveThemes 오탐(false positive) 회귀 테스트", () => {
     expect(spot.themes).toContain("해변");
   });
 
-  it("'유'로 시작하지 않고 '책'으로 이어지지 않는 진짜 산 이름은 여전히 자연경관으로 분류된다", () => {
+  it("'유'로 시작하지 않고 '엽서'으로 이어지지 않는 진짜 산 이름은 여전히 자연경관으로 분류된다", () => {
     const spot = byName("가상지리산");
     expect(spot.themes).toContain("자연경관");
   });

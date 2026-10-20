@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
 
 /*
-  책 한 권의 사진을 한 장씩 넘겨 본다.
+  엽서 한 장의 사진을 한 장씩 넘겨 본다.
 
   한 번에 한 장만 크게 보이고(길게 늘어놓으면 스무 장이 한 화면을 다 먹는다), 큰 단추와 손가락 밀기와 화살표
   키로 넘긴다. 곁의 한 장씩만 미리 받아 둔다 — 스무 장을 한꺼번에 받으면 부모님 폰의 데이터를 쓴다.
@@ -14,7 +14,7 @@ import { postcardFileUrl } from "@/lib/supabase/mailboxPublic";
 /** 이만큼(px) 가로로 밀면 넘긴다. 세로로 더 많이 움직였으면 화면을 굴리려던 것이라 넘기지 않는다. */
 const SWIPE = 40;
 
-/** 사진마다 하트를 받는 책장에서 앨범에 달아 주는 것. 하트를 켜고 끄는 일은 부르는 쪽이 한다. */
+/** 사진마다 하트를 받는 사진첩에서 앨범에 달아 주는 것. 하트를 켜고 끄는 일은 부르는 쪽이 한다. */
 export interface AlbumHearts {
   /** 내가 이 사진에 하트를 달았나. */
   mine: (file: string) => boolean;

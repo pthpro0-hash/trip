@@ -10,17 +10,17 @@ const open = (initial: MailboxSettings = RECOMMENDED, extra: Partial<React.Compo
   return { onSave, onCancel };
 };
 
-describe("MailboxSettingsEditor · 책장 설정", () => {
+describe("MailboxSettingsEditor · 사진첩 설정", () => {
   it("처음에는 모두 권장 — '권장' 표시가 각 묶음에 붙고, 안내도 그렇게 말한다", () => {
     open();
     expect(screen.getByText("지금 모두 권장 설정이에요")).toBeTruthy();
-    // 사진 수·크기·글씨·답장·하트·작년 오늘·올해의 책·보관 — 여덟 묶음('가고 싶은 곳 받기'는 2026-10-14 뺐다).
+    // 사진 수·크기·글씨·답장·하트·작년 오늘·올해 모아보기·보관 — 여덟 묶음('가고 싶은 곳 받기'는 2026-10-14 뺐다).
     expect(screen.getAllByText("권장").length).toBeGreaterThanOrEqual(8);
     expect(screen.getByRole("radio", { name: /20장/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /보통/, checked: true })).toBeTruthy();
   });
 
-  it("책 한 권 사진 수를 6·12·20장에서 고른다", () => {
+  it("엽서 한 장 사진 수를 6·12·20장에서 고른다", () => {
     const { onSave } = open();
     fireEvent.click(screen.getByRole("radio", { name: /12장/ }));
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
@@ -29,9 +29,9 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
 
   it("사진 크기를 고르면 용량 어림이 바뀐다", () => {
     open();
-    expect(screen.getByText(/책 한 권이 약 1\.0~1\.4MB/)).toBeTruthy();
+    expect(screen.getByText(/엽서 한 장이 약 1\.0~1\.4MB/)).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: /선명/ }));
-    expect(screen.getByText(/책 한 권이 약 2\.0~2\.8MB/)).toBeTruthy();
+    expect(screen.getByText(/엽서 한 장이 약 2\.0~2\.8MB/)).toBeTruthy();
   });
 
   it("글씨 크기를 바꾸면 미리보기 글씨가 따라 바뀐다", () => {
@@ -76,10 +76,10 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
     expect(onSave).toHaveBeenCalledWith(RECOMMENDED);
   });
 
-  it("하트를 사진마다(권장) 받을지 책마다 받을지 고른다", () => {
+  it("하트를 사진마다(권장) 받을지 엽서마다 받을지 고른다", () => {
     const { onSave } = open();
     expect(screen.getByRole("radio", { name: /사진마다/ })).toBeChecked();
-    fireEvent.click(screen.getByRole("radio", { name: /책마다/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /엽서마다/ }));
     expect(screen.getByText("권장과 다른 설정 1개")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ heart: "book" }));
@@ -102,9 +102,9 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
     expect(screen.getByText("권장과 다른 설정 1개")).toBeTruthy();
   });
 
-  it("올해의 책을 보여 줄지(권장) 고른다 — 12월~2월 알림과 해마다 단추", () => {
+  it("올해 모아보기를 보여 줄지(권장) 고른다 — 12월~2월 알림과 해마다 단추", () => {
     const { onSave } = open();
-    const group = screen.getByRole("radiogroup", { name: "올해의 책" });
+    const group = screen.getByRole("radiogroup", { name: "올해 모아보기" });
     expect(within(group).getByRole("radio", { name: "보여 주기" })).toBeChecked();
     fireEvent.click(within(group).getByRole("radio", { name: "안 보여 주기" }));
     expect(screen.getByText("권장과 다른 설정 1개")).toBeTruthy();
@@ -112,15 +112,15 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ year: false }));
   });
 
-  it("끈 올해의 책이 저장된 설정을 열면 '안 보여 주기'로 보인다", () => {
+  it("끈 올해 모아보기가 저장된 설정을 열면 '안 보여 주기'로 보인다", () => {
     open({ ...RECOMMENDED, year: false });
-    const group = screen.getByRole("radiogroup", { name: "올해의 책" });
+    const group = screen.getByRole("radiogroup", { name: "올해 모아보기" });
     expect(within(group).getByRole("radio", { name: "안 보여 주기" })).toBeChecked();
   });
 
-  it("사진까지 보관할 책을 고른다 — 최근 10권(권장) 또는 전부", () => {
+  it("사진까지 보관할 엽서을 고른다 — 최근 10권(권장) 또는 전부", () => {
     const { onSave } = open();
-    const group = screen.getByRole("radiogroup", { name: "사진까지 보관할 책" });
+    const group = screen.getByRole("radiogroup", { name: "사진까지 보관할 엽서" });
     expect(within(group).getByRole("radio", { name: /최근 10권/ })).toBeChecked();
     fireEvent.click(within(group).getByRole("radio", { name: /^전부/ }));
     expect(screen.getByText("권장과 다른 설정 1개")).toBeTruthy();
@@ -136,7 +136,7 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
 
   it("'전부'로 저장된 설정을 열면 '전부'로 보인다", () => {
     open({ ...RECOMMENDED, keep: "all" });
-    const group = screen.getByRole("radiogroup", { name: "사진까지 보관할 책" });
+    const group = screen.getByRole("radiogroup", { name: "사진까지 보관할 엽서" });
     expect(within(group).getByRole("radio", { name: /^전부/ })).toBeChecked();
   });
 
@@ -147,9 +147,9 @@ describe("MailboxSettingsEditor · 책장 설정", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("바꾼 것이 어디에 적용되는지 말해 준다 — 새 책부터 / 바로", () => {
+  it("바꾼 것이 어디에 적용되는지 말해 준다 — 새 엽서부터 / 바로", () => {
     open();
-    expect(screen.getByText(/새로 꽂는 책부터 적용돼요/)).toBeTruthy();
+    expect(screen.getByText(/새로 보내는 엽서부터 적용돼요/)).toBeTruthy();
     expect(screen.getByText(/부모님 화면에는 바로 적용돼요/)).toBeTruthy();
   });
 });

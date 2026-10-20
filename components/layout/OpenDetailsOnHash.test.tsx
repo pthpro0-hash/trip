@@ -8,7 +8,7 @@ const page = () => (
     <OpenDetailsOnHash />
     <section id="shelf">
       <details>
-        <summary>가족 책장</summary>
+        <summary>가족 사진첩</summary>
         <p>안</p>
       </details>
     </section>
