@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { SpotsHome } from "@/components/home/SpotsHome";
-import { WelcomeDialog } from "@/components/home/WelcomeDialog";
 import { IntroScreen } from "@/components/home/IntroScreen";
 import { buildExample } from "@/lib/example";
 import { StartSwitch } from "@/components/home/StartSwitch";
@@ -17,9 +16,9 @@ import { viewOf } from "@/lib/nav";
   둘 다 없으면 여행 100선 — 처음 온 사람에게 내 여행은 아직 빈 지도고,
   검색엔진이 보고 가는 것도 이쪽이다.
 
-  처음 온 사람(로그인 전)에게는 여행 100선 위에 환영 팝업 하나가 뜬다(WelcomeDialog) — 이 서비스가 무엇을 해 주는지를
-  한 번 말하고, "오늘 그만 보기"를 누르면 오늘은 다시 안 뜬다. 예전에는 안내 창이 둘이고 어느 화면에서든 떴다. 이제
-  하나이고, 이 화면에서만 뜬다. 한때 팝업 대신 맨 위에 환영 영역을 넣었더니 아래 100선이 밀려 내려가 혼잡해 보였다.
+  로그인 전 사람에게는 여행 100선 위에 전체 화면 소개가 방문마다 한 번 뜬다(IntroScreen) — 이 서비스가 무엇을 해 주는지를
+  말하고, 닫으면 아래 여행 100선이 그대로 보인다. 예전에는 안내 창이 둘이고 어느 화면에서든 떴다. 이제 하나이고, 이 화면에서만
+  뜬다. 한때 맨 위에 환영 영역을 넣었더니 아래 100선이 밀려 내려가 혼잡해 보였다.
 */
 
 export const metadata: Metadata = {
@@ -61,13 +60,8 @@ export default async function HomePage({
         // 로그인한 사람일 수 있으면 "내 여행 한 줄" 자리만 비워 두었다가 채운다(번쩍이거나 밀리지 않게). 값은 읽지 않고 이름만 본다.
         maybeSignedIn={maybeSignedIn}
       />
-      {/*
-        이 기기에서 처음 온 로그인 전 사람에게 한 번, 전체 화면 소개(IntroScreen). 아래 팝업보다 앞에 둔다 — 소개가 뜨면 팝업은 이번
-        방문에 건너뛰도록 소개 쪽 효과가 먼저 적어 둔다. 장면에 쓰는 사진은 예시 여행의 곳마다 첫 장이다.
-      */}
+      {/* 로그인 전 사람에게 방문마다 한 번, 브라우저에서 뜨는 전체 화면 소개. 장면에 쓰는 사진은 예시 여행의 곳마다 첫 장이다. */}
       <IntroScreen photos={buildExample()?.photos.filter((_, index) => index % 2 === 0).map((photo) => photo.url) ?? []} />
-      {/* 로그인 전 첫 방문자에게만, 브라우저에서 뜬다. 내 여행(지도)에는 시트가 이미 같은 말을 하니 두지 않는다. */}
-      <WelcomeDialog />
     </>
   );
 }

@@ -3,21 +3,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AddPhotosLink } from "@/components/photo/AddPhotosLink";
-import { fromSearchEngine, markWelcomeShown } from "@/lib/welcome";
-import { markIntroSeen, readIntroSeen, shouldShowIntro } from "@/lib/intro";
+import { markIntroShown, readIntroShown, shouldShowIntro } from "@/lib/intro";
 import { hasSessionCookieHere } from "@/lib/sessionCookie";
 
 /*
-  처음 온 사람에게 한 번만 뜨는 전체 화면 소개. 2초 남짓한 장면 — 사진 → 지도 위의 길과 핀 → 한 장 카드 — 이 차례로 나타난 뒤
+  로그인 전 사람에게 방문마다 한 번 뜨는 전체 화면 소개. 2초 남짓한 장면 — 사진 → 지도 위의 길과 핀 → 한 장 카드 — 이 차례로 나타난 뒤
   멈춘다. 동영상 파일이 아니라 화면에서 그려서(CSS) 가볍고, 어떤 화면에서도 또렷하다. 움직임을 줄인 기기에서는 마지막 그림이
   처음부터 보인다.
 
-  언제 뜨는지는 lib/intro 가 정한다: 이 기기에서 한 번, 검색에서 바로 넘어온 사람·로그인한 사람에게는 안 뜬다. 브라우저에서만
-  그려서(처음에는 아무것도 그리지 않는다) 서버가 보내는 본문과 검색엔진에는 들어가지 않는다.
-
-  뜨면 환영 팝업(WelcomeDialog)은 이번 방문에 내밀었다고 적어 겹치지 않게 한다. 두 컴포넌트의 효과는 앞서 놓인 쪽이 먼저
-  돌므로, app/page 에서 이 컴포넌트를 팝업보다 앞에 둔다.
+  언제 뜨는지는 lib/intro 가 정한다: 로그인 전이면 방문마다 한 번(같은 방문에서 앱 안으로 돌아올 때는 안 뜬다). 브라우저에서만
+  그려서(처음에는 아무것도 그리지 않는다) 서버가 보내는 본문에는 들어가지 않는다. 닫으면 그 뒤의 여행 100선이 그대로 보인다.
 */
 
 function Glyph({ children }: { children: ReactNode }) {
@@ -130,16 +125,8 @@ export function IntroScreen({ photos }: { photos: string[] }) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const seen = readIntroSeen();
-    const show = shouldShowIntro({
-      seen,
-      fromSearch: fromSearchEngine(document.referrer),
-      hasSession: hasSessionCookieHere(),
-    });
-    if (!show) return;
-    // 이 기기에서 한 번만, 이번 방문의 환영 팝업과는 겹치지 않게 — 아래 두 줄은 바로 적어야 뒤에 오는 팝업의 효과가 본다.
-    markIntroSeen();
-    markWelcomeShown();
+    if (!shouldShowIntro({ shown: readIntroShown(), hasSession: hasSessionCookieHere() })) return;
+    markIntroShown();
     void Promise.resolve().then(() => setOpen(true));
   }, []);
 
@@ -206,13 +193,13 @@ export function IntroScreen({ photos }: { photos: string[] }) {
         </ul>
 
         <div className="mt-auto flex flex-col gap-3 pt-7">
-          <AddPhotosLink
-            href="/trips/new"
+          <button
+            type="button"
             onClick={close}
             className="flex w-full items-center justify-center rounded-full bg-accent px-6 py-4 text-[17px] font-semibold text-on-accent shadow-[0_8px_20px_-8px_rgba(11,102,240,0.6)] transition hover:bg-accent-hover"
           >
             시작하기
-          </AddPhotosLink>
+          </button>
           <Link
             href="/example"
             onClick={close}

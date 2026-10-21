@@ -170,7 +170,7 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
 
       {/*
         여행을 남긴 사람에게만 가장 최근 여행 한 줄. 기록이 없는 사람에게는 아무것도 그리지 않는다 — 이 서비스가
-        무엇을 해 주는지는 로그인 전 방문자에게 뜨는 환영 팝업(WelcomeDialog)이 말한다. 한때 이 띠가 제목 위에 있어서
+        무엇을 해 주는지는 로그인 전 방문자에게 뜨는 첫 방문 소개(IntroScreen)이 말한다. 한때 이 띠가 제목 위에 있어서
         제목과 100선이 아래로 밀렸다.
       */}
       <HomeIntro maybeSignedIn={maybeSignedIn} />
