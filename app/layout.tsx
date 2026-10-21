@@ -34,8 +34,8 @@ export const metadata: Metadata = {
 // 폰의 위 상태 줄 색을 화면 바탕과 맞춘다(켜질 때 어색한 띠가 생기지 않게).
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#e9edf2" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0f14" },
   ],
 };
 
@@ -54,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
         />
       </head>
-      <body className="min-h-screen bg-bg text-text antialiased">
+      <body className="min-h-screen bg-page text-text antialiased">
         <SiteHeader />
         {/* 가족의 여행을 보는 중이면 누구의 것인지 늘 알린다. */}
         <FamilyBanner />

@@ -52,7 +52,7 @@ export function SiteHeader() {
   if (isReceiverPath(pathname)) return null;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-bg/85 backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-line bg-page/80 backdrop-blur-xl">
       {/* 높이를 못 박는다. 지도 첫 화면이 "화면 − 이 띠" 만큼을 채운다. */}
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:gap-3 sm:px-5">
         <Link

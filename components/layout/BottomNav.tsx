@@ -105,9 +105,9 @@ function Bar({ active }: { active: NavId | null }) {
         위 띠(z-30)와 같은 층. 모달(z-40~50)은 이 위에 떠야 한다 — 아래에서 올라오는
         시트(HubDialog)가 탭에 잘리면 안 된다.
       */
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/95 backdrop-blur-md sm:hidden [padding-bottom:env(safe-area-inset-bottom,0px)]"
+      className="fixed inset-x-3 bottom-[calc(8px+env(safe-area-inset-bottom,0px))] z-30 mx-auto max-w-md rounded-[28px] bg-bg/85 shadow-[0_8px_32px_-8px_rgba(20,40,80,0.28)] ring-1 ring-line backdrop-blur-xl sm:hidden"
     >
-      <ul className={`mx-auto grid h-14 max-w-md ${items.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
+      <ul className={`grid h-14 gap-0.5 p-1 ${items.length === 5 ? "grid-cols-5" : "grid-cols-4"}`}>
         {items.map((item) => {
           const on = item.id !== "add" && item.id === active;
           return (
@@ -123,8 +123,8 @@ function Bar({ active }: { active: NavId | null }) {
                       : undefined
                 }
                 aria-current={on ? "page" : undefined}
-                className={`flex h-full flex-col items-center justify-center gap-0.5 text-[11px] transition ${
-                  on ? "font-semibold text-accent" : "font-medium text-text-muted"
+                className={`flex h-full flex-col items-center justify-center gap-0.5 rounded-[22px] text-[11px] transition ${
+                  on ? "bg-accent-soft font-semibold text-accent" : "font-medium text-text-muted"
                 }`}
               >
                 {item.id === "add" ? (
