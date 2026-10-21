@@ -111,26 +111,43 @@ create trigger family_links_limit
 -- (auth.uid()) 이 자기에게 준 권한만 알려 준다 — 남의 연결을 캐묻는 데는 쓸 수 없다.
 --
 -- need 는 'view' < 'edit' < 'full'. 주인 본인은 늘 true.
+--
+-- 관리자(app_admins, supabase/spotSuggest.sql · admin.sql)는 누구의 여행이든 '보기'만 할 수 있다 — 관리자 페이지의
+-- "이 계정 보기"(보기 전용)가 이 길로 읽는다. 고치기·올리기·지우기(edit/full)는 관리자에게도 열리지 않는다.
+-- 관리자 표가 아직 없는 곳에서도 이 파일이 돌도록 plpgsql 로 두고, 표가 있을 때만 들여다본다.
 -- ═══════════════════════════════════════════════
 
 create or replace function public.family_can(owner uuid, need text)
 returns boolean
-language sql
+language plpgsql
 stable
 security definer
 set search_path = public
 as $$
-  select auth.uid() is not null and (
-    auth.uid() = owner
-    or exists (
-      select 1
-      from public.family_links l
-      where l.owner_id = owner
-        and l.member_id = auth.uid()
-        and (case l.role when 'view' then 1 when 'edit' then 2 when 'full' then 3 else 0 end)
-          >= (case need when 'view' then 1 when 'edit' then 2 when 'full' then 3 else 99 end)
-    )
-  );
+begin
+  if auth.uid() is null then
+    return false;
+  end if;
+  if auth.uid() = owner then
+    return true;
+  end if;
+  if exists (
+    select 1
+    from public.family_links l
+    where l.owner_id = owner
+      and l.member_id = auth.uid()
+      and (case l.role when 'view' then 1 when 'edit' then 2 when 'full' then 3 else 0 end)
+        >= (case need when 'view' then 1 when 'edit' then 2 when 'full' then 3 else 99 end)
+  ) then
+    return true;
+  end if;
+  if need = 'view' and to_regclass('public.app_admins') is not null then
+    if exists (select 1 from public.app_admins a where a.user_id = auth.uid()) then
+      return true;
+    end if;
+  end if;
+  return false;
+end;
 $$;
 
 revoke all on function public.family_can(uuid, text) from public;

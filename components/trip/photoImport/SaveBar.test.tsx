@@ -142,4 +142,20 @@ describe("SaveBar · 로그인하고 기록하기", () => {
     bar({ mode: "login" });
     expect(clickLink(screen.getByRole("link", { name: "로그인하고 기록하기" }))).toBe(false);
   });
+
+  it("고른 사진이 보관 한도의 남은 자리보다 많으면 최대 장수를 알리고, 기록 단추를 막고, 다시 고르게 한다", () => {
+    const onRepick = vi.fn();
+    bar({ count: 2, over: { left: 120, picked: 300, limit: 500 }, onRepick });
+    expect(screen.getByRole("alert")).toHaveTextContent("지금 올릴 수 있는 사진은 최대 120장이에요. 고른 사진은 300장이에요.");
+    expect(screen.getByRole("button", { name: "여행 2건 기록하기" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "사진 다시 고르기" }));
+    expect(onRepick).toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "보관 한도 · 등업 신청" })).toHaveAttribute("href", "/me");
+  });
+
+  it("자리가 다 찼으면 다시 고르기 대신 사진 없이 기록하거나 등업을 신청하라고 한다", () => {
+    bar({ over: { left: 0, picked: 10, limit: 500 }, onRepick: () => undefined });
+    expect(screen.getByRole("alert")).toHaveTextContent("사진 보관 자리가 다 찼어요(보관 한도 500장)");
+    expect(screen.queryByRole("button", { name: "사진 다시 고르기" })).toBeNull();
+  });
 });

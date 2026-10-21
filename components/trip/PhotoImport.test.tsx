@@ -95,6 +95,9 @@ vi.mock("@/lib/goTo", () => ({ goTo: (href: string) => goTo(href) }));
 
 let currentUser: { id: string } | null = { id: "나" };
 let savedRanges: DateRange[] = [];
+// 보관 한도(lib/grade). 비우면 못 읽은 것 — 화면에서 막지 않는다.
+let quotaNow: { grade: 1 | 2 | 3 | 4; limit: number | null; used: number } | null = null;
+vi.mock("@/lib/supabase/grade", () => ({ fetchQuota: async () => quotaNow }));
 
 vi.mock("@/lib/photo/readShots", () => ({ readShots: (files: File[]) => readShots(files) }));
 
@@ -213,6 +216,7 @@ describe("PhotoImport", () => {
     window.history.replaceState({}, "", "/");
     currentUser = { id: "나" };
     savedRanges = [];
+    quotaNow = null;
     sessionStorage.clear();
     // 완료 화면이 맨 위로 올린다. 시험이 끝난 뒤 늦게 도착하는 저장에도 jsdom 의 "구현되지 않음" 소리가 나지 않게,
     // 되돌리지 않는 가짜를 둔다(창은 파일마다 따로 만들어진다).
@@ -1725,6 +1729,32 @@ describe("PhotoImport", () => {
       await 사진넣기(석장);
       await waitFor(() => expect(제목칸()[0].value).toBe("안목해변"));
       expect(screen.queryByRole("group", { name: "이름 후보" })).toBeNull();
+    });
+  });
+
+  describe("보관 한도", () => {
+    it("고르기 전에 지금 올릴 수 있는 최대 장수를 알린다", async () => {
+      quotaNow = { grade: 4, limit: 500, used: 312 };
+      await 화면열기();
+      expect(await screen.findByText(/사진 보관 312 \/ 500장 · 지금 최대/)).toHaveTextContent("188장까지 올릴 수 있어요");
+    });
+
+    it("남은 자리보다 많이 고르면 최대 장수를 알리고 기록을 막는다 — 사진 없이 기록은 된다", async () => {
+      quotaNow = { grade: 4, limit: 500, used: 497 };
+      await 사진넣기();
+      const alert = await screen.findByRole("alert", {}, { timeout: 3000 });
+      expect(alert).toHaveTextContent("지금 올릴 수 있는 사진은 최대 3장이에요. 고른 사진은 5장이에요.");
+      expect(await 기록단추()).toBeDisabled();
+      fireEvent.click(screen.getByRole("checkbox", { name: /사진도 함께 올리기/ }));
+      expect(await 기록단추()).toBeEnabled();
+      expect(screen.queryByText(/최대 3장이에요/)).toBeNull();
+    });
+
+    it("무제한이면 막지 않는다", async () => {
+      quotaNow = { grade: 1, limit: null, used: 9000 };
+      await 사진넣기();
+      expect(await 기록단추()).toBeEnabled();
+      expect(screen.queryByText(/최대 \d+장이에요/)).toBeNull();
     });
   });
 });

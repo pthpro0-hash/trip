@@ -5,7 +5,6 @@ import {
   SIGNED_URL_SECONDS,
   backfillThumbs,
   fetchPlacePhotos,
-  PHOTO_LIMIT,
   UPLOAD_LANES,
   legacyThumbPath,
   markerPath,
@@ -53,7 +52,12 @@ function target(name: string): UploadTarget {
 }
 
 interface FakeOptions {
+  /** 이미 보관한 장수(보관 한도 계산에 쓰인다). */
   already?: number;
+  /** 보관 한도. 비우면 무제한. */
+  limit?: number | null;
+  /** 사진 줄을 넣을 때 DB 가 한도로 거절한다(photo_quota). */
+  quotaRejects?: string[];
   /** 이 이름들은 올리다 실패한다. */
   uploadFails?: string[];
   /** 이 이름들은 표에 넣다 실패한다. */
@@ -81,13 +85,15 @@ function fakeSupabase(options: FakeOptions = {}) {
   };
 
   const supabase = {
+    rpc: async (name: string) =>
+      name === "photo_quota"
+        ? { data: { grade: 4, limit: options.limit ?? null, used: options.already ?? 0 }, error: null }
+        : { data: null, error: { message: "unknown" } },
     from: (table: string) => ({
-      select: () => ({
-        eq: async () => ({ count: options.already ?? 0, error: null }),
-      }),
       insert: async (row: Record<string, unknown>) => {
         const name = state.nameOf.get(String(row.storage_path)) ?? "";
         if ((options.rowFails ?? []).includes(name)) return { error: { message: "nope" } };
+        if ((options.quotaRejects ?? []).includes(name)) return { error: { message: "photo_quota" } };
         state.inserted.push({ table, ...row });
         return { error: null };
       },
@@ -267,7 +273,7 @@ describe("uploadPhotos", () => {
   });
 
   it("상한을 넘겨 올리지 않는다", async () => {
-    const { supabase, state } = fakeSupabase({ already: PHOTO_LIMIT - 3 });
+    const { supabase, state } = fakeSupabase({ limit: 10, already: 7 });
     const run = uploadPhotos(supabase, "나", Array.from({ length: 10 }, (_, i) => target(`${i}.jpg`)));
     await 끝까지(state, run);
     const outcome = await run;
@@ -278,8 +284,25 @@ describe("uploadPhotos", () => {
     expect(state.inserted).toHaveLength(3);
   });
 
+  it("보관 한도를 못 읽었거나 무제한이면 화면 쪽에서는 막지 않는다", async () => {
+    const { supabase, state } = fakeSupabase({ limit: null, already: 5000 });
+    const run = uploadPhotos(supabase, "나", ["a.jpg", "b.jpg"].map(target));
+    await 끝까지(state, run);
+    expect((await run).uploaded).toBe(2);
+  });
+
+  it("DB 가 한도로 거절하면(사이에 다른 기기에서 올렸다) 그 장은 '자리가 없어 못 올림'으로 세고 파일을 지우며, 나머지는 올리지 않는다", async () => {
+    const { supabase, state } = fakeSupabase({ quotaRejects: ["0.jpg"] });
+    const run = uploadPhotos(supabase, "나", ["0.jpg"].map(target));
+    await 끝까지(state, run);
+    const outcome = await run;
+    expect(outcome.overLimit).toBe(1);
+    expect(outcome.failed).toBe(0);
+    expect(state.removed.length).toBe(3);
+  });
+
   it("이미 상한을 채웠으면 한 장도 올리지 않는다", async () => {
-    const { supabase, state } = fakeSupabase({ already: PHOTO_LIMIT });
+    const { supabase, state } = fakeSupabase({ limit: 10, already: 10 });
     const run = uploadPhotos(supabase, "나", ["a.jpg", "b.jpg"].map(target));
     await 끝까지(state, run);
     const outcome = await run;
@@ -383,7 +406,7 @@ describe("uploadPrepared · 맡겨 둔 사진 올리기", () => {
   });
 
   it("상한을 넘겨 올리지 않고, 올리지 않을 사진은 꺼내 오지도 않는다", async () => {
-    const { supabase, state } = fakeSupabase({ already: PHOTO_LIMIT - 2 });
+    const { supabase, state } = fakeSupabase({ limit: 10, already: 8 });
     const run = uploadPrepared(supabase, "나", Array.from({ length: 5 }, (_, i) => prepared(`${i}.jpg`)), load);
     await 끝까지(state, run);
     const outcome = await run;

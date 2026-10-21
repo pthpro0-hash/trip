@@ -69,4 +69,14 @@ describe("무엇을 할 수 있나 — 그 주인이 준 권한대로", () => {
   it("추가도 가능: 모두", () => {
     expect(can(as("full"))).toEqual(["read", "edit", "add", "remove"]);
   });
+
+  it("관리자 보기는 적힌 권한이 무엇이든 '보기만'이다", () => {
+    window.sessionStorage.setItem("family-view", JSON.stringify({ ownerId: "u9", label: "x", role: "full", admin: true }));
+    const view = readFamilyView();
+    expect(view).toEqual({ ownerId: "u9", label: "x", role: "view", admin: true });
+    expect(canIn(view, "read")).toBe(true);
+    expect(canIn(view, "edit")).toBe(false);
+    expect(canIn(view, "add")).toBe(false);
+    expect(canIn(view, "remove")).toBe(false);
+  });
 });

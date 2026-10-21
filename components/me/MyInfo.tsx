@@ -10,6 +10,8 @@ import { fetchMailboxes } from "@/lib/supabase/mailbox";
 import { mailboxPath } from "@/lib/mailbox";
 import { countPendingSuggestions, isAdmin } from "@/lib/supabase/spotSuggestions";
 import { fetchUnreadHeartCount, fetchUnreadReplyCount } from "@/lib/supabase/postcards";
+import { fetchGradeRequests } from "@/lib/supabase/grade";
+import { PhotoQuota } from "./PhotoQuota";
 
 /*
   내 정보 — 흩어져 있던 것들이 한 곳에 모인 메뉴.
@@ -92,10 +94,16 @@ export function MyInfoView({
   unread,
   shelves = [],
   waiting = null,
+  requests = 0,
+  storage = null,
   signingOut,
   onSignOut,
 }: {
   state: MyInfoState;
+  /** 관리자일 때 검토 전인 등업 신청 수. */
+  requests?: number;
+  /** 사진 보관 칸(보관 한도·사용량·등업 신청). 로그인했을 때만 MyInfo 가 넣는다. */
+  storage?: ReactNode;
   unread: number;
   /** 관리자일 때 검토 전인 빠진 곳 추천 수(관리자가 아니면 null — 관리 줄을 내지 않는다). */
   waiting?: number | null;
@@ -139,6 +147,7 @@ export function MyInfoView({
         </section>
       ) : (
         <>
+          {storage}
           <Group title="가족">
             <Row href="/family" title="가족 공유" hint="가족을 초대해 내 여행을 함께 봐요" />
             <Row
@@ -154,6 +163,12 @@ export function MyInfoView({
           </Group>
           {waiting !== null && (
             <Group title="관리">
+              <Row
+                href="/admin"
+                title="회원 관리"
+                hint="등급(사진 보관 한도)·등업 신청·계정 보기"
+                badge={requests > 0 ? `등업 신청 ${requests}` : undefined}
+              />
               <Row
                 href="/admin/suggestions"
                 title="빠진 곳 추천 관리"
@@ -187,6 +202,8 @@ export function MyInfo() {
   const [shelves, setShelves] = useState<ShelfLink[]>([]);
   const [signingOut, setSigningOut] = useState(false);
   const [waiting, setWaiting] = useState<number | null>(null);
+  const [requests, setRequests] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -196,6 +213,7 @@ export function MyInfo() {
         const { data } = await currentUser(supabase);
         if (!data.user) return setState("login");
         setState(accountOf(data.user));
+        setUserId(data.user.id);
         // 새 소식과 사진첩 줄은 곁다리다. 못 세고 못 읽으면 숫자·줄 없이 조용히 둔다(관리 줄은 그대로 남는다).
         const [replies, hearts, boxes] = await Promise.all([
           fetchUnreadReplyCount(supabase),
@@ -204,7 +222,11 @@ export function MyInfo() {
         ]);
         setUnread(replies + hearts);
         // 관리자라면 관리 줄을 낸다. 관리자가 아니거나 못 알아보면 아무것도 내지 않는다.
-        if (await isAdmin(supabase, data.user.id)) setWaiting((await countPendingSuggestions(supabase)) ?? 0);
+        if (await isAdmin(supabase, data.user.id)) {
+          setWaiting((await countPendingSuggestions(supabase)) ?? 0);
+          const asked = await fetchGradeRequests(supabase);
+          if (asked !== "failed") setRequests(asked.filter((item) => item.status === "pending").length);
+        }
         if (boxes !== "failed") {
           setShelves(boxes.owned.filter((box) => !box.closed).map((box) => ({ id: box.id, name: box.name, token: box.token })));
         }
@@ -227,5 +249,16 @@ export function MyInfo() {
     }
   };
 
-  return <MyInfoView state={state} unread={unread} shelves={shelves} waiting={waiting} signingOut={signingOut} onSignOut={() => void signOut()} />;
+  return (
+    <MyInfoView
+      state={state}
+      unread={unread}
+      shelves={shelves}
+      waiting={waiting}
+      requests={requests}
+      storage={userId ? <PhotoQuota userId={userId} /> : null}
+      signingOut={signingOut}
+      onSignOut={() => void signOut()}
+    />
+  );
 }

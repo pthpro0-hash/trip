@@ -43,9 +43,16 @@ interface SaveBarProps {
   onLogin?: () => void;
   /** 로그인하기 전에 알릴 말 — 사진을 맡아 두려다 못 했을 때. 단추 바로 위에 붙어, 단추를 보는 눈에 함께 들어온다. */
   notice?: string;
+  /**
+   * 고른 사진이 보관 한도의 남은 자리보다 많을 때(lib/grade). 주면 기록 단추를 막고, 올릴 수 있는 최대 장수를 알려 다시 고르게 한다.
+   * 사진 없이 기록하는 것은 막지 않는다 — '사진도 함께 올리기'를 끄면 이 값이 오지 않는다.
+   */
+  over?: { left: number; picked: number; limit: number };
+  /** 사진을 다시 고르는 창을 연다. */
+  onRepick?: () => void;
 }
 
-export function SaveBar({ mode, count, adding = 0, saving, withPhotos, onWithPhotos, onSave, onLogin, notice }: SaveBarProps) {
+export function SaveBar({ mode, count, adding = 0, saving, withPhotos, onWithPhotos, onSave, onLogin, notice, over, onRepick }: SaveBarProps) {
   if (mode === "login") {
     return (
       <div className={ROOT}>
@@ -90,6 +97,31 @@ export function SaveBar({ mode, count, adding = 0, saving, withPhotos, onWithPho
 
   return (
     <div className={ROOT}>
+      {over && (
+        <div role="alert" className="mb-3 flex flex-col gap-2 rounded-2xl bg-accent-soft px-4 py-3 text-[14px] leading-snug text-text">
+          {over.left === 0 ? (
+            <p className="break-keep">
+              사진 보관 자리가 다 찼어요(보관 한도 {over.limit.toLocaleString("ko-KR")}장). 사진 없이 기록하거나, 내 정보에서 등업을
+              신청해 주세요.
+            </p>
+          ) : (
+            <p className="break-keep">
+              지금 올릴 수 있는 사진은 <strong>최대 {over.left.toLocaleString("ko-KR")}장</strong>이에요. 고른 사진은{" "}
+              {over.picked.toLocaleString("ko-KR")}장이에요. {over.left.toLocaleString("ko-KR")}장 이하로 다시 골라 주세요.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {over.left > 0 && onRepick && (
+              <button type="button" onClick={onRepick} className="font-semibold text-accent underline underline-offset-2">
+                사진 다시 고르기
+              </button>
+            )}
+            <Link href="/me" className="font-medium text-text-muted underline underline-offset-2">
+              보관 한도 · 등업 신청
+            </Link>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5">
           <input
@@ -103,7 +135,7 @@ export function SaveBar({ mode, count, adding = 0, saving, withPhotos, onWithPho
             <span className="block break-keep text-[12px] text-text-faint [text-wrap:balance]">줄여서 올리고 원본은 보관하지 않아요</span>
           </span>
         </label>
-        <button type="button" onClick={onSave} disabled={saving || count + adding === 0} className={`${BUTTON} shrink-0`}>
+        <button type="button" onClick={onSave} disabled={saving || count + adding === 0 || !!over} className={`${BUTTON} shrink-0`}>
           {label}
         </button>
       </div>

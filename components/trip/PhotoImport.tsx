@@ -10,6 +10,8 @@ import { currentUser } from "@/lib/supabase/lazy";
 import { fetchSavedRanges, overlapsSaved, saveTrip, tripRange, type DateRange } from "@/lib/supabase/trips";
 import { addToExistingTrip, recountVisits } from "@/lib/supabase/tripAdd";
 import { uploadPhotos, uploadPrepared, type PreparedTarget, type UploadTarget } from "@/lib/supabase/photos";
+import { fetchQuota } from "@/lib/supabase/grade";
+import { fits, limitLabel, roomLeft, type Quota } from "@/lib/grade";
 import { readShots, type ReadResult } from "@/lib/photo/readShots";
 import { canPrepare, prepareForLogin } from "@/lib/photo/prepare";
 import { clearStash, loadStashedPhoto, probeStash, readStash, type StashMeta } from "@/lib/photo/stash";
@@ -215,6 +217,8 @@ export function PhotoImport() {
   const [saving, setSaving] = useState(false);
   const [outcome, setOutcome] = useState<SaveOutcome | null>(null);
   const [withPhotos, setWithPhotos] = useState(true);
+  // 사진 주인의 보관 한도와 사용량(lib/grade). 못 읽었으면 null — 그때는 화면에서 막지 않는다(DB 가 막는다).
+  const [quota, setQuota] = useState<Quota | null>(null);
   const [uploadNote, setUploadNote] = useState<string | null>(null);
   /*
     고르기 창을 닫은 뒤, 브라우저가 파일 목록을 건네줄 때까지의 틈.
@@ -298,6 +302,9 @@ export function PhotoImport() {
         const owner = ownerOf(viewed, data.user.id);
         setUserId(owner);
         setAuthChecked(true);
+        void fetchQuota(supabase, owner).then((found) => {
+          if (active) setQuota(found);
+        });
         // 같은 사진을 두 번 넣는 일이 잦다. 이미 저장한 날짜를 미리 알아 둔다.
         setSavedRanges(await fetchSavedRanges(supabase, owner));
         const remembered = await fetchPlaceNames(supabase, owner);
@@ -431,6 +438,19 @@ export function PhotoImport() {
   const addingCount = withPhotos
     ? visible.filter(({ trip, key }) => overlapsSaved(tripRange(trip), savedRanges) && !justSaved.has(key)).length
     : 0;
+
+  /*
+    이번에 올릴 사진 장수 — 사진도 함께 올릴 때, 아직 기록하지 않은 눈에 보이는 여행의 사진 전부. 이미 기록한 여행에 더하는 사진은
+    이미 올린 같은 사진을 빼고 올리지만 그 수는 기록할 때에야 알 수 있어, 여기서는 넉넉히(전부) 센다.
+  */
+  const uploadCount = withPhotos
+    ? visible.reduce((sum, { trip, key }) => (justSaved.has(key) ? sum : sum + trip.shots.length), 0)
+    : 0;
+  const room = quota ? roomLeft(quota) : null;
+  const over =
+    quota && quota.limit !== null && room !== null && uploadCount > 0 && !fits(quota, uploadCount)
+      ? { left: room, picked: uploadCount, limit: quota.limit }
+      : undefined;
 
   // 로그인하러 떠나기 전에 맡아 둘 사진 — 눈에 보이는 여행에 든 것만. 뺀 여행의 사진까지 줄이느라 시간을 쓰지 않는다.
   const stashShots = useMemo(() => shotsOf(visible.map(({ trip }) => trip)), [visible]);
@@ -938,6 +958,8 @@ export function PhotoImport() {
     setJustSaved(done);
     setOutcome(result);
     setSaving(false);
+    // 올린 만큼 남은 자리가 줄었다. 다음에 더 고를 때 맞는 수를 보이게 다시 읽는다.
+    void fetchQuota(supabase, userId).then((found) => setQuota(found));
   };
 
   /*
@@ -1298,6 +1320,13 @@ export function PhotoImport() {
           >
             사진 고르기
           </button>
+          {/* 고르기 전에 올릴 수 있는 최대 장수를 알린다(무제한이면 적지 않는다). 넘게 고르면 기록 막대가 다시 고르게 한다. */}
+          {quota && quota.limit !== null && (
+            <p className="text-center text-[13px] text-text-muted">
+              사진 보관 {quota.used.toLocaleString("ko-KR")} / {limitLabel(quota.limit)} · 지금 최대{" "}
+              <strong className="font-semibold text-text">{(room ?? 0).toLocaleString("ko-KR")}장</strong>까지 올릴 수 있어요
+            </p>
+          )}
           <Link href="/example" className="self-center text-[14px] font-medium text-text-muted underline underline-offset-2 transition hover:text-text">
             결과가 어떻게 나오는지 예시 보기
           </Link>
@@ -1454,6 +1483,8 @@ export function PhotoImport() {
           onSave={save}
           onLogin={signedOut && canLeaveWithPhotos ? () => void login() : undefined}
           notice={signedOut && stashFailed ? "이 브라우저에서는 사진을 잠깐 맡아 둘 수 없어요" : undefined}
+          over={signedOut ? undefined : over}
+          onRepick={pick}
         />
       )}
     </>

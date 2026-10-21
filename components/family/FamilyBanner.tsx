@@ -20,6 +20,7 @@ export function FamilyBanner() {
   const ownerId = view?.ownerId;
   const role = view?.role;
   const label = view?.label;
+  const admin = view?.admin === true;
 
   /*
     보는 중에 주인이 권한을 바꾸거나 연결을 끊었을 수 있다. 화면이 열릴 때마다 한 번 맞춰
@@ -27,7 +28,8 @@ export function FamilyBanner() {
     (확인하지 못했으면 그대로 둔다. 막는 것은 어차피 DB 다.)
   */
   useEffect(() => {
-    if (!ownerId || !role || !label) return;
+    // 관리자 보기는 가족 연결이 아니라 맞춰 볼 것이 없다(권한은 늘 '보기만').
+    if (!ownerId || !role || !label || admin) return;
     let active = true;
     void loadClient()
       .then((supabase) => (supabase && active ? fetchCircle(supabase) : "failed"))
@@ -46,9 +48,34 @@ export function FamilyBanner() {
     return () => {
       active = false;
     };
-  }, [ownerId, role, label]);
+  }, [ownerId, role, label, admin]);
 
   if (!view) return null;
+
+  if (view.admin) {
+    const leave = () => {
+      stopFamilyView();
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/admin";
+    };
+    return (
+      <div role="status" className="sticky top-14 z-20 border-b border-line bg-[#fff4e5] dark:bg-[#3a2a12]">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2 sm:px-5">
+          <p className="min-w-0 flex-1 truncate text-[13px] text-text">
+            <span className="font-semibold">관리자 보기</span> — <span className="font-semibold">{view.label}</span> 님의 여행
+            <span className="ml-1.5 text-text-muted">· 보기 전용</span>
+          </p>
+          <button
+            type="button"
+            onClick={leave}
+            className="shrink-0 rounded-full bg-text px-3.5 py-1.5 text-[13px] font-medium text-bg"
+          >
+            관리자 화면으로
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const back = () => {
     stopFamilyView();

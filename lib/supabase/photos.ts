@@ -10,6 +10,8 @@ import {
   type Shrunk,
 } from "@/lib/photo/resize";
 import { removeCopiesOfPhoto } from "./postcardCleanup";
+import { fetchQuota, isQuotaError } from "./grade";
+import { roomLeft } from "@/lib/grade";
 import { readAll } from "./readAll";
 
 export const BUCKET = "trip-photos";
@@ -36,8 +38,6 @@ const typeOf = (blob: Blob) => (blob.type.startsWith("image/") ? blob.type : "im
  * 것으로 막는다 (uploadPhotos 참고).
  */
 export const UPLOAD_LANES = 6;
-/** 계정당 사진 수 상한. 비용이 걷잡을 수 없이 늘지 않게 한다. */
-export const PHOTO_LIMIT = 2000;
 /** 서명 주소를 한 번에 달라고 하는 경로 수의 상한. */
 const SIGN_CHUNK = 300;
 /** 표에서 한 번에 읽는 줄 수. 서버는 한 번에 1000줄까지만 주므로 그 안에서 나눠 읽는다. */
@@ -85,18 +85,6 @@ function wallClock(date: Date): string {
     `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
     ` ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
   );
-}
-
-export async function countPhotos(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<number> {
-  const { count, error } = await supabase
-    .from("trip_photos")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId);
-
-  return error ? 0 : (count ?? 0);
 }
 
 /*
@@ -188,7 +176,8 @@ async function putOne(
   if (rowError) {
     // 아무도 가리키지 않는 파일을 남기지 않는다. 작은 판들도 함께.
     await supabase.storage.from(BUCKET).remove([path, thumbPath(path), markerPath(path)]);
-    return { kind: "failed" };
+    // 보관 한도에 걸려 DB 가 거절했다(supabase/admin.sql) — 망 탓이 아니라 다시 올려도 안 된다.
+    return isQuotaError(rowError) ? { kind: "overLimit" } : { kind: "failed" };
   }
 
   return { kind: "uploaded" };
@@ -252,12 +241,14 @@ async function uploadEach<T extends PhotoPlace>(
   // 얼마나 걸리는지는 올리는 쪽이 안다. 화면이 시계를 들고 있을 일이 아니다.
   const startedAt = Date.now();
 
-  const already = await countPhotos(supabase, userId);
   /*
-    상한 자리는 올리기 시작할 때 잡고, 실패하면 돌려준다. 다 끝난 뒤에
-    빼면 나란히 뜬 네 장이 같은 한 자리를 보고 상한을 넘어선다.
+    보관 한도(등급, lib/grade)의 남은 자리는 올리기 시작할 때 잡고, 실패하면 돌려준다. 다 끝난 뒤에 빼면 나란히 뜬 네 장이
+    같은 한 자리를 보고 한도를 넘어선다. 사진의 주인(userId — 가족 여행이면 그 주인)의 자리를 본다. 한도를 못 읽었으면(무제한이거나
+    admin.sql 전) 여기서는 막지 않는다 — 마지막으로 막는 것은 DB 다.
   */
-  const quota = { left: Math.max(0, PHOTO_LIMIT - already) };
+  const quotaNow = await fetchQuota(supabase, userId);
+  const room = quotaNow ? roomLeft(quotaNow) : null;
+  const quota = { left: room ?? Number.POSITIVE_INFINITY };
 
   const slots: (Slot | undefined)[] = new Array(targets.length);
   const flying = new Map<number, Promise<void>>();
@@ -297,7 +288,9 @@ async function uploadEach<T extends PhotoPlace>(
       try {
         // 망이 끊겨 던져도 그 한 장의 실패로 센다 — 나머지 사진과 완료 화면까지 멈추면 어디까지 올랐는지 알 수 없다.
         const slot: Slot = await putOne(supabase, userId, target, shrunk).catch((): Slot => ({ kind: "failed" }));
-        if (slot.kind !== "uploaded") quota.left += 1;
+        // DB 가 한도라고 했으면 남은 자리는 없다(화면이 본 사용량과 그 사이 달라졌다). 나머지는 줄이지도 올리지도 않는다.
+        if (slot.kind === "overLimit") quota.left = 0;
+        else if (slot.kind !== "uploaded") quota.left += 1;
         finish(index, slot);
       } finally {
         // 제 자리는 스스로 비운다. 아래 race 가 이미 끝난 것을 붙들지 않게.

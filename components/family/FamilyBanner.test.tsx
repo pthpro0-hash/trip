@@ -43,4 +43,15 @@ describe("FamilyBanner", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(readFamilyView()).toEqual(mine);
   });
+
+  it("관리자 보기 — '관리자 보기 · 보기 전용'이라 알리고, 가족 연결을 맞춰 보지 않으며, 관리자 화면으로 돌아가는 길을 둔다", async () => {
+    render(<FamilyBanner />);
+    act(() => startFamilyView({ ownerId: "u9", label: "user@example.com", role: "view", admin: true }));
+    expect(screen.getByRole("status")).toHaveTextContent("관리자 보기 — user@example.com 님의 여행");
+    expect(screen.getByRole("status")).toHaveTextContent("보기 전용");
+    expect(screen.getByRole("button", { name: "관리자 화면으로" })).toBeTruthy();
+    // 가족 연결에 없다고 내 여행으로 쫓아내지 않는다.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(readFamilyView()?.admin).toBe(true);
+  });
 });

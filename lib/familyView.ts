@@ -22,6 +22,11 @@ export interface FamilyView {
   label: string;
   /** 그 주인이 나에게 준 권한. */
   role: FamilyRole;
+  /**
+   * 관리자 보기(관리자 페이지의 "이 계정 보기"). 가족 연결이 아니라 관리자 권한으로 보는 것이라 늘 '보기만'이고, 위 띠가
+   * "관리자 보기"라고 알린다. DB 는 관리자에게 보기만 열어 준다(supabase/admin.sql · family.sql 의 family_can).
+   */
+  admin?: boolean;
 }
 
 const KEY = "family-view";
@@ -45,7 +50,11 @@ export function readFamilyView(): FamilyView | null {
     try {
       const value = JSON.parse(text) as Partial<FamilyView>;
       if (typeof value.ownerId === "string" && typeof value.label === "string" && isFamilyRole(value.role)) {
-        cached = { ownerId: value.ownerId, label: value.label, role: value.role };
+        // 관리자 보기는 무엇이 적혀 있든 보기만이다.
+        cached =
+          value.admin === true
+            ? { ownerId: value.ownerId, label: value.label, role: "view", admin: true }
+            : { ownerId: value.ownerId, label: value.label, role: value.role };
       }
     } catch {
       // 깨진 값은 없는 것으로 본다.
