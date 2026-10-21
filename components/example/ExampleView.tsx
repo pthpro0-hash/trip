@@ -46,7 +46,7 @@ export function ExampleView({ example }: { example: Example }) {
           <ul className="grid grid-cols-3 gap-2">
             {example.photos.map((photo) => (
               <li key={photo.file} className="flex flex-col gap-1">
-                <div className="relative aspect-square overflow-hidden rounded-xl bg-bg-subtle">
+                <div className="relative aspect-square overflow-hidden rounded-2xl bg-bg-subtle">
                   <Image src={photo.url} alt={`${photo.placeName} 사진`} fill sizes="(max-width: 672px) 33vw, 220px" className="object-cover" />
                 </div>
                 <span className="text-[12px] text-text-faint">{photo.takenAt}</span>
@@ -95,7 +95,7 @@ export function ExampleView({ example }: { example: Example }) {
         </Step>
       </ol>
 
-      <section className="flex flex-col gap-3 rounded-2xl bg-bg-subtle p-6">
+      <section className="flex flex-col gap-3 rounded-3xl bg-surface p-6 ring-1 ring-line">
         <p className="text-[18px] font-bold tracking-tight text-text">내 사진으로 만들어 보세요</p>
         <p className="text-[15px] leading-relaxed text-text-muted">사진을 고르는 것부터 시작해요. 기록할 때 로그인해요.</p>
         <AddPhotosLink

@@ -26,7 +26,7 @@ export function NearbyButton({ state, onRequest, onClear }: NearbyButtonProps) {
         disabled={busy}
         aria-pressed={active}
         className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
-          active ? "bg-accent text-on-accent" : "bg-bg-subtle text-text hover:bg-line"
+          active ? "bg-accent text-on-accent" : "bg-surface text-text ring-1 ring-line hover:bg-bg-subtle"
         }`}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5">

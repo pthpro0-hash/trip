@@ -58,7 +58,7 @@ export function SearchBox({ value, onChange, spots, onFocus }: SearchBoxProps) {
   return (
     <div ref={containerRef} className="relative">
       <svg
-        className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-text-faint"
+        className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-text-faint"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -85,7 +85,7 @@ export function SearchBox({ value, onChange, spots, onFocus }: SearchBoxProps) {
         }}
         placeholder="이름, 지역, 테마로 검색 (예: 제주 해변)"
         aria-label="검색"
-        className="w-full rounded-xl bg-bg-subtle py-3 pl-10 pr-10 text-[15px] text-text placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-accent/50"
+        className="w-full rounded-full bg-surface py-3.5 pl-11 pr-11 text-[16px] text-text shadow-[0_6px_24px_-10px_rgba(20,40,80,0.25)] ring-1 ring-line placeholder:text-text-faint focus:outline-none focus:ring-2 focus:ring-accent/50"
       />
       {draft && (
         <button

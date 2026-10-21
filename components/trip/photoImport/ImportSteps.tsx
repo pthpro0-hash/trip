@@ -10,7 +10,7 @@ const STEPS = ["고르기", "확인", "기록"] as const;
 const DOT = {
   done: "bg-accent-soft text-accent",
   now: "bg-accent text-on-accent",
-  next: "bg-bg-subtle text-text-faint",
+  next: "bg-surface text-text-faint ring-1 ring-line",
 } as const;
 
 export function ImportSteps({ current }: { current: 1 | 2 | 3 }) {

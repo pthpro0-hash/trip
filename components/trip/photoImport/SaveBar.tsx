@@ -17,10 +17,10 @@ import { ADD_HREF } from "@/lib/nav";
   화면 맨 아래에 붙지 않고 여백만큼 떠 있다. 넓은 화면(sm~)에서는 떠 있는 카드라 여백을 그대로 둔다.
 */
 const ROOT =
-  "sticky bottom-0 z-10 -mx-5 -mb-16 mt-2 border-t border-line bg-bg/95 px-5 py-3 backdrop-blur-md [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))] sm:bottom-4 sm:mx-0 sm:mb-0 sm:rounded-2xl sm:border sm:shadow-lg";
+  "sticky bottom-0 z-10 -mx-5 -mb-16 mt-2 rounded-t-[28px] bg-bg/90 px-5 py-3 shadow-[0_-10px_30px_-14px_rgba(20,40,80,0.3)] ring-1 ring-line backdrop-blur-xl [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))] sm:bottom-4 sm:mx-0 sm:mb-0 sm:rounded-2xl sm:border sm:shadow-lg";
 
 const BUTTON =
-  "rounded-full bg-accent px-5 py-3 text-[15px] font-semibold text-on-accent transition hover:bg-accent-hover disabled:opacity-60";
+  "rounded-full bg-accent px-6 py-3.5 text-[15px] font-semibold text-on-accent transition hover:bg-accent-hover disabled:opacity-60";
 
 /** 로그인하고 이 화면(사진으로 여행 추가)으로 돌아오는 주소. */
 export const LOGIN_HREF = `/login?next=${encodeURIComponent(ADD_HREF)}`;

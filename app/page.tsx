@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { SpotsHome } from "@/components/home/SpotsHome";
 import { WelcomeDialog } from "@/components/home/WelcomeDialog";
+import { IntroScreen } from "@/components/home/IntroScreen";
+import { buildExample } from "@/lib/example";
 import { StartSwitch } from "@/components/home/StartSwitch";
 import { SketchHub } from "@/components/hub/SketchHubLazy";
 import { START_COOKIE, startOf } from "@/lib/start";
@@ -59,6 +61,11 @@ export default async function HomePage({
         // 로그인한 사람일 수 있으면 "내 여행 한 줄" 자리만 비워 두었다가 채운다(번쩍이거나 밀리지 않게). 값은 읽지 않고 이름만 본다.
         maybeSignedIn={maybeSignedIn}
       />
+      {/*
+        이 기기에서 처음 온 로그인 전 사람에게 한 번, 전체 화면 소개(IntroScreen). 아래 팝업보다 앞에 둔다 — 소개가 뜨면 팝업은 이번
+        방문에 건너뛰도록 소개 쪽 효과가 먼저 적어 둔다. 장면에 쓰는 사진은 예시 여행의 곳마다 첫 장이다.
+      */}
+      <IntroScreen photos={buildExample()?.photos.filter((_, index) => index % 2 === 0).map((photo) => photo.url) ?? []} />
       {/* 로그인 전 첫 방문자에게만, 브라우저에서 뜬다. 내 여행(지도)에는 시트가 이미 같은 말을 하니 두지 않는다. */}
       <WelcomeDialog />
     </>

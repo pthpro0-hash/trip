@@ -88,7 +88,7 @@ const pill =
 function Preview({ box, wide = false }: { box: MailboxItem; wide?: boolean }) {
   // wide: 사진첩 화면 맨 앞의 큰 단추. 아니면 목록 줄 안의 작은 알약.
   const look = wide
-    ? "flex-1 rounded-full bg-bg-subtle px-5 py-3 text-center text-[15px] font-medium text-text ring-1 ring-line transition hover:bg-line disabled:opacity-60"
+    ? "flex-1 rounded-full bg-surface px-5 py-3 text-center text-[15px] font-medium text-text ring-1 ring-line transition hover:bg-bg-subtle disabled:opacity-60"
     : pill;
   if (box.closed) {
     return (
@@ -595,7 +595,7 @@ export function MailboxPanel() {
               aria-controls="album-panel"
               onClick={() => setTab(item.id)}
               className={`flex-1 rounded-full px-3 py-2 text-[14px] font-medium transition ${
-                tab === item.id ? "bg-accent-soft text-accent" : "bg-bg-subtle text-text-muted hover:text-text"
+                tab === item.id ? "bg-accent text-on-accent" : "bg-surface text-text-muted ring-1 ring-line hover:text-text"
               }`}
             >
               {item.label}
@@ -810,13 +810,13 @@ export function MailboxPanel() {
                   onClick={() => show(box.id)}
                   aria-label={`${box.name} 열기`}
                   data-closed={box.closed ? "true" : undefined}
-                  className={`flex w-full items-center gap-3.5 rounded-2xl p-3 text-left ring-1 ring-line transition hover:bg-bg-subtle ${box.closed ? "bg-bg-subtle" : "bg-bg"}`}
+                  className={`flex w-full items-center gap-4 rounded-2xl p-3.5 text-left ring-1 ring-line transition hover:bg-bg-subtle ${box.closed ? "bg-bg-subtle" : "bg-surface"}`}
                 >
                   {cover ? (
                     // eslint-disable-next-line @next/next/no-img-element -- 엽서 보관함의 공개 주소라 미리 최적화할 수 없다
-                    <img src={cover} alt="" loading="lazy" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                    <img src={cover} alt="" loading="lazy" className="h-20 w-20 shrink-0 rounded-2xl object-cover" />
                   ) : (
-                    <span aria-hidden="true" className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-accent-soft text-[24px] text-accent">
+                    <span aria-hidden="true" className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-accent-soft text-[28px] text-accent">
                       ✉
                     </span>
                   )}
@@ -859,7 +859,7 @@ export function MailboxPanel() {
           <button
             type="button"
             onClick={() => setCreating(true)}
-            className="rounded-2xl border border-dashed border-line px-5 py-3.5 text-[15px] font-medium text-text-muted transition hover:bg-bg-subtle hover:text-text"
+            className="rounded-2xl bg-surface px-5 py-4 text-[15px] font-semibold text-accent ring-1 ring-line transition hover:bg-bg-subtle"
           >
             + 새 사진첩
           </button>
@@ -873,7 +873,7 @@ export function MailboxPanel() {
               <li
                 key={box.id}
                 data-closed={box.closed ? "true" : undefined}
-                className={`flex flex-col gap-2 rounded-xl px-3.5 py-3 ring-1 ring-line ${box.closed ? "bg-bg-subtle" : "bg-bg"}`}
+                className={`flex flex-col gap-2 rounded-2xl px-4 py-3.5 ring-1 ring-line ${box.closed ? "bg-bg-subtle" : "bg-surface"}`}
               >
                 <div className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-text">{box.name}</span>
@@ -932,7 +932,7 @@ export function MailboxPanel() {
     <div className="flex flex-col gap-5">
       {message && (
         // 목록이 길어 아래쪽 카드의 단추를 누르면 맨 위의 알림이 화면 밖이다. 아무 일도 안 일어난 것처럼 보이지 않게 위 띠 아래에 붙인다.
-        <p role="status" className="sticky top-[4.25rem] z-20 break-all rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text shadow-md ring-1 ring-line">
+        <p role="status" className="sticky top-[4.25rem] z-20 break-all rounded-2xl bg-surface px-4 py-3 text-[14px] text-text shadow-md ring-1 ring-line">
           {message}
         </p>
       )}

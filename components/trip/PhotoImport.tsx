@@ -1287,14 +1287,14 @@ export function PhotoImport() {
         {picker}
         <ImportSteps current={1} />
 
-        <div className="flex flex-col gap-4 rounded-2xl bg-bg-subtle p-6">
-          <p className="break-keep text-[15px] leading-relaxed text-text-muted">
+        <div className="flex flex-col gap-4 rounded-3xl bg-surface p-6 shadow-[0_8px_32px_-14px_rgba(20,40,80,0.28)] ring-1 ring-line">
+          <p className="break-keep text-[16px] leading-relaxed text-text-muted">
             사진을 고르면 언제 어디서 찍었는지 읽어 여행으로 묶어 드려요.
           </p>
           <button
             type="button"
             onClick={pick}
-            className="w-full rounded-full bg-accent px-6 py-3.5 text-[16px] font-semibold text-on-accent transition hover:bg-accent-hover"
+            className="w-full rounded-full bg-accent px-6 py-4 text-[17px] font-semibold text-on-accent shadow-[0_8px_20px_-8px_rgba(11,102,240,0.6)] transition hover:bg-accent-hover"
           >
             사진 고르기
           </button>
@@ -1329,11 +1329,11 @@ export function PhotoImport() {
         {readSummary}
 
         {stage.message && (
-          <p role="alert" className="break-keep rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">{stage.message}</p>
+          <p role="alert" className="break-keep rounded-2xl bg-surface px-4 py-3 text-[14px] text-text-muted ring-1 ring-line">{stage.message}</p>
         )}
 
         {stage.name === "ready" && read && (
-          <div className="break-keep rounded-2xl bg-bg-subtle p-6 text-[15px] text-text-muted">
+          <div className="break-keep rounded-2xl bg-surface p-6 text-[15px] text-text-muted ring-1 ring-line">
             여행으로 묶을 만한 사진을 찾지 못했어요. 사진 파일이 맞는지 확인해 주세요.
           </div>
         )}
@@ -1395,11 +1395,11 @@ export function PhotoImport() {
       )}
 
       {stage.message && (
-        <p className="break-keep rounded-xl bg-bg-subtle px-4 py-3 text-[14px] text-text-muted">{stage.message}</p>
+        <p className="break-keep rounded-2xl bg-surface px-4 py-3 text-[14px] text-text-muted ring-1 ring-line">{stage.message}</p>
       )}
 
       {noAdd && (
-        <p className="break-keep rounded-xl bg-bg-subtle px-4 py-3.5 text-[14px] text-text-muted">
+        <p className="break-keep rounded-2xl bg-surface px-4 py-3.5 text-[14px] text-text-muted ring-1 ring-line">
           {family?.label} 님의 여행에는 사진을 더할 수 없어요(권한이 &lsquo;추가도 가능&rsquo;이 아니에요). 내
           여행으로 돌아가 올려 주세요.
         </p>

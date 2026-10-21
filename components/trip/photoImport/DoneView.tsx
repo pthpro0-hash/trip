@@ -67,7 +67,7 @@ export function DoneView({ outcome, onMore, onRetry, onRetryPhotos, retrying = f
   if (outcome.overLimit > 0) lines.push(`보관할 수 있는 사진 수를 넘어 ${outcome.overLimit}장은 올리지 못했어요`);
 
   return (
-    <section className="flex flex-col items-center gap-5 rounded-2xl bg-bg-subtle px-6 py-10 text-center">
+    <section className="flex flex-col items-center gap-5 rounded-3xl bg-surface px-6 py-10 text-center ring-1 ring-line">
       {(outcome.saved > 0 || outcome.merged > 0) && (
         <span aria-hidden="true" className="grid h-14 w-14 place-items-center rounded-full bg-accent-soft text-accent">
           <svg

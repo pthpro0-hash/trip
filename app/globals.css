@@ -115,3 +115,28 @@ h2 {
 .rs-24 { font-size: calc(24px * var(--rs, 1)); }
 .rs-28 { font-size: calc(28px * var(--rs, 1)); }
 .rs-32 { font-size: calc(32px * var(--rs, 1)); }
+
+/*
+  첫 방문 인트로(components/home/IntroScreen)의 2초 장면. 사진 → 지도의 길과 핀 → 한 장 카드 순서로 차례로 나타난다.
+  --d 는 각 조각이 시작하는 때. 움직임을 줄인 기기에서는 마지막 그림이 처음부터 보인다.
+*/
+@keyframes intro-pop {
+  from { opacity: 0; transform: translateY(14px) scale(0.92) rotate(var(--r, 0deg)); }
+  to { opacity: 1; transform: translateY(0) scale(1) rotate(var(--r, 0deg)); }
+}
+@keyframes intro-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes intro-pin {
+  0% { opacity: 0; transform: translateY(-10px) scale(0.4); }
+  70% { opacity: 1; transform: translateY(0) scale(1.18); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.intro-pop { animation: intro-pop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0s) both; transform: rotate(var(--r, 0deg)); }
+.intro-draw { stroke-dasharray: 1; animation: intro-draw 0.8s ease-in-out var(--d, 0s) both; }
+.intro-pin { transform-box: fill-box; transform-origin: center bottom; animation: intro-pin 0.4s ease-out var(--d, 0s) both; }
+@media (prefers-reduced-motion: reduce) {
+  .intro-pop, .intro-draw, .intro-pin { animation: none; }
+  .intro-draw { stroke-dashoffset: 0; }
+}

@@ -30,7 +30,7 @@ export function FilterBar({ criteria, onChange }: FilterBarProps) {
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <button
           type="button"
-          className="flex items-center gap-1 rounded-full bg-bg-subtle px-3.5 py-1.5 text-[13px] font-medium text-text md:hidden"
+          className="flex items-center gap-1 rounded-full bg-surface px-3.5 py-1.5 text-[13px] font-medium text-text ring-1 ring-line md:hidden"
           aria-expanded={expanded}
           onClick={() => setExpanded(!expanded)}
         >
@@ -86,7 +86,7 @@ function FilterGroup<T extends string>({
           className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
             selected.includes(option)
               ? "bg-accent text-on-accent"
-              : "bg-bg-subtle text-text hover:bg-line"
+              : "bg-surface text-text ring-1 ring-line hover:bg-bg-subtle"
           }`}
         >
           <input

@@ -77,7 +77,7 @@ export function SpotCard({ spot, selected, query, distanceKm, focused }: SpotCar
           {spot.seasons.map((season) => (
             <span
               key={season}
-              className="rounded-md bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent"
+              className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[11px] font-medium text-accent"
             >
               {season}
             </span>
@@ -85,7 +85,7 @@ export function SpotCard({ spot, selected, query, distanceKm, focused }: SpotCar
           {spot.foods.slice(0, 2).map((food) => (
             <span
               key={food}
-              className="rounded-md bg-bg-subtle px-2 py-0.5 text-[11px] text-text-muted"
+              className="rounded-full bg-bg-subtle px-2.5 py-0.5 text-[11px] text-text-muted"
             >
               {food}
             </span>

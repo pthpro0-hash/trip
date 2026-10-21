@@ -33,7 +33,7 @@ export function RegionStrip({ spots }: RegionStripProps) {
             <Link
               key={region}
               href={`/regions/${region}`}
-              className="group relative overflow-hidden rounded-xl bg-bg-subtle py-2.5 pl-3.5 pr-2.5 ring-1 ring-line transition hover:-translate-y-0.5 hover:shadow-[0_6px_18px_rgba(0,0,0,0.10)]"
+              className="group relative overflow-hidden rounded-2xl bg-surface py-2.5 pl-3.5 pr-2.5 ring-1 ring-line transition hover:-translate-y-0.5 hover:shadow-[0_6px_18px_rgba(0,0,0,0.10)]"
             >
               <span
                 className="absolute inset-y-0 left-0 w-[3px]"

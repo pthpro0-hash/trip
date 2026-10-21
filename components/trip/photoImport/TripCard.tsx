@@ -223,7 +223,7 @@ export function TripCard({
  */
 export function DismissedTrip({ title, onUndo }: { title: string; onUndo: () => void }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-bg-subtle px-4 py-2.5 text-[14px] text-text-muted">
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-2.5 text-[14px] text-text-muted ring-1 ring-line">
       <span className="min-w-0 truncate">‘{title}’을 뺐어요</span>
       <button
         type="button"

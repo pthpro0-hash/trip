@@ -135,18 +135,30 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
         머리글은 서비스 이름이 아니라 이 면이 무엇인지를 말한다. 이름은
         위 띠가 이미 들고 있고, 사람들이 찾는 말은 "한국관광 100선"이다. 이 제목이 검색에 걸리는 h1 이다.
       */}
-      <header>
-        <h1 className="text-[34px] font-bold tracking-tight text-text md:text-[44px]">
+      <header className="flex flex-col items-center pt-4 text-center sm:pt-8">
+        <h1 className="text-[38px] font-bold leading-[1.1] tracking-tight text-text md:text-[56px]">
           한국관광 100선
         </h1>
-        <p className="mt-1 text-[15px] text-text-muted">
+        <p className="mt-3 max-w-md text-[16px] leading-relaxed text-text-muted md:text-[18px]">
           갈 곳은 여기서 찾고, 다녀온 곳은 사진으로 내 여행에 남겨요
         </p>
+        {/* 검색을 맨 위 가운데에 — 찾는 일이 이 화면의 첫 일이다. */}
+        <div className="mt-6 w-full max-w-xl text-left">
+          <SearchBox
+            value={criteria.query ?? ""}
+            spots={SPOTS}
+            onFocus={() => void loadOverviews()}
+            onChange={(next) => {
+              setCriteria({ ...criteria, query: next || undefined });
+              if (next.trim() && !viewChosenByUser) setMobileView("list");
+            }}
+          />
+        </div>
         {/* 내 여행의 시작과 결과 예시로 가는 길 — 큰 띠를 얹지 않고 한 줄로만 둔다(첫 화면이 혼잡해 보이지 않게). */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
           <AddPhotosLink
             href="/trips/new"
-            className="rounded-full bg-accent px-4 py-2 text-[14px] font-semibold text-on-accent transition hover:bg-accent-hover"
+            className="rounded-full bg-accent px-6 py-3 text-[15px] font-semibold text-on-accent shadow-[0_6px_18px_-6px_rgba(11,102,240,0.55)] transition hover:bg-accent-hover"
           >
             사진으로 내 여행 만들기
           </AddPhotosLink>
@@ -165,15 +177,6 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
 
       <RegionStrip spots={SPOTS} />
 
-      <SearchBox
-        value={criteria.query ?? ""}
-        spots={SPOTS}
-        onFocus={() => void loadOverviews()}
-        onChange={(next) => {
-          setCriteria({ ...criteria, query: next || undefined });
-          if (next.trim() && !viewChosenByUser) setMobileView("list");
-        }}
-      />
       <FilterBar criteria={criteria} onChange={setCriteria} />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -185,7 +188,7 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
               onClick={() => setSavedOnly(!savedOnly)}
               aria-pressed={savedOnly}
               className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
-                savedOnly ? "bg-accent text-on-accent" : "bg-bg-subtle text-text hover:bg-line"
+                savedOnly ? "bg-accent text-on-accent" : "bg-surface text-text ring-1 ring-line hover:bg-bg-subtle"
               }`}
             >
               가고 싶은 곳 {wishlist.ids.length}
@@ -213,7 +216,7 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
         // list panel itself is hidden while mobileView is "map", so a message
         // placed inside it would silently disappear along with the panel,
         // leaving an empty map with no explanation.
-        <div className="rounded-2xl bg-bg-subtle p-5 text-[15px] text-text-muted">
+        <div className="rounded-2xl bg-surface p-5 text-[15px] text-text-muted ring-1 ring-line">
           {savedOnly
             ? "가고 싶은 곳 중에는 조건에 맞는 곳이 없어요."
             : "조건에 맞는 곳이 없어요."}

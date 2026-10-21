@@ -100,7 +100,7 @@ export function HomeIntro({ maybeSignedIn = false }: { maybeSignedIn?: boolean }
   const latest = trips[0];
 
   return (
-    <section className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl bg-bg-subtle px-5 py-4">
+    <section className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl bg-surface px-5 py-4 ring-1 ring-line">
       <div className="min-w-0 basis-full sm:flex-1">
         <p className="truncate text-[16px] font-semibold tracking-tight text-text">
           {latest.title || formatSpan(latest.startedOn, latest.endedOn)}
