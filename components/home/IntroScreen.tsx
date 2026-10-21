@@ -34,16 +34,17 @@ function Glyph({ children }: { children: ReactNode }) {
 
 const FEATURES: { text: string; icon: ReactNode }[] = [
   {
-    text: "사진은 이 기기 안에서 읽어요",
+    text: "멋진 사진첩이 됩니다.",
     icon: (
       <Glyph>
-        <rect x="5" y="11" width="14" height="9" rx="2" />
-        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+        <rect x="4" y="5" width="16" height="14" rx="2.5" />
+        <path d="M4 15.5l4.2-4.2 4 4 3-3L20 16" />
+        <circle cx="9" cy="9.5" r="1.2" />
       </Glyph>
     ),
   },
   {
-    text: "다녀온 길이 지도 위에 그려져요",
+    text: "여행이 지도 위에 그려져요.",
     icon: (
       <Glyph>
         <path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z" />
@@ -52,7 +53,7 @@ const FEATURES: { text: string; icon: ReactNode }[] = [
     ),
   },
   {
-    text: "부모님께는 링크 하나로 보여 드려요",
+    text: "지인 공유, 가족 사진첩도 됩니다.",
     icon: (
       <Glyph>
         <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
@@ -174,25 +175,26 @@ export function IntroScreen({ photos }: { photos: string[] }) {
           <Scene photos={photos} />
         </div>
 
-        <div className="mt-6 text-center">
-          <h2 id="intro-title" className="text-[30px] font-bold leading-[1.25] tracking-tight text-text">
-            사진만 고르면,{" "}
+        <div className="mt-5 text-center">
+          <h2 id="intro-title" className="text-[28px] font-bold leading-[1.3] tracking-tight text-text">
+            귀찮은 사진 정리.{" "}
             <br />
-            내 여행이 한 장이 돼요
+            올리기만 하면,{" "}
+            <br />내 여행 스케치가 됩니다.
           </h2>
           <p className="mt-3 text-[16px] leading-relaxed text-text-muted">날짜와 장소로 저절로 정리해 드려요</p>
         </div>
 
-        <ul aria-label="특징" className="mt-6 flex flex-col gap-2.5">
+        <ul aria-label="특징" className="mt-5 flex flex-col gap-2">
           {FEATURES.map((feature) => (
-            <li key={feature.text} className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 text-[15px] font-medium text-text ring-1 ring-line">
+            <li key={feature.text} className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-2.5 text-[15px] font-medium text-text ring-1 ring-line">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">{feature.icon}</span>
               {feature.text}
             </li>
           ))}
         </ul>
 
-        <div className="mt-auto flex flex-col gap-3 pt-7">
+        <div className="mt-auto flex flex-col gap-3 pt-5">
           <button
             type="button"
             onClick={close}

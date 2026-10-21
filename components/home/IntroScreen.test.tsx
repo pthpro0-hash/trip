@@ -11,7 +11,7 @@ import { resetIntroShownForTest } from "@/lib/intro";
 const PHOTOS = ["https://tong.visitkorea.or.kr/a.jpg", "https://tong.visitkorea.or.kr/b.jpg", "https://tong.visitkorea.or.kr/c.jpg"];
 
 const setReferrer = (value: string) => Object.defineProperty(document, "referrer", { value, configurable: true });
-const 소개 = () => screen.findByRole("dialog", { name: /사진만 고르면/ });
+const 소개 = () => screen.findByRole("dialog", { name: /귀찮은 사진 정리/ });
 
 describe("IntroScreen", () => {
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe("IntroScreen", () => {
     render(<IntroScreen photos={PHOTOS} />);
     const dialog = await 소개();
     expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(within(dialog).getByRole("heading", { level: 2 })).toHaveTextContent("사진만 고르면, 내 여행이 한 장이 돼요");
+    expect(within(dialog).getByRole("heading", { level: 2 })).toHaveTextContent("귀찮은 사진 정리. 올리기만 하면, 내 여행 스케치가 됩니다.");
     expect(within(dialog).getByText("날짜와 장소로 저절로 정리해 드려요")).toBeTruthy();
   });
 
@@ -36,9 +36,9 @@ describe("IntroScreen", () => {
     const dialog = await 소개();
     const items = within(within(dialog).getByRole("list", { name: "특징" })).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual([
-      "사진은 이 기기 안에서 읽어요",
-      "다녀온 길이 지도 위에 그려져요",
-      "부모님께는 링크 하나로 보여 드려요",
+      "멋진 사진첩이 됩니다.",
+      "여행이 지도 위에 그려져요.",
+      "지인 공유, 가족 사진첩도 됩니다.",
     ]);
     expect(within(dialog).getByText("사진: 한국관광공사")).toBeTruthy();
   });
