@@ -9,6 +9,8 @@
   따지지 않는다.
 */
 
+import { hasSessionCookieHere } from "./sessionCookie";
+
 const SHOWN_KEY = "intro:shown";
 
 /** 저장소를 못 쓸 때(사생활 보호 창 등)에는 이 값이 방문의 기억을 대신한다. */
@@ -40,4 +42,50 @@ export function resetIntroShownForTest(): void {
 
 export function shouldShowIntro(input: { shown: boolean; hasSession: boolean }): boolean {
   return !input.shown && !input.hasSession;
+}
+
+/*
+  빨리 뜨게 하기.
+
+  예전에는 화면의 자바스크립트(여행 100선 121곳, 지도 등)가 다 받아지고 붙은 뒤에야 소개를 띄웠다. 폰에서는 몇 초 동안 100선이
+  보이다가 소개가 뒤늦게 덮었다. 이제 서버가 소개를 처음부터 그려 보내고(로그인 쿠키가 없을 때만, app/page), 그 바로 앞에 둔 아주
+  작은 글(INTRO_BOOT_SCRIPT)이 화면이 그려지기 전에 "이번 방문에 이미 봤나"를 보고 <html data-intro="on|off"> 를 적는다. off 면
+  globals.css 가 소개를 감춘다 — 그래서 이미 본 사람에게 소개가 번쩍이지도 않는다.
+
+  앱 안에서 첫 화면으로 돌아온 경우에는 그 글이 다시 돌지 않는다. 그때는 introOpen 이 같은 판단을 해서 적는다. 닫으면 off 로 적어
+  같은 방문 안에서는 다시 열리지 않는다.
+*/
+
+const INTRO_ATTR = "data-intro";
+const INTRO_EVENT = "intro-change";
+
+/** 화면이 그려지기 전에 도는 글. 위 함수들과 같은 규칙(로그인 쿠키 · 이번 방문에 봤나)을 문자열로 둔다. */
+export const INTRO_BOOT_SCRIPT = `(function(){var d=document.documentElement;try{if(/(^|;\\s*)sb-[^=]+-auth-token(\\.\\d+)?=/.test(document.cookie)||sessionStorage.getItem("${SHOWN_KEY}")==="1"){d.setAttribute("${INTRO_ATTR}","off");return}sessionStorage.setItem("${SHOWN_KEY}","1")}catch(e){}d.setAttribute("${INTRO_ATTR}","on")})();`;
+
+/** 지금 소개를 보여야 하나. 아직 아무도 정하지 않았으면(앱 안에서 넘어왔다) 여기서 정하고 적는다. */
+export function introOpen(): boolean {
+  const root = document.documentElement;
+  if (!root.hasAttribute(INTRO_ATTR)) {
+    const show = shouldShowIntro({ shown: readIntroShown(), hasSession: hasSessionCookieHere() });
+    if (show) markIntroShown();
+    root.setAttribute(INTRO_ATTR, show ? "on" : "off");
+  }
+  return root.getAttribute(INTRO_ATTR) === "on";
+}
+
+/** 소개를 닫는다. 같은 방문 안에서는 다시 열리지 않는다. */
+export function closeIntro(): void {
+  document.documentElement.setAttribute(INTRO_ATTR, "off");
+  window.dispatchEvent(new Event(INTRO_EVENT));
+}
+
+export function subscribeIntro(onChange: () => void): () => void {
+  window.addEventListener(INTRO_EVENT, onChange);
+  return () => window.removeEventListener(INTRO_EVENT, onChange);
+}
+
+/** 시험에서 정해 둔 것을 지운다. */
+export function resetIntroForTest(): void {
+  shownInMemory = false;
+  document.documentElement.removeAttribute(INTRO_ATTR);
 }

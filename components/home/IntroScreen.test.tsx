@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { IntroScreen } from "./IntroScreen";
-import { resetIntroShownForTest } from "@/lib/intro";
+import { resetIntroForTest } from "@/lib/intro";
 
 /*
   로그인 전 사람에게 방문마다 한 번 뜨는 전체 화면 소개. 약속 한 줄·특징 셋·시작하기·예시·건너뛰기가 있다.
@@ -17,7 +17,7 @@ describe("IntroScreen", () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
-    resetIntroShownForTest();
+    resetIntroForTest();
     document.cookie = "sb-test-auth-token=; path=/; max-age=0";
     setReferrer("");
     document.body.style.overflow = "";

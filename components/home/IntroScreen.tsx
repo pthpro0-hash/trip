@@ -2,17 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { markIntroShown, readIntroShown, shouldShowIntro } from "@/lib/intro";
-import { hasSessionCookieHere } from "@/lib/sessionCookie";
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { INTRO_BOOT_SCRIPT, closeIntro, introOpen, subscribeIntro } from "@/lib/intro";
 
 /*
   로그인 전 사람에게 방문마다 한 번 뜨는 전체 화면 소개. 2초 남짓한 장면 — 사진 → 지도 위의 길과 핀 → 한 장 카드 — 이 차례로 나타난 뒤
   멈춘다. 동영상 파일이 아니라 화면에서 그려서(CSS) 가볍고, 어떤 화면에서도 또렷하다. 움직임을 줄인 기기에서는 마지막 그림이
   처음부터 보인다.
 
-  언제 뜨는지는 lib/intro 가 정한다: 로그인 전이면 방문마다 한 번(같은 방문에서 앱 안으로 돌아올 때는 안 뜬다). 브라우저에서만
-  그려서(처음에는 아무것도 그리지 않는다) 서버가 보내는 본문에는 들어가지 않는다. 닫으면 그 뒤의 여행 100선이 그대로 보인다.
+  언제 뜨는지는 lib/intro 가 정한다: 로그인 전이면 방문마다 한 번(같은 방문에서 앱 안으로 돌아올 때는 안 뜬다). 빨리 뜨도록 서버가
+  처음부터 그려 보내고, 바로 앞의 작은 글이 그려지기 전에 볼지 말지를 정한다(lib/intro 의 INTRO_BOOT_SCRIPT). 닫으면 그 뒤의
+  여행 100선이 그대로 보인다.
 */
 
 function Glyph({ children }: { children: ReactNode }) {
@@ -134,23 +134,18 @@ function Scene({ photos }: { photos: string[] }) {
 }
 
 export function IntroScreen({ photos }: { photos: string[] }) {
-  const [open, setOpen] = useState(false);
+  // 서버는 늘 그린다(보일지는 앞의 글과 globals.css 가 정한다). 붙은 뒤에는 브라우저의 판단을 따른다.
+  const open = useSyncExternalStore(subscribeIntro, introOpen, () => true);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!shouldShowIntro({ shown: readIntroShown(), hasSession: hasSessionCookieHere() })) return;
-    markIntroShown();
-    void Promise.resolve().then(() => setOpen(true));
-  }, []);
-
-  const close = () => setOpen(false);
+  const close = closeIntro;
 
   useEffect(() => {
     if (!open) return;
     const kept = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") closeIntro();
     };
     window.addEventListener("keydown", onKey);
     dialogRef.current?.focus();
@@ -168,13 +163,16 @@ export function IntroScreen({ photos }: { photos: string[] }) {
     특징 줄을 접고, 그래도 모자라면 그때만 스크롤된다.
   */
   return (
+    <>
+    {/* 이 글이 소개보다 먼저 읽혀야 그려지기 전에 감출 수 있다. 앱 안에서 그려질 때(React 가 넣을 때)는 돌지 않는다 — 그때는 introOpen 이 정한다. */}
+    <script dangerouslySetInnerHTML={{ __html: INTRO_BOOT_SCRIPT }} />
     <div
       ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="intro-title"
       tabIndex={-1}
-      className="fixed inset-0 z-[60] overflow-y-auto bg-page outline-none"
+      className="intro-overlay fixed inset-0 z-[60] overflow-y-auto bg-page outline-none"
     >
       <div className="mx-auto flex h-dvh min-h-[420px] w-full max-w-md flex-col gap-[1.4dvh] px-6 pb-3 pt-2 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))] [padding-top:max(0.5rem,env(safe-area-inset-top))]">
         <div className="flex shrink-0 items-center justify-between">
@@ -235,5 +233,6 @@ export function IntroScreen({ photos }: { photos: string[] }) {
         </div>
       </div>
     </div>
+    </>
   );
 }

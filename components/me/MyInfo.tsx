@@ -129,10 +129,21 @@ export function MyInfoView({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={state.avatar} alt="" className="h-12 w-12 shrink-0 rounded-full object-cover" />
         )}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-[28px] font-bold tracking-tight text-text">내 정보</h1>
           {state !== "login" && <p className="truncate text-[15px] text-text-muted">{state.name}</p>}
         </div>
+        {/* 로그아웃은 맨 위 이름 옆에 둔다 — 아래 끝에 있으면 사진 보관·가족·안내를 다 지나야 보였다. */}
+        {state !== "login" && (
+          <button
+            type="button"
+            onClick={onSignOut}
+            disabled={signingOut}
+            className="shrink-0 rounded-full bg-surface px-4 py-2 text-[14px] font-medium text-text-muted ring-1 ring-line transition hover:bg-bg-subtle hover:text-text disabled:opacity-60"
+          >
+            로그아웃
+          </button>
+        )}
       </header>
 
       {state === "login" ? (
@@ -181,17 +192,6 @@ export function MyInfoView({
       )}
 
       {GUIDE}
-
-      {state !== "login" && (
-        <button
-          type="button"
-          onClick={onSignOut}
-          disabled={signingOut}
-          className="self-start rounded-full bg-bg-subtle px-5 py-2.5 text-[15px] font-medium text-text-muted transition hover:bg-line disabled:opacity-60"
-        >
-          로그아웃
-        </button>
-      )}
     </main>
   );
 }

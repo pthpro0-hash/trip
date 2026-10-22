@@ -221,6 +221,12 @@ describe("MyInfo · 내 정보 메뉴", () => {
       await waitFor(() => expect(state.signOut).toHaveBeenCalledTimes(1));
     });
 
+    it("로그아웃은 맨 위, 제목 옆에 있다 — 아래까지 내려가지 않아도 된다", async () => {
+      render(<MyInfo />);
+      const button = await screen.findByRole("button", { name: "로그아웃" });
+      expect(button.closest("header")).toBe(screen.getByRole("heading", { level: 1, name: "내 정보" }).closest("header"));
+    });
+
     it("로그아웃하는 동안에는 다시 누를 수 없다", async () => {
       state.signOut.mockReturnValue(new Promise(() => undefined));
       render(<MyInfo />);

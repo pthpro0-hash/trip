@@ -41,7 +41,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
+    // 첫 화면 소개(lib/intro)의 작은 글이 그려지기 전에 data-intro 를 적는다. 서버가 보낸 것과 달라지는 것이 정상이라 그 한 칸만 비교에서 뺀다.
+    <html lang="ko" suppressHydrationWarning>
       <head>
         {/*
           Apple devices get their own system face from the --font-sans stack;

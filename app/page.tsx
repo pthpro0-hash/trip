@@ -55,13 +55,18 @@ export default async function HomePage({
   }
   return (
     <>
+      {/*
+        로그인 전 사람에게 방문마다 한 번 뜨는 전체 화면 소개. 빨리 뜨도록 서버가 그려 보내고 100선보다 앞에 둔다 — 문서의 앞쪽에 있어야
+        긴 100선 목록보다 먼저 읽혀 그려진다. 로그인 쿠키가 있으면 아예 보내지 않는다. 장면의 사진은 예시 여행의 곳마다 첫 장이다.
+      */}
+      {!maybeSignedIn && (
+        <IntroScreen photos={buildExample()?.photos.filter((_, index) => index % 2 === 0).map((photo) => photo.url) ?? []} />
+      )}
       <SpotsHome
         switcher={<StartSwitch current="spots" />}
         // 로그인한 사람일 수 있으면 "내 여행 한 줄" 자리만 비워 두었다가 채운다(번쩍이거나 밀리지 않게). 값은 읽지 않고 이름만 본다.
         maybeSignedIn={maybeSignedIn}
       />
-      {/* 로그인 전 사람에게 방문마다 한 번, 브라우저에서 뜨는 전체 화면 소개. 장면에 쓰는 사진은 예시 여행의 곳마다 첫 장이다. */}
-      <IntroScreen photos={buildExample()?.photos.filter((_, index) => index % 2 === 0).map((photo) => photo.url) ?? []} />
     </>
   );
 }

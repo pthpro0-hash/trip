@@ -157,4 +157,16 @@ describe("HomePage · 첫 방문 소개", () => {
     expect(screen.getByText("지도 허브")).toBeTruthy();
     expect(screen.queryByText("첫 방문 소개")).toBeNull();
   });
+
+  it("로그인 쿠키가 있으면 소개를 아예 보내지 않는다", async () => {
+    cookieNames = ["sb-abcdefgh-auth-token"];
+    await open({});
+    expect(screen.getByText("여행 100선 홈")).toBeTruthy();
+    expect(screen.queryByText("첫 방문 소개")).toBeNull();
+  });
+
+  it("소개는 100선보다 앞에 둔다 — 문서 앞쪽에 있어야 먼저 그려진다", async () => {
+    const { container } = await open({});
+    expect(container.textContent?.indexOf("첫 방문 소개")).toBeLessThan(container.textContent?.indexOf("여행 100선 홈") ?? 0);
+  });
 });
