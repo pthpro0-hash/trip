@@ -29,6 +29,7 @@ import { HomeIntro } from "@/components/home/HomeIntro";
 import { ScrollTop } from "@/components/layout/ScrollTop";
 import { restoreToCard, spotFocus } from "@/lib/scrollMemory";
 import { useHydrated } from "@/lib/useHydrated";
+import { introCovering, subscribeIntro } from "@/lib/intro";
 
 const SPOTS = spotsData as Spot[];
 
@@ -126,6 +127,13 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
     고른 적이 있으면 그 뜻을 따른다 — 검색이 하는 것과 같은 규칙이다.
   */
   const view = focus && !viewChosenByUser ? "list" : mobileView;
+
+  /*
+    첫 방문 소개가 화면을 덮고 있는 동안에는 카카오 지도(스크립트와 지도 그림)를 부르지 않는다. 폰에서는 이 화면이 지도부터
+    보여 주는데, 가려진 지도가 소개의 사진과 망을 다투느라 소개가 늦게 그려졌다. 소개를 닫으면 그때 부른다. 서버가 그릴 때는
+    소개가 있을지 모르니 빈 자리로 둔다.
+  */
+  const introUp = useSyncExternalStore(subscribeIntro, introCovering, () => true);
 
   return (
     <main className="mx-auto flex max-w-6xl flex-col gap-5 px-5 pb-16 pt-6">
@@ -258,7 +266,11 @@ export function SpotsHome({ switcher, maybeSignedIn = false }: SpotsHomeProps = 
         <div
           className={`h-[70vh] overflow-hidden rounded-2xl ring-1 ring-line md:sticky md:top-6 ${view === "list" ? "hidden md:block" : ""}`}
         >
-          <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
+          {introUp ? (
+            <div aria-hidden="true" className="h-full w-full bg-bg-subtle" />
+          ) : (
+            <KakaoMap spots={results} selectedId={selectedId} onMarkerClick={setSelectedId} />
+          )}
         </div>
       </div>
 

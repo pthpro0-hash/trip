@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import { closeIntro } from "@/lib/intro";
 import { SpotsHome as HomePage } from "./SpotsHome";
 
 // The search field debounces before it tells the page, so these go through
@@ -180,5 +181,29 @@ describe("HomePage · 첫 화면의 순서", { timeout: 20000 }, () => {
     const picks = screen.getAllByRole("link", { name: /사진 고르기/ });
     expect(picks).toHaveLength(1);
     expect(picks[0]).toHaveAttribute("href", "/trips/new");
+  });
+});
+
+/*
+  첫 방문 소개가 덮고 있는 동안에는 카카오 지도를 부르지 않는다 — 가려진 지도가 소개와 망을 다투면 소개가 늦게 그려진다.
+*/
+describe("HomePage · 소개가 덮고 있는 동안의 지도", { timeout: 20000 }, () => {
+  const mapBox = (container: HTMLElement) => container.querySelector('[class~="min-h-[400px]"]');
+
+  it("소개가 떠 있으면 지도 자리만 두고, 닫으면 그때 지도를 부른다", () => {
+    document.documentElement.setAttribute("data-intro", "on");
+    try {
+      const { container } = render(<HomePage />);
+      expect(mapBox(container)).toBeNull();
+      act(() => closeIntro());
+      expect(mapBox(container)).not.toBeNull();
+    } finally {
+      document.documentElement.removeAttribute("data-intro");
+    }
+  });
+
+  it("소개가 없으면(로그인한 사람 등) 처음부터 지도를 부른다", () => {
+    const { container } = render(<HomePage />);
+    expect(mapBox(container)).not.toBeNull();
   });
 });

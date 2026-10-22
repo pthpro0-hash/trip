@@ -84,6 +84,9 @@ create table if not exists public.trip_photos (
 );
 
 create index if not exists trip_photos_visit_idx on public.trip_photos (visit_id);
+-- 이 사람의 사진으로 찾는 일(지도 핀·대표 사진·장수)이 많다. 따로 실행할 때는 supabase/indexes.sql.
+create index if not exists trip_photos_user_idx on public.trip_photos (user_id, id);
+create index if not exists trip_photos_user_cover_idx on public.trip_photos (user_id) where is_cover;
 
 -- ═══════════════════════════════════════════════
 -- 그해의 한 줄

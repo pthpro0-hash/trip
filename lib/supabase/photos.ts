@@ -342,19 +342,23 @@ export const SIGNED_URL_SECONDS = 24 * 60 * 60;
   까닭이 이것이었다. 한 번 받은 주소를 이 탭이 살아 있는 동안 다시 쓰면,
   주소가 같으니 브라우저가 가진 것을 그대로 보여 준다.
 
-  탭 저장소(sessionStorage)에 둔다. 탭을 닫으면 사라진다 — 같이 쓰는
-  기기에 내 사진 주소를 오래 남기지 않는다. 수명이 두 시간 넘게 남은
-  것만 다시 쓴다.
+  기기 저장소(localStorage)에 둔다. 예전에는 탭 저장소(sessionStorage)라 탭을 닫았다 열거나 홈 화면 아이콘으로 다시 열 때마다
+  주소가 새로 만들어져, 같은 사진을 처음부터 다시 내려받았다(느리고, 내려받는 양도 늘었다). 이제 주소의 수명(하루) 동안은 다시
+  열어도 같은 주소라 브라우저가 가진 사진을 바로 보여 준다. 같이 쓰는 기기에 남지 않도록 로그아웃하면 지운다(lib/signOut 의
+  forgetSignedUrls). 수명이 두 시간 넘게 남은 것만 다시 쓴다.
 */
 const REUSE_MARGIN_MS = 2 * 60 * 60 * 1000;
-const SIGNED_STORE = "signed-urls:v1";
+const SIGNED_STORE = "signed-urls:v2";
+/** 탭 저장소에 두던 때의 이름. 남아 있으면 치운다. */
+const OLD_SIGNED_STORE = "signed-urls:v1";
 let signedMemo: Map<string, { url: string; until: number }> | null = null;
 
 function memoOf(): Map<string, { url: string; until: number }> {
   if (signedMemo) return signedMemo;
   signedMemo = new Map();
   try {
-    const raw = window.sessionStorage.getItem(SIGNED_STORE);
+    window.sessionStorage.removeItem(OLD_SIGNED_STORE);
+    const raw = window.localStorage.getItem(SIGNED_STORE);
     if (raw) for (const [path, entry] of Object.entries(JSON.parse(raw))) signedMemo.set(path, entry as { url: string; until: number });
   } catch {
     // 저장소를 못 쓰면 이번 화면 동안만 기억한다.
@@ -362,10 +366,18 @@ function memoOf(): Map<string, { url: string; until: number }> {
   return signedMemo;
 }
 
+/** 기기에 적어 두는 주소 수의 상한. 주소 하나가 300자 남짓이라 이만큼이면 1MB 안팎이다(기기 저장소는 보통 5MB). */
+const SIGNED_KEEP_MAX = 3000;
+
 function keepMemo(memo: Map<string, { url: string; until: number }>, now: number) {
   for (const [path, entry] of memo) if (entry.until - now <= REUSE_MARGIN_MS) memo.delete(path);
+  // 너무 많으면 곧 끝나는 것부터 덜어 낸다(이번 화면에서는 그대로 쓰고, 적어 두는 것만 줄인다).
+  const kept =
+    memo.size > SIGNED_KEEP_MAX
+      ? [...memo].sort((a, b) => b[1].until - a[1].until).slice(0, SIGNED_KEEP_MAX)
+      : [...memo];
   try {
-    window.sessionStorage.setItem(SIGNED_STORE, JSON.stringify(Object.fromEntries(memo)));
+    window.localStorage.setItem(SIGNED_STORE, JSON.stringify(Object.fromEntries(kept)));
   } catch {
     // 가득 찼거나 막혔으면 이번 화면 동안만 기억한다.
   }
@@ -375,7 +387,8 @@ function keepMemo(memo: Map<string, { url: string; until: number }>, now: number
 export function forgetSignedUrls(): void {
   signedMemo = new Map();
   try {
-    window.sessionStorage.removeItem(SIGNED_STORE);
+    window.localStorage.removeItem(SIGNED_STORE);
+    window.sessionStorage.removeItem(OLD_SIGNED_STORE);
   } catch {
     // 막혔으면 할 일이 없다.
   }

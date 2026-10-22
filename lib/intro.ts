@@ -73,6 +73,14 @@ export function introOpen(): boolean {
   return root.getAttribute(INTRO_ATTR) === "on";
 }
 
+/**
+ * 지금 소개가 화면을 덮고 있나 — 읽기만 한다(정하지 않는다). 첫 화면의 지도처럼 가려진 동안에는 무거운 것을 미뤄 두는 데 쓴다.
+ * 소개가 없는 화면·로그인한 사람에게는 늘 false.
+ */
+export function introCovering(): boolean {
+  return document.documentElement.getAttribute(INTRO_ATTR) === "on";
+}
+
 /** 소개를 닫는다. 같은 방문 안에서는 다시 열리지 않는다. */
 export function closeIntro(): void {
   document.documentElement.setAttribute(INTRO_ATTR, "off");

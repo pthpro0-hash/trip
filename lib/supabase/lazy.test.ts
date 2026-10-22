@@ -88,3 +88,19 @@ describe("currentUser · 같은 순간의 로그인 확인은 한 번만 묻는�
     expect(b.data.user?.id).toBe("2");
   });
 });
+
+describe("currentUser · 서버에 묻지 않고 브라우저의 세션에서 읽는다", () => {
+  it("세션이 있으면 그 사용자 — 서버(getUser)에는 묻지 않는다", async () => {
+    const getUser = vi.fn();
+    const getSession = vi.fn(async () => ({ data: { session: { user: { id: "u" } } }, error: null }));
+    const supabase = { auth: { getUser, getSession } } as unknown as SupabaseClient;
+    expect((await currentUser(supabase)).data.user).toEqual({ id: "u" });
+    expect(getSession).toHaveBeenCalledTimes(1);
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
+  it("세션이 없으면(로그인 전·로그아웃·세션 끝남) 사용자도 없다", async () => {
+    const supabase = { auth: { getSession: async () => ({ data: { session: null }, error: null }) } } as unknown as SupabaseClient;
+    expect((await currentUser(supabase)).data.user).toBeNull();
+  });
+});

@@ -211,29 +211,31 @@ export async function fetchTrips(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<SavedTrip[] | null> {
-  const { data, error } = await supabase
-    .from("trips")
-    .select(
-      "id,title,started_on,ended_on,companions,note,visits(id,place_name,spot_id,dong,lat,lng,started_at,photo_count,position)",
-    )
-    .eq("user_id", userId)
-    .order("started_on", { ascending: false });
+  /*
+    여행과 대표 사진을 한꺼번에 묻는다 — 예전에는 여행을 받은 뒤에 대표 사진을 물어 왕복이 두 번이었다(Supabase 가 멀어 한 번에
+    0.2초 남짓). 대표 사진만 따로 가져오는 것은, 방문에 딸린 사진을 통째로 끌어오면 수백 줄이 딸려 오는데 목록에서 쓰는 것은
+    여행마다 한 장뿐이기 때문이다.
+  */
+  const [{ data, error }, covers] = await Promise.all([
+    supabase
+      .from("trips")
+      .select(
+        "id,title,started_on,ended_on,companions,note,visits(id,place_name,spot_id,dong,lat,lng,started_at,photo_count,position)",
+      )
+      .eq("user_id", userId)
+      .order("started_on", { ascending: false }),
+    readAll<Record<string, unknown>>((from, to) =>
+      supabase
+        .from("trip_photos")
+        .select("storage_path, visits!inner(trip_id)")
+        .eq("user_id", userId)
+        .eq("is_cover", true)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+  ]);
 
   if (error || !data) return null;
-
-  /*
-    대표 사진만 따로 가져온다. 방문에 딸린 사진을 통째로 끌어오면 수백 줄이
-    딸려 오는데, 목록에서 쓰는 것은 여행마다 한 장뿐이다.
-  */
-  const covers = await readAll<Record<string, unknown>>((from, to) =>
-    supabase
-      .from("trip_photos")
-      .select("storage_path, visits!inner(trip_id)")
-      .eq("user_id", userId)
-      .eq("is_cover", true)
-      .order("id", { ascending: true })
-      .range(from, to),
-  );
 
   const coverByTrip = new Map<string, string>();
   for (const cover of covers ?? []) {

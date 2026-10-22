@@ -99,19 +99,19 @@ export function SketchView() {
       setUserId(owner);
       setStatus("ready");
 
-      // 둘 다 곁다리다. 못 불러와도 스케치는 그려져야 한다.
-      try {
-        const lines = await fetchHeadlines(supabase, owner);
-        if (active) setWritten(lines);
-      } catch {
-        // 적어 둔 말을 못 불러온 것뿐이다.
-      }
-      try {
-        const shots = await visitCovers(supabase, owner);
-        if (active) setCovers(shots);
-      } catch {
-        // 사진을 못 얹으면 점으로 그려진다.
-      }
+      // 둘 다 곁다리다. 못 불러와도 스케치는 그려져야 한다. 서로 기다릴 까닭이 없어 한꺼번에 묻는다(왕복 한 번을 아낀다).
+      await Promise.all([
+        fetchHeadlines(supabase, owner)
+          .then((lines) => {
+            if (active) setWritten(lines);
+          })
+          .catch(() => undefined), // 적어 둔 말을 못 불러온 것뿐이다.
+        visitCovers(supabase, owner)
+          .then((shots) => {
+            if (active) setCovers(shots);
+          })
+          .catch(() => undefined), // 사진을 못 얹으면 점으로 그려진다.
+      ]);
     });
 
     void import("@/lib/sido").then((module) => {

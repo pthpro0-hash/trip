@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
+import { hasSessionCookie } from "@/lib/sessionCookie";
 
 /*
   로그인 세션을 이어 주는 자리.
@@ -15,6 +16,12 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/sup
 */
 export async function proxy(request: NextRequest) {
   if (!isSupabaseConfigured) return NextResponse.next();
+  /*
+    로그인 세션 쿠키가 없으면(둘러보는 사람 · 검색엔진) 이어 줄 세션도 없다. Supabase 에 묻지 않고 그대로 보낸다 — 화면마다
+    멀리 있는 Supabase 를 한 번씩 다녀오던 시간을 아낀다. 로그인 도중의 code-verifier 쿠키는 세션이 아니다(로그인 마무리는
+    /auth/callback 이 한다).
+  */
+  if (!hasSessionCookie(request.cookies.getAll().map((cookie) => cookie.name))) return NextResponse.next();
 
   let response = NextResponse.next({ request });
 
